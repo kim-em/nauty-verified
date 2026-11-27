@@ -119,7 +119,8 @@ theorem wp_rows {Q : Post} {le : temp_env} {m : mem} {n : Nat} {bg : block} {gof
       Q.normal E0 empty_env le' m')
     (hQr : ∀ m' (r : Int) c, tclGo ⟨grows⟩ canong lab (List.range n) = (r, c) →
       ArrayAt m' .Mint32 bs (intOfZ (Ptrofs.unsigned so)) (fun _ => .Vint (ir c)) 1 →
-      Unch m m' (fun z => z = bWS ∨ z = bs) → Keep m m' bWS → Q.ret E0 (.Vint (ir r)) m') :
+      Unch m m' (fun z => z = bWS ∨ z = bs) → Keep m m' bWS → Keep m m' bs →
+      Q.ret E0 (.Vint (ir r)) m') :
     Wp xi ge Source.dense.fn.testcanlab rows Q empty_env le m := by
   have hM1 := h.M1
   have hMlt := h.Mlt
@@ -217,17 +218,18 @@ theorem wp_rows {Q : Post} {le : temp_env} {m : mem} {n : Nat} {bg : block} {gof
         refine ⟨by simp, rfl, c, longs ws'', hc, rfl, by rw [ho2 _ (by decide)]; exact hi,
           by rw [ho2 _ (by decide)]; exact hph, hTc, harr2, hu.trans hu2, hk.trans hk2,
           fun x h1 h2 h3 => by rw [ho2 x h3, ho x h1 h2 h3]⟩
-      · intro m3 harr3 hu3
+      · intro m3 harr3 hu3 hk3s
+        have hKs : Keep m m3 bs := (Keep.unch (hu.trans hu2) hsW).trans hk3s
         have hU : Unch m m3 (fun z => z = bWS ∨ z = bs) :=
           ((hu.trans hu2).mono fun z hz => .inl hz).trans (hu3.mono fun z hz => .inr hz)
         have hK : Keep m m3 bWS := (hk.trans hk2).trans (Keep.unch hu3 (Ne.symm hsW))
         refine ⟨fun hlt => ?_, fun hgt => ?_⟩
         · rw [hcmp] at hlt
           rw [hlt] at hTc
-          exact hQr m3 (-1) c hTc harr3 hU hK
+          exact hQr m3 (-1) c hTc harr3 hU hK hKs
         · rw [hcmp] at hgt
           rw [hgt] at hTc
-          exact hQr m3 1 c hTc harr3 hU hK
+          exact hQr m3 1 c hTc harr3 hU hK hKs
     · rw [ite_eq_right (by simpa using hc)]
       apply wp_break
       have hcn' : n - c = 0 := by omega

@@ -50,7 +50,7 @@ theorem wp_cmp {Q : Post} {le : temp_env} {m : mem} {bWS bc bs : block} {pofs so
     (hQn : wordScan (fun w => bv64 (ws w)) (fun w => bv64 (pw w)) M 0 = .eq →
       ∀ le', (∀ x, x ≠ id.j → PTree.get x le' = PTree.get x le) → Q.normal E0 empty_env le' m)
     (hQr : ∀ m', ArrayAt m' .Mint32 bs (intOfZ (Ptrofs.unsigned so)) (fun _ => .Vint (ir c)) 1 →
-      Unch m m' (· = bs) →
+      Unch m m' (· = bs) → Alloc.Keep m m' bs →
       (wordScan (fun w => bv64 (ws w)) (fun w => bv64 (pw w)) M 0 = .lt →
         Q.ret E0 (.Vint (ir (-1))) m') ∧
       (wordScan (fun w => bv64 (ws w)) (fun w => bv64 (pw w)) M 0 = .gt →
@@ -61,6 +61,9 @@ theorem wp_cmp {Q : Post} {le : temp_env} {m : mem} {bWS bc bs : block} {pofs so
   obtain ⟨m', hst, harr', -⟩ := store_array hsarr (show 0 < 1 by decide) (.Vint (ir c)) rfl
   have harr'' : ArrayAt m' .Mint32 bs (intOfZ (Ptrofs.unsigned so)) (fun _ => .Vint (ir c)) 1 :=
     harr'.congr fun i hi => by simp [upd, show i = 0 by omega]
+  have hKs : Alloc.Keep m m' bs := Alloc.Keep.store hst (by
+    have := hsarr.base_nonneg
+    simp only [elemOfs, intOfZ_zOfInt]; omega)
   have hstop : ∀ (le' : temp_env) (a : expr) (r : Int) (Q' : Post),
       (∀ le'' m'', Exec.evalExpr ge empty_env le'' m'' a = some (.Vint (ir r))) → typeof a = tint →
       PTree.get id.samerows le' = some (.Vptr bs so) → PTree.get id.i le' = some (.Vint (ir c)) →
@@ -119,7 +122,7 @@ theorem wp_cmp {Q : Post} {le : temp_env} {m : mem} {bWS bc bs : block} {pofs so
       by_cases hlt : (bv64 (ws k)).toNat < (bv64 (pw k)).toNat
       · rw [ite_eq_left (by simpa using hlt)]
         refine hstop le' _ (-1) _ (fun _ _ => by simp only [Exec.evalExpr, typeof, cop]; rfl) rfl hsr' hi' ?_
-        exact (hQr m' harr'' (Unch.store hst rfl)).1 (hS.trans (hSk.trans (ite_eq_left hlt)))
+        exact (hQr m' harr'' (Unch.store hst rfl) hKs).1 (hS.trans (hSk.trans (ite_eq_left hlt)))
       · rw [ite_eq_right (by simpa using hlt)]
         wp_step; wp_step
         apply wp_if_eval
@@ -128,7 +131,7 @@ theorem wp_cmp {Q : Post} {le : temp_env} {m : mem} {bWS bc bs : block} {pofs so
         by_cases hgt : (bv64 (pw k)).toNat < (bv64 (ws k)).toNat
         · rw [ite_eq_left (by simpa using hgt)]
           refine hstop le' _ 1 _ (fun _ _ => rfl) rfl hsr' hi' ?_
-          exact (hQr m' harr'' (Unch.store hst rfl)).2
+          exact (hQr m' harr'' (Unch.store hst rfl) hKs).2
             (hS.trans (hSk.trans ((ite_eq_right hlt).trans (ite_eq_left hgt))))
         · rw [ite_eq_right (by simpa using hgt)]
           apply wp_skip

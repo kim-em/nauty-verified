@@ -376,4 +376,126 @@ theorem SearchAt.afterWP {n : Nat} {m m' : mem} {S : SLoc} {ctx : Ctx n} {st : S
       (fresh_old' dS) (fresh_old' dB) (fresh_old dS) (fresh_old dN) (fresh_old dN)
       (fresh_old dN)⟩
 
+/-- After a call that reallocates naugraph.c's `workperm` and `workset`. -/
+theorem SearchAt.afterWPWS {n : Nat} {m m' : mem} {S : SLoc} {ctx : Ctx n} {st : Search n}
+    {pre nsp : Bool} (h : SearchAt m S ctx st pre nsp) (hval : ∀ z ∈ S.blocks, Mem.valid_block m z)
+    {cW cS : Nat} {bW bS : block}
+    (dW : DynAt m Block.naugraphWorkperm Block.naugraphWorkpermSz 4 cW bW)
+    (dS : DynAt m Block.naugraphWorkset Block.naugraphWorksetSz 8 cS bS)
+    {W : block → Prop} (hu : Unch m m' W)
+    (hW : ∀ z, W z → (z ∈ S.blocks ∧ z ∉ [Block.naugraphBucket, Block.naugraphBucketSz,
+      Block.nautilWorkperm, Block.nautilWorkpermSz]) ∨
+      (0 < cW ∧ z = bW) ∨ (0 < cS ∧ z = bS) ∨ (z ∉ S.blocks ∧ ¬ IsWork m z))
+    {cW' cS' : Nat} {bW' bS' : block}
+    (dW' : DynAt m' Block.naugraphWorkperm Block.naugraphWorkpermSz 4 cW' bW')
+    (dS' : DynAt m' Block.naugraphWorkset Block.naugraphWorksetSz 8 cS' bS')
+    (hrW : (cW' = cW ∧ bW' = bW) ∨ ¬ Mem.valid_block m bW')
+    (hrS : (cS' = cS ∧ bS' = bS) ∨ ¬ Mem.valid_block m bS')
+    (hne : 0 < cW' → 0 < cS' → bW' ≠ bS') :
+    WorkMono m m' ∧ WorkAt n m' S S.blocks := by
+  obtain ⟨cW0, bW0, cS0, bS0, cB, bB, cN, bN, dW0, dS0, dB, dN, nW, nS, nB, nN, pWS, pWB, pSB, pNW,
+    pNS, pNB⟩ := h.work.arr
+  have hcW : cW0 = cW := by
+    have := dW0.capLd.symm.trans dW.capLd
+    simp only [Option.some.injEq, val.Vlong.injEq] at this
+    exact lr_nat_inj dW0.capLt dW.capLt this
+  have hcS : cS0 = cS := by
+    have := dS0.capLd.symm.trans dS.capLd
+    simp only [Option.some.injEq, val.Vlong.injEq] at this
+    exact lr_nat_inj dS0.capLt dS.capLt this
+  subst hcW hcS
+  have hbW : 0 < cW0 → bW0 = bW := fun hc => dW.same_block dW0 hc
+  have hbS : 0 < cS0 → bS0 = bS := fun hc => dS.same_block dS0 hc
+  have gl : ∀ z ∈ [Block.naugraphBucket, Block.naugraphBucketSz, Block.nautilWorkperm,
+      Block.nautilWorkpermSz], ¬ W z := by
+    intro z hz hWz
+    have hzb : z ∈ S.blocks := by
+      rw [SLoc.blocks_split]; exact List.mem_append_right _ ((by decide : ∀ y ∈ [Block.naugraphBucket,
+        Block.naugraphBucketSz, Block.nautilWorkperm, Block.nautilWorkpermSz], y ∈ globs) z hz)
+    rcases hW z hWz with ⟨-, h1⟩ | ⟨hc, rfl⟩ | ⟨hc, rfl⟩ | ⟨h1, -⟩
+    · exact h1 hz
+    · exact nW hc (hbW hc ▸ hzb)
+    · exact nS hc (hbS hc ▸ hzb)
+    · exact h1 hzb
+  simp only [List.forall_mem_cons] at gl
+  obtain ⟨g3, g4, g5, g6, -⟩ := gl
+  have wb : ∀ {c : Nat} {b : block}, 0 < c → b ∉ S.blocks → IsWork m b → (0 < cW0 → b ≠ bW0) →
+      (0 < cS0 → b ≠ bS0) → ¬ W b := by
+    intro c b hc hb hwb hne1 hne2 hWb
+    rcases hW b hWb with ⟨h1, -⟩ | ⟨hc', rfl⟩ | ⟨hc', rfl⟩ | ⟨-, h1⟩
+    · exact hb h1
+    · exact hne1 hc' (hbW hc').symm
+    · exact hne2 hc' (hbS hc').symm
+    · exact h1 hwb
+  have dB' := dB.keep hu g3 g4 fun hc => Keep.unch hu (wb hc (nB hc) (.inr (.inr (.inl ⟨_, hc, dB⟩)))
+    (fun hc' e => pWB hc' hc e.symm) fun hc' e => pSB hc' hc e.symm)
+  have dN' := dN.keep hu g5 g6 fun hc => Keep.unch hu (wb hc (nN hc) (.inr (.inr (.inr ⟨_, hc, dN⟩)))
+    (fun hc' e => pNW hc hc' e) fun hc' e => pNS hc hc' e)
+  have rW := SlotRel.of_old dW hrW
+  have rS := SlotRel.of_old dS hrS
+  have rB := SlotRel.unch dB hu g3 g4
+  have rN := SlotRel.unch dN hu g5 g6
+  refine ⟨WorkMono.of_slots h.work fun c1 b1 c2 b2 c3 b3 c4 b4 d1 d2 d3 d4 =>
+      ⟨SlotRel.next dW' (rW _ _ d1), SlotRel.next dS' (rS _ _ d2), SlotRel.next dB' (rB _ _ d3),
+        SlotRel.next dN' (rN _ _ d4)⟩,
+    WorkAt.next h.work hval dW' dS' dB' dN' rW rS rB rN
+      (fun _ _ => hne) (fresh_old' dB) (fresh_old' dB) (fresh_old dN) (fresh_old dN)
+      (fresh_old dN)⟩
+
+/-- After a call that reallocates only nautil.c's `workperm`. -/
+theorem SearchAt.afterN {n : Nat} {m m' : mem} {S : SLoc} {ctx : Ctx n} {st : Search n}
+    {pre nsp : Bool} (h : SearchAt m S ctx st pre nsp) (hval : ∀ z ∈ S.blocks, Mem.valid_block m z)
+    {cN : Nat} {bN : block} (dN : DynAt m Block.nautilWorkperm Block.nautilWorkpermSz 4 cN bN)
+    {W : block → Prop} (hu : Unch m m' W)
+    (hW : ∀ z, W z → (z ∈ S.blocks ∧ z ∉ [Block.naugraphWorkperm, Block.naugraphWorkpermSz,
+      Block.naugraphWorkset, Block.naugraphWorksetSz, Block.naugraphBucket, Block.naugraphBucketSz]) ∨
+      (0 < cN ∧ z = bN) ∨ (z ∉ S.blocks ∧ ¬ IsWork m z))
+    {cap' : Nat} {b' : block} (dN' : DynAt m' Block.nautilWorkperm Block.nautilWorkpermSz 4 cap' b')
+    (hrel : (cap' = cN ∧ b' = bN) ∨ ¬ Mem.valid_block m b') :
+    WorkMono m m' ∧ WorkAt n m' S S.blocks := by
+  obtain ⟨cW, bW, cS, bS, cB, bB, cN0, bN0, dW, dS, dB, dN0, nW, nS, nB, nN, pWS, pWB, pSB, pNW,
+    pNS, pNB⟩ := h.work.arr
+  have hcN : cN0 = cN := by
+    have := dN0.capLd.symm.trans dN.capLd
+    simp only [Option.some.injEq, val.Vlong.injEq] at this
+    exact lr_nat_inj dN0.capLt dN.capLt this
+  subst hcN
+  have hbN : 0 < cN0 → bN0 = bN := fun hc => dN.same_block dN0 hc
+  have gl : ∀ z ∈ [Block.naugraphWorkperm, Block.naugraphWorkpermSz, Block.naugraphWorkset,
+      Block.naugraphWorksetSz, Block.naugraphBucket, Block.naugraphBucketSz], ¬ W z := by
+    intro z hz hWz
+    have hzb : z ∈ S.blocks := by
+      rw [SLoc.blocks_split]; exact List.mem_append_right _ ((by decide : ∀ y ∈ [Block.naugraphWorkperm,
+        Block.naugraphWorkpermSz, Block.naugraphWorkset, Block.naugraphWorksetSz,
+        Block.naugraphBucket, Block.naugraphBucketSz], y ∈ globs) z hz)
+    rcases hW z hWz with ⟨-, h1⟩ | ⟨hc, rfl⟩ | ⟨h1, -⟩
+    · exact h1 hz
+    · exact nN hc (hbN hc ▸ hzb)
+    · exact h1 hzb
+  simp only [List.forall_mem_cons] at gl
+  obtain ⟨g1, g2, g3, g4, g5, g6, -⟩ := gl
+  have wb : ∀ {c : Nat} {b : block}, 0 < c → b ∉ S.blocks → IsWork m b → (0 < cN0 → b ≠ bN0) →
+      ¬ W b := by
+    intro c b hc hb hwb hne hWb
+    rcases hW b hWb with ⟨h1, -⟩ | ⟨hc', rfl⟩ | ⟨-, h1⟩
+    · exact hb h1
+    · exact hne hc' (hbN hc').symm
+    · exact h1 hwb
+  have dW' := dW.keep hu g1 g2 fun hc => Keep.unch hu (wb hc (nW hc) (.inl ⟨_, hc, dW⟩)
+    fun hc' e => pNW hc' hc e.symm)
+  have dS' := dS.keep hu g3 g4 fun hc => Keep.unch hu (wb hc (nS hc) (.inr (.inl ⟨_, hc, dS⟩))
+    fun hc' e => pNS hc' hc e.symm)
+  have dB' := dB.keep hu g5 g6 fun hc => Keep.unch hu (wb hc (nB hc) (.inr (.inr (.inl ⟨_, hc, dB⟩)))
+    fun hc' e => pNB hc' hc e.symm)
+  have rW := SlotRel.unch dW hu g1 g2
+  have rS := SlotRel.unch dS hu g3 g4
+  have rB := SlotRel.unch dB hu g5 g6
+  have rN := SlotRel.of_old dN hrel
+  refine ⟨WorkMono.of_slots h.work fun c1 b1 c2 b2 c3 b3 c4 b4 d1 d2 d3 d4 =>
+      ⟨SlotRel.next dW' (rW _ _ d1), SlotRel.next dS' (rS _ _ d2), SlotRel.next dB' (rB _ _ d3),
+        SlotRel.next dN' (rN _ _ d4)⟩,
+    WorkAt.next h.work hval dW' dS' dB' dN' rW rS rB rN
+      (fresh_old dW) (fresh_old dW) (fresh_old dS) (fresh_old' dW) (fresh_old' dS)
+      (fresh_old' dB)⟩
+
 end NautyVerified.Proofs.Search

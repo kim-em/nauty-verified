@@ -38,6 +38,10 @@ theorem eval_gptr {e : env} {le : temp_env} {m : mem} {g : ident} {b : block} {v
     show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl]
   exact h.load
 
+theorem Keep.access' {m m' : mem} {b : block} (hk : Keep m m' b) {chunk : memory_chunk} {ofs : Z}
+    {p : Common.Memtype.permission} (h : Mem.valid_access m chunk b ofs p) : Mem.valid_access m' chunk b ofs p :=
+  ⟨fun o ho => hk.perm _ _ (h.1 o ho), h.2⟩
+
 abbrev updatecanCall : statement :=
   .Scall none
     (.Ederef
@@ -162,5 +166,131 @@ theorem wp_updatecan {f : function} {Q : Post} {le : temp_env} (c : PCtx m₀ m�
           (nw _ (by simp [SLoc.blocks]) (by sep_ne hd) (by sep_ne hd) (by sep_ne hd)))
         (nw _ (by simp [SLoc.blocks]) (by sep_ne hd) (by sep_ne hd) (by sep_ne hd))
     · exact { hinv with canongSize := by rw [updatecan_size]; exact hinv.canongSize }
+
+abbrev testcanlabCall : statement :=
+  .Scall (some (idOf 705))
+    (.Ederef
+      (.Efield (.Evar dense.id.«nauty:dispatch» (Tstruct dense.id.«_1027» noattr)) dense.id.«testcanlab»
+        (tptr (tfun [(tptr tulong), (tptr tulong), (tptr tint), (tptr tint), tint, tint] tint)))
+      (tfun [(tptr tulong), (tptr tulong), (tptr tint), (tptr tint), tint, tint] tint))
+    [(.Evar dense.id.«nauty:g» (tptr tulong)),
+     (.Evar dense.id.«nauty:canong» (tptr tulong)),
+     (.Etempvar dense.id.«lab» (tptr tint)),
+     (.Eaddrof (.Evar dense.id.«sr» tint) (tptr tint)),
+     (.Evar dense.id.«nauty:m» tint),
+     (.Evar dense.id.«nauty:n» tint)]
+
+theorem wp_testcanlab {f : function} {Q : Post} {le : temp_env} (c : PCtx m₀ m₁ S e bsr)
+    (h : PAt m₀ m₁ m S ctx bsr st nsp) (hsr : st.samerows = n) {v0 : Int} (hs0 : SrAt m bsr v0)
+    (hlab : PTree.get dense.id.lab le = some (.Vptr S.bl S.lofs))
+    (hQ : ∀ m', PAt m₀ m₁ m' S ctx bsr st nsp →
+      SrAt m' bsr ((testcanlab ctx st.canong st.lab).2 : Int) →
+      Q.normal E0 e (PTree.set (idOf 705) (.Vint (ir (testcanlab ctx st.canong st.lab).1)) le) m') :
+    Wp xi ge f testcanlabCall Q e le m := by
+  have hs := h.search
+  have hd := hs.distinct
+  have hinv := hs.inv
+  have hn0 := hs.n0
+  have hnlt := hs.nlt
+  obtain ⟨cw, hca, hcr⟩ := hs.arrays.canong.arr
+  obtain ⟨cW, bW, cS, bS, cB, bB, cN, bN, dW, dS, dB, dN, nW, nS, nB, nN, pWS, pWB, pSB, pNW,
+    pNS, pNB⟩ := hs.work.arr
+  have hvm : ∀ z ∈ S.blocks, Mem.valid_block m z := fun z hz => h.frame.2 _ (c.valid0 z hz)
+  refine wp_call (vf := .Vptr Block.testcanlabFn Ptrofs.zero)
+    (targs := [tptr tulong, tptr tulong, tptr tint, tptr tint, tint, tint]) (tres := tint)
+    (cc := cc_default) (vargs := [.Vptr S.bg S.gofs, .Vptr S.bc S.cofs, .Vptr S.bl S.lofs,
+      .Vptr bsr Ptrofs.zero, .Vint (ir S.M), .Vint (ir n)]) _ _
+    (Satisfies.grow (Testcanlab.testcanlab_satisfies S.bg S.gofs S.gw ctx.g S.bc S.cofs cw st.canong
+      S.bl S.lofs st.lab bsr Ptrofs.zero (fun _ => .Vint (ir v0)) S.M cW bW cS bS)) rfl
+    (eval_dispatch (c.eg _ (by decide)) field_dTestcanlab rfl (by decide) (by decide)
+      hs.fixed.dTestcanlab)
+    ?_ (by simp [Genv.find_funct, funct_testcanlabFn]) type_testcanlab ?_ ?_
+  · simp only [Exec.evalExprlist,
+      eval_gptr (ty := tptr tulong) (c.eg _ (by decide)) find_g rfl hs.fixed.g,
+      eval_gptr (ty := tptr tulong) (c.eg _ (by decide)) find_canong rfl hs.fixed.canong,
+      eval_gint (c.eg _ (by decide)) find_m hs.fixed.mm,
+      eval_gint (c.eg _ (by decide)) find_n hs.fixed.nn, typeof, cop]
+    simp only [Exec.evalExpr, hlab, Exec.evalLvalue, Exec.lvalOfVar, c.esr, typeof, cop]
+    rfl
+  · have hwb : 0 < cW → bW ∉ S.blocks := nW
+    have hsb : 0 < cS → bS ∉ S.blocks := nS
+    have wW : 0 < cW → bsr ≠ bW := fun hc e => h.work_ne c (.inl ⟨cW, hc, dW⟩) e.symm
+    have wS : 0 < cS → bsr ≠ bS := fun hc e => h.work_ne c (.inr (.inl ⟨cS, hc, dS⟩)) e.symm
+    refine ⟨rfl, hs.arrays.graph, ⟨hca, fun v hv => hcr v (by rw [hsr]; exact hv)⟩, hs.arrays.lab,
+      hinv.labSize, hinv.labSmall, hinv.labSurj, hs0, dW, dS, hs.tables.left, hs.tables.nautilBit,
+      ?_, c.ne_blocks (by simp [SLoc.blocks]) |>.symm, c.ne_blocks (by simp [SLoc.blocks]) |>.symm,
+      c.ne_blocks (by simp [SLoc.blocks]) |>.symm, ?_, ?_, hs.M1, hs.Mlt, hs.nM⟩
+    · rintro z (rfl | rfl | rfl | rfl)
+      · exact ⟨hvm _ (by simp [SLoc.blocks]), by sep_ne hd, by sep_ne hd, by sep_ne hd, by sep_ne hd,
+          by sep_ne hd, by sep_ne hd, fun hc e => hwb hc (by first | (rw [← e]; simp [SLoc.blocks]) | (rw [e]; simp [SLoc.blocks])),
+          fun hc e => hsb hc (by first | (rw [← e]; simp [SLoc.blocks]) | (rw [e]; simp [SLoc.blocks]))⟩
+      · exact ⟨hvm _ (by simp [SLoc.blocks]), by sep_ne hd, by sep_ne hd, by sep_ne hd, by sep_ne hd,
+          by sep_ne hd, by sep_ne hd, fun hc e => hwb hc (by first | (rw [← e]; simp [SLoc.blocks]) | (rw [e]; simp [SLoc.blocks])),
+          fun hc e => hsb hc (by first | (rw [← e]; simp [SLoc.blocks]) | (rw [e]; simp [SLoc.blocks]))⟩
+      · exact ⟨hvm _ (by simp [SLoc.blocks]), by sep_ne hd, by sep_ne hd, by sep_ne hd, by sep_ne hd,
+          by sep_ne hd, by sep_ne hd, fun hc e => hwb hc (by first | (rw [← e]; simp [SLoc.blocks]) | (rw [e]; simp [SLoc.blocks])),
+          fun hc e => hsb hc (by first | (rw [← e]; simp [SLoc.blocks]) | (rw [e]; simp [SLoc.blocks]))⟩
+      · exact ⟨h.grow1 _ c.valid1, c.ne_blocks (by simp [SLoc.blocks]) |>.symm,
+          c.ne_blocks (by simp [SLoc.blocks]) |>.symm, c.ne_blocks (by simp [SLoc.blocks]) |>.symm,
+          c.ne_blocks (by simp [SLoc.blocks]) |>.symm, c.ne_blocks (by simp [SLoc.blocks]) |>.symm,
+          c.ne_blocks (by simp [SLoc.blocks]) |>.symm, wW, wS⟩
+    · intro hc
+      exact ⟨fun e => hwb hc (by first | (rw [← e]; simp [SLoc.blocks]) | (rw [e]; simp [SLoc.blocks])), fun e => hwb hc (by first | (rw [← e]; simp [SLoc.blocks]) | (rw [e]; simp [SLoc.blocks])),
+        fun e => hwb hc (by first | (rw [← e]; simp [SLoc.blocks]) | (rw [e]; simp [SLoc.blocks])), fun e => hwb hc (by first | (rw [← e]; simp [SLoc.blocks]) | (rw [e]; simp [SLoc.blocks])),
+        pWS hc⟩
+    · intro hc
+      exact ⟨fun e => hsb hc (by first | (rw [← e]; simp [SLoc.blocks]) | (rw [e]; simp [SLoc.blocks])), fun e => hsb hc (by first | (rw [← e]; simp [SLoc.blocks]) | (rw [e]; simp [SLoc.blocks])),
+        fun e => hsb hc (by first | (rw [← e]; simp [SLoc.blocks]) | (rw [e]; simp [SLoc.blocks])), fun e => hsb hc (by first | (rw [← e]; simp [SLoc.blocks]) | (rw [e]; simp [SLoc.blocks]))⟩
+  · rintro t r m' ⟨⟨rfl, rfl, harr, hKs, cP', bP', cS', bS', dP', dS', -, -, rP, rS, hne, hu⟩, hv⟩
+    let W := fun z => z = bsr ∨ z = Block.naugraphWorkpermSz ∨ z = Block.naugraphWorkperm ∨
+      z = Block.naugraphWorksetSz ∨ z = Block.naugraphWorkset ∨ (0 < cW ∧ z = bW) ∨
+      (0 < cS ∧ z = bS) ∨ (¬ Mem.valid_block m bP' ∧ z = bP') ∨ (¬ Mem.valid_block m bS' ∧ z = bS')
+    have notW : ∀ z ∈ S.blocks, z ≠ Block.naugraphWorkpermSz → z ≠ Block.naugraphWorkperm →
+        z ≠ Block.naugraphWorksetSz → z ≠ Block.naugraphWorkset → ¬ W z := by
+      rintro z hz h1 h2 h3 h4 (e | e | e | e | e | ⟨hc, e⟩ | ⟨hc, e⟩ | ⟨hnv, e⟩ | ⟨hnv, e⟩)
+      · exact c.ne_blocks hz e
+      · exact h1 e
+      · exact h2 e
+      · exact h3 e
+      · exact h4 e
+      · exact nW hc (e ▸ hz)
+      · exact nS hc (e ▸ hz)
+      · exact hnv (e ▸ hvm z hz)
+      · exact hnv (e ▸ hvm z hz)
+    have hWa : ∀ z, W z → (z ∈ S.blocks ∧ z ∉ [Block.naugraphBucket, Block.naugraphBucketSz,
+        Block.nautilWorkperm, Block.nautilWorkpermSz]) ∨ (0 < cW ∧ z = bW) ∨ (0 < cS ∧ z = bS) ∨
+        (z ∉ S.blocks ∧ ¬ IsWork m z) := by
+      rintro z (rfl | rfl | rfl | rfl | rfl | ⟨hc, rfl⟩ | ⟨hc, rfl⟩ | ⟨hnv, rfl⟩ | ⟨hnv, rfl⟩)
+      · exact .inr (.inr (.inr ⟨fun hz => c.ne_blocks hz rfl, fun hw => h.work_ne c hw rfl⟩))
+      · exact .inl ⟨by simp [SLoc.blocks], by decide⟩
+      · exact .inl ⟨by simp [SLoc.blocks], by decide⟩
+      · exact .inl ⟨by simp [SLoc.blocks], by decide⟩
+      · exact .inl ⟨by simp [SLoc.blocks], by decide⟩
+      · exact .inr (.inl ⟨hc, rfl⟩)
+      · exact .inr (.inr (.inl ⟨hc, rfl⟩))
+      · exact .inr (.inr (.inr ⟨fun hz => hnv (hvm _ hz), fun hw => hnv hw.valid⟩))
+      · exact .inr (.inr (.inr ⟨fun hz => hnv (hvm _ hz), fun hw => hnv hw.valid⟩))
+    obtain ⟨hwm, hwk⟩ := SearchAt.afterWPWS hs hvm dW dS hu hWa dP' dS' rP rS (fun h1 _ => hne h1)
+    refine hQ m' (PAt.call c h hu ?_ ?_ hv hwm hwk
+      (hs.scalars.unch hu (by all_notW4 hd, notW))
+      (hs.stats.unch hu (notW _ (by simp [SLoc.blocks]) (by sep_ne hd) (by sep_ne hd) (by sep_ne hd)
+        (by sep_ne hd)))
+      (hs.arrays.unch hu (by all_notW4 hd, notW)) hinv (Keep.access' hKs h.srW)) harr
+    · rintro z (rfl | rfl | rfl | rfl | rfl | ⟨hc, rfl⟩ | ⟨hc, rfl⟩ | ⟨hnv, rfl⟩ | ⟨hnv, rfl⟩)
+      · exact .inr (.inr (.inr (.inr rfl)))
+      · exact .inr (.inl (by decide))
+      · exact .inr (.inl (by decide))
+      · exact .inr (.inl (by decide))
+      · exact .inr (.inl (by decide))
+      · exact .inr (.inr (.inl (.inl ⟨cW, hc, dW⟩)))
+      · exact .inr (.inr (.inl (.inr (.inl ⟨cS, hc, dS⟩))))
+      · exact .inr (.inr (.inr (.inl hnv)))
+      · exact .inr (.inr (.inr (.inl hnv)))
+    · intro z hz
+      exact Keep.unch hu (by
+        simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
+        rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
+          exact notW _ (by simp [SLoc.blocks]) (by sep_ne hd) (by sep_ne hd) (by sep_ne hd)
+            (by sep_ne hd))
 
 end NautyVerified.Proofs.Search.Processnode

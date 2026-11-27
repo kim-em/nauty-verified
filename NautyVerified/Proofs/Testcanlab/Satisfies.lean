@@ -51,7 +51,7 @@ def testcanlabSpec {n : Nat} (bg : block) (gofs : ptrofs) (gw : Nat → Lib.Inte
   post _ m t v m' := t = E0 ∧
     v = .Vint (ir (Hex.GraphIso.Nauty.testcanlab ⟨grows⟩ canong lab).1) ∧
     ArrayAt m' .Mint32 bs (intOfZ (Ptrofs.unsigned so))
-      (fun _ => .Vint (ir ((Hex.GraphIso.Nauty.testcanlab ⟨grows⟩ canong lab).2 : Int))) 1 ∧
+      (fun _ => .Vint (ir ((Hex.GraphIso.Nauty.testcanlab ⟨grows⟩ canong lab).2 : Int))) 1 ∧ Alloc.Keep m m' bs ∧
     ∃ capP' bP' capS' bS', DynAt m' WP WPS 4 capP' bP' ∧ DynAt m' WS WSS 8 capS' bS' ∧
       n ≤ capP' ∧ M ≤ capS' ∧
       ((capP' = capP ∧ bP' = bP) ∨ ¬ Mem.valid_block m bP') ∧
@@ -307,11 +307,11 @@ theorem testcanlab_satisfies {xi : ExternalCalls} {n : Nat} (bg : block) (gofs :
         hS.2.2.2.2.2.2.2 h0 h
     have post : ∀ m4 (r : Int) c, Hex.GraphIso.Nauty.testcanlab ⟨grows⟩ canong lab = (r, c) →
         ArrayAt m4 .Mint32 bs (intOfZ (Ptrofs.unsigned so)) (fun _ => .Vint (ir c)) 1 →
-        Unch m3 m4 (fun z => z = bS' ∨ z = bs) → Keep m3 m4 bS' →
+        Unch m3 m4 (fun z => z = bS' ∨ z = bs) → Keep m3 m4 bS' → Keep m3 m4 bs →
         (testcanlabSpec bg gofs gw grows bc cofs cw canong bl lofs lab bs so svals M capP bP capS bS).post
           [.Vptr bg gofs, .Vptr bc cofs, .Vptr bl lofs, .Vptr bs so, .Vint (ir M), .Vint (ir n)] m E0
           (.Vint (ir r)) m4 := by
-      intro m4 r c hR harr4 hu4 hk4
+      intro m4 r c hR harr4 hu4 hk4 hk4s
       show _ ∧ _
       simp only [hR]
       have hPS : 0 < capP' → bP' ≠ bS' := fun hc h => by
@@ -326,7 +326,9 @@ theorem testcanlab_satisfies {xi : ExternalCalls} {n : Nat} (bg : block) (gofs :
         rcases hbS' with ⟨_, hbb⟩ | hnv
         · exact (hbS (by omega)).2.2.2 (hbb ▸ h)
         · exact hnv (h ▸ hgP _ hvWPS)
-      refine ⟨trivial, trivial, harr4, capP', bP', capS', bS',
+      refine ⟨trivial, trivial, harr4,
+        (((Keep.unch huP bSr.1).trans (Keep.unch huS bSr.2)).trans (Keep.unch hu3 nS)).trans hk4s,
+        capP', bP', capS', bS',
         hDP3.keep hu4 ?_ ?_ fun hc => Keep.unch hu4 ?_,
         hDS3.keep hu4 ?_ ?_ fun _ => hk4, hcapP, hcapS, hbP', ?_, hPS,
         hU3.trans (hu4.mono fun z hz => ?_)⟩
@@ -378,7 +380,10 @@ theorem testcanlab_satisfies {xi : ExternalCalls} {n : Nat} (bg : block) (gofs :
       exact post m5 0 n (by rw [testcanlab_eq]; exact hT) harr5'
         ((hu'.mono fun z hz => .inl hz).trans (hu5.mono fun z hz => .inr hz))
         (hk'.trans (Keep.unch hu5 hS.2.2.2.1))
-    · intro m4 r c hT harr4 hu4 hk4
-      exact post m4 r c (by rw [testcanlab_eq]; exact hT) harr4 hu4 hk4
+        ((Keep.unch hu' fun e => hS.2.2.2.1 e.symm).trans (Keep.store hst (by
+          have := hsarr3.base_nonneg
+          simp only [elemOfs, intOfZ_zOfInt]; omega)))
+    · intro m4 r c hT harr4 hu4 hk4 hk4s
+      exact post m4 r c (by rw [testcanlab_eq]; exact hT) harr4 hu4 hk4 hk4s
 
 end NautyVerified.Proofs.Testcanlab
