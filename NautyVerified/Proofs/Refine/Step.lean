@@ -126,26 +126,73 @@ theorem Tmp.setCode {n : Nat} {le : temp_env} {L : Loc} {st : RefineSt n} (h : T
   hint := by rw [temps_gso _ _ (by decide)]; exact h.hint
   maxpos := by rw [temps_gso _ _ (by decide)]; exact h.maxpos
 
-/-- One iteration: HexGraphIso's `refineStep` for the chosen `split1`. -/
-theorem wp_iter (hT : TrivialPass xi) (hN : NontrivialPass xi) {n : Nat} {Q : Post}
-    {le : temp_env} {m : mem} {L : Loc} {ctx : Ctx n} {st : RefineSt n}
-    {aw : Nat → Lib.Integers.int64} {s : Nat} (hok : Ok n L) (hcS : L.M ≤ L.capS)
+section Generic
+open NautyVerified.Proofs.Set (sk)
+
+/-- One iteration in dialect `D`, with the passes `tr` and `ntr`. -/
+abbrev stepG (D : Dialect) (tr ntr : statement) : statement :=
+  .Ssequence (D.delE dense.id.active (tv dense.id.split1))
+    (.Ssequence (scanEnd dense.id.split2 dense.id.split1)
+      (.Ssequence (sk (mash (.Ebinop .Oadd (tv dense.id.split1) (tv dense.id.split2) tint)))
+        (sk (.Sifthenelse (.Ebinop .Oeq (tv dense.id.split1) (tv dense.id.split2) tint) tr ntr))))
+
+/-- The main loop in dialect `D`. -/
+abbrev mainLoopG (D : Dialect) (u0 u1 u2 u3 u4 u5 : ident) (tr ntr : statement) : statement :=
+  .Sloop (.Ssequence (guardG D u0 u1 u2 u3 u4 u5) (stepG D tr ntr)) .Sskip
+
+end Generic
+
+theorem mainLoop_D0 : mainLoop = mainLoopG D0 (idOf 709) (idOf 710) (idOf 711) (idOf 712)
+    (idOf 713) (idOf 714) trivial nontrivial := rfl
+
+theorem mainLoop_D1 : Refine1.mainLoop = mainLoopG D1 (idOf 707) (idOf 708) (idOf 709)
+    (idOf 710) (idOf 711) (idOf 712) Refine1.trivial Refine1.nontrivial := rfl
+
+/-- The trivial-splitter pass `tr` of `f`, on the locations `L` and graph `ctx`. -/
+def TrivialPassAt (xi : ExternalCalls) (f : function) (tr : statement) {n : Nat} (L : Loc)
+    (ctx : Ctx n) : Prop :=
+  ∀ {Q : Post} {le : temp_env} {m : mem} {st : RefineSt n} {aw : Nat → Lib.Integers.int64}
+    {split1 : Nat},
+    Mem m L ctx st aw → Tmp le L st → StInv n L st → st.numcells < n →
+    PTree.get dense.id.split1 le = some (.Vint (ir split1)) → split1 < n →
+    (∀ le' m', Done le' m' L ctx (refineTrivial ctx L.level split1 st) → Unch m m' L.writes →
+      Q.normal E0 empty_env le' m') →
+    Wp xi ge f tr Q empty_env le m
+
+/-- The nontrivial-splitter pass `ntr` of `f`, on the locations `L` and graph `ctx`. -/
+def NontrivialPassAt (xi : ExternalCalls) (f : function) (ntr : statement) {n : Nat} (L : Loc)
+    (ctx : Ctx n) : Prop :=
+  ∀ {Q : Post} {le : temp_env} {m : mem} {st : RefineSt n} {aw : Nat → Lib.Integers.int64}
+    {split1 split2 : Nat},
+    Mem m L ctx st aw → Tmp le L st → StInv n L st → st.numcells < n →
+    PTree.get dense.id.split1 le = some (.Vint (ir split1)) →
+    PTree.get dense.id.split2 le = some (.Vint (ir split2)) →
+    split1 < split2 → split2 = cellEnd st.ptn L.level split1 → split2 < n →
+    (∀ le' m', Done le' m' L ctx (refineNontrivial ctx L.level split1 split2 st) →
+      Unch m m' L.writes → Q.normal E0 empty_env le' m') →
+    Wp xi ge f ntr Q empty_env le m
+
+/-- One iteration in dialect `D`: HexGraphIso's `refineStep` for the chosen `split1`. -/
+theorem wp_iterG {D : Dialect} (hD : D.Sem) {f : function} {tr ntr : statement} {n : Nat}
+    {Q : Post} {le : temp_env} {m : mem} {L : Loc} {ctx : Ctx n} {st : RefineSt n}
+    {aw : Nat → Lib.Integers.int64} {s : Nat} (hMok : D.okM L.M) (hok : Ok n L)
+    (hT : TrivialPassAt xi f tr L ctx) (hN : NontrivialPassAt xi f ntr L ctx)
     (hm : Mem m L ctx st aw)
     (ht : Tmp le L st) (hi : StInv n L st) (hnc : st.numcells < n)
     (hps : pickSplit st.active st.hint = some s)
     (hs1 : PTree.get dense.id.split1 le = some (.Vint (ir s)))
     (hQ : ∀ le' m', Done le' m' L ctx (refineStep ctx L.level s st) → Unch m m' L.writes →
       Q.normal E0 empty_env le' m') :
-    Wp xi ge dense.fn.refine step Q empty_env le m := by
+    Wp xi ge f (stepG D tr ntr) Q empty_env le m := by
   have hsn : s < n := VSet.mem_lt (pickSplit_mem hps)
   have hnl := hok.nlt
   have hnM := hok.nM
   have hMl := hok.Mlt
-  simp only [step]
+  simp only [stepG]
   wp_step
-  refine Set.wp_delElementB hm.act (by omega) ht.active (c := s) (show Exec.evalExpr ge empty_env le m
-    (tv dense.id.split1) = _ from hs1) rfl (by omega) (by omega) find_naugraphBit hm.bit rfl ?_
-  intro m1 harr1 hu1 _
+  refine hD.delE hMok hMl hm.act ht.active (c := s) (show Exec.evalExpr ge empty_env le m
+    (tv dense.id.split1) = _ from hs1) rfl (by omega) hm.bit rfl ?_
+  intro m1 harr1 hu1
   have hm1 := hm.setAct hok hu1 harr1 (Set.setRep_del hm.actRep (by omega))
   have hps' := hi.ok.ptnSize
   have hlast : st.ptn[n - 1]! ≤ L.level := by have := hi.ok.ptnEnd; rwa [hps'] at this
@@ -196,15 +243,30 @@ theorem wp_iter (hT : TrivialPass xi) (hN : NontrivialPass xi) {n : Nat} {Q : Po
   rw [ir_eq (a := (s : Int)) (b := (en : Int)) ⟨by omega, by omega⟩ ⟨by omega, by omega⟩]
   by_cases hse : s = en
   · rw [ite_eq_left (by simp [hse])]
-    refine hT hok hm2 ht3 hi2 hnc hs1'' hsn fun le' m' hd hu => hQ' le' m' ?_ hu
+    refine hT hm2 ht3 hi2 hnc hs1'' hsn fun le' m' hd hu => hQ' le' m' ?_ hu
     have : refineStep ctx L.level s st = refineTrivial ctx L.level s st2 := by
       simp only [refineStep]; rw [ite_eq_left (by simp [en, ← hse])]
     rw [this]; exact hd
   · rw [ite_eq_right (by simp; omega)]
-    refine hN hok hcS hm2 ht3 hi2 hnc hs1'' hs2'' (by omega) rfl hce2 fun le' m' hd hu => hQ' le' m' ?_ hu
+    refine hN hm2 ht3 hi2 hnc hs1'' hs2'' (by omega) rfl hce2 fun le' m' hd hu => hQ' le' m' ?_ hu
     have : refineStep ctx L.level s st = refineNontrivial ctx L.level s en st2 := by
       simp only [refineStep]; rw [ite_eq_right (by simpa [en] using hse)]
     rw [this]; exact hd
+
+/-- One iteration: HexGraphIso's `refineStep` for the chosen `split1`. -/
+theorem wp_iter (hT : TrivialPass xi) (hN : NontrivialPass xi) {n : Nat} {Q : Post}
+    {le : temp_env} {m : mem} {L : Loc} {ctx : Ctx n} {st : RefineSt n}
+    {aw : Nat → Lib.Integers.int64} {s : Nat} (hok : Ok n L) (hcS : L.M ≤ L.capS)
+    (hm : Mem m L ctx st aw)
+    (ht : Tmp le L st) (hi : StInv n L st) (hnc : st.numcells < n)
+    (hps : pickSplit st.active st.hint = some s)
+    (hs1 : PTree.get dense.id.split1 le = some (.Vint (ir s)))
+    (hQ : ∀ le' m', Done le' m' L ctx (refineStep ctx L.level s st) → Unch m m' L.writes →
+      Q.normal E0 empty_env le' m') :
+    Wp xi ge dense.fn.refine step Q empty_env le m :=
+  wp_iterG D0_sem True.intro hok (fun hm ht hi hnc hs hsp hQ => hT hok hm ht hi hnc hs hsp hQ)
+    (fun hm ht hi hnc hs1 hs2 h12 he h2n hQ => hN hok hcS hm ht hi hnc hs1 hs2 h12 he h2n hQ)
+    hm ht hi hnc hps hs1 hQ
 
 /-- The loop state with fuel `F`: memory and temporaries describe `st`, and the
 rest of HexGraphIso's loop from `st` with fuel `F` gives the final result. -/
@@ -213,21 +275,23 @@ def LoopAt {n : Nat} (L : Loc) (ctx : Ctx n) (st₀ : RefineSt n) (m₀ : mem) (
   ∃ st, Done le m L ctx st ∧ refineFuel st < F ∧
     refineLoop ctx L.level (4 * n + 8) st₀ = refineLoop ctx L.level F st ∧ Unch m₀ m L.writes
 
-/-- `refine`'s main loop is HexGraphIso's `refineLoop` with fuel `4n + 8`. -/
-theorem wp_mainLoop (hT : TrivialPass xi) (hN : NontrivialPass xi) {n : Nat} {Q : Post}
-    {le : temp_env} {m : mem} {L : Loc} {ctx : Ctx n} {st₀ : RefineSt n} (hok : Ok n L)
-    (hcS : L.M ≤ L.capS) (hd : Done le m L ctx st₀)
+/-- The main loop in dialect `D` is HexGraphIso's `refineLoop` with fuel `4n + 8`. -/
+theorem wp_mainLoopG {D : Dialect} (hD : D.Sem) {u0 u1 u2 u3 u4 u5 : ident}
+    (hU : GuardOk [u0, u1, u2, u3, u4, u5]) {f : function} {tr ntr : statement} {n : Nat}
+    {Q : Post} {le : temp_env} {m : mem} {L : Loc} {ctx : Ctx n} {st₀ : RefineSt n}
+    (hMok : D.okM L.M) (hok : Ok n L) (hT : TrivialPassAt xi f tr L ctx)
+    (hN : NontrivialPassAt xi f ntr L ctx) (hd : Done le m L ctx st₀)
     (hQ : ∀ le' m', Done le' m' L ctx (refineLoop ctx L.level (4 * n + 8) st₀) →
       Unch m m' L.writes → Q.normal E0 empty_env le' m') :
-    Wp xi ge dense.fn.refine mainLoop Q empty_env le m := by
-  simp only [mainLoop]
+    Wp xi ge f (mainLoopG D u0 u1 u2 u3 u4 u5 tr ntr) Q empty_env le m := by
+  simp only [mainLoopG]
   refine wp_loop (I := fun F t e le' m' => t = E0 ∧ e = empty_env ∧ LoopAt L ctx st₀ m F le' m')
     (J := fun F t e le' m' => t = E0 ∧ e = empty_env ∧ ∃ G, G < F ∧ LoopAt L ctx st₀ m G le' m')
     ?_ ?_ (n := 4 * n + 8)
     ⟨rfl, rfl, st₀, hd, refineFuel_lt_init st₀, rfl, Unch.refl _ _⟩
   · rintro F t e le' m' ⟨rfl, rfl, st, ⟨aw, hm, ht, hi⟩, hF, hloop, hu⟩
     wp_step
-    refine wp_guard hok hm ht hi ?_ ?_
+    refine wp_guardG hD hU hMok hok hm ht hi ?_ ?_
     · intro le'' hstop ht''
       simp only [E0_append]
       refine hQ le'' m' ?_ hu
@@ -236,11 +300,22 @@ theorem wp_mainLoop (hT : TrivialPass xi) (hN : NontrivialPass xi) {n : Nat} {Q 
     · intro le'' s hnc hps ht'' hs1
       simp only [E0_append]
       obtain ⟨G, rfl, hG, hloop'⟩ := refineLoop_next ctx L.level hF hnc hps
-      refine wp_iter hT hN hok hcS hm ht'' hi hnc hps hs1 fun le3 m3 hd3 hu3 => ?_
+      refine wp_iterG hD hMok hok hT hN hm ht'' hi hnc hps hs1 fun le3 m3 hd3 hu3 => ?_
       simp only [E0_append]
       exact ⟨True.intro, True.intro, G, by omega, _, hd3, hG, hloop.trans hloop', hu.trans hu3⟩
   · rintro F t e le' m' ⟨rfl, rfl, G, hG, hl⟩
     apply wp_skip
     exact ⟨G, hG, by simp, rfl, hl⟩
+
+/-- `refine`'s main loop is HexGraphIso's `refineLoop` with fuel `4n + 8`. -/
+theorem wp_mainLoop (hT : TrivialPass xi) (hN : NontrivialPass xi) {n : Nat} {Q : Post}
+    {le : temp_env} {m : mem} {L : Loc} {ctx : Ctx n} {st₀ : RefineSt n} (hok : Ok n L)
+    (hcS : L.M ≤ L.capS) (hd : Done le m L ctx st₀)
+    (hQ : ∀ le' m', Done le' m' L ctx (refineLoop ctx L.level (4 * n + 8) st₀) →
+      Unch m m' L.writes → Q.normal E0 empty_env le' m') :
+    Wp xi ge dense.fn.refine mainLoop Q empty_env le m :=
+  wp_mainLoopG D0_sem (by decide) True.intro hok
+    (fun hm ht hi hnc hs hsp hQ => hT hok hm ht hi hnc hs hsp hQ)
+    (fun hm ht hi hnc hs1 hs2 h12 he h2n hQ => hN hok hcS hm ht hi hnc hs1 hs2 h12 he h2n hQ) hd hQ
 
 end NautyVerified.Proofs.Refine
