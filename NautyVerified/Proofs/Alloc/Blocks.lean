@@ -18,11 +18,20 @@ namespace Block
 def malloc : Common.Values.block := PArith.BinPos.Pos.of_nat 242
 def free : Common.Values.block := PArith.BinPos.Pos.of_nat 221
 def zalloc : Common.Values.block := PArith.BinPos.Pos.of_nat 132
+/-- nautil.c's `static int *workperm`. -/
+def nautilWorkperm : Common.Values.block := PArith.BinPos.Pos.of_nat 29
+/-- nautil.c's `static size_t workperm_sz`. -/
+def nautilWorkpermSz : Common.Values.block := PArith.BinPos.Pos.of_nat 199
 end Block
 
 kernel_rfl find_malloc : Genv.find_symbol ge.genv_genv dense.id.malloc = some Block.malloc
 kernel_rfl find_free : Genv.find_symbol ge.genv_genv dense.id.free = some Block.free
 kernel_rfl find_zalloc : Genv.find_symbol ge.genv_genv dense.id.nauty_zalloc = some Block.zalloc
+
+kernel_rfl find_nautilWorkperm :
+  Genv.find_symbol ge.genv_genv dense.id.«nautil:workperm» = some Block.nautilWorkperm
+kernel_rfl find_nautilWorkpermSz :
+  Genv.find_symbol ge.genv_genv dense.id.«nautil:workperm_sz» = some Block.nautilWorkpermSz
 
 kernel_rfl funct_malloc : Genv.find_funct_ptr ge.genv_genv Block.malloc =
   some (.External .EF_malloc [tulong] (tptr .Tvoid) Common.AST.cc_default)
