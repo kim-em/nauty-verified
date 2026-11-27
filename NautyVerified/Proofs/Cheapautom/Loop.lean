@@ -125,6 +125,19 @@ theorem go_ge (ptn : Array Nat) (level F c k nnt : Nat) (hc : ¬ c < ptn.size) :
     Hex.GraphIso.Nauty.cheapautom.go ptn level F c k nnt = (k, nnt) := by
   cases F <;> simp [Hex.GraphIso.Nauty.cheapautom.go, hc]
 
+theorem go_bound (ptn : Array Nat) (level : Nat) :
+    ∀ F c k nnt, (Hex.GraphIso.Nauty.cheapautom.go ptn level F c k nnt).1 ≤ k ∧
+      (Hex.GraphIso.Nauty.cheapautom.go ptn level F c k nnt).2 ≤ nnt + F
+  | 0, _, _, _ => by simp [Hex.GraphIso.Nauty.cheapautom.go]
+  | F + 1, c, k, nnt => by
+    rw [Hex.GraphIso.Nauty.cheapautom.go]
+    split
+    · dsimp only
+      split
+      · have := go_bound ptn level F (cellEnd ptn level (c + 1) + 1) (k - 1) (nnt + 1); omega
+      · have := go_bound ptn level F (c + 1) (k - 1) nnt; omega
+    · simp
+
 theorem wp_cells {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {bp : block}
     {pofs : ptrofs} {ptn : Array Nat} {level n : Nat} (h : Frame m le bp pofs ptn level n)
     (hk : PTree.get id.k le = some (.Vint (ir n))) (hnnt : PTree.get id.nnt le = some (.Vint (ir 0)))
