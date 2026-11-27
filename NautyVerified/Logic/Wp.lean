@@ -174,6 +174,18 @@ theorem wp_loop {f : function} {body iter : statement} {I J : Nat → trace → 
   wp_of_triple (triple_loop (fun n t => triple_iff_wp.2 (hbody n t))
     (fun n t => triple_iff_wp.2 (hiter n t)) n) hi
 
+/-- A statement finishing normally leaves the local environment as it was. -/
+theorem wp_env {f : function} {s : statement} {Q : Post} {e le m}
+    (h : Wp xi ge f s Q e le m) :
+    Wp xi ge f s { Q with normal := fun t e' le' m' => e' = e ∧ Q.normal t e' le' m' } e le m := by
+  intro k e' le' m' ⟨he, hle, hm⟩
+  subst he hle hm
+  rcases h k e' le' m' ⟨rfl, rfl, rfl⟩ with ⟨t, le₂, m₂, hs, hq⟩ | hb | hc | hr
+  · exact .inl ⟨t, le₂, m₂, hs, rfl, hq⟩
+  · exact .inr (.inl hb)
+  · exact .inr (.inr (.inl hc))
+  · exact .inr (.inr (.inr hr))
+
 /-! ## Computational forms
 
 The same rules with the evaluation in the premise, as a `match` on the
