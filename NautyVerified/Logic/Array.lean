@@ -42,7 +42,7 @@ abbrev elemOfs (chunk : memory_chunk) (base : Int) (i : Nat) : Z :=
 structure ArrayAt (m : mem) (chunk : memory_chunk) (b : block) (base : Int)
     (vals : Nat → val) (n : Nat) : Prop where
   base_nonneg : 0 ≤ base
-  fits : base + csize chunk * n ≤ 2 ^ 64
+  fits : base + csize chunk * n < 2 ^ 64
   load : ∀ i < n, Mem.load chunk m b (elemOfs chunk base i) = some (vals i)
   writable : ∀ i < n, Mem.valid_access m chunk b (elemOfs chunk base i) .Writable
 
