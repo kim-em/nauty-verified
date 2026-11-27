@@ -260,6 +260,15 @@ through their proved specifications); and the allocator layer:
 memory are `GraphAt` (row `v` at word `M * v`, each row `SetRep` of the Hex
 row).
 
+`bestcell` (naugraph.c, `Proofs/Bestcell/`) is proved against HexGraphIso's
+`bestcell`: the start loop against `startsOf` over `cells`, the joined-cell
+counts against `bestcellRows` unrolled into `rowsStep`/`rowStep` folds
+(`Spec/Bestcell.lean`, with `rows_bound` keeping every count below `nnt`), and
+the argmax against `argmaxLoop`. Its spec (`bestcellSpec`, `Pre`, `Post`) is
+shared with `targetcell`: the three `DYNALLSTAT` pairs may be replaced, and
+only `dyn3Set` changes. Sets reached through a pointer global use
+`Proofs/Set/Global.lean`; loops from a nonzero start use `wp_forLoopFrom`.
+
 Conventions settled while doing these:
 
 - An `int` array holding `o : Array Nat` is `ArrayAt … (ints o) n`; a set of
