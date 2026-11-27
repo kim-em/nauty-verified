@@ -5,7 +5,7 @@ import NautyVerified.Statement.Harness
 /-!
 # What the harness needs from `densenauty`
 
-`densenautySpec G bg bl bp bo bst bc`: `dense_main` calls
+`densenautySpec G gens bg bl bp bo bst bc`: `dense_main` calls
 `densenauty(g, lab, ptn, orbits, &options, &stats, m, n, canong)` with
 
 - memory equal to the program's initial memory except in the `options`
@@ -17,11 +17,14 @@ import NautyVerified.Statement.Harness
   (`ptn` 1 inside a cell and 0 at its end, `harnessPtn`);
 - `orbits`, `canong` and the `statsblk` `stats` writable.
 
-Afterwards the trace writes the generators HexGraphIso emits, in order
-(`gensWords` of `(runColoredTraced G).autos`, which is what `emit_generator`
-writes), and memory holds the canonical labelling in `lab`, the orbits of
-HexGraphIso's final search state in `orbits`, the canonical graph's rows in
-`canong`, and the result's counters (and `errstatus = 0`) in `stats`. The
+Afterwards the trace writes the generators `gens`, in order (`gensWords
+gens`, which is what `emit_generator` writes for them). `gens` is a
+parameter: it is the list of generators nauty emits (one each time
+`numgenerators` increases), which `main` forwards to its output and the
+caller relates to `Statement.expected`'s first block. Memory holds the
+canonical labelling in `lab`, the orbits of HexGraphIso's final search state
+in `orbits`, the canonical graph's rows in `canong`, and the result's
+counters as their C types hold them (and `errstatus = 0`) in `stats`. The
 block `stats` keeps its permissions, so `main` can free it.
 -/
 
@@ -97,7 +100,7 @@ structure OptionsAt (m : mem) : Prop where
 
 /-- `densenauty(g, lab, ptn, orbits, &options, &stats, m, n, canong)` as
 `dense_main` calls it on the coloured graph `G`. -/
-def densenautySpec {n k : Nat} (G : Colored n k) (bg bl bp bo bst bc : block) : FunSpec where
+def densenautySpec {n k : Nat} (G : Colored n k) (gens : List (Array Nat)) (bg bl bp bo bst bc : block) : FunSpec where
   pre args m := args = [.Vptr bg Ptrofs.zero, .Vptr bl Ptrofs.zero, .Vptr bp Ptrofs.zero,
       .Vptr bo Ptrofs.zero, .Vptr Block.options Ptrofs.zero, .Vptr bst Ptrofs.zero,
       .Vint (ir (wordsOf n)), .Vint (ir n), .Vptr bc Ptrofs.zero] ∧
@@ -116,7 +119,7 @@ def densenautySpec {n k : Nat} (G : Colored n k) (bg bl bp bo bst bc : block) : 
     0 < n ∧ n ≤ 65536
   post _ m t _ m' :=
     let r := runColoredTraced G
-    Writes t (gensWords r.autos.toList n) ∧
+    Writes t (gensWords gens n) ∧
     ArrayAt m' .Mint32 bl 0 (ints r.result.canonlab) n ∧
     ArrayAt m' .Mint32 bo 0 (ints (Statement.finalState G).orbits) n ∧
     (∃ cw, ArrayAt m' .Mint64 bc 0 (longs cw) (wordsOf n * n) ∧
