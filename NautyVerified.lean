@@ -69,3 +69,5 @@ import NautyVerified.Proofs.Permset.Many
 import NautyVerified.Proofs.Permset.One
 import NautyVerified.Proofs.Permset.Satisfies
 import NautyVerified.Proofs.Updatecan.Syntax
+import NautyVerified.Spec.InvPerm
+import NautyVerified.Proofs.Updatecan.Inv
