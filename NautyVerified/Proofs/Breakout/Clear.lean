@@ -51,4 +51,100 @@ theorem cmplu_ptrTo {m : mem} {ba : block} {base : Int} {vals : Nat → val} {M 
   apply decide_eq_decide.2
   omega
 
+theorem clearedFrom_succ (ws : Nat → Lib.Integers.int64) (k : Nat) :
+    upd (longs (clearedFrom ws (k + 1))) k (.Vlong (lr 0)) = longs (clearedFrom ws k) := by
+  funext w
+  simp only [upd, longs, clearedFrom]
+  by_cases h : w = k
+  · subst h; simp
+  · rw [if_neg h]
+    by_cases hw : w < k
+    · rw [if_pos hw, if_pos (by omega)]
+    · rw [if_neg hw, if_neg (by omega)]
+
+theorem sub_ptrTo8 (ce : Cfrontend.Ctypes.composite_env) (base : Int) (k : Nat) :
+    Ptrofs.sub (ptrTo base 8 (k + 1)) (Ptrofs.mul (Ptrofs.repr
+      (Cfrontend.Ctypes.sizeof ce tulong)) (Ptrofs.of_ints (ir 1))) = ptrTo base 8 k := by
+  have h : intOfZ (Cfrontend.Ctypes.sizeof ce tulong) = 8 := rfl
+  have := sub_ptrTo base (Cfrontend.Ctypes.sizeof ce tulong) k
+  rw [h] at this
+  exact this
+
+theorem wp_clear {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {ba : block}
+    {ofs : ptrofs} {ws : Nat → Lib.Integers.int64} {M : Nat}
+    (harr : ArrayAt m .Mint64 ba (intOfZ (Ptrofs.unsigned ofs)) (longs ws) M) (hM : 0 < M)
+    (hM2 : M < 2147483648) (hact : PTree.get id.active le = some (.Vptr ba ofs))
+    (hm : PTree.get id.m le = some (.Vint (ir M)))
+    (hQ : ∀ le' m', ArrayAt m' .Mint64 ba (intOfZ (Ptrofs.unsigned ofs)) (longs fun _ => lr 0) M →
+      Unch m m' (· = ba) → (∀ k, k ≠ id.es → k ≠ id.t1 → PTree.get k le' = PTree.get k le) →
+      Q.normal E0 e le' m') :
+    Wp xi ge f clear Q e le m := by
+  have hf := harr.fits
+  have hb := harr.base_nonneg
+  have h8 : csize .Mint64 = 8 := rfl
+  rw [h8] at hf
+  simp only [clear, sk]
+  wp_step; wp_step; wp_step
+  apply wp_set_eval
+  simp only [Exec.evalExpr, hact, hm, typeof, cop]
+  rw [add_ptrTo ofs _ M (by omega), sizeof_tulong]
+  simp only [seqPost, Post.after, E0_append]
+  let base := intOfZ (Ptrofs.unsigned ofs)
+  refine wp_loop (I := fun k t e' le' m' => t = E0 ∧ e = e' ∧ k ≤ M ∧
+      PTree.get id.es le' = some (.Vptr ba (ptrTo base 8 k)) ∧
+      ArrayAt m' .Mint64 ba base (longs (clearedFrom ws k)) M ∧ Unch m m' (· = ba) ∧
+      ∀ k', k' ≠ id.es → k' ≠ id.t1 → PTree.get k' le' = PTree.get k' le)
+    (J := fun k t e' le' m' => ∃ k' < k, t = E0 ∧ e = e' ∧ k' ≤ M ∧
+      PTree.get id.es le' = some (.Vptr ba (ptrTo base 8 k')) ∧
+      ArrayAt m' .Mint64 ba base (longs (clearedFrom ws k')) M ∧ Unch m m' (· = ba) ∧
+      ∀ k'', k'' ≠ id.es → k'' ≠ id.t1 → PTree.get k'' le' = PTree.get k'' le) ?_ ?_ (n := M)
+    ⟨rfl, rfl, Nat.le_refl _, temps_gss _ _ _, by
+      have : clearedFrom ws M = fun w => if w < M then ws w else lr 0 := rfl
+      refine ⟨hb, by rw [h8]; omega, fun i hi => ?_, fun i hi => harr.writable i hi⟩
+      simp only [longs, clearedFrom, if_pos hi]; exact harr.load i hi,
+      Unch.refl _ _, fun k' hk _ => temps_gso _ _ hk⟩
+  · rintro k t e' le' m' ⟨rfl, rfl, hk, hes, harr', hu, hother⟩
+    have hact' : PTree.get id.active le' = some (.Vptr ba ofs) := by
+      rw [hother _ (by decide) (by decide)]; exact hact
+    wp_step; wp_step; wp_step
+    apply wp_if_eval
+    simp only [Exec.evalExpr, hes, hact', typeof, cop]
+    rw [cmplu_ptrTo harr' hM hk rfl]
+    simp only [Option.map, cop]
+    rcases k with _ | j
+    · rw [ite_eq_right (by decide)]
+      apply wp_break
+      have h0 : clearedFrom ws 0 = fun _ => lr 0 := by funext w; simp [clearedFrom]
+      rw [h0] at harr'
+      exact hQ le' m' harr' hu hother
+    · rw [ite_eq_left (by simp)]
+      apply wp_skip
+      simp only [seqPost, Post.after, E0_append]
+      wp_step; wp_step; wp_step; wp_step
+      apply wp_set_eval
+      simp only [Exec.evalExpr, hes, typeof, cop, sub_ptrTo8]
+      simp only [seqPost, Post.after, E0_append]
+      apply wp_set_eval
+      simp only [Exec.evalExpr, temps_gss, seqPost, Post.after, E0_append]
+      have hj : j < M := by omega
+      have hu8 : intOfZ (Ptrofs.unsigned (ptrTo base 8 j)) = base + 8 * j := by
+        apply unsigned_ptrTo <;> omega
+      obtain ⟨m'', hst, harr'', -⟩ := store_array harr' hj (.Vlong (lr 0)) rfl
+      apply wp_assign_eval
+      simp (config := {decide := true}) only [Exec.evalLvalue, Exec.evalExpr, temps_gss, temps_gso,
+        typeof, cop, Exec.assignLoc, Cfrontend.Ctypes.access_mode,
+        cast_int_long_ir (a := 0) ⟨by decide, by decide⟩]
+      show match Mem.store .Mint64 m' ba (Ptrofs.unsigned _) _ with
+        | some m' => _ | none => False
+      rw [show Ptrofs.unsigned (ptrTo base 8 j) = elemOfs .Mint64 base j by
+        rw [← zOfInt_intOfZ (Ptrofs.unsigned _), hu8]; rfl, hst]
+      refine ⟨j, by omega, trivial, trivial, by omega, ?_, ?_, hu.trans (Unch.store hst rfl), ?_⟩
+      · rfl
+      · rw [← clearedFrom_succ]; exact harr''
+      · intro k'' h1 h2
+        rw [temps_gso _ _ h1, temps_gso _ _ h2, hother _ h1 h2]
+  · rintro k t e' le' m' ⟨k', hk', h⟩
+    apply wp_skip
+    exact ⟨k', hk', by simpa using h⟩
+
 end NautyVerified.Proofs.Breakout

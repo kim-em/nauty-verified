@@ -24,3 +24,4 @@ import NautyVerified.Proofs.Orbjoin.Satisfies
 import NautyVerified.Logic.Pointer
 import NautyVerified.Spec.Setwords
 import NautyVerified.Logic.PtrArith
+import NautyVerified.Proofs.Breakout.Clear
