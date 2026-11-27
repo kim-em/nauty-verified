@@ -87,6 +87,8 @@ import NautyVerified.Proofs.Search.State
 import NautyVerified.Proofs.Search.Spec
 import NautyVerified.Proofs.Top.DensenautySyntax
 import NautyVerified.Proofs.Top.NautySyntax
+import NautyVerified.Proofs.Top.Spec
+import NautyVerified.Proofs.Top.Densenauty
 import NautyVerified.Proofs.Search.Node.Spec
 import NautyVerified.Proofs.Search.Node.OtherHex
 import NautyVerified.Proofs.Search.Node.Rebuild
