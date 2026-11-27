@@ -39,3 +39,4 @@ import NautyVerified.Proofs.Prune.Short
 import NautyVerified.Proofs.Set.Subset
 import NautyVerified.Proofs.Prune.LongSyntax
 import NautyVerified.Proofs.Prune.LongPair
+import NautyVerified.Proofs.Prune.Long
