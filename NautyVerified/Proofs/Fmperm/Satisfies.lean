@@ -82,7 +82,7 @@ theorem fmperm_satisfies {xi : ExternalCalls} (bpm : block) (pofs : ptrofs) (bf 
     wp_step
     refine Alloc.wp_dynalloc1 find_nautilWorkpermSz find_nautilWorkperm rfl hD
       (by simp (config := {decide := true}) only [entryTemps, temps_gss]) hn hc4 ?_
-    intro le1 m1 cap' b' hD' hcap hu1 hb' ho1
+    intro le1 m1 cap' b' hD' hcap hu1 hb' _ ho1
     -- the caller's blocks are outside what `DYNALLOC1` changed
     have hout : ∀ z, Mem.valid_block m z → z ≠ WPS → z ≠ WP → ¬ (0 < cap ∧ z = b0) →
         ¬ (z = WPS ∨ z = WP ∨ (0 < cap ∧ z = b0) ∨ (¬ Mem.valid_block m b' ∧ z = b')) := by

@@ -89,14 +89,15 @@ structure Keeps (m m' : mem) (b : block) : Prop where
   low : ∀ chunk (ofs : Int), ofs + csize chunk ≤ 0 →
     Mem.load chunk m' b (zOfInt ofs) = Mem.load chunk m b (zOfInt ofs)
   perm : ∀ b' ofs k p, Mem.perm m b' ofs k p → Mem.perm m' b' ofs k p
+  grow : ∀ z, Mem.valid_block m z → Mem.valid_block m' z
 
 theorem Keeps.refl (m : mem) (b : block) : Keeps m m b :=
-  ⟨Unch.refl _ _, fun _ _ _ => rfl, fun _ _ _ _ h => h⟩
+  ⟨Unch.refl _ _, fun _ _ _ => rfl, fun _ _ _ _ h => h, fun _ h => h⟩
 
 theorem Keeps.trans {m₁ m₂ m₃ : mem} {b : block} (h₁ : Keeps m₁ m₂ b) (h₂ : Keeps m₂ m₃ b) :
     Keeps m₁ m₃ b :=
   ⟨h₁.unch.trans h₂.unch, fun c o h => by rw [h₂.low c o h, h₁.low c o h],
-    fun _ _ _ _ h => h₂.perm _ _ _ _ (h₁.perm _ _ _ _ h)⟩
+    fun _ _ _ _ h => h₂.perm _ _ _ _ (h₁.perm _ _ _ _ h), fun _ h => h₂.grow _ (h₁.grow _ h)⟩
 
 variable {xi : ExternalCalls}
 
@@ -169,7 +170,7 @@ theorem wp_fill {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {b
           List.replicate_succ']
         exact this
       · refine hkeep.trans ⟨Unch.store hst rfl, fun c o hco => ?_, fun _ _ _ _ h =>
-          Mem.perm_store_1 _ _ _ _ _ _ hst _ _ _ _ h⟩
+          Mem.perm_store_1 _ _ _ _ _ _ hst _ _ _ _ h, fun _ h => Mem.store_valid_block_1 _ _ _ _ _ _ hst _ h⟩
         apply Mem.load_store_other _ _ _ _ _ _ hst
         right; left
         change intOfZ _ ≤ intOfZ _
@@ -239,7 +240,7 @@ theorem zalloc_satisfies (sz : Nat) :
     simp only [Exec.evalExpr, hp', typeof, cop, dense.fn.nauty_zalloc.fn_return_eq,
       Nextelement.free_empty]
     refine ⟨rfl, b, rfl, ⟨hfr.unch.trans hkeep.unch, ?_, fun o h1 h2 => hkeep.perm _ _ _ _ (hfr.perm o h1 h2),
-      hfr.new⟩, hbytes⟩
+      hfr.new, fun z hz => hkeep.grow _ (hfr.grow _ hz)⟩, hbytes⟩
     rw [hkeep.low _ (-8) (by decide)]
     exact hfr.hdr
 

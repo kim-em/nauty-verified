@@ -58,6 +58,7 @@ structure Fresh (m m' : mem) (b : block) (sz : Nat) : Prop where
   hdr : Mem.load Mptr m' b (zOfInt (-8)) = some (.Vlong (lr sz))
   perm : ∀ ofs : Int, -8 ≤ ofs → ofs < sz → Mem.perm m' b (zOfInt ofs) .Cur .Freeable
   new : ¬ Mem.valid_block m b
+  grow : ∀ z, Mem.valid_block m z → Mem.valid_block m' z
 
 def mallocSpec (sz : Nat) : FunSpec where
   pre args _ := args = [.Vlong (lr sz)] ∧ sz < 2 ^ 63
@@ -87,7 +88,8 @@ theorem malloc_satisfies {xi : ExternalCalls} (sz : Nat) :
   refine ⟨E0, .Vptr b Ptrofs.zero, m2, ?_, rfl, b, rfl, ?_⟩
   · rw [← vptrofs_lr sz]
     exact .extcall_malloc_sem_intro _ _ _ _ _ ha hst
-  · refine ⟨(Unch.alloc ha).trans (Unch.store hst rfl), ?_, ?_, ?_⟩
+  · refine ⟨(Unch.alloc ha).trans (Unch.store hst rfl), ?_, ?_, ?_, fun z hz =>
+      Mem.store_valid_block_1 _ _ _ _ _ _ hst _ (Mem.valid_block_alloc _ _ _ _ _ ha _ hz)⟩
     · have := Mem.load_store_same _ _ _ _ _ _ hst
       rw [vptrofs_lr sz] at this
       exact this

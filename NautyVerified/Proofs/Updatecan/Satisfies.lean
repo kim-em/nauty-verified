@@ -84,7 +84,7 @@ theorem updatecan_satisfies {xi : ExternalCalls} {n : Nat} (bg : block) (gofs : 
     wp_step
     refine Alloc.wp_dynalloc1 find_naugraphWorkpermSz find_naugraphWorkperm rfl hD
       (by simp (config := {decide := true}) only [entryTemps, temps_gss]) hn hc4 ?_
-    intro le1 m1 cap' b' hD' hcap hu1 hb' ho1
+    intro le1 m1 cap' b' hD' hcap hu1 hb' _ ho1
     have hout : ∀ z, Mem.valid_block m z → z ≠ WPS → z ≠ WP → ¬ (0 < cap ∧ z = b0) →
         ¬ (z = WPS ∨ z = WP ∨ (0 < cap ∧ z = b0) ∨ (¬ Mem.valid_block m b' ∧ z = b')) := by
       rintro z hv h1 h2 h3 (h | h | h | ⟨hb, rfl⟩)

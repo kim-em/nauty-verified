@@ -169,6 +169,7 @@ theorem wp_dynalloc1 {f : function} {Q : Post} {le : temp_env} {m : mem}
     (hQ : ∀ le' m' cap' b', DynAt m' bp bs c cap' b' → n ≤ cap' →
       Unch m m' (fun z => z = bs ∨ z = bp ∨ (0 < cap ∧ z = b) ∨ (¬ Mem.valid_block m b' ∧ z = b')) →
       ((cap' = cap ∧ b' = b) ∨ ¬ Mem.valid_block m b') →
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
       (∀ k, k ≠ t1 → k ≠ t2 → PTree.get k le' = PTree.get k le) →
       Q.normal E0 empty_env le' m') :
     Wp xi ge f (dynalloc1 gs gp elt (.Etempvar x tint) t1 t2 msg msgLen) Q empty_env le m := by
@@ -264,7 +265,13 @@ theorem wp_dynalloc1 {f : function} {Q : Post} {le : temp_env} {m : mem}
       apply Mem.store_valid_block_1 _ _ _ _ _ _ hst2
       unfold Mem.valid_block at hv ⊢
       rw [hnb1]; exact hv
-    refine hQ _ m4 n b' hD' (Nat.le_refl _) ?_ (.inr hnew) ?_
+    have hgrow : ∀ z, Mem.valid_block m z → Mem.valid_block m4 z := fun z hz => by
+      apply Mem.store_valid_block_1 _ _ _ _ _ _ hst4
+      apply hfr.grow
+      apply Mem.store_valid_block_1 _ _ _ _ _ _ hst2
+      unfold Mem.valid_block at hz ⊢
+      rw [hnb1]; exact hz
+    refine hQ _ m4 n b' hD' (Nat.le_refl _) ?_ (.inr hnew) hgrow ?_
     · exact (((hu1.mono fun z hz => .inr (.inr (.inl hz))).trans
         (Unch.store hst2 (.inl rfl))).trans (hfr.unch.mono fun z hz => .inr (.inr (.inr ⟨hz ▸ hnew, hz⟩)))).trans
         (Unch.store hst4 (.inr (.inl rfl)))
@@ -272,6 +279,6 @@ theorem wp_dynalloc1 {f : function} {Q : Post} {le : temp_env} {m : mem}
       rw [temps_gso _ _ h2, temps_gso _ _ h1]
   · rw [ite_eq_right (by simpa using hnc)]
     apply wp_skip
-    exact hQ le m cap b hD (by omega) (Unch.refl _ _) (.inl ⟨rfl, rfl⟩) (fun _ _ _ => rfl)
+    exact hQ le m cap b hD (by omega) (Unch.refl _ _) (.inl ⟨rfl, rfl⟩) (fun _ h => h) (fun _ _ _ => rfl)
 
 end NautyVerified.Proofs.Alloc
