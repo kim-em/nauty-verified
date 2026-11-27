@@ -851,4 +851,42 @@ theorem place_getElem! (lab counts members X : Array Nat) (cell1 bmin W : Nat)
   rw [hfo] at h1 h2
   rw [h1, h2]
 
+/-- `place_getElem!` for the scatter written as a fold of writes. -/
+theorem fold_getElem! (lab counts members X : Array Nat) (cell1 bmin W : Nat)
+    (hmem : ∀ q, q < counts.size → bmin ≤ counts[q]!)
+    (hbd : ∀ q, q < counts.size → counts[q]! - bmin < W)
+    (hcv : countValues counts.toList = (List.range W).map (bmin + ·))
+    (hmembers : ∀ o, o < counts.size → members[o]! = lab[cell1 + o]!)
+    (hX : cell1 + counts.size ≤ X.size) (hL : cell1 + counts.size ≤ lab.size)
+    (p : Nat) (hp1 : cell1 ≤ p) (hp2 : p < cell1 + counts.size) :
+    ((List.range counts.size).foldl (fun a k =>
+        a.set! (dest counts bmin (fun w => cell1 + baseOff counts bmin w) k) members[k]!) X)[p]! =
+      (writeSegment lab cell1
+        (segmentOf lab cell1 counts.toList (countValues counts.toList)))[p]! := by
+  let starts : Array Nat := ((List.range W).map fun w => cell1 + baseOff counts bmin w).toArray
+  have hssize : starts.size = W := by simp [starts]
+  have hs0 : ∀ w, w < W → starts[w]! = cell1 + baseOff counts bmin w := by
+    intro w hw
+    rw [getElem!_pos starts w (by rw [hssize]; exact hw)]
+    simp [starts]
+  rw [← place_getElem! lab counts members X cell1 bmin W hmem hbd hcv hmembers starts hssize hs0
+    hX hL p hp1 hp2]
+  have hinv : ∀ w, w < starts.size → starts[w]! =
+      (fun w => cell1 + baseOff counts bmin w) w + placed counts bmin 0 w := by
+    intro w hw; rw [placed_zero, Nat.add_zero]; exact hs0 w (by rw [← hssize]; exact hw)
+  have hbound : ∀ o, 0 ≤ o → o < 0 + counts.size → counts[o]! - bmin < starts.size := by
+    intro o _ ho; rw [hssize]; exact hbd o (by omega)
+  rw [ntcPlace_eq_fold counts members bmin _ counts.size 0 X starts hinv hbound]
+  simp only [Nat.zero_add]
+
+/-- The scatter's destinations lie in the cell. -/
+theorem dest_range (counts : Array Nat) (bmin W cell1 : Nat)
+    (hbd : ∀ q, q < counts.size → counts[q]! - bmin < W) (o : Nat) (ho : o < counts.size) :
+    cell1 ≤ dest counts bmin (fun w => cell1 + baseOff counts bmin w) o ∧
+      dest counts bmin (fun w => cell1 + baseOff counts bmin w) o < cell1 + counts.size := by
+  have h := destOff_lt counts bmin W hbd o ho
+  rw [destOff] at h
+  rw [dest]
+  omega
+
 end NautyVerified.Spec.Ntc

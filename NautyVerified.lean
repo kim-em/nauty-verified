@@ -86,6 +86,7 @@ import NautyVerified.Proofs.Refine.WindowN
 import NautyVerified.Proofs.Refine.CellCount
 import NautyVerified.Proofs.Refine.Upd
 import NautyVerified.Proofs.Refine.ScanN
+import NautyVerified.Proofs.Refine.PlaceN
 import NautyVerified.Proofs.Isautom.Scan
 import NautyVerified.Proofs.Isautom.Satisfies
 import NautyVerified.Proofs.Permset.Syntax
