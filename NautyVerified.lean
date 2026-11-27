@@ -27,6 +27,7 @@ import NautyVerified.Spec.Setwords
 import NautyVerified.Logic.PtrArith
 import NautyVerified.Proofs.Set.Clear
 import NautyVerified.Proofs.Set.Add
+import NautyVerified.Proofs.Set.Global
 import NautyVerified.Proofs.Set.Inter
 import NautyVerified.Proofs.Breakout.Rotate
 import NautyVerified.Proofs.Breakout.Satisfies
