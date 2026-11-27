@@ -160,4 +160,18 @@ theorem TcChain.snoc {m m' : mem} {M : Nat} {S : block → Prop} (hu : Unch m m'
       · simp
       · exact .tail _ (.tail _ (.tail _ hz))
 
+/-- Entry `i`'s node points to its target cell, an array of `M` words. -/
+theorem TcChain.cell {m : mem} {M : Nat} :
+    ∀ {prev : block} {chain : List (block × block)} {i : Nat} {nd tc : block},
+      TcChain m M prev chain → chain[i]? = some (nd, tc) →
+      FieldAt m .Mint64 nd 8 (.Vptr tc Ptrofs.zero) ∧ ∃ vals, ArrayAt m .Mint64 tc 0 vals M
+  | _, [], _, _, _, _, h => by simp at h
+  | _, (q, t) :: _, 0, _, _, h, he => by
+    simp only [List.getElem?_cons_zero, Option.some.injEq, Prod.mk.injEq] at he
+    obtain ⟨rfl, rfl⟩ := he
+    exact ⟨h.2.1, h.2.2.1⟩
+  | _, _ :: _, i + 1, _, _, h, he => by
+    simp only [List.getElem?_cons_succ] at he
+    exact TcChain.cell h.2.2.2 he
+
 end NautyVerified.Proofs.Search
