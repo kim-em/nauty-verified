@@ -251,6 +251,30 @@ Each item is an issue; items in 1 and 2 parallelise once Phase 2 and the
 Rep definitions exist. Expected size: 25-40 Lean lines per C line on set
 code; total C-side 100k-200k lines (estimate from one function).
 
+Status: proved against HexGraphIso (`*_satisfies`, axiom-clean):
+`nextelement`, `orbjoin`, `breakout`, `fmptn`, `shortprune`, `longprune`.
+
+Conventions settled while doing these:
+
+- An `int` array holding `o : Array Nat` is `ArrayAt … (ints o) n`; a set of
+  `M` words `ws` is `ArrayAt … (longs ws) M` together with
+  `SetRep (bv64 ∘ ws) M s`. Specs return the words existentially (or as a
+  named function such as `Set.single`, `Set.addW`, `Set.andW`) plus the
+  `SetRep` of the Hex result, so callers never see bit layouts.
+- nauty's set macros are generic lemmas in `Proofs/Set/` (`EMPTYSET`,
+  `ADDELEMENT`, word-wise `INTERSECT` loops, the `NOTSUBSET` scan),
+  instantiated per function by the identifiers SimplExpr chose.
+- Each function's frame (pointer temporaries, read-only arrays, block
+  disjointness) is a structure with `temps` and `unch` transport lemmas.
+- Hex functions written with `Id.run do` loops are unrolled once into folds
+  (`orbjoin_eq`, `fmptn_eq`, `longprune_eq`) and the C loops are matched
+  against the folds, iteration by iteration.
+- Word offsets inside the workspace are carried as `Nat` atoms advanced by
+  `M + M` (`PairsAt`), never as products, so `omega` closes the arithmetic.
+- `longprune` is specified over an arbitrary contiguous run of pairs; how
+  nauty's ring of `fmptr` pairs maps to `SearchState.autos` belongs to its
+  callers.
+
 ## Phase 6: dense end-to-end
 
 Compose Phase 5 with Phase 3 into `densenauty_binary_correct`; derive the
