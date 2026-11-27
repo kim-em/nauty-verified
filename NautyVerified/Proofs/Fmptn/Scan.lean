@@ -151,7 +151,7 @@ theorem wp_scan {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {b
     · rw [ite_eq_right (by simpa using hlt)]
       apply wp_skip
       refine ⟨by simp, rfl, rfl, j + 1, by omega, by omega, by omega, ?_, ?_, hrest⟩
-      · simp (config := {decide := true}) only [le2, temps_gss]; rfl
+      · simp (config := {decide := true}) only [temps_gss]; rfl
       · rw [hlmin2, hnext, ite_eq_right hlt]
   · rintro v t e' le' m' ⟨rfl, rfl, rfl, j, hj1, hj2, rfl, hij, hlj, ho⟩
     have hf := hother le' ho

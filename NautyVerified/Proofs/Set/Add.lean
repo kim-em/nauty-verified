@@ -45,6 +45,10 @@ theorem eval_word {e : env} {le : temp_env} {m : mem} {ba : block} {ofs : ptrofs
   rw [h8] at hf ⊢
   omega
 
+/-- The words after `ADDELEMENT(s, c)` on words `ws`. -/
+abbrev addW (ws : Nat → Lib.Integers.int64) (c : Nat) : Nat → Lib.Integers.int64 :=
+  upd ws (c / 64) (Int64.or (ws (c / 64)) (lr ((2 ^ (63 - c % 64) : Nat) : Int)))
+
 theorem longs_upd (ws : Nat → Lib.Integers.int64) (i : Nat) (x : Lib.Integers.int64) :
     upd (longs ws) i (.Vlong x) = longs (upd ws i x) := by
   funext j; simp only [upd, longs]; split <;> rfl
@@ -70,8 +74,7 @@ theorem wp_addElement {s : Common.AST.ident} {a : expr} {f : function} {Q : Post
     (htc : Exec.evalExpr ge e le m a = some (.Vint (ir c))) (hty : typeof a = tint) (hc : c < 64 * M) (hc2 : c < 2147483648)
     (hbit : BitTable m Block.nautilBit) (he : PTree.get bit e = none)
     (hQ : ∀ m', ArrayAt m' .Mint64 ba (intOfZ (Ptrofs.unsigned ofs))
-        (longs (upd ws (c / 64) (Int64.or (ws (c / 64)) (lr ((2 ^ (63 - c % 64) : Nat) : Int)))))
-        M →
+        (longs (addW ws c)) M →
       Unch m m' (· = ba) → Q.normal E0 e le m') :
     Wp xi ge f (addElement s a) Q e le m := by
   have hw : c / 64 < M := by omega
@@ -119,6 +122,31 @@ open CompCert4Lean.Lib.Integers NautyVerified.Logic NautyVerified.Word NautyVeri
 theorem BitTable.unch {m m' : mem} {S : block → Prop} {b : block} (h : BitTable m b)
     (hu : Unch m m' S) (hb : ¬ S b) : BitTable m' b := fun i hi => by
   rw [hu.load _ _ _ hb]; exact h i hi
+
+theorem setRep_zero {n M : Nat} (hn : n ≤ 64 * M) :
+    SetRep (fun w : Nat => bv64 ((fun _ : Nat => lr 0) w)) M
+      (Hex.GraphIso.Nauty.VSet.empty : Hex.GraphIso.Nauty.VSet n) := by
+  have h := setRep_empty (n := n) hn
+  have he : (fun w : Nat => bv64 ((fun _ : Nat => lr 0) w)) = fun _ => (0 : BitVec 64) := by
+    funext w; simp [intOfZ_zOfInt]
+  rw [he]; exact h
+
+/-- `ADDELEMENT` on words representing `s` gives words representing `s.insert c`. -/
+theorem setRep_add {n M c : Nat} {ws : Nat → Lib.Integers.int64} {s : Hex.GraphIso.Nauty.VSet n}
+    (h : SetRep (fun w => bv64 (ws w)) M s) (hc : c < n) :
+    SetRep (fun w => bv64 (addW ws c w)) M (s.insert c) := by
+  have h' := setRep_insert h hc
+  have he : (fun w => bv64 (upd ws (c / 64) (Int64.or (ws (c / 64))
+      (lr ((2 ^ (63 - c % 64) : Nat) : Int))) w)) =
+      fun w => if w = c / 64 then (fun w => bv64 (ws w)) w ||| bitAt (c % 64)
+        else (fun w => bv64 (ws w)) w := by
+    funext w
+    simp only [upd]
+    split
+    · rename_i hw; subst hw
+      simp only [bv64_or, bv64_repr, intOfZ_zOfInt, bitAt, BitVec.ofInt_natCast]
+    · rfl
+  rw [he]; exact h'
 
 /-- The words of `{c}`. -/
 def single (c : Nat) : Nat → Lib.Integers.int64 :=

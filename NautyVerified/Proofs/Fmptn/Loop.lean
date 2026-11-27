@@ -1,0 +1,133 @@
+import NautyVerified.Proofs.Fmptn.Scan
+
+/-!
+# The cells of `fmptn`
+
+`wp_single` and `wp_cell`: one iteration of `fmptn`'s loop at the start `c` of
+a cell adds, as HexGraphIso's `cellStep`, the vertex of a trivial cell to
+`fix` and `mcr`, or the least vertex of a nontrivial cell to `mcr`.
+-/
+
+namespace NautyVerified.Proofs.Fmptn
+
+open CompCert4Lean CompCert4Lean.Cfrontend.Clight CompCert4Lean.Common.Globalenvs
+open CompCert4Lean.Common.Values CompCert4Lean.Common.ExternalCalls CompCert4Lean.Common.Events
+open CompCert4Lean.Common.Memory CompCert4Lean.Common.AST
+open CompCert4Lean.Foundation.Numbers.Rocq.Coq CompCert4Lean.Lib.Maps CompCert4Lean.Lib.Integers
+open NautyVerified NautyVerified.Logic NautyVerified.Program NautyVerified.Word NautyVerified.Spec
+open NautyVerified.Proofs.Set (longs addW BitTable)
+open Hex.GraphIso.Nauty (VSet)
+
+variable {xi : ExternalCalls}
+
+/-- The two result sets, `fix` (words `wf`, representing `fx`) and `mcr`
+(words `wm`, representing `mc`), in their blocks, with the `bit` table. -/
+structure Sets (m : mem) (le : temp_env) (bf : block) (fofs : ptrofs) (bm : block)
+    (mofs : ptrofs) (n M : Nat) (wf wm : Nat → Lib.Integers.int64) (fx mc : VSet n) : Prop where
+  hfix : PTree.get id.fix le = some (.Vptr bf fofs)
+  hmcr : PTree.get id.mcr le = some (.Vptr bm mofs)
+  farr : ArrayAt m .Mint64 bf (intOfZ (Ptrofs.unsigned fofs)) (longs wf) M
+  marr : ArrayAt m .Mint64 bm (intOfZ (Ptrofs.unsigned mofs)) (longs wm) M
+  frep : SetRep (fun w => bv64 (wf w)) M fx
+  mrep : SetRep (fun w => bv64 (wm w)) M mc
+  bit : BitTable m Block.nautilBit
+  Mlt : M < 2147483648
+  nM : n ≤ 64 * M
+
+/-- The blocks of `fmptn`'s arrays are distinct. -/
+structure Disjoint (bl bp bf bm : block) : Prop where
+  fm : bf ≠ bm
+  fl : bf ≠ bl
+  fp : bf ≠ bp
+  ml : bm ≠ bl
+  mp : bm ≠ bp
+  bf : Block.nautilBit ≠ bf
+  bm : Block.nautilBit ≠ bm
+
+theorem Sets.temps {m : mem} {le le' : temp_env} {bf : block} {fofs : ptrofs} {bm : block}
+    {mofs : ptrofs} {n M : Nat} {wf wm : Nat → Lib.Integers.int64} {fx mc : VSet n}
+    (h : Sets m le bf fofs bm mofs n M wf wm fx mc)
+    (hle : ∀ k, k ≠ id.i → k ≠ id.lmin → k ≠ id.t3 → k ≠ id.es → k ≠ id.es1 → k ≠ id.t1 →
+      k ≠ id.t2 → PTree.get k le' = PTree.get k le) :
+    Sets m le' bf fofs bm mofs n M wf wm fx mc :=
+  { h with
+    hfix := by rw [hle _ (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
+      (by decide)]; exact h.hfix
+    hmcr := by rw [hle _ (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
+      (by decide)]; exact h.hmcr }
+
+theorem wp_single {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {bl : block}
+    {lofs : ptrofs} {bp : block} {pofs : ptrofs} {bf : block} {fofs : ptrofs} {bm : block}
+    {mofs : ptrofs} {lab ptn : Array Nat} {n level M c : Nat} {wf wm : Nat → Lib.Integers.int64}
+    {fx mc : VSet n}
+    (h : Frame m le bl lofs bp pofs lab ptn n level) (hs : Sets m le bf fofs bm mofs n M wf wm fx mc)
+    (hd : Disjoint bl bp bf bm) (he : PTree.get Set.bit e = none) (hc : c < n)
+    (hi : PTree.get id.i le = some (.Vint (ir c)))
+    (hQ : ∀ m', Frame m' le bl lofs bp pofs lab ptn n level →
+      Sets m' le bf fofs bm mofs n M (addW wf lab[c]!) (addW wm lab[c]!)
+        (fx.insert lab[c]!) (mc.insert lab[c]!) →
+      Unch m m' (fun b => b = bf ∨ b = bm) → Q.normal E0 e le m') :
+    Wp xi ge f single Q e le m := by
+  have hlc := h.lsmall c hc
+  have hn := h.nlt
+  have hnM := hs.nM
+  have hev : ∀ m', Frame m' le bl lofs bp pofs lab ptn n level →
+      Exec.evalExpr ge e le m' (at_ id.lab (tv id.i)) = some (.Vint (ir (lab[c]! : Int))) :=
+    fun m' hf => eval_at hf.larr hf.nlt id.lab hf.hlab (tv id.i) c hc hi rfl
+  wp_step
+  refine Set.wp_addElement hs.farr hs.Mlt hs.hfix (hev m h) rfl (by omega) (by omega) hs.bit he ?_
+  intro m1 harr1 hu1
+  have hf1 := h.unch hu1 (Ne.symm hd.fl) (Ne.symm hd.fp)
+  refine Set.wp_addElement (hs.marr.unch hu1 (Ne.symm hd.fm)) hs.Mlt hs.hmcr (hev m1 hf1) rfl
+    (by omega) (by omega) (hs.bit.unch hu1 hd.bf) he ?_
+  intro m2 harr2 hu2
+  apply hQ m2 (hf1.unch hu2 (Ne.symm hd.ml) (Ne.symm hd.mp))
+    ⟨hs.hfix, hs.hmcr, harr1.unch hu2 hd.fm, harr2, Set.setRep_add hs.frep hlc,
+      Set.setRep_add hs.mrep hlc, (hs.bit.unch hu1 hd.bf).unch hu2 hd.bm, hs.Mlt, hs.nM⟩
+  exact (hu1.mono fun b hb => .inl hb).trans (hu2.mono fun b hb => .inr hb)
+
+theorem wp_cell {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {bl : block}
+    {lofs : ptrofs} {bp : block} {pofs : ptrofs} {bf : block} {fofs : ptrofs} {bm : block}
+    {mofs : ptrofs} {lab ptn : Array Nat} {n level M c c2 : Nat} {wf wm : Nat → Lib.Integers.int64}
+    {fx mc : VSet n}
+    (h : Frame m le bl lofs bp pofs lab ptn n level) (hs : Sets m le bf fofs bm mofs n M wf wm fx mc)
+    (hd : Disjoint bl bp bf bm) (he : PTree.get Set.bit e = none) (hc : c < c2) (hc2 : c2 < n)
+    (hend : ptn[c2]! ≤ level) (hgt : ∀ k, c ≤ k → k < c2 → level < ptn[k]!)
+    (hi : PTree.get id.i le = some (.Vint (ir c)))
+    (hQ : ∀ le' m', PTree.get id.i le' = some (.Vint (ir c2)) →
+      Frame m' le' bl lofs bp pofs lab ptn n level →
+      Sets m' le' bf fofs bm mofs n M wf (addW wm (scanMin lab (List.range' (c + 1) (c2 - c)) lab[c]!))
+        fx (mc.insert (scanMin lab (List.range' (c + 1) (c2 - c)) lab[c]!)) →
+      Unch m m' (fun b => b = bf ∨ b = bm) →
+      (∀ k, k ≠ id.i → k ≠ id.lmin → k ≠ id.t3 → PTree.get k le' = PTree.get k le) →
+      Q.normal E0 e le' m') :
+    Wp xi ge f cell Q e le m := by
+  have hn := h.nlt
+  have hnM := hs.nM
+  have hlc := eval_at (ge := ge) (e := e) h.larr h.nlt id.lab h.hlab (tv id.i) c (by omega) hi rfl
+  wp_step; wp_step; wp_step
+  apply wp_set_eval
+  rw [hlc]
+  simp only [ints]
+  let le1 := PTree.set id.lmin (.Vint (ir (lab[c]! : Int))) le
+  have ho1 : ∀ k, k ≠ id.lmin → PTree.get k le1 = PTree.get k le := fun k hk => temps_gso _ _ hk
+  have hf1 : Frame m le1 bl lofs bp pofs lab ptn n level :=
+    h.temps fun k _ h2 _ _ _ _ _ => ho1 k h2
+  wp_step
+  refine wp_scan hf1 hc hc2 hend hgt (by rw [ho1 _ (by decide)]; exact hi) (temps_gss _ _ _) ?_
+  intro le2 hi2 hl2 ho2
+  have hs2 : Sets m le2 bf fofs bm mofs n M wf wm fx mc :=
+    hs.temps fun k h1 h2 h3 _ _ _ _ => by rw [ho2 k h1 h2 h3, ho1 k h2]
+  have hf2 : Frame m le2 bl lofs bp pofs lab ptn n level :=
+    h.temps fun k h1 h2 h3 _ _ _ _ => by rw [ho2 k h1 h2 h3, ho1 k h2]
+  have hsm := scanMin_lt (lab := lab) (B := n) (List.range' (c + 1) (c2 - c)) lab[c]!
+    (fun x hx => h.lsmall x (by simp [List.mem_range'] at hx; omega)) (h.lsmall c (by omega))
+  refine Set.wp_addElement hs2.marr hs2.Mlt hs2.hmcr hl2 rfl (by omega) (by omega) hs2.bit he ?_
+  intro m3 harr3 hu3
+  refine hQ le2 m3 hi2 (hf2.unch hu3 (Ne.symm hd.ml) (Ne.symm hd.mp))
+    ⟨hs2.hfix, hs2.hmcr, hs2.farr.unch hu3 hd.fm, harr3, hs2.frep, Set.setRep_add hs2.mrep hsm,
+      hs2.bit.unch hu3 hd.bm, hs2.Mlt, hs2.nM⟩ (hu3.mono fun b hb => .inr hb) ?_
+  intro k h1 h2 h3
+  rw [ho2 k h1 h2 h3, ho1 k h2]
+
+end NautyVerified.Proofs.Fmptn
