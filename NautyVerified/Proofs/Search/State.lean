@@ -10,13 +10,14 @@ import NautyVerified.Proofs.Alloc.Dyn3
 blocks of nauty.c's `DYNALLSTAT` arrays; the harness's automorphism
 callback; `M`.
 
-`SearchAt m S st pre`: memory holds HexGraphIso's search state `st` (a
+`SearchAt m S ctx st pre nsp`: memory holds HexGraphIso's search state `st` (a
 `Search n`, run with `inf = NAUTY_INFINITY`, see `Spec/SearchInf.lean`):
 
 - the pointer globals, the option copies and the dispatch table hold the
   values the pinned configuration gives them (`Fixed`);
-- each static `int` of nauty.c holds the field of `st` it mirrors
-  (`Scalars`);
+- each static `int` of nauty.c holds the field of `st` it mirrors, and
+  `needshortprune` holds `nsp` (`Scalars`): HexGraphIso carries the
+  short-prune request in `Exit.unwind`, nauty in this global;
 - the members of the caller's `statsblk` hold `st`'s counters (`Stats`);
   `maxlevel` only once the first leaf is reached (`pre = false`): before
   that the harness has not initialised it, and nothing reads it;
@@ -156,7 +157,7 @@ structure Fixed (n : Nat) (m : mem) (S : SLoc) : Prop where
   allocM : IntAt m Block.allocM S.M
 
 /-- nauty.c's static `int`s hold `st`'s fields. -/
-structure Scalars {n : Nat} (m : mem) (st : Search n) : Prop where
+structure Scalars {n : Nat} (m : mem) (st : Search n) (nsp : Bool) : Prop where
   gcaFirst : IntAt m Block.gcaFirst st.gcaFirst
   gcaCanon : IntAt m Block.gcaCanon st.gcaCanon
   noncheaplevel : IntAt m Block.noncheaplevel st.noncheaplevel
@@ -168,7 +169,7 @@ structure Scalars {n : Nat} (m : mem) (st : Search n) : Prop where
   canonlevel : IntAt m Block.canonlevel st.canonlevel
   stabvertex : IntAt m Block.stabvertex st.stabvertex
   cosetindex : IntAt m Block.cosetindex st.cosetindex
-  needshortprune : IntAt m Block.needshortprune 0
+  needshortprune : IntAt m Block.needshortprune (if nsp then 1 else 0)
 
 /-- The `statsblk` members (x86-64 layout) hold `st`'s counters; `maxlevel`
 only once the first leaf is reached. -/
@@ -306,10 +307,10 @@ structure SInv {n : Nat} (st : Search n) : Prop where
   samerows : st.samerows ≤ n
 
 /-- Memory holds HexGraphIso's search state `st` for the graph `ctx`. -/
-structure SearchAt {n : Nat} (m : mem) (S : SLoc) (ctx : Ctx n) (st : Search n) (pre : Bool) :
+structure SearchAt {n : Nat} (m : mem) (S : SLoc) (ctx : Ctx n) (st : Search n) (pre nsp : Bool) :
     Prop where
   fixed : Fixed n m S
-  scalars : Scalars m st
+  scalars : Scalars m st nsp
   stats : Stats m S st pre
   arrays : Arrays m S ctx st
   dyns : Dyns n m S
