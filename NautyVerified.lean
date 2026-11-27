@@ -97,6 +97,7 @@ import NautyVerified.Proofs.Search.Node.Rebuild
 import NautyVerified.Proofs.Search.Step
 import NautyVerified.Proofs.Search.Node.OkOff
 import NautyVerified.Proofs.Search.Node.Compare
+import NautyVerified.Proofs.Search.Node.OtherSteps
 import NautyVerified.Proofs.Search.Frame
 import NautyVerified.Proofs.Harness.Spec
 import NautyVerified.Proofs.Search.Node.Firstpathnode
