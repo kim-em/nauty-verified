@@ -22,6 +22,12 @@ def zalloc : Common.Values.block := PArith.BinPos.Pos.of_nat 132
 def nautilWorkperm : Common.Values.block := PArith.BinPos.Pos.of_nat 29
 /-- nautil.c's `static size_t workperm_sz`. -/
 def nautilWorkpermSz : Common.Values.block := PArith.BinPos.Pos.of_nat 199
+/-- naugraph.c's `static int *workperm`. -/
+def naugraphWorkperm : Common.Values.block := PArith.BinPos.Pos.of_nat 1
+/-- naugraph.c's `static size_t workperm_sz`. -/
+def naugraphWorkpermSz : Common.Values.block := PArith.BinPos.Pos.of_nat 176
+/-- `permset`'s block. -/
+def permset : Common.Values.block := PArith.BinPos.Pos.of_nat 300
 /-- naugraph.c's static `bit[64]`. -/
 def naugraphBit : Common.Values.block := PArith.BinPos.Pos.of_nat 295
 end Block
@@ -37,6 +43,14 @@ kernel_rfl find_nautilWorkpermSz :
 
 kernel_rfl find_naugraphBit :
   Genv.find_symbol ge.genv_genv dense.id.«naugraph:bit» = some Block.naugraphBit
+
+kernel_rfl find_naugraphWorkperm :
+  Genv.find_symbol ge.genv_genv dense.id.«naugraph:workperm» = some Block.naugraphWorkperm
+kernel_rfl find_naugraphWorkpermSz :
+  Genv.find_symbol ge.genv_genv dense.id.«naugraph:workperm_sz» = some Block.naugraphWorkpermSz
+kernel_rfl find_permset : Genv.find_symbol ge.genv_genv dense.id.permset = some Block.permset
+kernel_rfl funct_permset :
+  Genv.find_funct_ptr ge.genv_genv Block.permset = some (.Internal dense.fn.permset)
 
 kernel_rfl funct_malloc : Genv.find_funct_ptr ge.genv_genv Block.malloc =
   some (.External .EF_malloc [tulong] (tptr .Tvoid) Common.AST.cc_default)

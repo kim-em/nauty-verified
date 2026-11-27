@@ -68,3 +68,4 @@ import NautyVerified.Proofs.Permset.Word
 import NautyVerified.Proofs.Permset.Many
 import NautyVerified.Proofs.Permset.One
 import NautyVerified.Proofs.Permset.Satisfies
+import NautyVerified.Proofs.Updatecan.Syntax
