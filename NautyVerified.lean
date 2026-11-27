@@ -90,6 +90,7 @@ import NautyVerified.Proofs.Top.NautySyntax
 import NautyVerified.Proofs.Search.Node.Spec
 import NautyVerified.Proofs.Search.Node.OtherHex
 import NautyVerified.Proofs.Search.Node.Rebuild
+import NautyVerified.Proofs.Search.Node.OkOff
 import NautyVerified.Proofs.Search.Frame
 import NautyVerified.Proofs.Harness.Spec
 import NautyVerified.Proofs.Search.Node.Firstpathnode
@@ -139,6 +140,7 @@ import NautyVerified.Spec.RefineFuel
 import NautyVerified.Spec.SearchInf
 import NautyVerified.Spec.SearchInfRun
 import NautyVerified.Spec.NodeOk
+import NautyVerified.Spec.NodeOkOff
 import NautyVerified.Spec.NtcPlace
 import NautyVerified.Spec.CountWin
 import NautyVerified.Proofs.Testcanlab.Syntax
