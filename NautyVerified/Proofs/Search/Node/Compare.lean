@@ -179,4 +179,260 @@ theorem wp_codeFirst {f : function} {Q : Post} {e : env} {le : temp_env} {m : me
     simp only [hA, decide_false, Bool.false_and]
     rfl
 
+/-- `Arrays` after a store into `canoncode` only. -/
+theorem Arrays.setCanoncode {m m' : mem} {S : SLoc} {ctx : Ctx n} {st : Search n}
+    (h : Arrays m S ctx st) (hu : Unch m m' (· = S.bCC)) (hd : S.blocks.Pairwise (· ≠ ·))
+    {cc : Array Nat} (hcc : ArrayAt m' .Mint16signed S.bCC 0 (shorts cc) (n + 2)) :
+    Arrays m' S ctx { st with canoncode := cc } := by
+  obtain ⟨aw, ha, har⟩ := h.active
+  obtain ⟨fw, hf, hfr⟩ := h.fixedpts
+  obtain ⟨wv, hwv⟩ := h.workperm
+  exact ⟨h.lab.unch hu (by sep_ne hd), h.ptn.unch hu (by sep_ne hd),
+    h.orbits.unch hu (by sep_ne hd), ⟨aw, ha.unch hu (by sep_ne hd), har⟩,
+    ⟨fw, hf.unch hu (by sep_ne hd), hfr⟩, ⟨wv, hwv.unch hu (by sep_ne hd)⟩,
+    h.firstlab.unch hu (by sep_ne hd), h.canonlab.unch hu (by sep_ne hd),
+    h.firstcode.unch hu (by sep_ne hd), hcc, h.firsttc.unch hu (by sep_ne hd),
+    h.canong.unch hu (by sep_ne hd), h.autos.unch hu (by sep_ne hd) (by sep_ne hd),
+    ⟨h.graph.arr.unch hu (by sep_ne hd), h.graph.rep⟩⟩
+
+theorem SearchAt.setCompCanon {m m' : mem} {S : SLoc} {ctx : Ctx n} {st : Search n}
+    {pre nsp : Bool} (h : SearchAt m S ctx st pre nsp) (hu : Unch m m' (· ∈ [Block.compCanon]))
+    {v : Int} (iCC : IntAt m' Block.compCanon v) (hv1 : -1 ≤ v) (hv2 : v ≤ 1) :
+    SearchAt m' S ctx { st with compCanon := v } pre nsp := by
+  have sc := h.scalars
+  refine h.setScalars hu (fun z hz => by simp at hz; subst hz; decide)
+    ⟨sc.gcaFirst.unch hu (by decide), sc.gcaCanon.unch hu (by decide),
+      sc.noncheaplevel.unch hu (by decide), sc.allsamelevel.unch hu (by decide),
+      sc.eqlevFirst.unch hu (by decide), sc.eqlevCanon.unch hu (by decide), iCC,
+      sc.samerows.unch hu (by decide), sc.canonlevel.unch hu (by decide),
+      sc.stabvertex.unch hu (by decide), sc.cosetindex.unch hu (by decide),
+      sc.needshortprune.unch hu (by decide)⟩
+    { h.arrays with } { h.stats with } ?_
+  obtain ⟨s1, s2, s3, s4, s5, s6, s7, -, -, s10⟩ := h.inv.scalars
+  exact { h.inv with scalars := ⟨s1, s2, s3, s4, s5, s6, s7, hv1, hv2, s10⟩ }
+
+theorem SearchAt.setEqlevCanon {m m' : mem} {S : SLoc} {ctx : Ctx n} {st : Search n}
+    {pre nsp : Bool} (h : SearchAt m S ctx st pre nsp) (hu : Unch m m' (· ∈ [Block.eqlevCanon]))
+    {v : Int} (iEC : IntAt m' Block.eqlevCanon v) (hv1 : -1 ≤ v) (hv2 : v < 2147483648) :
+    SearchAt m' S ctx { st with eqlevCanon := v } pre nsp := by
+  have sc := h.scalars
+  refine h.setScalars hu (fun z hz => by simp at hz; subst hz; decide)
+    ⟨sc.gcaFirst.unch hu (by decide), sc.gcaCanon.unch hu (by decide),
+      sc.noncheaplevel.unch hu (by decide), sc.allsamelevel.unch hu (by decide),
+      sc.eqlevFirst.unch hu (by decide), iEC, sc.compCanon.unch hu (by decide),
+      sc.samerows.unch hu (by decide), sc.canonlevel.unch hu (by decide),
+      sc.stabvertex.unch hu (by decide), sc.cosetindex.unch hu (by decide),
+      sc.needshortprune.unch hu (by decide)⟩
+    { h.arrays with } { h.stats with } ?_
+  obtain ⟨s1, s2, s3, s4, s5, -, -, s8⟩ := h.inv.scalars
+  exact { h.inv with scalars := ⟨s1, s2, s3, s4, s5, hv1, hv2, s8⟩ }
+
+/-- The best-leaf comparison. -/
+def cmpCanonA (level code : Nat) (st : Search n) : Search n :=
+  if st.eqlevCanon == Int.ofNat level - 1 then
+    if code < st.canoncode[level]! then { st with compCanon := -1 }
+    else if code > st.canoncode[level]! then { st with compCanon := 1 }
+    else { st with compCanon := 0, eqlevCanon := Int.ofNat level }
+  else st
+
+/-- Saving the code when the node is better. -/
+def cmpCanonB (level code : Nat) (st : Search n) : Search n :=
+  if st.compCanon > (0 : Int) then { st with canoncode := st.canoncode.set! level code } else st
+
+theorem cmpCanon_eq (level code : Nat) (st : Search n) :
+    cmpCanon level code st = cmpCanonB level code (cmpCanonA level code st) := rfl
+
+/-- `if (comp_canon > 0) canoncode[level] = code;` -/
+theorem wp_canonB {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {S : SLoc}
+    {ctx : Ctx n} {st : Search n} {pre nsp : Bool} {level c : Nat}
+    (h : SearchAt m S ctx st pre nsp)
+    (hE1 : PTree.get dense.id.«nauty:comp_canon» e = none)
+    (hE2 : PTree.get dense.id.«nauty:canoncode» e = none)
+    (hlev : PTree.get dense.id.level le = some (.Vint (ir level)))
+    (hcode : PTree.get dense.id.code le = some (.Vint (ir c)))
+    (hc : c < 32768) (hn : level ≤ n)
+    (hQ : ∀ m', SearchAt m' S ctx (cmpCanonB level c st) pre nsp → Unch m m' (· ∈ [S.bCC]) →
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) → Q.normal E0 e le m') :
+    Wp xi ge f (.Sifthenelse (.Ebinop .Ogt (.Evar dense.id.«nauty:comp_canon» tint) (ci 0 tint) tint)
+      (sk (.Sassign (gats dense.id.«nauty:canoncode» (tv dense.id.level))
+        (.Etempvar dense.id.code tshort))) .Sskip) Q e le m := by
+  have hnl := h.nlt
+  have hd := h.distinct
+  obtain ⟨-, -, -, -, -, -, -, hc1, hc2, -⟩ := h.inv.scalars
+  apply wp_if_eval
+  rw [Exec.evalExpr, eval_gint hE1 find_compCanon h.scalars.compCanon]
+  simp only [Exec.evalExpr, typeof, cop]
+  rw [ir_lt (a := 0) (b := st.compCanon) ⟨by decide, by decide⟩ ⟨by omega, by omega⟩]
+  by_cases hp : (0 : Int) < st.compCanon
+  · rw [ite_eq_left (by simpa using hp)]
+    wp_step; wp_step
+    refine wp_gstoreS hE2 Program.find_nautyCanoncode
+      (h.dyns.canoncode.ptr (by have := h.dyns.capCC; omega)) h.arrays.canoncode (by omega)
+      (tv dense.id.level) level (by omega) hlev rfl (.Etempvar dense.id.code tshort) c hc hcode
+      (.inr rfl) ?_
+    intro m' harr hu hk hv
+    have hU : Unch m m' (· ∈ [S.bCC]) := hu.mono fun z hz => by simp [hz]
+    have hcs := h.inv.canoncodeSize
+    have hcB : cmpCanonB level c st = { st with canoncode := st.canoncode.set! level c } := by
+      unfold cmpCanonB; rw [ite_eq_left (by omega)]
+    refine hQ m' ?_ hU hv
+    rw [hcB]
+    refine h.rebuild hU (fun z hz => by simp at hz; subst hz; simp [SLoc.wr, SLoc.wrV])
+      (fun z hz => by
+        simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
+        rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
+        all_goals first | exact hk | exact Keep.unch hu (by sep_ne hd))
+      { h.scalars.unch hu (by sep_all hd) with } { h.stats.unch hu (by sep_ne hd) with }
+      (h.arrays.setCanoncode hu hd (by rw [shorts_set (by omega)]; exact harr)) ?_
+    have i := h.inv
+    exact { i with
+      codesSmall := fun j hj => by
+        refine ⟨(i.codesSmall j hj).1, ?_⟩
+        show (st.canoncode.set! level c)[j]! < 32768
+        by_cases hjl : j = level
+        · subst hjl; rw [Array.getElem!_set!_self _ _ _ (by omega)]; omega
+        · rw [Array.getElem!_set!_ne _ _ _ _ (Ne.symm hjl)]; exact (i.codesSmall j hj).2
+      canoncodeSize := by show (st.canoncode.set! level c).size = n + 2; simp [hcs] }
+  · rw [ite_eq_right (by simpa using hp)]
+    apply wp_skip
+    have hcB : cmpCanonB level c st = st := by unfold cmpCanonB; rw [ite_eq_right (by omega)]
+    exact hQ m (by rw [hcB]; exact h) (Unch.refl _ _) fun _ h => h
+
+/-- `if (eqlev_canon == level - 1) { if (code < canoncode[level]) comp_canon = -1; else if … }` -/
+theorem wp_canonA {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {S : SLoc}
+    {ctx : Ctx n} {st : Search n} {pre nsp : Bool} {level c : Nat}
+    (h : SearchAt m S ctx st pre nsp)
+    (hE1 : PTree.get dense.id.«nauty:comp_canon» e = none)
+    (hE2 : PTree.get dense.id.«nauty:canoncode» e = none)
+    (hE3 : PTree.get dense.id.«nauty:eqlev_canon» e = none)
+    (hlev : PTree.get dense.id.level le = some (.Vint (ir level)))
+    (hcode : PTree.get dense.id.code le = some (.Vint (ir c)))
+    (hc : c < 32768) (h1 : 1 ≤ level) (hn : level ≤ n)
+    (hQ : ∀ m', SearchAt m' S ctx (cmpCanonA level c st) pre nsp →
+      Unch m m' (· ∈ [Block.compCanon, Block.eqlevCanon]) →
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) → Q.normal E0 e le m') :
+    Wp xi ge f
+      (.Sifthenelse
+        (.Ebinop .Oeq (.Evar dense.id.«nauty:eqlev_canon» tint)
+          (.Ebinop .Osub (tv dense.id.level) (ci 1 tint) tint) tint)
+        (sk (.Sifthenelse
+          (.Ebinop .Olt (.Etempvar dense.id.code tshort) (gats dense.id.«nauty:canoncode» (tv dense.id.level)) tint)
+          (sk (.Sassign (.Evar dense.id.«nauty:comp_canon» tint) (.Eunop .Oneg (ci 1 tint) tint)))
+          (sk (.Sifthenelse
+            (.Ebinop .Ogt (.Etempvar dense.id.code tshort) (gats dense.id.«nauty:canoncode» (tv dense.id.level)) tint)
+            (sk (.Sassign (.Evar dense.id.«nauty:comp_canon» tint) (ci 1 tint)))
+            (.Ssequence
+              (sk (.Sassign (.Evar dense.id.«nauty:comp_canon» tint) (ci 0 tint)))
+              (sk (.Sassign (.Evar dense.id.«nauty:eqlev_canon» tint) (tv dense.id.level))))))))
+        .Sskip) Q e le m := by
+  have hnl := h.nlt
+  have hd := h.distinct
+  obtain ⟨-, -, -, -, -, he1, he2, -⟩ := h.inv.scalars
+  have hcc := h.inv.codesSmall level (by omega)
+  have hCC : Exec.evalExpr ge e le m (gats dense.id.«nauty:canoncode» (tv dense.id.level)) =
+      some (.Vint (ir (st.canoncode[level]! : Int))) :=
+    eval_gats hE2 Program.find_nautyCanoncode (h.dyns.canoncode.ptr (by have := h.dyns.capCC; omega))
+      h.arrays.canoncode (by omega) (tv dense.id.level) level (by omega) hlev rfl
+  have hcd : Exec.evalExpr ge e le m (.Etempvar dense.id.code tshort) = some (.Vint (ir c)) := hcode
+  have mono2 : ∀ {m'}, Unch m m' (· ∈ [Block.compCanon]) →
+      Unch m m' (· ∈ [Block.compCanon, Block.eqlevCanon]) :=
+    fun hu => hu.mono fun z hz => by simp at hz ⊢; exact .inl hz
+  apply wp_if_eval
+  rw [Exec.evalExpr, eval_gint hE3 find_eqlevCanon h.scalars.eqlevCanon]
+  simp only [Exec.evalExpr, hlev, tv, typeof, cop, ir_sub]
+  rw [ir_eq (a := st.eqlevCanon) (b := (level : Int) - 1) ⟨by omega, by omega⟩ ⟨by omega, by omega⟩]
+  by_cases hA : st.eqlevCanon = (level : Int) - 1
+  · rw [ite_eq_left (by simpa using hA)]
+    wp_step; wp_step
+    apply wp_if_eval
+    rw [Exec.evalExpr, hcd, hCC]
+    simp only [typeof, cop]
+    rw [ir_lt (a := (c : Int)) (b := (st.canoncode[level]! : Int)) ⟨by omega, by omega⟩
+      ⟨by omega, by omega⟩]
+    by_cases hlt : c < st.canoncode[level]!
+    · rw [ite_eq_left (by simp; omega)]
+      wp_step; wp_step
+      refine wp_gint hE1 find_compCanon h.scalars.compCanon.writable (x := -1)
+        (by simp [Exec.evalExpr, typeof, cop]) rfl ?_
+      intro m' iCC hu hv
+      have hU : Unch m m' (· ∈ [Block.compCanon]) := hu.mono fun z hz => by simp [hz]
+      have hA' : cmpCanonA level c st = { st with compCanon := -1 } := by
+        unfold cmpCanonA; simp [hA, hlt]
+      exact hQ m' (by rw [hA']; exact h.setCompCanon hU iCC (by decide) (by decide)) (mono2 hU) hv
+    · rw [ite_eq_right (by simp; omega)]
+      wp_step; wp_step
+      apply wp_if_eval
+      rw [Exec.evalExpr, hcd, hCC]
+      simp only [typeof, cop]
+      rw [ir_lt (a := (st.canoncode[level]! : Int)) (b := (c : Int)) ⟨by omega, by omega⟩
+        ⟨by omega, by omega⟩]
+      by_cases hgt : st.canoncode[level]! < c
+      · rw [ite_eq_left (by simp; omega)]
+        wp_step; wp_step
+        refine wp_gint hE1 find_compCanon h.scalars.compCanon.writable (x := 1)
+          (by simp [Exec.evalExpr, typeof, cop]) rfl ?_
+        intro m' iCC hu hv
+        have hU : Unch m m' (· ∈ [Block.compCanon]) := hu.mono fun z hz => by simp [hz]
+        have hA' : cmpCanonA level c st = { st with compCanon := 1 } := by
+          unfold cmpCanonA; simp [hA, hlt, hgt]
+        exact hQ m' (by rw [hA']; exact h.setCompCanon hU iCC (by decide) (by decide)) (mono2 hU) hv
+      · rw [ite_eq_right (by simp; omega)]
+        wp_step; wp_step; wp_step
+        refine wp_gint hE1 find_compCanon h.scalars.compCanon.writable (x := 0)
+          (by simp [Exec.evalExpr, typeof, cop]) rfl ?_
+        intro m₁ iCC hu₁ hv₁
+        have hU₁ : Unch m m₁ (· ∈ [Block.compCanon]) := hu₁.mono fun z hz => by simp [hz]
+        have h₁ := h.setCompCanon hU₁ iCC (by decide) (by decide)
+        simp only [seqPost, Post.after, E0_append]
+        wp_step; wp_step
+        refine wp_gint hE3 find_eqlevCanon h₁.scalars.eqlevCanon.writable (x := level)
+          (show Exec.evalExpr ge e le m₁ (tv dense.id.level) = _ from hlev) rfl ?_
+        intro m₂ iEC hu₂ hv₂
+        have hU₂ : Unch m₁ m₂ (· ∈ [Block.eqlevCanon]) := hu₂.mono fun z hz => by simp [hz]
+        have hA' : cmpCanonA level c st =
+            { { st with compCanon := 0 } with eqlevCanon := (level : Int) } := by
+          unfold cmpCanonA; simp [hA, hlt, hgt]
+        refine hQ m₂ (by rw [hA']; exact h₁.setEqlevCanon hU₂ iEC (by omega) (by omega)) ?_
+          fun z hz => hv₂ z (hv₁ z hz)
+        exact (mono2 hU₁).trans (hU₂.mono fun z hz => by simp at hz ⊢; exact .inr hz)
+  · rw [ite_eq_right (by simpa using hA)]
+    apply wp_skip
+    have hA' : cmpCanonA level c st = st := by unfold cmpCanonA; simp [hA]
+    exact hQ m (by rw [hA']; exact h) (Unch.refl _ _) fun _ h => h
+
+/-- `codeCanon`: `cmpCanon`, the best-leaf half of `compareCodes`. -/
+theorem wp_codeCanon {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {S : SLoc}
+    {ctx : Ctx n} {st : Search n} {pre nsp : Bool} {level c : Nat}
+    (h : SearchAt m S ctx st pre nsp)
+    (hE0 : PTree.get dense.id.«nauty:getcanon» e = none)
+    (hE1 : PTree.get dense.id.«nauty:comp_canon» e = none)
+    (hE2 : PTree.get dense.id.«nauty:canoncode» e = none)
+    (hE3 : PTree.get dense.id.«nauty:eqlev_canon» e = none)
+    (hlev : PTree.get dense.id.level le = some (.Vint (ir level)))
+    (hcode : PTree.get dense.id.code le = some (.Vint (ir c)))
+    (hc : c < 32768) (h1 : 1 ≤ level) (hn : level ≤ n)
+    (hQ : ∀ m', SearchAt m' S ctx (cmpCanon level c st) pre nsp →
+      Unch m m' (· ∈ [Block.compCanon, Block.eqlevCanon, S.bCC]) →
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) → Q.normal E0 e le m') :
+    Wp xi ge f Othernode.codeCanon Q e le m := by
+  simp only [Othernode.codeCanon]
+  apply wp_if_eval
+  rw [eval_gint hE0 find_getcanon h.fixed.getcanon]
+  simp only [typeof, cop]
+  rw [ite_eq_left (by decide)]
+  wp_step; wp_step; wp_step
+  refine wp_canonA h hE1 hE2 hE3 hlev hcode hc h1 hn ?_
+  intro m₁ h₁ hu₁ hv₁
+  simp only [seqPost, Post.after, E0_append]
+  wp_step; wp_step
+  refine wp_canonB h₁ hE1 hE2 hlev hcode hc hn ?_
+  intro m₂ h₂ hu₂ hv₂
+  refine hQ m₂ (by rw [cmpCanon_eq]; exact h₂) ?_ fun z hz => hv₂ z (hv₁ z hz)
+  exact (hu₁.mono fun z hz => by
+    simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz ⊢
+    rcases hz with hz | hz
+    · exact .inl hz
+    · exact .inr (.inl hz)).trans (hu₂.mono fun z hz => by
+    simp at hz ⊢; exact .inr (.inr hz))
+
 end NautyVerified.Proofs.Search
