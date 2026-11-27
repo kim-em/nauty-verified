@@ -1,19 +1,22 @@
-import NautyVerified.Proofs.Breakout.Clear
+import NautyVerified.Proofs.Set.Clear
+import NautyVerified.Spec.Setwords
 
 /-!
-# `ADDELEMENT` in `breakout`
+# `ADDELEMENT`
 
-`wp_add`: `active[tc >> 6] |= bit[tc & 63]` sets bit `tc` of the active set,
-reading nautil.c's `bit` table.
+`wp_addElement`: `s[a >> 6] |= bit[a & 63]`, for an `int` expression `a`
+holding `c`, sets bit `c` of the set `s`, reading nautil.c's `bit` table.
+`setRep_single`: the words `EMPTYSET` then `ADDELEMENT(s, c)` leave represent
+`{c}`.
 -/
 
-namespace NautyVerified.Proofs.Breakout
+namespace NautyVerified.Proofs.Set
 
 open CompCert4Lean CompCert4Lean.Cfrontend.Clight CompCert4Lean.Common.Globalenvs
 open CompCert4Lean.Common.Values CompCert4Lean.Common.ExternalCalls CompCert4Lean.Common.Events
 open CompCert4Lean.Common.Memory CompCert4Lean.Common.AST
 open CompCert4Lean.Foundation.Numbers.Rocq.Coq CompCert4Lean.Lib.Maps CompCert4Lean.Lib.Integers
-open NautyVerified NautyVerified.Logic NautyVerified.Program NautyVerified.Word
+open NautyVerified NautyVerified.Logic NautyVerified.Program NautyVerified.Word NautyVerified.Spec
 
 variable {xi : ExternalCalls}
 
@@ -59,18 +62,18 @@ theorem addr_word {ba : block} {ofs : ptrofs} {M : Nat} {m : mem} {vals : Nat �
   rw [h8] at hf ⊢
   omega
 
-/-- `ADDELEMENT(active, tc)`: word `tc / 64` of the active set gets bit `tc % 64`. -/
-theorem wp_add {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {ba : block}
+/-- `ADDELEMENT(s, a)`: word `c / 64` of the set gets bit `c % 64`. -/
+theorem wp_addElement {s : Common.AST.ident} {a : expr} {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {ba : block}
     {ofs : ptrofs} {ws : Nat → Lib.Integers.int64} {M c : Nat}
     (harr : ArrayAt m .Mint64 ba (intOfZ (Ptrofs.unsigned ofs)) (longs ws) M)
-    (hM : M < 2147483648) (hact : PTree.get id.active le = some (.Vptr ba ofs))
-    (htc : PTree.get id.tc le = some (.Vint (ir c))) (hc : c < 64 * M) (hc2 : c < 2147483648)
-    (hbit : BitTable m Block.nautilBit) (he : PTree.get id.bit e = none)
+    (hM : M < 2147483648) (hact : PTree.get s le = some (.Vptr ba ofs))
+    (htc : Exec.evalExpr ge e le m a = some (.Vint (ir c))) (hty : typeof a = tint) (hc : c < 64 * M) (hc2 : c < 2147483648)
+    (hbit : BitTable m Block.nautilBit) (he : PTree.get bit e = none)
     (hQ : ∀ m', ArrayAt m' .Mint64 ba (intOfZ (Ptrofs.unsigned ofs))
         (longs (upd ws (c / 64) (Int64.or (ws (c / 64)) (lr ((2 ^ (63 - c % 64) : Nat) : Int)))))
         M →
       Unch m m' (· = ba) → Q.normal E0 e le m') :
-    Wp xi ge f add Q e le m := by
+    Wp xi ge f (addElement s a) Q e le m := by
   have hw : c / 64 < M := by omega
   have hb : c % 64 < 64 := Nat.mod_lt _ (by decide)
   have h6 : Lib.Integers.Int.ltu (ir 6) Lib.Integers.Int.iwordsize = true := by decide
@@ -86,11 +89,11 @@ theorem wp_add {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {ba
     rw [h8]; omega
   obtain ⟨m', hst, harr', -⟩ := store_array harr hw
     (.Vlong (Int64.or (ws (c / 64)) (lr ((2 ^ (63 - c % 64) : Nat) : Int)))) rfl
-  simp only [add, sk]
+  simp only [addElement, setWord, sk]
   wp_step; wp_step
   apply wp_assign_eval
-  simp only [Exec.evalLvalue, Exec.evalExpr, Exec.lvalOfVar, hact, htc, he, find_nautilBit,
-    typeof, cop, h6, hshr, hand, ite_true]
+  simp only [Exec.evalLvalue, Exec.evalExpr, Exec.lvalOfVar, hact, htc, hty, he, find_nautilBit]
+  simp only [typeof, cop, h6, hshr, hand, ite_true]
   simp only [Exec.derefLoc, Cfrontend.Ctypes.access_mode, Exec.assignLoc]
   simp only [cop]
   have hl1 := load_array harr hw (addr_word harr hw hM)
@@ -105,4 +108,35 @@ theorem wp_add {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {ba
   rw [longs_upd] at harr'
   exact hQ m' harr' (Unch.store hst rfl)
 
-end NautyVerified.Proofs.Breakout
+end NautyVerified.Proofs.Set
+
+namespace NautyVerified.Proofs.Set
+
+open CompCert4Lean CompCert4Lean.Common.Values CompCert4Lean.Common.Memory
+open CompCert4Lean.Foundation.Numbers.Rocq.Coq
+open CompCert4Lean.Lib.Integers NautyVerified.Logic NautyVerified.Word NautyVerified.Spec
+
+theorem BitTable.unch {m m' : mem} {S : block → Prop} {b : block} (h : BitTable m b)
+    (hu : Unch m m' S) (hb : ¬ S b) : BitTable m' b := fun i hi => by
+  rw [hu.load _ _ _ hb]; exact h i hi
+
+/-- The words of `{c}`. -/
+def single (c : Nat) : Nat → Lib.Integers.int64 :=
+  upd (fun _ => lr 0) (c / 64) (Int64.or (lr 0) (lr ((2 ^ (63 - c % 64) : Nat) : Int)))
+
+theorem setRep_single {n M c : Nat} (hn : n ≤ 64 * M) (hc : c < n) :
+    SetRep (fun w => bv64 (single c w)) M
+      (Hex.GraphIso.Nauty.VSet.empty.insert c : Hex.GraphIso.Nauty.VSet n) := by
+  have h := setRep_insert (setRep_empty (n := n) hn) hc
+  have he : (fun w => bv64 (single c w)) =
+      fun w => if w = c / 64 then (fun _ => (0 : BitVec 64)) w ||| bitAt (c % 64)
+        else (fun _ => (0 : BitVec 64)) w := by
+    funext w
+    simp only [single, upd]
+    split
+    · simp only [bv64_or, bv64_repr, intOfZ_zOfInt, bitAt, BitVec.ofInt_natCast]
+      simp
+    · simp [intOfZ_zOfInt]
+  rw [he]; exact h
+
+end NautyVerified.Proofs.Set

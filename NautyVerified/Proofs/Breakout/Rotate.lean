@@ -1,4 +1,5 @@
-import NautyVerified.Proofs.Breakout.Add
+import NautyVerified.Proofs.Breakout.Syntax
+import NautyVerified.Proofs.Set.Add
 import NautyVerified.Logic.Ints
 import HexGraphIso.Nauty.Search.Refine
 

@@ -1,4 +1,4 @@
-import NautyVerified.Proofs.Syntax
+import NautyVerified.Proofs.Set.Syntax
 import NautyVerified.Source.Dense
 
 /-!
@@ -29,39 +29,17 @@ abbrev next : Common.AST.ident := dense.id.next
 abbrev es : Common.AST.ident := dense.id.es_
 abbrev t1 : Common.AST.ident := idOf 703
 abbrev t2 : Common.AST.ident := idOf 704
-abbrev bit : Common.AST.ident := NautyVerified.Source.dense.id.«nautil:bit»
 end id
 
 abbrev sk (s : statement) : statement := .Ssequence .Sskip s
 abbrev tv (x : Common.AST.ident) : expr := .Etempvar x tint
 abbrev pv (x : Common.AST.ident) : expr := .Etempvar x (tptr tulong)
 
-/-- `EMPTYSET(active, m)`: clear the words from the end. -/
-abbrev clear : statement :=
-  .Ssequence
-    (sk (.Sset id.es (.Ebinop .Oadd (.Ecast (pv id.active) (tptr tulong)) (tv id.m) (tptr tulong))))
-    (.Sloop
-      (.Ssequence
-        (sk (.Sifthenelse (.Ebinop .Ogt (pv id.es) (.Ecast (pv id.active) (tptr tulong)) tint)
-          .Sskip .Sbreak))
-        (.Ssequence
-          (.Ssequence
-            (sk (.Sset id.t1 (.Ecast (.Ebinop .Osub (pv id.es) (ci 1 tint) (tptr tulong)) (tptr tulong))))
-            (.Sset id.es (pv id.t1)))
-          (.Sassign (.Ederef (pv id.t1) tulong) (ci 0 tint))))
-      .Sskip)
-
-/-- `active[tc >> 6]`. -/
-abbrev activeWord : expr :=
-  .Ederef (.Ebinop .Oadd (pv id.active) (.Ebinop .Oshr (tv id.tc) (ci 6 tint) tint) (tptr tulong))
-    tulong
+/-- `EMPTYSET(active, m)`. -/
+abbrev clear : statement := Set.emptySet id.active id.m id.es id.t1
 
 /-- `ADDELEMENT(active, tc)`. -/
-abbrev add : statement :=
-  sk (.Sassign activeWord
-    (.Ebinop .Oor activeWord
-      (.Ederef (.Ebinop .Oadd (.Evar id.bit (tarray tulong 64))
-        (.Ebinop .Oand (tv id.tc) (ci 63 tint) tint) (tptr tulong)) tulong) tulong))
+abbrev add : statement := Set.addElement id.active (tv id.tc)
 
 /-- `lab[e]`. -/
 abbrev labAt (e : expr) : expr :=

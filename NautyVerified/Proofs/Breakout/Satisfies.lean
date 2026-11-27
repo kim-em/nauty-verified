@@ -22,29 +22,6 @@ open CompCert4Lean.Common.Memory CompCert4Lean.Common.AST
 open CompCert4Lean.Foundation.Numbers.Rocq.Coq CompCert4Lean.Lib.Maps CompCert4Lean.Lib.Integers
 open NautyVerified NautyVerified.Logic NautyVerified.Program NautyVerified.Word NautyVerified.Spec
 
-theorem BitTable.unch {m m' : mem} {S : block → Prop} {b : block} (h : BitTable m b)
-    (hu : Unch m m' S) (hb : ¬ S b) : BitTable m' b := fun i hi => by
-  rw [hu.load _ _ _ hb]; exact h i hi
-
-/-- The active set after `breakout`: `{tc}`. -/
-def single (tc : Nat) : Nat → Lib.Integers.int64 :=
-  upd (fun _ => lr 0) (tc / 64) (Int64.or (lr 0) (lr ((2 ^ (63 - tc % 64) : Nat) : Int)))
-
-theorem setRep_single {n M tc : Nat} (hn : n ≤ 64 * M) (htc : tc < n) :
-    SetRep (fun w => bv64 (single tc w)) M
-      (Hex.GraphIso.Nauty.VSet.empty.insert tc : Hex.GraphIso.Nauty.VSet n) := by
-  have h := setRep_insert (setRep_empty (n := n) hn) htc
-  have he : (fun w => bv64 (single tc w)) =
-      fun w => if w = tc / 64 then (fun _ => (0 : BitVec 64)) w ||| bitAt (tc % 64)
-        else (fun _ => (0 : BitVec 64)) w := by
-    funext w
-    simp only [single, upd]
-    split
-    · simp only [bv64_or, bv64_repr, intOfZ_zOfInt, bitAt, BitVec.ofInt_natCast]
-      simp
-    · simp [intOfZ_zOfInt]
-  rw [he]; exact h
-
 /-- The specification of `breakout`. -/
 def breakoutSpec (bl : block) (lofs : ptrofs) (bp : block) (pofs : ptrofs) (ba : block)
     (aofs : ptrofs) (lab ptn : Array Nat) (n level tc tv M : Nat)
@@ -53,8 +30,8 @@ def breakoutSpec (bl : block) (lofs : ptrofs) (bp : block) (pofs : ptrofs) (ba :
       .Vint (ir tv), .Vptr ba aofs, .Vint (ir M)] ∧
     ArrayAt m .Mint32 bl (intOfZ (Ptrofs.unsigned lofs)) (ints lab) n ∧
     ArrayAt m .Mint32 bp (intOfZ (Ptrofs.unsigned pofs)) (ints ptn) n ∧
-    ArrayAt m .Mint64 ba (intOfZ (Ptrofs.unsigned aofs)) (longs ws) M ∧
-    BitTable m Block.nautilBit ∧
+    ArrayAt m .Mint64 ba (intOfZ (Ptrofs.unsigned aofs)) (Set.longs ws) M ∧
+    Set.BitTable m Block.nautilBit ∧
     bl ≠ bp ∧ bl ≠ ba ∧ bp ≠ ba ∧ Block.nautilBit ≠ ba ∧
     lab.size = n ∧ ptn.size = n ∧ (∀ x < n, lab[x]! < n) ∧
     (∃ j, tc ≤ j ∧ j < n ∧ lab[j]! = tv) ∧
@@ -64,8 +41,8 @@ def breakoutSpec (bl : block) (lofs : ptrofs) (bp : block) (pofs : ptrofs) (ba :
       (ints (Hex.GraphIso.Nauty.breakout n lab ptn level tc tv).1) n ∧
     ArrayAt m' .Mint32 bp (intOfZ (Ptrofs.unsigned pofs))
       (ints (Hex.GraphIso.Nauty.breakout n lab ptn level tc tv).2.1) n ∧
-    ArrayAt m' .Mint64 ba (intOfZ (Ptrofs.unsigned aofs)) (longs (single tc)) M ∧
-    SetRep (fun w => bv64 (single tc w)) M (Hex.GraphIso.Nauty.breakout n lab ptn level tc tv).2.2 ∧
+    ArrayAt m' .Mint64 ba (intOfZ (Ptrofs.unsigned aofs)) (Set.longs (Set.single tc)) M ∧
+    SetRep (fun w => bv64 (Set.single tc w)) M (Hex.GraphIso.Nauty.breakout n lab ptn level tc tv).2.2 ∧
     Unch m m' (fun b => b = bl ∨ b = bp ∨ b = ba)
 
 /-- The temporaries on entry. -/
@@ -96,15 +73,15 @@ theorem breakout_satisfies {xi : ExternalCalls} (bl : block) (lofs : ptrofs) (bp
     rw [Source.dense.fn.breakout.fn_body_eq, body_eq]
     simp only [body]
     wp_step
-    refine wp_clear harr hM hM2 (by simp (config := {decide := true}) only [entryTemps, temps_gso, temps_gss])
+    refine Set.wp_emptySet (by decide) (by decide) (by decide) harr hM hM2 (by simp (config := {decide := true}) only [entryTemps, temps_gso, temps_gss])
       (by simp (config := {decide := true}) only [entryTemps, temps_gss]) ?_
     intro le1 m1 harr1 hu1 ho1
     wp_step
     have htcn : tc < n := by omega
-    refine wp_add (c := tc) harr1 hM2
+    refine Set.wp_addElement (c := tc) harr1 hM2
       (by rw [ho1 _ (by decide) (by decide)]; simp (config := {decide := true}) only [entryTemps, temps_gso, temps_gss])
-      (by rw [ho1 _ (by decide) (by decide)]; simp (config := {decide := true}) only [entryTemps, temps_gso, temps_gss])
-      (by omega) (by omega) (hbit.unch hu1 hba) rfl ?_
+      (by simp only [Exec.evalExpr]; rw [ho1 _ (by decide) (by decide)]; simp (config := {decide := true}) only [entryTemps, temps_gso, temps_gss])
+      rfl (by omega) (by omega) (hbit.unch hu1 hba) rfl ?_
     intro m2 harr2 hu2
     have hT : ∀ k, k ≠ id.es → k ≠ id.t1 →
         PTree.get k le1 = PTree.get k (entryTemps bl lofs bp pofs ba aofs level tc tv M) := ho1
@@ -150,7 +127,7 @@ theorem breakout_satisfies {xi : ExternalCalls} (bl : block) (lofs : ptrofs) (bp
     · have := harr3.unch hu4 hlp
       simpa [Hex.GraphIso.Nauty.breakout, hls] using this
     · exact (harr2.unch hu3 (Ne.symm hla)).unch hu4 (Ne.symm hpa)
-    · exact setRep_single hnM htcn
+    · exact Set.setRep_single hnM htcn
     · refine ((hu12.mono ?_).trans (hu3.mono ?_)).trans (hu4.mono ?_) <;> intro b hb <;> simp_all
 
 end NautyVerified.Proofs.Breakout
