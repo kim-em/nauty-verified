@@ -92,6 +92,10 @@ theorem nontrivialCell_nec {n : Nat} (ctx : Ctx n) (level : Nat) (ws : VSet n) {
   rw [nontrivialCell, ite_eq_right (by simp; omega), ite_eq_right (by simp only [beq_iff_eq]; exact he)]
   simp only [windowScan_lab]
 
+/-- The blocks one cell of the pass writes: all of `L.writes` but the splitter words. -/
+abbrev cellW (L : Loc) (z : block) : Prop :=
+  z = L.bl ∨ z = L.bp ∨ z = L.bn ∨ z = L.bc ∨ z = L.ba ∨ z = L.bW ∨ z = L.bB
+
 /-- What a processed cell leaves, besides `Mem` and `Tmp`. -/
 structure CellOut (n level : Nat) (st0 st : RefineSt n) (cell1 cell2 : Nat) : Prop where
   ok : StOk n level st
@@ -161,7 +165,7 @@ theorem wp_splitN {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc} {ctx 
       Tmp le' L (nontrivialCell ctx L.level ws cell1 cell2 st) →
       CellOut n L.level st (nontrivialCell ctx L.level ws cell1 cell2 st) cell1 cell2 →
       (∃ bv, ArrayAt m' .Mint32 L.bB 0 bv L.capB) → (∃ wv, ArrayAt m' .Mint32 L.bW 0 wv L.capW) →
-      Unch m m' L.writes → Keep m m' L.bB → Keep m m' L.bW →
+      Unch m m' (cellW L) → Keep m m' L.bB → Keep m m' L.bW →
       (∀ z, z ∉ splitTemps → PTree.get z le' = PTree.get z le) →
       Q.normal E0 empty_env le' m' ∧ Q.cont E0 empty_env le' m') :
     Wp xi ge Source.dense.fn.refine splitN Q empty_env le m := by
@@ -370,9 +374,9 @@ theorem wp_splitN {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc} {ctx 
         · exact .inr (.inl h)
         · exact .inr (.inr (.inr (.inr (.inl h))))
         · exact .inr (.inr (.inl h))
-        · exact .inr (.inr (.inr (.inr (.inr (.inr (.inr h))))))
+        · exact .inr (.inr (.inr (.inr (.inr (.inr h)))))
       · rcases hz with h | h
-        · exact .inr (.inr (.inr (.inr (.inr (.inr (.inr h))))))
+        · exact .inr (.inr (.inr (.inr (.inr (.inr h)))))
         · exact .inr (.inr (.inr (.inr (.inr (.inl h)))))
     · exact ((hk2.trans hkB4).trans (Keep.unch hu6 d.bl_bB.symm)).trans
         (Keep.unch hu7 (Ne.symm d.ba_bB))
@@ -405,7 +409,7 @@ theorem wp_cellN {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc} {ctx :
       Tmp le' L (nontrivialCell ctx L.level ws cell1 cell2 st) →
       CellOut n L.level st (nontrivialCell ctx L.level ws cell1 cell2 st) cell1 cell2 →
       (∃ bv, ArrayAt m' .Mint32 L.bB 0 bv L.capB) → (∃ wv, ArrayAt m' .Mint32 L.bW 0 wv L.capW) →
-      Unch m m' L.writes → Keep m m' L.bB → Keep m m' L.bW →
+      Unch m m' (cellW L) → Keep m m' L.bB → Keep m m' L.bW →
       (∀ z, z ∉ cellTemps → PTree.get z le' = PTree.get z le) →
       Q.normal E0 empty_env le' m' ∧ Q.cont E0 empty_env le' m') :
     Wp xi ge Source.dense.fn.refine cellN Q empty_env le m := by
@@ -544,7 +548,7 @@ theorem wp_cellN {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc} {ctx :
   · refine (hu14.mono fun z hz => ?_).trans hu5
     rcases hz with h | h
     · exact .inr (.inr (.inr (.inl h)))
-    · exact .inr (.inr (.inr (.inr (.inr (.inr (.inr h))))))
+    · exact .inr (.inr (.inr (.inr (.inr (.inr h)))))
   · intro z hz
     simp only [cellTemps, List.mem_append, not_or, List.mem_cons, List.not_mem_nil, or_false] at hz
     obtain ⟨⟨h0, h1, h2, h3, h4, h5, h6⟩, h7⟩ := hz
