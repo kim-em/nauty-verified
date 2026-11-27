@@ -253,8 +253,11 @@ code; total C-side 100k-200k lines (estimate from one function).
 
 Status: proved against HexGraphIso (`*_satisfies`, axiom-clean):
 `nextelement`, `orbjoin`, `breakout`, `fmptn`, `shortprune`, `longprune`,
-`fmperm`; and the allocator layer: `malloc`, `free`, `nauty_zalloc`,
-`DYNALLOC1` (`wp_dynalloc1`).
+`fmperm` (nautil.c); `cheapautom`, `isautom` (naugraph.c, `isautom` calling
+`nextelement` through its proved specification); and the allocator layer:
+`malloc`, `free`, `nauty_zalloc`, `DYNALLOC1` (`wp_dynalloc1`). Graphs in
+memory are `GraphAt` (row `v` at word `M * v`, each row `SetRep` of the Hex
+row).
 
 Conventions settled while doing these:
 
