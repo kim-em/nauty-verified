@@ -67,7 +67,7 @@ theorem addr_word {ba : block} {ofs : ptrofs} {M : Nat} {m : mem} {vals : Nat �
   omega
 
 /-- `ADDELEMENT(s, a)`: word `c / 64` of the set gets bit `c % 64`. -/
-theorem wp_addElement {s : Common.AST.ident} {a : expr} {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {ba : block}
+theorem wp_addElement' {s : Common.AST.ident} {a : expr} {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {ba : block}
     {ofs : ptrofs} {ws : Nat → Lib.Integers.int64} {M c : Nat}
     (harr : ArrayAt m .Mint64 ba (intOfZ (Ptrofs.unsigned ofs)) (longs ws) M)
     (hM : M < 2147483648) (hact : PTree.get s le = some (.Vptr ba ofs))
@@ -75,7 +75,9 @@ theorem wp_addElement {s : Common.AST.ident} {a : expr} {f : function} {Q : Post
     (hbit : BitTable m Block.nautilBit) (he : PTree.get bit e = none)
     (hQ : ∀ m', ArrayAt m' .Mint64 ba (intOfZ (Ptrofs.unsigned ofs))
         (longs (addW ws c)) M →
-      Unch m m' (· = ba) → Q.normal E0 e le m') :
+      Unch m m' (· = ba) →
+      Outside m m' ba (intOfZ (Ptrofs.unsigned ofs)) (intOfZ (Ptrofs.unsigned ofs) + 8 * M) →
+      Q.normal E0 e le m') :
     Wp xi ge f (addElement s a) Q e le m := by
   have hw : c / 64 < M := by omega
   have hb : c % 64 < 64 := Nat.mod_lt _ (by decide)
@@ -109,7 +111,23 @@ theorem wp_addElement {s : Common.AST.ident} {a : expr} {f : function} {Q : Post
   simp only [hl1, hl2, longs, cop, Mem.storev]
   rw [addr_word harr hw hM, hst]
   rw [longs_upd] at harr'
-  exact hQ m' harr' (Unch.store hst rfl)
+  exact hQ m' harr' (Unch.store hst rfl) (Outside.store harr hw hst (Int.le_refl _)
+    (by rw [show csize .Mint64 = 8 from rfl]; exact Int.le_refl _))
+
+
+theorem wp_addElement {s : Common.AST.ident} {a : expr} {f : function} {Q : Post} {e : env}
+    {le : temp_env} {m : mem} {ba : block}
+    {ofs : ptrofs} {ws : Nat → Lib.Integers.int64} {M c : Nat}
+    (harr : ArrayAt m .Mint64 ba (intOfZ (Ptrofs.unsigned ofs)) (longs ws) M)
+    (hM : M < 2147483648) (hact : PTree.get s le = some (.Vptr ba ofs))
+    (htc : Exec.evalExpr ge e le m a = some (.Vint (ir c))) (hty : typeof a = tint) (hc : c < 64 * M)
+    (hc2 : c < 2147483648)
+    (hbit : BitTable m Block.nautilBit) (he : PTree.get bit e = none)
+    (hQ : ∀ m', ArrayAt m' .Mint64 ba (intOfZ (Ptrofs.unsigned ofs))
+        (longs (addW ws c)) M →
+      Unch m m' (· = ba) → Q.normal E0 e le m') :
+    Wp xi ge f (addElement s a) Q e le m :=
+  wp_addElement' harr hM hact htc hty hc hc2 hbit he fun m' ha hu _ => hQ m' ha hu
 
 end NautyVerified.Proofs.Set
 

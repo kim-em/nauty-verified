@@ -222,4 +222,79 @@ theorem ArrayAt.slice {m : mem} {chunk : memory_chunk} {b : block} {base : Int}
   · rw [elemOfs_slice]; exact h.load _ (by omega)
   · rw [elemOfs_slice]; exact h.writable _ (by omega)
 
+/-! ## Changes inside one range of a block -/
+
+/-- `m'` is `m` changed in block `b` only inside the bytes `[lo, hi)`. -/
+structure Outside (m m' : mem) (b : block) (lo hi : Int) : Prop where
+  load : ∀ chunk (ofs : Int), (ofs + csize chunk ≤ lo ∨ hi ≤ ofs) →
+    Mem.load chunk m' b (zOfInt ofs) = Mem.load chunk m b (zOfInt ofs)
+  access : ∀ chunk ofs p, Mem.valid_access m chunk b ofs p → Mem.valid_access m' chunk b ofs p
+
+theorem Outside.refl (m : mem) (b : block) (lo hi : Int) : Outside m m b lo hi :=
+  ⟨fun _ _ _ => rfl, fun _ _ _ h => h⟩
+
+theorem Outside.trans {m₁ m₂ m₃ : mem} {b : block} {lo hi : Int} (h₁ : Outside m₁ m₂ b lo hi)
+    (h₂ : Outside m₂ m₃ b lo hi) : Outside m₁ m₃ b lo hi :=
+  ⟨fun c o h => by rw [h₂.load c o h, h₁.load c o h], fun c o p h => h₂.access c o p (h₁.access c o p h)⟩
+
+/-- A change outside `b` is outside any range of `b`. -/
+theorem Outside.of_unch {m m' : mem} {S : block → Prop} {b : block} (hu : Unch m m' S) (hb : ¬ S b)
+    (lo hi : Int) : Outside m m' b lo hi :=
+  ⟨fun c _ _ => hu.load c b _ hb, fun c o p h => hu.access c b o p hb h⟩
+
+/-- Storing element `i` of an array that lies inside `[lo, hi)`. -/
+theorem Outside.store {m m' : mem} {chunk : memory_chunk} {b : block} {base : Int}
+    {vals : Nat → val} {n : Nat} (h : ArrayAt m chunk b base vals n) {i : Nat} (hi : i < n)
+    {v : val} (hst : Mem.store chunk m b (elemOfs chunk base i) v = some m') {lo hi' : Int}
+    (hlo : lo ≤ base) (hhi : base + csize chunk * n ≤ hi') : Outside m m' b lo hi' := by
+  have hc := csize_pos chunk
+  have hcn : csize chunk * ((i : Int) + 1) ≤ csize chunk * n :=
+    Int.mul_le_mul_of_nonneg_left (by omega) (by omega)
+  have hci : 0 ≤ csize chunk * (i : Int) := Int.mul_nonneg (by omega) (by omega)
+  refine ⟨fun c o ho => ?_, fun c o p hv => Mem.store_valid_access_1 _ _ _ _ _ _ hst _ _ _ _ hv⟩
+  apply Mem.load_store_other _ _ _ _ _ _ hst
+  right
+  rcases ho with ho | ho
+  · left
+    change intOfZ _ ≤ intOfZ _
+    simp only [intOfZ_add, intOfZ_zOfInt, elemOfs]
+    have : intOfZ (size_chunk c) = csize c := rfl
+    omega
+  · right
+    change intOfZ _ ≤ intOfZ _
+    simp only [intOfZ_add, intOfZ_zOfInt, elemOfs]
+    have : intOfZ (size_chunk chunk) = csize chunk := rfl
+    rw [Int.mul_add, Int.mul_one] at hcn
+    omega
+
+/-- A slice written by a computation that changed only the slice's range: the
+whole array has the slice's new values and the old values elsewhere. -/
+theorem ArrayAt.outside {m m' : mem} {chunk : memory_chunk} {b : block} {base : Int}
+    {vals vals' : Nat → val} {N : Nat} (h : ArrayAt m chunk b base vals N) (off len : Nat)
+    (h' : ArrayAt m' chunk b (base + csize chunk * off) vals' len)
+    (ho : Outside m m' b (base + csize chunk * off) (base + csize chunk * (off + len))) :
+    ArrayAt m' chunk b base (fun i => if off ≤ i ∧ i < off + len then vals' (i - off) else vals i) N := by
+  have hc := csize_pos chunk
+  refine ⟨h.base_nonneg, h.fits, fun i hi => ?_, fun i hi => ?_⟩
+  · by_cases hin : off ≤ i ∧ i < off + len
+    · rw [ite_eq_left hin]
+      have := h'.load (i - off) (by omega)
+      rwa [elemOfs_slice, show off + (i - off) = i by omega] at this
+    · rw [ite_eq_right hin]
+      rw [elemOfs, ho.load _ _ ?_]
+      · exact h.load i hi
+      · rcases Nat.lt_or_ge i off with h1 | h1
+        · left
+          have : csize chunk * ((i : Int) + 1) ≤ csize chunk * off :=
+            Int.mul_le_mul_of_nonneg_left (by omega) (by omega)
+          rw [Int.mul_add, Int.mul_one] at this; omega
+        · right
+          have : csize chunk * ((off : Int) + len) ≤ csize chunk * i :=
+            Int.mul_le_mul_of_nonneg_left (by omega) (by omega)
+          push_cast; omega
+  · by_cases hin : off ≤ i ∧ i < off + len
+    · have := h'.writable (i - off) (by omega)
+      rwa [elemOfs_slice, show off + (i - off) = i by omega] at this
+    · exact ho.access _ _ _ (h.writable i hi)
+
 end NautyVerified.Logic
