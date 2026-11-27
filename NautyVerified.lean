@@ -171,3 +171,4 @@ import NautyVerified.Proofs.Harness.Tail
 import NautyVerified.Proofs.Harness.Opts
 import NautyVerified.Proofs.Harness.PartMain
 import NautyVerified.Proofs.Harness.InputMain
+import NautyVerified.Proofs.Harness.Phases
