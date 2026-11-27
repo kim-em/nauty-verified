@@ -57,6 +57,24 @@ theorem Keep.unch {m m' : mem} {S : block → Prop} {b : block} (hu : Unch m m' 
       change intOfZ _ < intOfZ _
       simp only [intOfZ_add, show intOfZ (size_chunk .Mint8unsigned) = 1 from rfl]; omega⟩⟩
 
+/-- A change confined to offsets `≥ 0` of `b` keeps it. -/
+theorem Keep.of_outside {m m' : mem} {b : block} {hi : Int} (ho : Outside m m' b 0 hi) :
+    Keep m m' b :=
+  ⟨fun c o h => ho.load c o (.inl h), fun ofs p hp => by
+    have hva : Mem.valid_access m .Mint8unsigned b ofs p := by
+      refine ⟨fun o ho' => ?_, ⟨ofs, by
+        apply intOfZ_injective
+        simp [show intOfZ (align_chunk .Mint8unsigned) = 1 from rfl]⟩⟩
+      have h1 : intOfZ ofs ≤ intOfZ o := ho'.1
+      have h2 : intOfZ o < intOfZ ofs + 1 := by
+        have := ho'.2; change intOfZ _ < intOfZ _ at this
+        simpa [intOfZ_add, show intOfZ (size_chunk .Mint8unsigned) = 1 from rfl] using this
+      rw [show o = ofs by apply intOfZ_injective; omega]
+      exact hp
+    exact (ho.access _ _ _ hva).1 ofs ⟨by change intOfZ _ ≤ intOfZ _; exact Int.le_refl _, by
+      change intOfZ _ < intOfZ _
+      simp only [intOfZ_add, show intOfZ (size_chunk .Mint8unsigned) = 1 from rfl]; omega⟩⟩
+
 theorem Malloced.keep {m m' : mem} {b : block} {N : Nat} (h : Malloced m b N) (hk : Keep m m' b) :
     Malloced m' b N :=
   ⟨by rw [Mptr_eq, hk.low .Mint64 (-8) (by decide)]; exact h.hdr,
