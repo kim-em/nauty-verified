@@ -126,6 +126,7 @@ import NautyVerified.Spec.WordCmp
 import NautyVerified.Spec.Testcanlab
 import NautyVerified.Spec.RefineFuel
 import NautyVerified.Spec.SearchInf
+import NautyVerified.Spec.SearchInfRun
 import NautyVerified.Spec.NtcPlace
 import NautyVerified.Spec.CountWin
 import NautyVerified.Proofs.Testcanlab.Syntax
