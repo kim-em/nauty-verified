@@ -28,6 +28,31 @@ variable {xi : ExternalCalls}
 /-- The values of an `int` array holding `o`. -/
 def ints (o : Array Nat) (i : Nat) : val := .Vint (ir (o[i]! : Int))
 
+/-- Reading `p[e]` for an `int *` temporary `p` and an index `e` holding `c < n`. -/
+theorem eval_at {e : env} {le : temp_env} {m : mem} {bo : block} {ofs : ptrofs}
+    {o : Array Nat} {n : Nat} (harr : ArrayAt m .Mint32 bo (intOfZ (Ptrofs.unsigned ofs)) (ints o) n)
+    (hn : n < 2147483648) (p : Common.AST.ident) (horb : PTree.get p le = some (.Vptr bo ofs))
+    (a : expr) (c : Nat) (hc : c < n)
+    (ha : Exec.evalExpr ge e le m a = some (.Vint (ir c))) (hty : typeof a = tint) :
+    Exec.evalExpr ge e le m
+      (.Ederef (.Ebinop .Oadd (.Etempvar p (tptr tint)) a (tptr tint)) tint) = some (ints o c) := by
+  simp only [Exec.evalExpr, horb, ha, hty]
+  simp only [typeof, cop, Exec.derefLoc, Cfrontend.Ctypes.access_mode]
+  apply load_array harr hc
+  apply addr_elem ofs _ .Mint32 rfl rfl (by omega)
+  have hf := harr.fits
+  have h4 : csize .Mint32 = 4 := rfl
+  rw [h4] at hf ⊢
+  omega
+
+theorem ints_set {o : Array Nat} {j : Nat} (hj : j < o.size) (v : Nat) :
+    ints (o.set! j v) = upd (ints o) j (.Vint (ir (v : Int))) := by
+  funext i
+  simp only [ints, upd]
+  by_cases h : i = j
+  · subst h; rw [if_pos rfl, Array.getElem!_set!_self _ _ _ hj]
+  · rw [if_neg h, Array.getElem!_set!_ne _ _ _ _ (Ne.symm h)]
+
 /-- Reading `orbits[e]` for an index `e` holding `c < n`. -/
 theorem eval_orb {e : env} {le : temp_env} {m : mem} {bo : block} {ofs : ptrofs}
     {o : Array Nat} {n : Nat} (harr : ArrayAt m .Mint32 bo (intOfZ (Ptrofs.unsigned ofs)) (ints o) n)
