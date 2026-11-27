@@ -44,10 +44,7 @@ theorem wp_store {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {
     (rhs : expr) (x : Int) (hrhs : Exec.evalExpr ge e le m rhs = some (.Vint (ir x)))
     (hrty : typeof rhs = tint)
     (hQ : ∀ m', ArrayAt m' .Mint32 bo (intOfZ (Ptrofs.unsigned ofs)) (upd (ints o) c (.Vint (ir x))) n →
-      (∀ chunk b' ofs', b' ≠ bo → Mem.load chunk m' b' ofs' = Mem.load chunk m b' ofs') →
-      (∀ {chunk' b' base' vals' n'}, ArrayAt m chunk' b' base' vals' n' → b' ≠ bo →
-        ArrayAt m' chunk' b' base' vals' n') →
-      Q.normal E0 e le m') :
+      Unch m m' bo → Q.normal E0 e le m') :
     Wp xi ge f (.Sassign (.Ederef (.Ebinop .Oadd (.Etempvar p (tptr tint)) a (tptr tint)) tint) rhs)
       Q e le m := by
   have haddr : Ptrofs.unsigned (Ptrofs.add ofs (Ptrofs.mul (Ptrofs.repr
@@ -65,9 +62,7 @@ theorem wp_store {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {
   show match Mem.store .Mint32 m bo (Ptrofs.unsigned _) _ with
     | some m' => Q.normal E0 e le m' | none => False
   rw [haddr, hst]
-  refine hQ m' harr' (fun chunk b' ofs' hb => hfar chunk b' ofs' (.inl hb)) ?_
-  intro chunk' b' base' vals' n' h hb
-  exact h.store_away hst (.inl hb)
+  exact hQ m' harr' (Unch.store hst)
 
 /-- The arrays and pointer temporaries survive a change of other temporaries. -/
 theorem Frame.temps {m : mem} {le le' : temp_env} {bo : block} {ofs : ptrofs} {bm : block}
@@ -84,7 +79,7 @@ theorem wp_joinStep {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem
     {bo : block} {ofs : ptrofs} {bm : block} {mofs : ptrofs} {o mp : Array Nat} {n : Nat}
     (h : Frame m le bo ofs bm mofs o mp n) {i : Nat} (hi : i < n)
     (hiv : PTree.get id.i le = some (.Vint (ir i)))
-    (hQ : ∀ le' m', Frame m' le' bo ofs bm mofs (join mp n o i) mp n →
+    (hQ : ∀ le' m', Frame m' le' bo ofs bm mofs (join mp n o i) mp n → Unch m m' bo →
       PTree.get id.i le' = some (.Vint (ir i)) → Q.normal E0 e le' m') :
     Wp xi ge f joinStep Q e le m := by
   have hii : Exec.evalExpr ge e le m (tv id.i) = some (.Vint (ir i)) := hiv
@@ -101,7 +96,7 @@ theorem wp_joinStep {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem
   · rw [ite_eq_right (by simp [hfix])]
     apply wp_skip
     have : join mp n o i = o := by simp [join, hfix]
-    exact hQ le m (by rw [this]; exact h) hiv
+    exact hQ le m (by rw [this]; exact h) (Unch.refl _ _) hiv
   · rw [ite_eq_left (by simp; omega)]
     have hoi := ints_lt h.desc hi
     wp_step; wp_step; wp_step
@@ -161,12 +156,12 @@ theorem wp_joinStep {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem
     · rw [ite_eq_left (by simpa using hab)]
       wp_step; wp_step
       refine wp_store h2.arr h2.nlt id.orbits h2.horb (tv id.j2) b hblt hjb rfl (tv id.j1) a hja rfl ?_
-      intro m' harr' _ hkeep
-      apply hQ le2 m' _ hiv2
+      intro m' harr' hu
+      apply hQ le2 m' _ hu hiv2
       rw [hjoin, if_pos hab]
       exact { h2 with
         arr := by rw [ints_set (by omega)]; exact harr'
-        marr := hkeep h2.marr h.hne.symm
+        marr := h2.marr.unch hu h.hne.symm
         desc := h.desc.set hblt (by omega) }
     · rw [ite_eq_right (by simpa using hab)]
       wp_step; wp_step
@@ -178,16 +173,16 @@ theorem wp_joinStep {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem
       · rw [ite_eq_left (by simpa using hba)]
         wp_step; wp_step
         refine wp_store h2.arr h2.nlt id.orbits h2.horb (tv id.j1) a halt hja rfl (tv id.j2) b hjb rfl ?_
-        intro m' harr' _ hkeep
-        apply hQ le2 m' _ hiv2
+        intro m' harr' hu
+        apply hQ le2 m' _ hu hiv2
         rw [hjoin, if_neg hab, if_pos hba]
         exact { h2 with
           arr := by rw [ints_set (by omega)]; exact harr'
-          marr := hkeep h2.marr h.hne.symm
+          marr := h2.marr.unch hu h.hne.symm
           desc := h.desc.set halt (by omega) }
       · rw [ite_eq_right (by simpa using hba)]
         apply wp_skip
-        apply hQ le2 m _ hiv2
+        apply hQ le2 m _ (Unch.refl _ _) hiv2
         rw [hjoin, if_neg hab, if_neg hba]
         exact h2
 

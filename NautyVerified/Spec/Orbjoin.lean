@@ -157,4 +157,24 @@ theorem joins_desc {o map : Array Nat} {n : Nat} (hd : Descending o n)
     rw [List.range_succ, List.foldl_append, List.foldl_cons, List.foldl_nil]
     exact join_desc (joins_desc hd hm k (by omega)) (by omega) (hm k (by omega))
 
+/-- `compress` keeps the forest descending. -/
+theorem compress_desc {s : Array Nat × Nat} {n : Nat} (hd : Descending s.1 n) {i : Nat}
+    (hi : i < n) : Descending (compress s i).1 n := by
+  have h1 := hd.2 i hi
+  have h2 := hd.2 s.1[i]! (by omega)
+  exact hd.set hi (by omega)
+
+/-- The second loop of `orbjoin` keeps the forest descending and counts at most
+one root per vertex. -/
+theorem compresses_desc {o : Array Nat} {n : Nat} (hd : Descending o n) :
+    ∀ k ≤ n, Descending ((List.range k).foldl compress (o, 0)).1 n ∧
+      ((List.range k).foldl compress (o, 0)).2 ≤ k
+  | 0, _ => ⟨hd, Nat.le_refl _⟩
+  | k + 1, hk => by
+    rw [List.range_succ, List.foldl_append, List.foldl_cons, List.foldl_nil]
+    have ih := compresses_desc hd k (by omega)
+    refine ⟨compress_desc ih.1 (by omega), ?_⟩
+    simp only [compress]
+    split <;> omega
+
 end NautyVerified.Spec

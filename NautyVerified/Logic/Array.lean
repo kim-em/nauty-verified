@@ -130,6 +130,31 @@ theorem ArrayAt.store_away {m m' : mem} {chunk : memory_chunk} {b : block} {base
     rw [Int.mul_add, Int.mul_one] at this
     omega
 
+/-- `m'` is `m` changed only inside block `b`: every load from another block
+is unchanged, and every valid access stays valid. -/
+structure Unch (m m' : mem) (b : block) : Prop where
+  load : ∀ chunk b' ofs, b' ≠ b → Mem.load chunk m' b' ofs = Mem.load chunk m b' ofs
+  access : ∀ chunk b' ofs p, Mem.valid_access m chunk b' ofs p → Mem.valid_access m' chunk b' ofs p
+
+theorem Unch.refl (m : mem) (b : block) : Unch m m b := ⟨fun _ _ _ _ => rfl, fun _ _ _ _ h => h⟩
+
+theorem Unch.trans {m₁ m₂ m₃ : mem} {b : block} (h₁ : Unch m₁ m₂ b) (h₂ : Unch m₂ m₃ b) :
+    Unch m₁ m₃ b :=
+  ⟨fun c b' o hb => (h₂.load c b' o hb).trans (h₁.load c b' o hb),
+   fun c b' o p h => h₂.access c b' o p (h₁.access c b' o p h)⟩
+
+theorem Unch.store {m m' : mem} {chunk : memory_chunk} {b : block} {ofs : Z} {v : val}
+    (h : Mem.store chunk m b ofs v = some m') : Unch m m' b :=
+  ⟨fun _ _ _ hb => Mem.load_store_other _ _ _ _ _ _ h _ _ _ (.inl hb),
+   fun _ _ _ _ hv => Mem.store_valid_access_1 _ _ _ _ _ _ h _ _ _ _ hv⟩
+
+/-- An array in another block survives. -/
+theorem ArrayAt.unch {m m' : mem} {b₀ : block} (hu : Unch m m' b₀) {chunk : memory_chunk}
+    {b : block} {base : Int} {vals : Nat → val} {n : Nat} (h : ArrayAt m chunk b base vals n)
+    (hb : b ≠ b₀) : ArrayAt m' chunk b base vals n :=
+  ⟨h.base_nonneg, h.fits, fun i hi => by rw [hu.load _ _ _ hb]; exact h.load i hi,
+   fun i hi => hu.access _ _ _ _ (h.writable i hi)⟩
+
 /-- C's `p + i`, for `p` pointing at offset `base` and an `int` index `i`
 inside the array, is the address of element `i`. -/
 theorem addr_elem (ofs : Lib.Integers.ptrofs) (sz : Z) (chunk : memory_chunk)
