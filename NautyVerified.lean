@@ -75,3 +75,4 @@ import NautyVerified.Spec.Updatecan
 import NautyVerified.Proofs.Updatecan.Rows
 import NautyVerified.Proofs.Updatecan.Satisfies
 import NautyVerified.Spec.WordCmp
+import NautyVerified.Spec.Testcanlab
