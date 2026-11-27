@@ -37,7 +37,8 @@ def shortpruneSpec (b1 : block) (o1 : ptrofs) (b2 : block) (o2 : ptrofs) (M : Na
     ArrayAt m .Mint64 b2 (intOfZ (Ptrofs.unsigned o2)) (longs w2) M ∧
     b2 ≠ b1 ∧ M < 2147483648
   post _ m t _ m' := t = E0 ∧
-    ArrayAt m' .Mint64 b1 (intOfZ (Ptrofs.unsigned o1)) (longs (andW w1 w2)) M ∧ Unch m m' (· = b1)
+    ArrayAt m' .Mint64 b1 (intOfZ (Ptrofs.unsigned o1)) (longs (andW w1 w2)) M ∧ Unch m m' (· = b1) ∧
+    Alloc.KeepA m m'
 
 theorem shortprune_satisfies {xi : ExternalCalls} (b1 : block) (o1 : ptrofs) (b2 : block)
     (o2 : ptrofs) (M : Nat) (w1 w2 : Nat → Lib.Integers.int64) :
@@ -59,7 +60,7 @@ theorem shortprune_satisfies {xi : ExternalCalls} (b1 : block) (o1 : ptrofs) (b2
       (by simp (config := {decide := true}) only [le0, temps_gso, temps_gss])
       (by simp (config := {decide := true}) only [le0, temps_gss])
       (by decide) (by decide) (by decide) ?_
-    intro le' m' harr hu _
-    exact ⟨m', Nextelement.free_empty m', rfl, harr, hu⟩
+    intro le' m' harr hu hk _
+    exact ⟨m', Nextelement.free_empty m', rfl, harr, hu, hk⟩
 
 end NautyVerified.Proofs.Prune

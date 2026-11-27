@@ -54,7 +54,7 @@ theorem wp_body {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_env} {m
     (hL : PairsAt ww M o L)
     (hQ : ∀ le' m' wt', ArrayAt m' .Mint64 bt (intOfZ (Ptrofs.unsigned tofs)) (longs wt') M →
       SetRep (fun w => bv64 (wt' w)) M (L.foldl (pruneStep F) T) →
-      Unch m m' (· = bt) →
+      Unch m m' (· = bt) → Alloc.KeepA m m' →
       (∀ k, k ≠ id.i → k ≠ id.bottom → PTree.get k le' = PTree.get k le) →
       Q.normal E0 e le' m') :
     Wp xi ge f body Q e le m := by
@@ -65,13 +65,13 @@ theorem wp_body {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_env} {m
       PTree.get id.bottom le' = some (.Vptr bw (ptrTo wb 8 o')) ∧ PairsAt ww M o' L' ∧
       L'.foldl (pruneStep F) T' = R ∧
       ArrayAt m' .Mint64 bt (intOfZ (Ptrofs.unsigned tofs)) (longs wt') M ∧
-      SetRep (fun w => bv64 (wt' w)) M T' ∧ Unch m m' (· = bt) ∧
+      SetRep (fun w => bv64 (wt' w)) M T' ∧ Unch m m' (· = bt) ∧ Alloc.KeepA m m' ∧
       ∀ k, k ≠ id.i → k ≠ id.bottom → PTree.get k le' = PTree.get k le
   refine wp_loop (I := I) (J := fun v t e' le' m' => ∃ v', v' < v ∧ I v' t e' le' m') ?_ ?_
     (n := L.length) ⟨rfl, rfl, L, o, wt, T, rfl, rfl, hbot, hL, rfl, htarr, htrep, Unch.refl _ _,
-      fun _ _ _ => rfl⟩
+      Alloc.KeepA.refl _, fun _ _ _ => rfl⟩
   · rintro v t e' le' m' ⟨rfl, rfl, L', o', wt', T', rfl, hoff, hbot', hL', hfold, harr', hrep', hu,
-      hoth⟩
+      hkp, hoth⟩
     have h' := (h.temps hoth).unch hu
     have htop' : PTree.get id.top le' = some (.Vptr bw (ptrTo wb 8 tp)) := by
       rw [hoth _ (by decide) (by decide)]; exact htop
@@ -89,7 +89,7 @@ theorem wp_body {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_env} {m
       apply wp_break
       simp only [List.foldl_nil] at hfold
       rw [hfold] at hrep'
-      simpa using hQ le' m' wt' harr' hrep' hu hoth
+      simpa using hQ le' m' wt' harr' hrep' hu hkp hoth
     | cons p L'' =>
       obtain ⟨fx, mc⟩ := p
       obtain ⟨hfx, hmc, hL''⟩ := hL'
@@ -97,9 +97,9 @@ theorem wp_body {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_env} {m
       rw [ite_eq_left (by simp; omega)]
       apply wp_skip
       refine wp_pair h' harr' hrep' (by omega) hbot' hfx hmc ?_
-      intro le2 m2 wt2 hbot2 harr2 hrep2 hu2 hoth2
+      intro le2 m2 wt2 hbot2 harr2 hrep2 hu2 hk2 hoth2
       refine ⟨L''.length, by simp, by simp, rfl, L'', o' + M + M, wt2, _, rfl, by omega, hbot2,
-        hL'', ?_, harr2, hrep2, hu.trans hu2, fun k h1 h2 => by rw [hoth2 k h1 h2, hoth k h1 h2]⟩
+        hL'', ?_, harr2, hrep2, hu.trans hu2, hkp.trans hk2, fun k h1 h2 => by rw [hoth2 k h1 h2, hoth k h1 h2]⟩
       rw [← hfold, List.foldl_cons]
       rfl
   · rintro v t e' le' m' hJ
@@ -120,7 +120,7 @@ def longpruneSpec {n : Nat} (bt : block) (tofs : ptrofs) (bf : block) (fofs : pt
   post _ m t _ m' := t = E0 ∧ ∃ wt',
     ArrayAt m' .Mint64 bt (intOfZ (Ptrofs.unsigned tofs)) (longs wt') M ∧
     SetRep (fun w => bv64 (wt' w)) M (Hex.GraphIso.Nauty.longprune T F L.toArray) ∧
-    Unch m m' (· = bt)
+    Unch m m' (· = bt) ∧ Alloc.KeepA m m'
 
 theorem longprune_satisfies {n : Nat} {xi : ExternalCalls} (bt : block) (tofs : ptrofs)
     (bf : block) (fofs : ptrofs) (bw : block) (wb : Int) (ww : Nat → Lib.Integers.int64)
@@ -150,8 +150,8 @@ theorem longprune_satisfies {n : Nat} {xi : ExternalCalls} (bt : block) (tofs : 
     refine wp_body h htarr htrep hM hW ho
       (by simp (config := {decide := true}) only [le0, temps_gso, temps_gss])
       (by simp (config := {decide := true}) only [le0, temps_gso, temps_gss]) hL ?_
-    intro le' m' wt' harr' hrep' hu _
+    intro le' m' wt' harr' hrep' hu hk _
     rw [← longprune_eq] at hrep'
-    exact ⟨m', Nextelement.free_empty m', rfl, wt', harr', hrep', hu⟩
+    exact ⟨m', Nextelement.free_empty m', rfl, wt', harr', hrep', hu, hk⟩
 
 end NautyVerified.Proofs.Prune.Long

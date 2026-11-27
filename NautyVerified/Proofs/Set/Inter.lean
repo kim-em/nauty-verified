@@ -1,3 +1,4 @@
+import NautyVerified.Proofs.Alloc.KeepV
 import NautyVerified.Proofs.Set.Add
 import NautyVerified.Logic.For
 
@@ -51,7 +52,7 @@ theorem wp_andWord {p q i : Common.AST.ident} {f : function} {Q : Post} {e : env
     (hi : PTree.get i le = some (.Vint (ir k)))
     (hQ : ∀ m', ArrayAt m' .Mint64 bp (intOfZ (Ptrofs.unsigned pofs))
         (longs (upd wp k (Int64.and (wp k) (wq k)))) M →
-      Unch m m' (· = bp) → Q.normal E0 e le m') :
+      Unch m m' (· = bp) → Alloc.KeepA m m' → Q.normal E0 e le m') :
     Wp xi ge f (andWord p q i) Q e le m := by
   have hep := eval_word (e := e) hparr hM p hp (.Etempvar i tint) k hk hi rfl
   have heq := eval_word (e := e) hqarr hM q hq (.Etempvar i tint) k hk hi rfl
@@ -63,7 +64,7 @@ theorem wp_andWord {p q i : Common.AST.ident} {f : function} {Q : Post} {e : env
   simp only [typeof, cop, Exec.assignLoc, Cfrontend.Ctypes.access_mode, Mem.storev]
   rw [addr_word hparr hk hM, hst]
   rw [longs_upd] at harr'
-  exact hQ m' harr' (Unch.store hst rfl)
+  exact hQ m' harr' (Unch.store hst rfl) (Alloc.KeepA.storeArr hparr hst)
 
 /-- Words below `k` conjoined, the rest as in `wp`. -/
 def andBelow (wp wq : Nat → Lib.Integers.int64) (k w : Nat) : Lib.Integers.int64 :=
@@ -89,31 +90,32 @@ theorem wp_interLoop {p q i mv : Common.AST.ident} {f : function} {Q : Post} {e 
     (hq : PTree.get q le = some (.Vptr bq qofs)) (hm : PTree.get mv le = some (.Vint (ir M)))
     (hpi : p ≠ i) (hqi : q ≠ i) (hmi : mv ≠ i)
     (hQ : ∀ le' m', ArrayAt m' .Mint64 bp (intOfZ (Ptrofs.unsigned pofs)) (longs (andW wp wq)) M →
-      Unch m m' (· = bp) → (∀ k, k ≠ i → PTree.get k le' = PTree.get k le) →
+      Unch m m' (· = bp) → Alloc.KeepA m m' → (∀ k, k ≠ i → PTree.get k le' = PTree.get k le) →
       Q.normal E0 e le' m') :
     Wp xi ge f (forLoop i mv (andWord p q i)) Q e le m := by
   let Inv := fun (k : Nat) (le' : temp_env) (m' : mem) =>
     k ≤ M ∧ PTree.get i le' = some (.Vint (ir k)) ∧ (∀ k', k' ≠ i → PTree.get k' le' = PTree.get k' le) ∧
     ArrayAt m' .Mint64 bp (intOfZ (Ptrofs.unsigned pofs)) (longs (andBelow wp wq k)) M ∧
-    Unch m m' (· = bp)
+    Unch m m' (· = bp) ∧ Alloc.KeepA m m'
   let Mid := fun (k : Nat) (le' : temp_env) (m' : mem) =>
     k < M ∧ PTree.get i le' = some (.Vint (ir k)) ∧ (∀ k', k' ≠ i → PTree.get k' le' = PTree.get k' le) ∧
     ArrayAt m' .Mint64 bp (intOfZ (Ptrofs.unsigned pofs)) (longs (andBelow wp wq (k + 1))) M ∧
-    Unch m m' (· = bp)
+    Unch m m' (· = bp) ∧ Alloc.KeepA m m'
   refine wp_forLoop i mv _ M hM Inv Mid ?_ ?_ ?_ ?_ ?_
-  · rintro k le' m' ⟨hk, hi, ho, -, -⟩
+  · rintro k le' m' ⟨hk, hi, ho, -, -, -⟩
     exact ⟨hk, hi, by rw [ho _ hmi, hm]⟩
-  · refine ⟨Nat.zero_le _, temps_gss _ _ _, fun k' hk' => temps_gso _ _ hk', ?_, Unch.refl _ _⟩
+  · refine ⟨Nat.zero_le _, temps_gss _ _ _, fun k' hk' => temps_gso _ _ hk', ?_, Unch.refl _ _, Alloc.KeepA.refl _⟩
     exact hparr.congr fun j _ => by simp [longs, andBelow]
-  · rintro k le' m' hk ⟨-, hi, ho, harr, hu⟩
+  · rintro k le' m' hk ⟨-, hi, ho, harr, hu, hkp⟩
     refine wp_andWord harr (hqarr.unch hu hne) hM (by rw [ho _ hpi, hp]) (by rw [ho _ hqi, hq]) hk hi ?_
-    intro m'' harr' hu'
-    refine ⟨rfl, hk, hi, ho, ?_, hu.trans hu'⟩
+    intro m'' harr' hu' hk'
+    refine ⟨rfl, hk, hi, ho, ?_, hu.trans hu', hkp.trans hk'⟩
     rw [← andBelow_succ]
     exact harr'
-  · rintro k le' m' ⟨hk, hi, ho, harr, hu⟩
-    exact ⟨hi, by omega, temps_gss _ _ _, fun k' hk' => by rw [temps_gso _ _ hk', ho _ hk'], harr, hu⟩
-  · rintro le' m' ⟨-, -, ho, harr, hu⟩
-    exact hQ le' m' (harr.congr fun j hj => by simp [longs, andBelow, hj]) hu ho
+  · rintro k le' m' ⟨hk, hi, ho, harr, hu, hkp⟩
+    exact ⟨hi, by omega, temps_gss _ _ _, fun k' hk' => by rw [temps_gso _ _ hk', ho _ hk'], harr, hu,
+      hkp⟩
+  · rintro le' m' ⟨-, -, ho, harr, hu, hkp⟩
+    exact hQ le' m' (harr.congr fun j hj => by simp [longs, andBelow, hj]) hu hkp ho
 
 end NautyVerified.Proofs.Set

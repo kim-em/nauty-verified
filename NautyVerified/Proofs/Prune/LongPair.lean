@@ -122,7 +122,7 @@ theorem wp_pair {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_env} {m
     (hQ : ∀ le' m' wt', PTree.get id.bottom le' = some (.Vptr bw (ptrTo wb 8 (o + M + M))) →
       ArrayAt m' .Mint64 bt (intOfZ (Ptrofs.unsigned tofs)) (longs wt') M →
       SetRep (fun w => bv64 (wt' w)) M (if F.subset fx then T.inter mc else T) →
-      Unch m m' (· = bt) →
+      Unch m m' (· = bt) → Alloc.KeepA m m' →
       (∀ k, k ≠ id.i → k ≠ id.bottom → PTree.get k le' = PTree.get k le) →
       Q.normal E0 e le' m') :
     Wp xi ge f pair Q e le m := by
@@ -152,17 +152,17 @@ theorem wp_pair {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_env} {m
     have hs := hsub.1 hrM
     refine wp_interLoop htarr (slice_at h.warr (o + M) M (by omega)) (Ne.symm h.tw) hM h2.htcell
       (temps_gss _ _ _) h2.hm (by decide) (by decide) (by decide) ?_
-    intro le3 m3 harr3 hu3 ho3
+    intro le3 m3 harr3 hu3 hk3 ho3
     refine wp_advance hM (by rw [ho3 _ (by decide)]; exact temps_gss _ _ _)
       (by rw [ho3 _ (by decide)]; exact h2.hm) ?_
-    refine hQ _ m3 _ (temps_gss _ _ _) harr3 ?_ hu3 ?_
+    refine hQ _ m3 _ (temps_gss _ _ _) harr3 ?_ hu3 hk3 ?_
     · rw [ite_eq_left hs]; exact setRep_andW htrep hmc
     · intro k h1 h2'
       rw [temps_gso _ _ h2', ho3 k h1, ho2 k h1 h2']
   · rw [ite_eq_right (by simp; omega)]
     apply wp_skip
     refine wp_advance hM (temps_gss _ _ _) h2.hm ?_
-    refine hQ _ m wt (temps_gss _ _ _) htarr ?_ (Unch.refl _ _) ?_
+    refine hQ _ m wt (temps_gss _ _ _) htarr ?_ (Unch.refl _ _) (Alloc.KeepA.refl _) ?_
     · rw [ite_eq_right (fun hs => hrM (hsub.2 hs))]; exact htrep
     · intro k h1 h2'
       rw [temps_gso _ _ h2', ho2 k h1 h2']

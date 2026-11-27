@@ -169,7 +169,7 @@ theorem wp_prune0 {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} 
         show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl, hfm.load, h₁.fixed.mm.load, typeof,
         cop, Alloc.Mptr_eq]
       rw [ho2]
-    rintro t v m₂ ⟨⟨rfl, harr₂, hu₂⟩, hg₂⟩
+    rintro t v m₂ ⟨⟨rfl, harr₂, hu₂, -⟩, hg₂⟩
     have hU₂ : Unch m₁ m₂ (fun z => z = btc) := hu₂
     refine hQ m₂ _ (h₁.unch hU₂ (fun z hz he => hbS (he ▸ hz))
         (fun z hz he => hbW (he ▸ IsWork.back h hU₁ (by
