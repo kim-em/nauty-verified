@@ -200,4 +200,24 @@ theorem ArrayAt.congr {m : mem} {chunk : memory_chunk} {b : block} {base : Int}
     (he : ∀ i < n, vals i = vals' i) : ArrayAt m chunk b base vals' n :=
   ⟨h.base_nonneg, h.fits, fun i hi => by rw [← he i hi]; exact h.load i hi, h.writable⟩
 
+theorem elemOfs_slice (chunk : memory_chunk) (base : Int) (off i : Nat) :
+    elemOfs chunk (base + csize chunk * off) i = elemOfs chunk base (off + i) := by
+  simp only [elemOfs]
+  congr 1
+  rw [Int.natCast_add, Int.mul_add, Int.add_assoc]
+
+/-- The elements `off .. off + len - 1` of an array, as an array of their own. -/
+theorem ArrayAt.slice {m : mem} {chunk : memory_chunk} {b : block} {base : Int}
+    {vals : Nat → val} {N : Nat} (h : ArrayAt m chunk b base vals N) (off len : Nat)
+    (hle : off + len ≤ N) :
+    ArrayAt m chunk b (base + csize chunk * off) (fun i => vals (off + i)) len := by
+  have hc := csize_pos chunk
+  have h1 : csize chunk * (off : Int) + csize chunk * len ≤ csize chunk * N := by
+    rw [← Int.mul_add]
+    exact Int.mul_le_mul_of_nonneg_left (by omega) (by omega)
+  have h2 : 0 ≤ csize chunk * (off : Int) := Int.mul_nonneg (by omega) (by omega)
+  refine ⟨by have := h.base_nonneg; omega, by have := h.fits; omega, fun i hi => ?_, fun i hi => ?_⟩
+  · rw [elemOfs_slice]; exact h.load _ (by omega)
+  · rw [elemOfs_slice]; exact h.writable _ (by omega)
+
 end NautyVerified.Logic

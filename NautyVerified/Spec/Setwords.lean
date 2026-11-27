@@ -59,4 +59,36 @@ theorem setRep_inter {n M : Nat} {ws wt : Nat → BitVec 64} {s t : VSet n} (hs 
     rw [VSet.mem_inter, ← hs.2 v hv, ← ht.2 v hv]
     simp only [SetwordsMem, BitVec.getMsbD_and]⟩
 
+/-- nauty's word-wise `NOTSUBSET` test over `M` words decides HexGraphIso's `subset`. -/
+theorem setRep_subset {n M : Nat} {ws wt : Nat → BitVec 64} {s t : VSet n} (hs : SetRep ws M s)
+    (ht : SetRep wt M t) : (∀ i < M, ws i &&& ~~~ wt i = 0) ↔ s.subset t = true := by
+  rw [VSet.subset_iff]
+  constructor
+  · intro h v hv
+    have hvn := VSet.mem_lt hv
+    have hvM : v < 64 * M := Nat.lt_of_lt_of_le hvn hs.1
+    have hw := h (v / 64) (by omega)
+    have hb := congrArg (fun x => x.getMsbD (v % 64)) hw
+    simp only [BitVec.getMsbD_and, BitVec.getMsbD_not] at hb
+    rw [← ht.2 v hvM]
+    rw [← hs.2 v hvM] at hv
+    simp only [SetwordsMem] at hv ⊢
+    rw [hv] at hb
+    simpa [Nat.mod_lt v (by decide : 64 > 0)] using hb
+  · intro h i hi
+    apply BitVec.eq_of_getMsbD_eq
+    intro j hj
+    simp only [BitVec.getMsbD_and, BitVec.getMsbD_not, hj, decide_true,
+      Bool.true_and]
+    have hv : 64 * i + j < 64 * M := by omega
+    have e1 : (64 * i + j) / 64 = i := by omega
+    have e2 : (64 * i + j) % 64 = j := by omega
+    have h1 := hs.2 _ hv
+    have h2 := ht.2 _ hv
+    simp only [SetwordsMem, e1, e2] at h1 h2
+    rw [h1, h2]
+    cases hm : s.mem (64 * i + j)
+    · simp
+    · simp [h _ hm]
+
 end NautyVerified.Spec

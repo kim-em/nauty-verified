@@ -170,4 +170,9 @@ end PtrCmp
     sem_unary_operation .Oneg (.Vint x) (Tint .I32 .Signed a) m = some (.Vint (Lib.Integers.Int.neg x)) :=
   rfl
 
+@[simp, cop] theorem notint_l (x : Lib.Integers.int64) :
+    sem_unary_operation .Onotint (.Vlong x) (Tlong .Unsigned a) m =
+      some (.Vlong (Lib.Integers.Int64.not x)) :=
+  rfl
+
 end NautyVerified.Exec

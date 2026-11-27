@@ -44,6 +44,23 @@ theorem add_ptrTo (ofs : Lib.Integers.ptrofs) (sz : Z) (k : Nat) (hk : (k : Int)
   rw [bvp_add, bvp_mul, bvp_repr, bvp_of_ints, toInt_ir ⟨by omega, hk⟩, bvp_repr, intOfZ_zOfInt,
     bvp_eq_ofInt ofs, ← BitVec.ofInt_mul, ← BitVec.ofInt_add]
 
+theorem cmpu_lt (x y : Lib.Integers.ptrofs) :
+    Ptrofs.cmpu .Clt x y = decide ((bvp x).toNat < (bvp y).toNat) := by
+  show WordCore.ltu x y = _
+  exact toBV_ltu x y
+
+/-- `p + j` for `p` at element `k`. -/
+theorem add_ptrTo_ptrTo (base : Int) (sz : Z) (k j : Nat) (hj : (j : Int) < 2147483648) :
+    Ptrofs.add (ptrTo base (intOfZ sz) k) (Ptrofs.mul (Ptrofs.repr sz) (Ptrofs.of_ints (ir j))) =
+      ptrTo base (intOfZ sz) (k + j) := by
+  apply bvp_inj.1
+  rw [bvp_add, bvp_mul, bvp_repr, bvp_of_ints, toInt_ir ⟨by omega, hj⟩, bvp_repr, bvp_repr,
+    intOfZ_zOfInt, intOfZ_zOfInt, ← BitVec.ofInt_mul, ← BitVec.ofInt_add]
+  congr 1
+  push_cast
+  rw [Int.mul_add]
+  omega
+
 /-- `p - 1` for `p` at element `k + 1`. -/
 theorem sub_ptrTo (base : Int) (sz : Z) (k : Nat) :
     Ptrofs.sub (ptrTo base (intOfZ sz) (k + 1)) (Ptrofs.mul (Ptrofs.repr sz) (Ptrofs.of_ints (ir 1))) =

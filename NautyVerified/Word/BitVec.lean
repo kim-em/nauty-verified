@@ -114,6 +114,13 @@ theorem toBV_of_nat_lt (n : Nat) (h : n < 2 ^ bits) :
   rw [WordCore.or, toNat_toBV, val_repr_of_nat, BitVec.toNat_or, toNat_toBV, toNat_toBV]
   exact Nat.mod_eq_of_lt (Nat.or_lt_two_pow (val_lt_two_pow x) (val_lt_two_pow y))
 
+@[simp] theorem toBV_not (x : Word bits) : toBV (WordCore.not x) = ~~~ toBV x := by
+  rw [← BitVec.xor_allOnes]
+  apply BitVec.eq_of_toNat_eq
+  rw [WordCore.not, toNat_toBV, val_repr_of_nat, BitVec.toNat_xor, BitVec.toNat_allOnes, toNat_toBV]
+  exact Nat.mod_eq_of_lt (Nat.xor_lt_two_pow (val_lt_two_pow x)
+    (by have := Nat.one_le_two_pow (n := bits); omega))
+
 @[simp] theorem toBV_xor (x y : Word bits) : toBV (xor x y) = toBV x ^^^ toBV y := by
   apply BitVec.eq_of_toNat_eq
   rw [WordCore.xor, toNat_toBV, val_repr_of_nat, BitVec.toNat_xor, toNat_toBV, toNat_toBV]

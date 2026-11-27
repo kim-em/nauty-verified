@@ -36,3 +36,6 @@ import NautyVerified.Proofs.Fmptn.Scan
 import NautyVerified.Proofs.Fmptn.Loop
 import NautyVerified.Proofs.Fmptn.Satisfies
 import NautyVerified.Proofs.Prune.Short
+import NautyVerified.Proofs.Set.Subset
+import NautyVerified.Proofs.Prune.LongSyntax
+import NautyVerified.Proofs.Prune.LongPair

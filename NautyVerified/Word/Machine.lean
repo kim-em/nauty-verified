@@ -59,6 +59,7 @@ theorem bvp_inj {x y : Lib.Integers.ptrofs} : bvp x = bvp y ↔ x = y := toBV_in
 @[simp] theorem bv64_mul (x y : Lib.Integers.int64) : bv64 (Lib.Integers.Int64.mul x y) = bv64 x * bv64 y := toBV_mul x y
 @[simp] theorem bv64_and (x y : Lib.Integers.int64) : bv64 (Lib.Integers.Int64.and x y) = bv64 x &&& bv64 y := toBV_and x y
 @[simp] theorem bv64_or (x y : Lib.Integers.int64) : bv64 (Lib.Integers.Int64.or x y) = bv64 x ||| bv64 y := toBV_or x y
+@[simp] theorem bv64_not (x : Lib.Integers.int64) : bv64 (Lib.Integers.Int64.not x) = ~~~bv64 x := toBV_not x
 @[simp] theorem bv64_xor (x y : Lib.Integers.int64) : bv64 (Lib.Integers.Int64.xor x y) = bv64 x ^^^ bv64 y := toBV_xor x y
 @[simp] theorem bv64_neg (x : Lib.Integers.int64) : bv64 (Lib.Integers.Int64.neg x) = -bv64 x := toBV_neg x
 @[simp] theorem bv64_eq (x y : Lib.Integers.int64) : Lib.Integers.Int64.eq x y = decide (bv64 x = bv64 y) := toBV_eq x y
