@@ -27,6 +27,15 @@ kernel_rfl funct_nvWrite : Genv.find_funct_ptr ge.genv_genv Block.nvWrite =
 /-- The read event returning `x`. -/
 abbrev readEv (x : Lib.Integers.int64) : event := .Event_syscall Statement.nameRead [] (.EVlong x)
 
+/-- `Int64.signed (lr a) = a` in range. -/
+theorem signed_lr {a : Int} (h1 : -2 ^ 63 ≤ a) (h2 : a < 2 ^ 63) :
+    intOfZ (Lib.Integers.Int64.signed (lr a)) = a := by
+  rw [intOfZ_Int64_signed, bv64_repr, intOfZ_zOfInt, BitVec.toInt_ofInt]
+  apply Int.bmod_eq_of_le <;> omega
+
+/-- A one-event trace. -/
+def tr1 (ev : event) : trace := [ev]
+
 /-- `t` is `nv_read` events returning `l`. -/
 inductive Reads : trace → List Int → Prop
   | nil : Reads [] []
@@ -38,6 +47,9 @@ theorem Reads.append {t₁ t₂ : trace} {l₁ l₂ : List Int} (h₁ : Reads t�
   induction h₁ with
   | nil => exact h₂
   | cons x _ ih => exact .cons x ih
+
+theorem Reads.one (x : Lib.Integers.int64) :
+    Reads (tr1 (readEv x)) [intOfZ (Lib.Integers.Int64.signed x)] := .cons x .nil
 
 theorem nameRead_ne_nameWrite : Statement.nameRead ≠ Statement.nameWrite := by decide +kernel
 
