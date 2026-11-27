@@ -78,4 +78,60 @@ theorem GraphAt.row {n : Nat} {m : mem} {bg : block} {gofs : ptrofs} {gw : Nat �
     have := Nat.mul_le_mul_left M (show v + 1 ≤ n by omega)
     rw [Nat.mul_add, Nat.mul_one] at this; exact this)
 
+theorem setRep_congr {n M : Nat} {ws ws' : Nat → BitVec 64} {s : VSet n} (h : SetRep ws M s)
+    (he : ∀ w < M, ws w = ws' w) : SetRep ws' M s :=
+  ⟨h.1, fun v hv => by
+    rw [← h.2 v hv]; simp only [SetwordsMem]; rw [he _ (by omega)]⟩
+
+/-- The words of a graph with row `i` replaced by `w'`. -/
+def rowSet (cw : Nat → Lib.Integers.int64) (M i : Nat) (w' : Nat → Lib.Integers.int64) (u : Nat) :
+    Lib.Integers.int64 :=
+  if M * i ≤ u ∧ u < M * i + M then w' (u - M * i) else cw u
+
+/-- Replacing row `i` of a graph, after a change confined to that row. -/
+theorem GraphAt.setRow {n : Nat} {m m' : mem} {bc : block} {cofs : ptrofs}
+    {cw : Nat → Lib.Integers.int64} {rows : Array (VSet n)} {M i : Nat}
+    (h : GraphAt m bc cofs cw rows M) (hi : i < n) (hsz : rows.size = n)
+    {w' : Nat → Lib.Integers.int64} {r : VSet n}
+    (h' : ArrayAt m' .Mint64 bc (intOfZ (Ptrofs.unsigned (ptrTo (intOfZ (Ptrofs.unsigned cofs)) 8 (M * i))))
+      (longs w') M)
+    (hrep : SetRep (fun w => bv64 (w' w)) M r)
+    (ho : Outside m m' bc (intOfZ (Ptrofs.unsigned (ptrTo (intOfZ (Ptrofs.unsigned cofs)) 8 (M * i))))
+      (intOfZ (Ptrofs.unsigned (ptrTo (intOfZ (Ptrofs.unsigned cofs)) 8 (M * i))) + 8 * M)) :
+    GraphAt m' bc cofs (rowSet cw M i w') (rows.set! i r) M := by
+  have hf := h.arr.fits
+  have hb := h.arr.base_nonneg
+  have h8 : csize .Mint64 = 8 := rfl
+  rw [h8] at hf
+  have hle : M * i + M ≤ M * n := by
+    have := Nat.mul_le_mul_left M (show i + 1 ≤ n by omega); rw [Nat.mul_add, Nat.mul_one] at this
+    exact this
+  have hMn : ((M * n : Nat) : Int) = (M : Int) * n := by push_cast; rfl
+  have hu : intOfZ (Ptrofs.unsigned (ptrTo (intOfZ (Ptrofs.unsigned cofs)) 8 (M * i))) =
+      intOfZ (Ptrofs.unsigned cofs) + 8 * ((M * i : Nat) : Int) := by
+    apply unsigned_ptrTo <;> push_cast at hf ⊢ <;> omega
+  rw [hu] at h' ho
+  refine ⟨?_, fun v hv => ?_⟩
+  · have := ArrayAt.outside h.arr (M * i) M (by rw [h8]; exact h')
+      (by rw [h8, Int.mul_add, ← Int.add_assoc]; exact ho)
+    refine this.congr fun u _ => ?_
+    simp only [rowSet, longs]
+    split <;> rfl
+  · by_cases hvi : v = i
+    · subst hvi
+      rw [Array.getElem!_set!_self _ _ _ (by omega)]
+      refine setRep_congr hrep fun w hw => ?_
+      simp only [rowSet]
+      rw [ite_eq_left ⟨by omega, by omega⟩, show M * v + w - M * v = w by omega]
+    · rw [Array.getElem!_set!_ne _ _ _ _ (Ne.symm hvi)]
+      refine setRep_congr (h.rep v hv) fun w hw => ?_
+      simp only [rowSet]
+      rw [ite_eq_right]
+      rintro ⟨h1, h2⟩
+      rcases Nat.lt_or_gt_of_ne hvi with hlt | hgt
+      · have := Nat.mul_le_mul_left M (show v + 1 ≤ i by omega)
+        rw [Nat.mul_add, Nat.mul_one] at this; omega
+      · have := Nat.mul_le_mul_left M (show i + 1 ≤ v by omega)
+        rw [Nat.mul_add, Nat.mul_one] at this; omega
+
 end NautyVerified.Proofs.Graph
