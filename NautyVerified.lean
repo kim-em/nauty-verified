@@ -105,6 +105,7 @@ import NautyVerified.Proofs.Search.Node.OtherSteps
 import NautyVerified.Proofs.Search.Node.FirstHex
 import NautyVerified.Proofs.Search.Node.OkFirst
 import NautyVerified.Proofs.Search.Node.Prune
+import NautyVerified.Proofs.Search.Node.InvSteps
 import NautyVerified.Proofs.Search.Frame
 import NautyVerified.Proofs.Harness.Spec
 import NautyVerified.Proofs.Search.Node.Firstpathnode
