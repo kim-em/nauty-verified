@@ -126,7 +126,7 @@ def emitDefsWith {α : Type} [ToExpr α] (base sub listName : Name) (nameOf : po
 /-- Add `base.id.<name>` for each identifier name. -/
 def emitNames (base : Name) (names : List (Nat × String)) : CommandElabM Unit := do
   for (i, str) in names do
-    addDef (base ++ `id ++ Name.mkSimple str) (toTypeExpr positive)
+    addDef (base ++ `id ++ Name.mkSimple str) (mkConst ``Common.AST.ident)
       (toExpr (PArith.BinPos.Pos.of_nat i))
 
 def nameLookup (names : List (Nat × String)) (p : positive) : Name :=

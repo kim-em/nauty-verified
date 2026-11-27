@@ -8,3 +8,7 @@ import NautyVerified.Word.BitVec
 import NautyVerified.Spec.VSet
 import NautyVerified.Exec.Cop
 import NautyVerified.Program.Dense
+import NautyVerified.Word.Machine
+import NautyVerified.Proofs.Nextelement.Leftbit
+import NautyVerified.Proofs.Nextelement.Syntax
+import NautyVerified.Tools.PrintClight

@@ -17,8 +17,8 @@ open NautyVerified.Source
 abbrev ge : genv := globalenv dense.locals
 
 namespace Block
-def nextelement : positive := PArith.BinPos.Pos.of_nat 13
-def leftbit : positive := PArith.BinPos.Pos.of_nat 284
+def nextelement : Common.Values.block := PArith.BinPos.Pos.of_nat 13
+def leftbit : Common.Values.block := PArith.BinPos.Pos.of_nat 284
 end Block
 
 kernel_rfl find_nextelement :
