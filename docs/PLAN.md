@@ -184,19 +184,19 @@ temporaries as hypotheses, run `wp_step` and evaluate with the `cop` simp set
 and the `ir`/`bv64` lemmas, split on tests, and close leaves with the pure
 specification lemmas. `bv_decide` is not used (it adds `Lean.ofReduceBool`).
 
-## Phase 3: Clight to Asm theorem
+## Phase 3: Clight to Asm theorem (done)
 
-`transf_clight_correct`: backward simulation from `Clight.semantics2` (the
-SimplLocals output we reason about) to `Asm.semantics`, by copying the
-composition in `CompCert4Lean/Driver/Compiler.lean`
-(`cstrategy_semantic_preservation`, line 1494) from Cshmgen onwards, plus a
-new `Clight.semantics_receptive` and the existing
-`Asm.semantics_determinate_proof`. Show
-`transf_c_program p = transf_clight_program (clight p)` by unfolding, so the
-binary the driver emits is the one the theorem covers. Upstream to
-CompCert4Lean.
+`CompCert4Lean/Driver/ClightCompiler.lean` (fork branch `nauty-verified`):
+`Clight.semantics2_receptive`, and `transf_c_program_clight_correct`: if
+`transf_c_program … p = .OK tp`, `SimplExpr.transl_program ctx p = .OK c1` and
+`SimplLocals.transf_program cfg c1 = .OK c2`, then `backward_simulation
+(Clight.semantics2 xi c2) (Asm.semantics cfg xi tp)`. It chains each pass's
+`transf_program_match` into that pass's correctness theorem from Cshmgen on, so
+no linking certificates are involved. `Statement/Compiler.lean` instantiates
+it for the dense program (`dense_backward`) with `dense.clight_eq` and
+`dense.locals_eq`. Upstreaming to CompCert4Lean needs approval.
 
-## Phase 4: statements first
+## Phase 4: statements first (written; awaiting review)
 
 Before bulk proofs, commit the final statements with `sorry`:
 - encodings: `Inputs.events G`, `Out.trace r` for the harness protocol;
@@ -210,6 +210,15 @@ Before bulk proofs, commit the final statements with `sorry`:
   `64m < 2^31`, refine hash sums; `nextelement` already needed `64n < 2^31`);
 - the top theorem and corollaries.
 Review these with Kim before Phase 5.
+
+Written: `Statement/Harness.lean` (the environment `xi`, `Encodes`,
+`Consistent`, `reads`/`writes`, `expected`) and `Statement/Dense.lean`
+(`densenauty_binary_correct`, `canonWords_eq_iff`, `generators_correct`,
+`orbits_correct`, `maxN = 65536`), with `sorry` proofs on the allowlist.
+`expected G`, evaluated in Lean, equals the native binary's output on the
+fixtures checked (Petersen, coloured Petersen, an edgeless graph, five random
+graphs). The representation predicates are written per function during Phase
+5 (as `WordsAt`, `LeftbitTable`, `LoopInv` for `nextelement`).
 
 ## Phase 5: dense specs (the bulk)
 

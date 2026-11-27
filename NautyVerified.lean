@@ -15,3 +15,5 @@ import NautyVerified.Tools.PrintClight
 import NautyVerified.Proofs.Nextelement.Tree
 import NautyVerified.Proofs.Nextelement.Body
 import NautyVerified.Proofs.Nextelement.Satisfies
+import NautyVerified.Statement.Dense
+import NautyVerified.Statement.Compiler

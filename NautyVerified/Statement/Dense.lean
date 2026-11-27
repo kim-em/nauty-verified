@@ -1,0 +1,70 @@
+import NautyVerified.Statement.Harness
+
+/-!
+# The end-to-end theorem for dense nauty (statement)
+
+`densenauty_binary_correct`: the x86-64 program that CompCert4Lean compiles
+from the linked C sources (`dense_main.c`, nauty 2.9.3's dense code and
+`zalloc.c`; the binary `scripts/build_binary.sh` produces), run on any input
+encoding a coloured graph `G`, terminates, and writes exactly what
+HexGraphIso's search computes on `G` (`expected G`): the same generators in
+the same order, canonical labelling, orbits, canonical graph and statistics.
+
+The corollaries restate HexGraphIso's correctness theorems for what the binary
+writes: the canonical graph is a complete isomorphism invariant, the written
+generators generate the automorphism group, and the orbits are its orbits.
+
+The proofs are not done yet (Phases 5 and 6 of docs/PLAN.md).
+-/
+
+namespace NautyVerified.Statement
+
+open CompCert4Lean CompCert4Lean.Common.Events CompCert4Lean.Common.Behaviors
+open CompCert4Lean.Lib.Integers
+open Hex.GraphIso
+
+/-- The largest number of vertices covered. nauty's internal arithmetic is in
+`int`; this bound keeps every product it forms (`m * n`, `2 * 500 * m`, the
+refinement's hash sums) far from overflow. -/
+def maxN : Nat := 65536
+
+/-- The binary compiled from the linked dense program. -/
+abbrev Compiled (tp : X86.Asm.program) : Prop :=
+  Build.compile Source.dense.fresh Source.dense.program = .ok tp
+
+theorem densenauty_binary_correct {n k : Nat} (G : Colored n k) (hn : 0 < n) (hmax : n ≤ maxN)
+    {ins : List Int} (hins : Encodes G ins) {tp : X86.Asm.program} (hc : Compiled tp) :
+    ∀ beh, program_behaves (X86.Asm.semantics Build.config xi tp) beh → Consistent ins beh →
+      ∃ t, beh = .Terminates t (Lib.Integers.Int.repr .Z0) ∧ writes t = expected G := by
+  sorry
+
+/-! ## What the output means
+
+The parts of `expected G`, and HexGraphIso's theorems about them. -/
+
+/-- The canonical graph the binary writes (block 4). -/
+def canonWords {n k : Nat} (G : Colored n k) : List Int :=
+  (Nauty.runColoredTraced G).result.canong.toList.flatMap (rowWords (setwordsNeeded n))
+
+/-- The canonical graph is a complete invariant: two graphs on the same
+vertices and colours get the same canonical graph exactly when they are
+isomorphic. -/
+theorem canonWords_eq_iff {n k : Nat} (G H : Colored n k) :
+    canonWords G = canonWords H ↔ Isomorphic G H := by
+  sorry
+
+/-- The generators the binary writes (block 1) are automorphisms of `G`, and
+every automorphism of `G` is a product of them. -/
+theorem generators_correct {n k : Nat} (G : Colored n k) :
+    (∀ p ∈ (Nauty.runColoredTraced G).autos.toList, ∃ q, (∀ i : Fin n, (q i).val = p[i.val]!) ∧
+      IsIso G G q) ∧
+    ∀ q, IsIso G G q → Perm.Generated (Aut.gens G) q := by
+  sorry
+
+/-- The orbits the binary writes (block 3): two vertices get the same
+representative exactly when an automorphism maps one to the other. -/
+theorem orbits_correct {n k : Nat} (G : Colored n k) (u v : Fin n) :
+    (finalState G).orbits[u.val]! = (finalState G).orbits[v.val]! ↔ SameOrbit G u v := by
+  sorry
+
+end NautyVerified.Statement
