@@ -295,4 +295,10 @@ theorem Mem.frame {n : Nat} {m m' : mem} {L : Loc} {ctx : Ctx n} {st st' : Refin
     left := LeftbitTable.unch hm.left hu
       (notW_glob d.bl_g8 d.bp_g8 d.bn_g8 d.bc_g8 d.ba_g8 d.bW_g8 d.bS_g8 d.bB_g8) }
 
+/-- Entries `i < j` of `L.blocks` differ. -/
+theorem Ok.ne {n : Nat} {L : Loc} (h : Ok n L) (i j : Nat) (hij : i < j)
+    (hj : j < L.blocks.length := by simp [Loc.blocks]) :
+    L.blocks[i]'(Nat.lt_trans hij hj) ≠ L.blocks[j] :=
+  pw_ne h.distinct i j hij hj
+
 end NautyVerified.Proofs.Refine
