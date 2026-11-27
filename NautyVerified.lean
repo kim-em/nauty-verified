@@ -61,3 +61,4 @@ import NautyVerified.Proofs.Cheapautom.Satisfies
 import NautyVerified.Proofs.Graph.Rows
 import NautyVerified.Proofs.Set.Elem
 import NautyVerified.Proofs.Isautom.Scan
+import NautyVerified.Proofs.Isautom.Satisfies
