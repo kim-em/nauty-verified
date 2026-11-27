@@ -13,3 +13,4 @@ import NautyVerified.Proofs.Nextelement.Leftbit
 import NautyVerified.Proofs.Nextelement.Syntax
 import NautyVerified.Tools.PrintClight
 import NautyVerified.Proofs.Nextelement.Tree
+import NautyVerified.Proofs.Nextelement.Body
