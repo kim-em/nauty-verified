@@ -195,6 +195,12 @@ variable (x y : Lib.Integers.int64) (n : Lib.Integers.int)
 @[simp, cop] theorem cast_ib : sem_cast (.Vint n) (Tint .I32 .Signed a) (Tint .IBool .Signed b) m =
     some (.Vint (if Lib.Integers.Int.eq n Lib.Integers.Int.zero then Lib.Integers.Int.zero
       else Lib.Integers.Int.one)) := rfl
+@[simp, cop] theorem mul_il : sem_binary_operation ce .Omul (.Vint n) (Tint .I32 .Signed a)
+    (.Vlong y) (Tlong .Unsigned b) m =
+      some (.Vlong (Lib.Integers.Int64.mul (Lib.Integers.Int64.repr (Lib.Integers.Int.signed n)) y)) :=
+  rfl
+@[simp, cop] theorem notbool_i : sem_unary_operation .Onotbool (.Vint n) (Tint .I32 .Signed a) m =
+    some (Val.of_bool (!(!Lib.Integers.Int.eq n Lib.Integers.Int.zero))) := rfl
 end LongMixed
 
 @[simp, cop] theorem eq_pl (blk : block) (ofs : ptrofs) (t1 t2 : type) (y : Lib.Integers.int64) :

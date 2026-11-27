@@ -58,3 +58,4 @@ import NautyVerified.Proofs.Fmperm.Satisfies
 import NautyVerified.Proofs.Cheapautom.Syntax
 import NautyVerified.Proofs.Cheapautom.Loop
 import NautyVerified.Proofs.Cheapautom.Satisfies
+import NautyVerified.Proofs.Graph.Rows
