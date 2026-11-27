@@ -16,7 +16,7 @@ open CompCert4Lean.Common.Memory CompCert4Lean.Common.AST
 open CompCert4Lean.Foundation.Numbers.Rocq.Coq CompCert4Lean.Lib.Maps CompCert4Lean.Lib.Integers
 open NautyVerified NautyVerified.Logic NautyVerified.Program NautyVerified.Word NautyVerified.Spec
 open NautyVerified.Proofs.Set (longs addW BitTable)
-open Hex.GraphIso.Nauty (VSet)
+open Hex.GraphIso.Nauty (VSet fmptn cells cellEnd)
 
 variable {xi : ExternalCalls}
 
@@ -129,5 +129,103 @@ theorem wp_cell {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {b
       hs2.bit.unch hu3 hd.bm, hs2.Mlt, hs2.nM⟩ (hu3.mono fun b hb => .inr hb) ?_
   intro k h1 h2 h3
   rw [ho2 k h1 h2 h3, ho1 k h2]
+
+theorem wp_loop_fmptn {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {bl : block}
+    {lofs : ptrofs} {bp : block} {pofs : ptrofs} {bf : block} {fofs : ptrofs} {bm : block}
+    {mofs : ptrofs} {lab ptn : Array Nat} {n level M : Nat} {wf wm : Nat → Lib.Integers.int64}
+    (h : Frame m le bl lofs bp pofs lab ptn n level)
+    (hs : Sets m le bf fofs bm mofs n M wf wm VSet.empty VSet.empty)
+    (hd : Disjoint bl bp bf bm) (he : PTree.get Set.bit e = none) (hsize : ptn.size = n)
+    (hlast : ptn[n - 1]! ≤ level) (hi : PTree.get id.i le = some (.Vint (ir 0)))
+    (hQ : ∀ le' m' wf' wm', Frame m' le' bl lofs bp pofs lab ptn n level →
+      Sets m' le' bf fofs bm mofs n M wf' wm' (fmptn lab ptn level n).1 (fmptn lab ptn level n).2 →
+      Unch m m' (fun b => b = bf ∨ b = bm) →
+      (∀ k, k ≠ id.i → k ≠ id.lmin → k ≠ id.t3 → PTree.get k le' = PTree.get k le) →
+      Q.normal E0 e le' m') :
+    Wp xi ge f loop Q e le m := by
+  let R : VSet n × VSet n := (cells ptn level n).foldl (cellStep lab) (VSet.empty, VSet.empty)
+  have hR : fmptn lab ptn level n = R := fmptn_eq lab ptn level n
+  have hn := h.nlt
+  let Oth := fun le' : temp_env =>
+    ∀ k, k ≠ id.i → k ≠ id.lmin → k ≠ id.t3 → PTree.get k le' = PTree.get k le
+  refine wp_loop
+    (I := fun v t e' le' m' => t = E0 ∧ e = e' ∧ ∃ c wf wm fx mc F, c ≤ n ∧ v = n - c ∧
+      n - c ≤ F ∧ (cells.go ptn level n F c).foldl (cellStep lab) (fx, mc) = R ∧
+      PTree.get id.i le' = some (.Vint (ir c)) ∧ Frame m' le' bl lofs bp pofs lab ptn n level ∧
+      Sets m' le' bf fofs bm mofs n M wf wm fx mc ∧ Unch m m' (fun b => b = bf ∨ b = bm) ∧ Oth le')
+    (J := fun v t e' le' m' => t = E0 ∧ e = e' ∧ ∃ c c2 wf wm fx mc F, c ≤ c2 ∧ c2 < n ∧
+      v = n - c ∧ n - (c2 + 1) ≤ F ∧
+      (cells.go ptn level n F (c2 + 1)).foldl (cellStep lab) (fx, mc) = R ∧
+      PTree.get id.i le' = some (.Vint (ir c2)) ∧ Frame m' le' bl lofs bp pofs lab ptn n level ∧
+      Sets m' le' bf fofs bm mofs n M wf wm fx mc ∧ Unch m m' (fun b => b = bf ∨ b = bm) ∧ Oth le')
+    ?_ ?_ (n := n - 0)
+    ⟨rfl, rfl, 0, wf, wm, _, _, n, Nat.zero_le _, rfl, by omega, rfl, hi, h, hs, Unch.refl _ _,
+      fun _ _ _ _ => rfl⟩
+  · rintro v t e' le' m' ⟨rfl, rfl, c, wf, wm, fx, mc, F, hcn, rfl, hF, hfold, hic, hf, hs', hu, ho⟩
+    wp_step; wp_step; wp_step
+    apply wp_if_eval
+    rw [Exec.evalExpr, show Exec.evalExpr ge e le' m' (tv id.i) = _ from hic,
+      show Exec.evalExpr ge e le' m' (tv id.n) = _ from hf.hn]
+    simp only [typeof, cop]
+    rw [ir_lt (a := (c : Int)) (b := (n : Int)) ⟨by omega, by omega⟩ ⟨by omega, by omega⟩]
+    by_cases hc : c < n
+    · rw [ite_eq_left (by simpa using hc)]
+      apply wp_skip
+      have hsp := cellEnd_spec hsize hc hlast
+      obtain ⟨F, rfl⟩ : ∃ F', F = F' + 1 := ⟨F - 1, by omega⟩
+      rw [cells_go_succ _ _ _ _ _ hc, List.foldl_cons] at hfold
+      have hpc := hf.psmall c hc
+      have hlv := hf.levlt
+      have hpe := eval_at (ge := ge) (e := e) hf.parr hf.nlt id.ptn hf.hptn (tv id.i) c hc hic rfl
+      wp_step; wp_step
+      apply wp_if_eval
+      rw [Exec.evalExpr, hpe, show Exec.evalExpr ge e le' m' (tv id.level) = _ from hf.hlev]
+      simp only [ints, typeof, cop]
+      rw [ir_lt (a := (level : Int)) (b := (ptn[c]! : Int)) ⟨by omega, by omega⟩ ⟨by omega, by omega⟩]
+      by_cases hle : ptn[c]! ≤ level
+      · rw [ite_eq_left (by simp; omega)]
+        have hce : cellEnd ptn level c = c := by
+          rcases Nat.lt_or_ge c (cellEnd ptn level c) with hlt | hge
+          · have := hsp.2.2.2 c (Nat.le_refl _) hlt; omega
+          · omega
+        rw [hce] at hfold
+        simp only [cellStep, beq_self_eq_true, ite_true] at hfold
+        refine wp_single hf hs' hd he hc hic ?_
+        intro m2 hf2 hs2 hu2
+        exact ⟨by simp, rfl, c, c, _, _, _, _, F, Nat.le_refl _, hc, rfl, by omega, hfold, hic, hf2,
+          hs2, hu.trans hu2, ho⟩
+      · rw [ite_eq_right (by simp; omega)]
+        have hce : c < cellEnd ptn level c := by
+          rcases Nat.lt_or_ge c (cellEnd ptn level c) with hlt | hge
+          · exact hlt
+          · have h1 : cellEnd ptn level c = c := by have := hsp.1; omega
+            have h2 := hsp.2.2.1
+            rw [h1] at h2; omega
+        have hne : (c == cellEnd ptn level c) = false := by simp; omega
+        simp only [cellStep, hne] at hfold
+        refine wp_cell hf hs' hd he hce hsp.2.1 hsp.2.2.1 hsp.2.2.2 hic ?_
+        intro le2 m3 hi2 hf2 hs2 hu3 ho2
+        exact ⟨by simp, rfl, c, cellEnd ptn level c, _, _, _, _, F, Nat.le_of_lt hce, hsp.2.1, rfl, by omega,
+          hfold, hi2, hf2, hs2, hu.trans hu3, fun k h1 h2 h3 => by rw [ho2 k h1 h2 h3, ho k h1 h2 h3]⟩
+    · rw [ite_eq_right (by simpa using hc)]
+      apply wp_break
+      have hcn' : c = n := by omega
+      subst hcn'
+      rw [cells_go_ge _ _ _ _ _ hc, List.foldl_nil] at hfold
+      have h1 : (fmptn lab ptn level c).1 = fx := by rw [hR, ← hfold]
+      have h2 : (fmptn lab ptn level c).2 = mc := by rw [hR, ← hfold]
+      have := hQ le' m' wf wm hf (by rw [h1, h2]; exact hs') hu ho
+      simpa using this
+  · rintro v t e' le' m' ⟨rfl, rfl, c, c2, wf, wm, fx, mc, F, hcc, hc2, rfl, hF, hfold, hic, hf, hs',
+      hu, ho⟩
+    wp_step; wp_step
+    apply wp_set_eval
+    rw [Exec.evalExpr, show Exec.evalExpr ge e le' m' (tv id.i) = _ from hic]
+    simp only [Exec.evalExpr, typeof, cop, ir_add]
+    have hoth : ∀ k, k ≠ id.i → PTree.get k (PTree.set id.i (.Vint (ir ((c2 : Int) + 1))) le') =
+        PTree.get k le' := fun k hk => temps_gso _ _ hk
+    refine ⟨n - (c2 + 1), by omega, by simp, trivial, c2 + 1, wf, wm, fx, mc, F, by omega, rfl, hF,
+      hfold, by rw [temps_gss]; rfl, hf.temps fun k h1 _ _ _ _ _ _ => hoth k h1,
+      hs'.temps fun k h1 _ _ _ _ _ _ => hoth k h1, hu, fun k h1 h2 h3 => by rw [hoth k h1, ho k h1 h2 h3]⟩
 
 end NautyVerified.Proofs.Fmptn

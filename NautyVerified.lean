@@ -29,3 +29,8 @@ import NautyVerified.Proofs.Set.Clear
 import NautyVerified.Proofs.Set.Add
 import NautyVerified.Proofs.Breakout.Rotate
 import NautyVerified.Proofs.Breakout.Satisfies
+import NautyVerified.Spec.Fmptn
+import NautyVerified.Proofs.Fmptn.Syntax
+import NautyVerified.Proofs.Fmptn.Scan
+import NautyVerified.Proofs.Fmptn.Loop
+import NautyVerified.Proofs.Fmptn.Satisfies
