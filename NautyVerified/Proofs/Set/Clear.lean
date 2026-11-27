@@ -51,6 +51,21 @@ theorem cmplu_ptrTo {m : mem} {ba : block} {base : Int} {vals : Nat → val} {M 
   apply decide_eq_decide.2
   omega
 
+/-- Values below `k` as in `vals`, the rest zero words. -/
+def clearedFromV (vals : Nat → val) (k : Nat) (w : Nat) : val :=
+  if w < k then vals w else .Vlong (lr 0)
+
+theorem clearedFromV_succ (vals : Nat → val) (k : Nat) :
+    upd (clearedFromV vals (k + 1)) k (.Vlong (lr 0)) = clearedFromV vals k := by
+  funext w
+  simp only [upd, clearedFromV]
+  by_cases h : w = k
+  · subst h; simp
+  · rw [ite_eq_right h]
+    by_cases hw : w < k
+    · rw [ite_eq_left hw, ite_eq_left (by omega)]
+    · rw [ite_eq_right hw, ite_eq_right (by omega)]
+
 theorem clearedFrom_succ (ws : Nat → Lib.Integers.int64) (k : Nat) :
     upd (longs (clearedFrom ws (k + 1))) k (.Vlong (lr 0)) = longs (clearedFrom ws k) := by
   funext w
@@ -72,8 +87,8 @@ theorem sub_ptrTo8 (ce : Cfrontend.Ctypes.composite_env) (base : Int) (k : Nat) 
 
 theorem wp_emptySet' {s mv es tmp : Common.AST.ident} (hs1 : s ≠ es) (hs2 : s ≠ tmp)
     (het : es ≠ tmp) {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {ba : block}
-    {ofs : ptrofs} {ws : Nat → Lib.Integers.int64} {M : Nat}
-    (harr : ArrayAt m .Mint64 ba (intOfZ (Ptrofs.unsigned ofs)) (longs ws) M) (hM : 0 < M)
+    {ofs : ptrofs} {vals : Nat → val} {M : Nat}
+    (harr : ArrayAt m .Mint64 ba (intOfZ (Ptrofs.unsigned ofs)) vals M) (hM : 0 < M)
     (hM2 : M < 2147483648) (hact : PTree.get s le = some (.Vptr ba ofs))
     (hm : PTree.get mv le = some (.Vint (ir M)))
     (hQ : ∀ le' m', ArrayAt m' .Mint64 ba (intOfZ (Ptrofs.unsigned ofs)) (longs fun _ => lr 0) M →
@@ -94,18 +109,17 @@ theorem wp_emptySet' {s mv es tmp : Common.AST.ident} (hs1 : s ≠ es) (hs2 : s 
   let base := intOfZ (Ptrofs.unsigned ofs)
   refine wp_loop (I := fun k t e' le' m' => t = E0 ∧ e = e' ∧ k ≤ M ∧
       PTree.get es le' = some (.Vptr ba (ptrTo base 8 k)) ∧
-      ArrayAt m' .Mint64 ba base (longs (clearedFrom ws k)) M ∧ Unch m m' (· = ba) ∧
+      ArrayAt m' .Mint64 ba base (clearedFromV vals k) M ∧ Unch m m' (· = ba) ∧
       Outside m m' ba base (base + 8 * M) ∧
       ∀ k', k' ≠ es → k' ≠ tmp → PTree.get k' le' = PTree.get k' le)
     (J := fun k t e' le' m' => ∃ k' < k, t = E0 ∧ e = e' ∧ k' ≤ M ∧
       PTree.get es le' = some (.Vptr ba (ptrTo base 8 k')) ∧
-      ArrayAt m' .Mint64 ba base (longs (clearedFrom ws k')) M ∧ Unch m m' (· = ba) ∧
+      ArrayAt m' .Mint64 ba base (clearedFromV vals k') M ∧ Unch m m' (· = ba) ∧
       Outside m m' ba base (base + 8 * M) ∧
       ∀ k'', k'' ≠ es → k'' ≠ tmp → PTree.get k'' le' = PTree.get k'' le) ?_ ?_ (n := M)
     ⟨rfl, rfl, Nat.le_refl _, temps_gss _ _ _, by
-      have : clearedFrom ws M = fun w => if w < M then ws w else lr 0 := rfl
       refine ⟨hb, by rw [h8]; omega, fun i hi => ?_, fun i hi => harr.writable i hi⟩
-      simp only [longs, clearedFrom, ite_eq_left hi]; exact harr.load i hi,
+      simp only [clearedFromV, ite_eq_left hi]; exact harr.load i hi,
       Unch.refl _ _, Outside.refl _ _ _ _, fun k' hk _ => temps_gso _ _ hk⟩
   · rintro k t e' le' m' ⟨rfl, rfl, hk, hes, harr', hu, hout, hother⟩
     have hact' : PTree.get s le' = some (.Vptr ba ofs) := by
@@ -118,7 +132,7 @@ theorem wp_emptySet' {s mv es tmp : Common.AST.ident} (hs1 : s ≠ es) (hs2 : s 
     rcases k with _ | j
     · rw [ite_eq_right (by decide)]
       apply wp_break
-      have h0 : clearedFrom ws 0 = fun _ => lr 0 := by funext w; simp [clearedFrom]
+      have h0 : clearedFromV vals 0 = longs fun _ => lr 0 := by funext w; simp [clearedFromV, longs]
       rw [h0] at harr'
       exact hQ le' m' harr' hu hout hother
     · rw [ite_eq_left (by simp)]
@@ -144,7 +158,7 @@ theorem wp_emptySet' {s mv es tmp : Common.AST.ident} (hs1 : s ≠ es) (hs2 : s 
       refine ⟨j, by omega, trivial, trivial, by omega, ?_, ?_, hu.trans (Unch.store hst rfl),
         hout.trans (Outside.store harr' hj hst (Int.le_refl _) (by rw [h8]; exact Int.le_refl _)), ?_⟩
       · rfl
-      · rw [← clearedFrom_succ]; exact harr''
+      · rw [← clearedFromV_succ]; exact harr''
       · intro k'' h1 h2
         rw [temps_gso _ _ h1, temps_gso _ _ h2, hother _ h1 h2]
   · rintro k t e' le' m' ⟨k', hk', h⟩
@@ -162,6 +176,6 @@ theorem wp_emptySet {s mv es tmp : Common.AST.ident} (hs1 : s ≠ es) (hs2 : s �
       Unch m m' (· = ba) → (∀ k, k ≠ es → k ≠ tmp → PTree.get k le' = PTree.get k le) →
       Q.normal E0 e le' m') :
     Wp xi ge f (emptySet s mv es tmp) Q e le m :=
-  wp_emptySet' hs1 hs2 het harr hM hM2 hact hm fun le' m' ha hu _ ho => hQ le' m' ha hu ho
+  wp_emptySet' (vals := longs ws) hs1 hs2 het harr hM hM2 hact hm fun le' m' ha hu _ ho => hQ le' m' ha hu ho
 
 end NautyVerified.Proofs.Set

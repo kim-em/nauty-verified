@@ -174,7 +174,7 @@ theorem wp_rows {Q : Post} {le : temp_env} {m : mem} {n : Nat} {bg : block} {gof
         (targs := [tptr tulong, tptr tulong, tint, tptr tint]) (tres := .Tvoid)
         (cc := Common.AST.cc_default) _
         (Permset.permsetSpec bg (ptrTo baseg 8 (M * lab[c]!)) (fun j => gw (M * lab[c]! + j)) grows[lab[c]!]!
-          bc (ptrTo basec 8 (M * c)) (fun j => cw' (M * c + j)) bW Ptrofs.zero (invPerm lab) M)
+          bc (ptrTo basec 8 (M * c)) (longs fun j => cw' (M * c + j)) bW Ptrofs.zero (invPerm lab) M)
         (Permset.permset_satisfies _ _ _ _ _ _ _ _ _ _ _) rfl
         (by simp only [Exec.evalExpr, Exec.lvalOfVar,
           show PTree.get Source.dense.id.permset (empty_env : env) = none from rfl,

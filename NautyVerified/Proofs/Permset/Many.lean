@@ -22,9 +22,9 @@ variable {xi : ExternalCalls}
 
 theorem wp_many {Q : Post} {f : function} {le : temp_env} {m : mem} {n : Nat} {b1 : block}
     {o1 : ptrofs} {w1 : Nat → Lib.Integers.int64} {s : VSet n} {bp : block} {po : ptrofs}
-    {perm : Array Nat} {b2 : block} {o2 : ptrofs} {M : Nat} {w2 : Nat → Lib.Integers.int64}
+    {perm : Array Nat} {b2 : block} {o2 : ptrofs} {M : Nat} {vals2 : Nat → val}
     (h : Frame m le b1 o1 w1 s bp po perm b2 o2 M) (hM : 0 < M)
-    (harr2 : ArrayAt m .Mint64 b2 (intOfZ (Ptrofs.unsigned o2)) (longs w2) M)
+    (harr2 : ArrayAt m .Mint64 b2 (intOfZ (Ptrofs.unsigned o2)) vals2 M)
     (hQ : ∀ le' m' w2', ArrayAt m' .Mint64 b2 (intOfZ (Ptrofs.unsigned o2)) (longs w2') M →
       SetRep (fun w => bv64 (w2' w)) M (s.permset perm) → Unch m m' (· = b2) →
       Outside m m' b2 (intOfZ (Ptrofs.unsigned o2)) (intOfZ (Ptrofs.unsigned o2) + 8 * M) →

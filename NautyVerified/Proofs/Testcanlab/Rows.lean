@@ -108,13 +108,13 @@ theorem tclGo_range'_succ {n : Nat} (ctx : Ctx n) (canong : Array (VSet n)) (lab
 theorem wp_rows {Q : Post} {le : temp_env} {m : mem} {n : Nat} {bg : block} {gofs : ptrofs}
     {gw : Nat → Lib.Integers.int64} {grows : Array (VSet n)} {bc : block} {cofs : ptrofs}
     {cw : Nat → Lib.Integers.int64} {canong : Array (VSet n)} {bl : block} {lofs : ptrofs}
-    {lab : Array Nat} {bW bWS bs : block} {so : ptrofs} {M : Nat} {ws0 : Nat → Lib.Integers.int64}
+    {lab : Array Nat} {bW bWS bs : block} {so : ptrofs} {M : Nat} {ws0 : Nat → val}
     {vals : Nat → val}
     (h : Frame m le bg gofs gw grows bc cofs cw canong bl lofs lab bW bWS bs so M)
-    (hws0 : ArrayAt m .Mint64 bWS 0 (longs ws0) M)
+    (hws0 : ArrayAt m .Mint64 bWS 0 ws0 M)
     (hsarr : ArrayAt m .Mint32 bs (intOfZ (Ptrofs.unsigned so)) vals 1) (hsW : bs ≠ bWS)
-    (hQn : tclGo ⟨grows⟩ canong lab (List.range n) = (0, n) → ∀ le' m' ws',
-      ArrayAt m' .Mint64 bWS 0 (longs ws') M → Unch m m' (· = bWS) → Keep m m' bWS →
+    (hQn : tclGo ⟨grows⟩ canong lab (List.range n) = (0, n) → ∀ le' m' (ws' : Nat → val),
+      ArrayAt m' .Mint64 bWS 0 ws' M → Unch m m' (· = bWS) → Keep m m' bWS →
       (∀ x, x ≠ id.i → x ≠ id.ph → x ≠ id.j → PTree.get x le' = PTree.get x le) →
       Q.normal E0 empty_env le' m')
     (hQr : ∀ m' (r : Int) c, tclGo ⟨grows⟩ canong lab (List.range n) = (r, c) →
@@ -131,15 +131,15 @@ theorem wp_rows {Q : Post} {le : temp_env} {m : mem} {n : Nat} {bg : block} {gof
   let T := tclGo ctx canong lab (List.range n)
   let Oth := fun le' : temp_env => ∀ x, x ≠ id.i → x ≠ id.ph → x ≠ id.j → PTree.get x le' = PTree.get x le
   let I := fun (v : Nat) (t : trace) (e' : env) (le' : temp_env) (m' : mem) => t = E0 ∧
-    e' = empty_env ∧ ∃ c ws', c ≤ n ∧ v = n - c ∧ PTree.get id.i le' = some (.Vint (ir c)) ∧
+    e' = empty_env ∧ ∃ (c : Nat) (ws' : Nat → val), c ≤ n ∧ v = n - c ∧ PTree.get id.i le' = some (.Vint (ir c)) ∧
       PTree.get id.ph le' = some (.Vptr bc (ptrTo basec 8 (M * c))) ∧
       T = tclGo ctx canong lab (List.range' c (n - c)) ∧
-      ArrayAt m' .Mint64 bWS 0 (longs ws') M ∧ Unch m m' (· = bWS) ∧ Keep m m' bWS ∧ Oth le'
+      ArrayAt m' .Mint64 bWS 0 ws' M ∧ Unch m m' (· = bWS) ∧ Keep m m' bWS ∧ Oth le'
   let J := fun (v : Nat) (t : trace) (e' : env) (le' : temp_env) (m' : mem) => t = E0 ∧
-    e' = empty_env ∧ ∃ c ws', c < n ∧ v = n - c ∧ PTree.get id.i le' = some (.Vint (ir c)) ∧
+    e' = empty_env ∧ ∃ (c : Nat) (ws' : Nat → val), c < n ∧ v = n - c ∧ PTree.get id.i le' = some (.Vint (ir c)) ∧
       PTree.get id.ph le' = some (.Vptr bc (ptrTo basec 8 (M * c))) ∧
       T = tclGo ctx canong lab (List.range' (c + 1) (n - (c + 1))) ∧
-      ArrayAt m' .Mint64 bWS 0 (longs ws') M ∧ Unch m m' (· = bWS) ∧ Keep m m' bWS ∧ Oth le'
+      ArrayAt m' .Mint64 bWS 0 ws' M ∧ Unch m m' (· = bWS) ∧ Keep m m' bWS ∧ Oth le'
   wp_step; wp_step; wp_step; wp_step
   apply wp_set_eval
   simp only [Exec.evalExpr]
@@ -214,7 +214,7 @@ theorem wp_rows {Q : Post} {le : temp_env} {m : mem} {n : Nat} {bg : block} {gof
       · intro heq le2 ho2
         rw [hcmp] at heq
         rw [heq] at hTc
-        refine ⟨by simp, rfl, c, ws'', hc, rfl, by rw [ho2 _ (by decide)]; exact hi,
+        refine ⟨by simp, rfl, c, longs ws'', hc, rfl, by rw [ho2 _ (by decide)]; exact hi,
           by rw [ho2 _ (by decide)]; exact hph, hTc, harr2, hu.trans hu2, hk.trans hk2,
           fun x h1 h2 h3 => by rw [ho2 x h3, ho x h1 h2 h3]⟩
       · intro m3 harr3 hu3

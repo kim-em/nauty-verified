@@ -62,9 +62,9 @@ theorem wp_orWord0 {f : function} {Q : Post} {le : temp_env} {m : mem} {b2 : blo
 
 theorem wp_one {Q : Post} {f : function} {le : temp_env} {m : mem} {n : Nat} {b1 : block}
     {o1 : ptrofs} {w1 : Nat → Lib.Integers.int64} {s : VSet n} {bp : block} {po : ptrofs}
-    {perm : Array Nat} {b2 : block} {o2 : ptrofs} {w2 : Nat → Lib.Integers.int64}
+    {perm : Array Nat} {b2 : block} {o2 : ptrofs} {vals2 : Nat → val}
     (h : Frame m le b1 o1 w1 s bp po perm b2 o2 1)
-    (harr2 : ArrayAt m .Mint64 b2 (intOfZ (Ptrofs.unsigned o2)) (longs w2) 1)
+    (harr2 : ArrayAt m .Mint64 b2 (intOfZ (Ptrofs.unsigned o2)) vals2 1)
     (hQ : ∀ le' m' w2', ArrayAt m' .Mint64 b2 (intOfZ (Ptrofs.unsigned o2)) (longs w2') 1 →
       SetRep (fun w => bv64 (w2' w)) 1 (s.permset perm) → Unch m m' (· = b2) →
       Outside m m' b2 (intOfZ (Ptrofs.unsigned o2)) (intOfZ (Ptrofs.unsigned o2) + 8 * 1) →

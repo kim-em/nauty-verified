@@ -21,12 +21,12 @@ open NautyVerified.Proofs.Nextelement (LeftbitTable)
 open Hex.GraphIso.Nauty (VSet)
 
 def permsetSpec {n : Nat} (b1 : block) (o1 : ptrofs) (w1 : Nat → Lib.Integers.int64) (s : VSet n)
-    (b2 : block) (o2 : ptrofs) (w2 : Nat → Lib.Integers.int64) (bp : block) (po : ptrofs)
+    (b2 : block) (o2 : ptrofs) (v2 : Nat → val) (bp : block) (po : ptrofs)
     (perm : Array Nat) (M : Nat) : FunSpec where
   pre args m := args = [.Vptr b1 o1, .Vptr b2 o2, .Vint (ir M), .Vptr bp po] ∧
     ArrayAt m .Mint64 b1 (intOfZ (Ptrofs.unsigned o1)) (longs w1) M ∧
     SetRep (fun w => bv64 (w1 w)) M s ∧
-    ArrayAt m .Mint64 b2 (intOfZ (Ptrofs.unsigned o2)) (longs w2) M ∧
+    ArrayAt m .Mint64 b2 (intOfZ (Ptrofs.unsigned o2)) v2 M ∧
     ArrayAt m .Mint32 bp (intOfZ (Ptrofs.unsigned po)) (ints perm) n ∧
     (∀ u < n, perm[u]! < n) ∧ LeftbitTable m ∧ BitTable m Block.nautilBit ∧
     b2 ≠ b1 ∧ b2 ≠ bp ∧ b2 ≠ Block.nautilBit ∧ b2 ≠ Block.leftbit ∧ 0 < M ∧ M < 33554432
@@ -43,9 +43,9 @@ def entryTemps (b1 : block) (o1 : ptrofs) (b2 : block) (o2 : ptrofs) (bp : block
 
 theorem permset_satisfies {xi : ExternalCalls} {n : Nat} (b1 : block) (o1 : ptrofs)
     (w1 : Nat → Lib.Integers.int64) (s : VSet n) (b2 : block) (o2 : ptrofs)
-    (w2 : Nat → Lib.Integers.int64) (bp : block) (po : ptrofs) (perm : Array Nat) (M : Nat) :
+    (v2 : Nat → val) (bp : block) (po : ptrofs) (perm : Array Nat) (M : Nat) :
     Satisfies xi ge (.Internal Source.dense.fn.permset)
-      (permsetSpec b1 o1 w1 s b2 o2 w2 bp po perm M) := by
+      (permsetSpec b1 o1 w1 s b2 o2 v2 bp po perm M) := by
   refine satisfies_internal (Entry := fun _ m₀ e le m =>
     e = empty_env ∧ le = entryTemps b1 o1 b2 o2 bp po M ∧ m = m₀) ?_ ?_
   · rintro args m ⟨rfl, -⟩
