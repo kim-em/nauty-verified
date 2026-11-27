@@ -22,6 +22,8 @@ def zalloc : Common.Values.block := PArith.BinPos.Pos.of_nat 132
 def nautilWorkperm : Common.Values.block := PArith.BinPos.Pos.of_nat 29
 /-- nautil.c's `static size_t workperm_sz`. -/
 def nautilWorkpermSz : Common.Values.block := PArith.BinPos.Pos.of_nat 199
+/-- naugraph.c's static `bit[64]`. -/
+def naugraphBit : Common.Values.block := PArith.BinPos.Pos.of_nat 295
 end Block
 
 kernel_rfl find_malloc : Genv.find_symbol ge.genv_genv dense.id.malloc = some Block.malloc
@@ -32,6 +34,9 @@ kernel_rfl find_nautilWorkperm :
   Genv.find_symbol ge.genv_genv dense.id.«nautil:workperm» = some Block.nautilWorkperm
 kernel_rfl find_nautilWorkpermSz :
   Genv.find_symbol ge.genv_genv dense.id.«nautil:workperm_sz» = some Block.nautilWorkpermSz
+
+kernel_rfl find_naugraphBit :
+  Genv.find_symbol ge.genv_genv dense.id.«naugraph:bit» = some Block.naugraphBit
 
 kernel_rfl funct_malloc : Genv.find_funct_ptr ge.genv_genv Block.malloc =
   some (.External .EF_malloc [tulong] (tptr .Tvoid) Common.AST.cc_default)
