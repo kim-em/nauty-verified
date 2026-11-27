@@ -44,6 +44,13 @@ structure PAt {n : Nat} (m₀ m₁ m : mem) (S : SLoc) (ctx : Ctx n) (bsr : bloc
   grow1 : ∀ z, Mem.valid_block m₁ z → Mem.valid_block m z
   srW : Mem.valid_access m .Mint32 bsr (zOfInt 0) .Freeable
 
+/-- `∀ z ∈ [b₁, …], ¬ W z`, from `nw : ∀ z ∈ S.blocks, z ≠ x₁ → z ≠ x₂ → z ≠ x₃ → ¬ W z`
+and the distinctness of `S.blocks`. -/
+macro "all_notW " hd:term ", " nw:term : tactic =>
+  `(tactic| ((simp only [List.forall_mem_cons, List.mem_nil_iff, false_implies, implies_true,
+      and_true]; repeat' constructor) <;>
+    exact $nw _ (by simp [SLoc.blocks]) (by sep_ne $hd) (by sep_ne $hd) (by sep_ne $hd)))
+
 variable {n : Nat} {m₀ m₁ m m' : mem} {S : SLoc} {ctx : Ctx n} {e : env} {bsr : block}
   {st st' : Search n} {nsp nsp' : Bool}
 
