@@ -81,6 +81,7 @@ import NautyVerified.Proofs.Refine1.Count
 import NautyVerified.Proofs.Doref.Syntax
 import NautyVerified.Proofs.Doref.Satisfies
 import NautyVerified.Proofs.Search.Blocks
+import NautyVerified.Proofs.Search.State
 import NautyVerified.Proofs.Refine.Frame
 import NautyVerified.Proofs.Refine.Trivial
 import NautyVerified.Proofs.Refine.Pop
