@@ -40,3 +40,5 @@ import NautyVerified.Proofs.Set.Subset
 import NautyVerified.Proofs.Prune.LongSyntax
 import NautyVerified.Proofs.Prune.LongPair
 import NautyVerified.Proofs.Prune.Long
+import NautyVerified.Proofs.Alloc.Blocks
+import NautyVerified.Proofs.Alloc.Malloc
