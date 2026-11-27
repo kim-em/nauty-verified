@@ -52,12 +52,23 @@ private theorem bit_addr {c : Nat} (hc : c < 64) :
   have h8 : csize .Mint64 = 8 := rfl
   rw [h8]; omega
 
-private theorem load_bit {m : mem} {bb : block} (hbit : BitTable m bb) {c : Nat} (hc : c < 64) :
+theorem load_bit {m : mem} {bb : block} (hbit : BitTable m bb) {c : Nat} (hc : c < 64) :
     Mem.loadv .Mint64 m (.Vptr bb (Ptrofs.add Ptrofs.zero (Ptrofs.mul
       (Ptrofs.repr (Cfrontend.Ctypes.sizeof ge.genv_cenv tulong)) (Ptrofs.of_ints (ir (c : Int)))))) =
       some (.Vlong (lr ((2 ^ (63 - c) : Nat) : Int))) := by
   show Mem.load _ _ _ _ = _
   rw [bit_addr hc]; exact hbit _ hc
+
+/-- `bitId[a]` for `a` holding `c < 64`. -/
+theorem eval_bit1 {e : env} {le : temp_env} {m : mem} {bitId : Common.AST.ident} {a : expr}
+    {bb : block} {c : Nat}
+    (ha : Exec.evalExpr ge e le m a = some (.Vint (ir c))) (hty : typeof a = tint) (hc : c < 64)
+    (hbit : BitTable m bb) (he : PTree.get bitId e = none)
+    (hfind : Genv.find_symbol ge.genv_genv bitId = some bb) :
+    Exec.evalExpr ge e le m (bit1 bitId a) = some (.Vlong (lr ((2 ^ (63 - c) : Nat) : Int))) := by
+  simp only [bit1, Exec.evalExpr, Exec.lvalOfVar, ha, hty, he, hfind]
+  simp only [typeof, cop, Exec.derefLoc, Cfrontend.Ctypes.access_mode]
+  exact load_bit hbit hc
 
 theorem eval_isElement1 {e : env} {le : temp_env} {m : mem} {s bitId : Common.AST.ident}
     {a : expr} {ba bb : block} {ofs : ptrofs} {ws : Nat → Lib.Integers.int64} {c : Nat}

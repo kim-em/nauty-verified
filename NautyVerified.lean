@@ -77,6 +77,7 @@ import NautyVerified.Proofs.Refine.Finish
 import NautyVerified.Proofs.Refine.Satisfies
 import NautyVerified.Proofs.Refine.Fn
 import NautyVerified.Proofs.Refine1.Satisfies
+import NautyVerified.Proofs.Refine1.Count
 import NautyVerified.Proofs.Doref.Syntax
 import NautyVerified.Proofs.Doref.Satisfies
 import NautyVerified.Proofs.Search.Blocks
