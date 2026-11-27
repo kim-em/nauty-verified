@@ -271,7 +271,10 @@ only `dyn3Set` changes. Sets reached through a pointer global use
 `targetcell` (`Proofs/Targetcell/`) is proved against HexGraphIso's
 `targetcell` for any `digraph` argument and a hint below `n`, calling
 `bestcell` through `bestcell_satisfies`; `targetcell_mem` (Hex level) gives the
-start of a nontrivial cell when one exists.
+start of a nontrivial cell when one exists. `maketargetcell` (nautil.c,
+`Proofs/Maketargetcell/`) is proved against HexGraphIso's `maketargetcell`,
+calling `targetcell` through its function-pointer argument (which must be
+`Block.targetcell`), when some cell is nontrivial.
 
 Conventions settled while doing these:
 
