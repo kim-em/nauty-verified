@@ -1,0 +1,15 @@
+name = "nauty-verified"
+defaultTargets = ["NautyVerified"]
+
+[[require]]
+name = "compcert4lean"
+git = "https://github.com/kim-em/compcert4lean.git"
+rev = "a4ce530aeebf4380b4385096027627b9e407786f"  # branch toolchain-v4.35.0-rc3
+
+[[require]]
+name = "hex-graph-iso"
+git = "https://github.com/leanprover/hex-graph-iso.git"
+rev = "v0.10.0"
+
+[[lean_lib]]
+name = "NautyVerified"

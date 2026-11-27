@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check pinned nauty sources
+        run: cd c/nauty-2.9.3 && sha256sum -c SHA256SUMS
+
+      - name: Trust check
+        run: scripts/check_trust.sh
+
+      - name: Native harness against fixtures
+        run: scripts/run_native.sh
+
+      # CompCert4Lean is slow to build from scratch on a hosted runner, so
+      # the dependency builds are cached per toolchain and manifest.
+      - uses: actions/cache@v4
+        with:
+          path: .lake
+          key: lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-${{ github.sha }}
+          restore-keys: |
+            lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-
+
+      - uses: leanprover/lean-action@v1
+        with:
+          auto-config: false
+          build: true
+          use-mathlib-cache: false

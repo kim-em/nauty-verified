@@ -1,0 +1,15 @@
+nauty-verified
+
+Original work in this repository is licensed under the Apache License 2.0
+(LICENSE).
+
+c/nauty-2.9.3/ is an unmodified subset of nauty 2.9.3 by Brendan McKay and
+Adolfo Piperno, Apache License 2.0; see c/nauty-2.9.3/COPYRIGHT.
+
+The Lean dependency CompCert4Lean (https://github.com/kim-em/compcert4lean,
+a fork of https://github.com/fanlong/compcert4lean) includes a port of the
+CompCert compiler whose compiler passes are distributed under the INRIA
+Non-Commercial License Agreement. Any build or use of this repository that
+includes those passes, which the end-to-end theorems do, is subject to those
+terms: research, evaluation and educational use only. See that repository's
+LICENSE for the per-file terms.
