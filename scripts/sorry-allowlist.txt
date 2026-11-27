@@ -1,2 +1,1 @@
-NautyVerified/Statement/Harness.lean
 NautyVerified/Statement/Dense.lean

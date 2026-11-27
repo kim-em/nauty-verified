@@ -34,18 +34,20 @@ def nameWrite : RString := Prototype.rocqString "nv_write"
 
 /-! ## The external-call environment -/
 
-/-- `nv_read()`: returns any `long`, recorded as a system-call event. -/
+/-- `nv_read()`: returns any value of type `long`, recorded as a system-call
+event (as in CompCert's semantics of I/O functions, the event value may also
+be the address of a global; `Consistent` rules that out). -/
 inductive ReadStep : Senv.t → List val → Common.Memory.mem → trace → val → Common.Memory.mem → Prop
   where
-  | intro (ge : Senv.t) (m : Common.Memory.mem) (x : Lib.Integers.int64) :
-      ReadStep ge [] m [.Event_syscall nameRead [] (.EVlong x)] (.Vlong x) m
+  | intro (ge : Senv.t) (m : Common.Memory.mem) (ev : eventval) (v : val)
+      (h : eventval_match ge ev .Tlong v) :
+      ReadStep ge [] m [.Event_syscall nameRead [] ev] v m
 
-/-- `nv_write(x)`: records `x`. -/
+/-- `nv_write(x)`: records `x`; the event's (ignored) result is any `int`. -/
 inductive WriteStep : Senv.t → List val → Common.Memory.mem → trace → val → Common.Memory.mem → Prop
   where
-  | intro (ge : Senv.t) (m : Common.Memory.mem) (x : Lib.Integers.int64) :
-      WriteStep ge [.Vlong x] m [.Event_syscall nameWrite [.EVlong x] (.EVint Lib.Integers.Int.zero)]
-        .Vundef m
+  | intro (ge : Senv.t) (m : Common.Memory.mem) (x : Lib.Integers.int64) (r : Lib.Integers.int) :
+      WriteStep ge [.Vlong x] m [.Event_syscall nameWrite [.EVlong x] (.EVint r)] .Vundef m
 
 def readSem : extcall_sem := ReadStep
 def writeSem : extcall_sem := WriteStep
@@ -55,17 +57,116 @@ def sigRead : Common.AST.signature := { sig_args := [], sig_res := .Xlong, sig_c
 def sigWrite : Common.AST.signature :=
   { sig_args := [.Xlong], sig_res := .Xvoid, sig_cc := Common.AST.cc_default }
 
+/-- No behaviour: a call gets stuck. -/
+def noSem : extcall_sem := fun _ _ _ _ _ _ => False
+
 /-- The external functions: `nv_read` and `nv_write` at their declared
 signatures, and nothing else. -/
 def extSem (name : RString) (sg : Common.AST.signature) : extcall_sem :=
   if name = nameRead ∧ sg = sigRead then readSem
   else if name = nameWrite ∧ sg = sigWrite then writeSem
-  else fun _ _ _ _ _ _ => False
+  else noSem
+
+theorem empty_properties (sg : Common.AST.signature) : extcall_properties noSem sg := by
+  constructor <;> intros <;> simp_all [noSem]
+
+theorem read_properties : extcall_properties readSem sigRead := by
+  constructor
+  · intro _ _ _ _ _ _ hs
+    cases hs with
+    | intro _ ev v h =>
+      have := eventval_match_type _ _ _ _ h
+      cases h <;> simp_all [sigRead, Val.has_rettype, Val.has_type]
+  · intro ge1 ge2 _ _ _ _ _ heq hs
+    cases hs with
+    | intro _ ev v h => exact .intro _ _ _ _ (eventval_match_preserved ge1 ge2 heq.2.1 heq.1 _ _ _ h)
+  · intro _ _ _ _ _ _ _ hs h; cases hs; exact h
+  · intro _ _ _ _ _ _ _ _ _ hs _ h; cases hs; exact h
+  · intro _ _ _ _ _ _ _ _ _ _ hs _ h _; cases hs; exact h
+  · intro ge _ _ _ _ _ m1' vargs' hs hext hld
+    cases hs with
+    | intro _ ev v h =>
+      cases hld
+      exact ⟨_, m1', .intro _ _ _ _ h, .lessdef_refl _, hext,
+        Common.Memory.Mem.unchanged_on_refl _ _⟩
+  · intro ge1 ge2 _ _ _ _ _ f m1' vargs' hsi hs hinj hvi
+    cases hs with
+    | intro _ ev v h =>
+      cases hvi
+      obtain ⟨v2, hm2, hv2⟩ := eventval_match_inject_2 f ge1 ge2 hsi _ _ _ h
+      exact ⟨f, v2, m1', .intro _ _ _ _ hm2, hv2, hinj, Common.Memory.Mem.unchanged_on_refl _ _,
+        Common.Memory.Mem.unchanged_on_refl _ _, Common.Values.inject_incr_refl f,
+        fun _ _ _ h1 h2 => by simp_all⟩
+  · intro _ _ _ _ _ _ hs; cases hs; simp
+  · intro ge _ m _ _ _ t2 hs hmt
+    cases hs with
+    | intro _ ev v h =>
+      cases hmt with
+      | match_traces_syscall _ _ _ res2 _ hv2 hty =>
+        obtain ⟨v2, hm2⟩ := eventval_match_receptive ge ev _ _ res2 h
+          (eventval_match_valid _ _ _ _ h) hv2 hty
+        exact ⟨v2, _, .intro _ _ _ _ hm2⟩
+  · intro ge _ m _ _ _ _ _ _ hs1 hs2
+    cases hs1 with
+    | intro _ ev1 v1 h1 =>
+      cases hs2 with
+      | intro _ ev2 v2 h2 =>
+        refine ⟨.match_traces_syscall _ _ _ _ (eventval_match_valid _ _ _ _ h1)
+          (eventval_match_valid _ _ _ _ h2) (eventval_match_same_type _ _ _ _ _ _ h1 h2),
+          fun he => ?_⟩
+        have he' : ev1 = ev2 := by
+          injection he with h; injection h
+        subst he'
+        exact ⟨eventval_match_determ_1 _ _ _ _ _ h1 h2, rfl⟩
+
+theorem write_properties : extcall_properties writeSem sigWrite := by
+  constructor
+  · intro _ _ _ _ _ _ hs; cases hs; simp [sigWrite, Val.has_rettype]
+  · intro ge1 ge2 _ _ _ _ _ _ hs; cases hs; exact .intro _ _ _ _
+  · intro _ _ _ _ _ _ _ hs h; cases hs; exact h
+  · intro _ _ _ _ _ _ _ _ _ hs _ h; cases hs; exact h
+  · intro _ _ _ _ _ _ _ _ _ _ hs _ h _; cases hs; exact h
+  · intro ge _ _ _ _ _ m1' vargs' hs hext hld
+    cases hs
+    cases hld with
+    | lessdef_list_cons _ _ _ _ h1 h2 =>
+      cases h1; cases h2
+      exact ⟨.Vundef, m1', .intro _ _ _ _, .lessdef_refl _, hext,
+        Common.Memory.Mem.unchanged_on_refl _ _⟩
+  · intro ge1 ge2 _ _ _ _ _ f m1' vargs' _ hs hinj hvi
+    cases hs
+    cases hvi with
+    | inject_list_cons _ _ _ _ h1 h2 =>
+      cases h1; cases h2
+      exact ⟨f, .Vundef, m1', .intro _ _ _ _, .val_inject_undef _, hinj,
+        Common.Memory.Mem.unchanged_on_refl _ _, Common.Memory.Mem.unchanged_on_refl _ _,
+        Common.Values.inject_incr_refl f, fun _ _ _ h1 h2 => by simp_all⟩
+  · intro _ _ _ _ _ _ hs; cases hs; simp
+  · intro ge _ m _ _ _ t2 hs hmt
+    cases hs
+    cases hmt with
+    | match_traces_syscall _ _ _ res2 _ _ hty =>
+      cases res2 <;> simp only [eventval_type] at hty
+      · exact ⟨_, _, .intro _ _ _ _⟩
+      all_goals exact absurd hty (by decide)
+  · intro ge _ m _ _ _ _ _ _ hs1 hs2
+    cases hs1; cases hs2
+    refine ⟨.match_traces_syscall _ _ _ _ trivial trivial rfl, fun _ => ⟨rfl, rfl⟩⟩
 
 /-- The environment of the end-to-end theorem. -/
+theorem extSem_properties (name : RString) (sg : Common.AST.signature) :
+    extcall_properties (extSem name sg) sg := by
+  unfold extSem
+  by_cases h1 : name = nameRead ∧ sg = sigRead
+  · rw [ite_eq_left h1]; obtain ⟨-, rfl⟩ := h1; exact read_properties
+  · rw [ite_eq_right h1]
+    by_cases h2 : name = nameWrite ∧ sg = sigWrite
+    · rw [ite_eq_left h2]; obtain ⟨-, rfl⟩ := h2; exact write_properties
+    · rw [ite_eq_right h2]; exact empty_properties sg
+
 def xi : CompCert4Lean.Common.ExternalCalls.ExternalCalls where
-  external := { sem := extSem, properties := sorry }
-  inlineAssembly := { sem := fun _ _ _ _ _ _ _ _ => False, properties := sorry }
+  external := { sem := extSem, properties := extSem_properties }
+  inlineAssembly := { sem := fun _ _ => noSem, properties := fun _ sg => empty_properties sg }
 
 /-! ## Input -/
 
@@ -81,11 +182,16 @@ def Encodes {n k : Nat} (G : Colored n k) (ins : List Int) : Prop :=
 
 /-! ## Traces -/
 
-/-- The values `nv_read` returned, in order. -/
-def reads : trace → List Int
+/-- The values `nv_read` returned, in order (`none` for a result that is not an
+integer). -/
+def reads : trace → List (Option Int)
   | [] => []
-  | .Event_syscall name [] (.EVlong x) :: t =>
-      if name = nameRead then intOfZ (Lib.Integers.Int64.signed x) :: reads t else reads t
+  | .Event_syscall name [] ev :: t =>
+      if name = nameRead then
+        (match ev with
+         | .EVlong x => some (intOfZ (Lib.Integers.Int64.signed x))
+         | _ => none) :: reads t
+      else reads t
   | _ :: t => reads t
 
 /-- The values passed to `nv_write`, in order. -/
@@ -104,8 +210,9 @@ def VloadsZero (t : trace) : Prop :=
 `nauty_kill_request`: every finite part of its trace read a prefix of `ins`
 and read 0 from every volatile location. -/
 def Consistent (ins : List Int) : program_behavior → Prop
-  | .Terminates t _ | .Diverges t | .Goes_wrong t => reads t <+: ins ∧ VloadsZero t
-  | .Reacts T => ∀ k, reads ((List.range k).map T) <+: ins ∧ VloadsZero ((List.range k).map T)
+  | .Terminates t _ | .Diverges t | .Goes_wrong t => reads t <+: ins.map some ∧ VloadsZero t
+  | .Reacts T => ∀ k, reads ((List.range k).map T) <+: ins.map some ∧
+      VloadsZero ((List.range k).map T)
 
 /-! ## Output -/
 
