@@ -253,8 +253,9 @@ code; total C-side 100k-200k lines (estimate from one function).
 
 Status: proved against HexGraphIso (`*_satisfies`, axiom-clean):
 `nextelement`, `orbjoin`, `breakout`, `fmptn`, `shortprune`, `longprune`,
-`fmperm` (nautil.c); `cheapautom`, `isautom` (naugraph.c, `isautom` calling
-`nextelement` through its proved specification); and the allocator layer:
+`fmperm`, `permset` (nautil.c); `cheapautom`, `isautom`, `updatecan`
+(naugraph.c; `isautom` calls `nextelement` and `updatecan` calls `permset`
+through their proved specifications); and the allocator layer:
 `malloc`, `free`, `nauty_zalloc`, `DYNALLOC1` (`wp_dynalloc1`). Graphs in
 memory are `GraphAt` (row `v` at word `M * v`, each row `SetRep` of the Hex
 row).
@@ -291,6 +292,10 @@ Conventions settled while doing these:
   return it in their post.
 - Facts about the `workperm` block are needed only when `n > 0`: with
   capacity 0 the block is arbitrary and may coincide with a caller's array.
+- A function writing into part of a caller's array (a row of `canong`, a
+  slice of the workspace) also reports `Outside m m' b lo hi`: block `b`
+  changed only in `[lo, hi)`. `ArrayAt.outside` and `GraphAt.setRow` rebuild
+  the caller's whole array from it.
 
 ## Phase 6: dense end-to-end
 
