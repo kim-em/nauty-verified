@@ -44,3 +44,4 @@ import NautyVerified.Proofs.Alloc.Blocks
 import NautyVerified.Proofs.Alloc.Malloc
 import NautyVerified.Proofs.Alloc.Zalloc
 import NautyVerified.Proofs.Alloc.Zero
+import NautyVerified.Proofs.Alloc.Free
