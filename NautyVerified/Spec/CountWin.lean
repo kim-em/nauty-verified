@@ -109,4 +109,13 @@ theorem pmult_last {cs : List Nat} {k : Nat} (hk : k + 1 = cs.length) (v : Nat) 
 theorem pmult_le {cs : List Nat} (k v : Nat) : pmult cs k v ≤ k + 1 :=
   Nat.le_trans List.countP_le_length (by simp; omega)
 
+theorem pmax_le {cs : List Nat} {B : Nat} (hb : ∀ o : Nat, cs[o]! ≤ B) : ∀ {k : Nat}, k < cs.length →
+    pmax cs k ≤ B
+  | 0, hk => by rw [pmax_zero hk]; exact hb 0
+  | k + 1, hk => by
+    rw [pmax_succ hk]
+    have := pmax_le hb (k := k) (by omega)
+    have := hb (k + 1)
+    omega
+
 end NautyVerified.Spec
