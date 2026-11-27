@@ -109,6 +109,7 @@ import NautyVerified.Proofs.Search.Node.Tc
 import NautyVerified.Proofs.Search.Node.TcOps
 import NautyVerified.Proofs.Search.Node.Prologue
 import NautyVerified.Proofs.Search.Node.Steps
+import NautyVerified.Proofs.Search.Node.LocDistinct
 import NautyVerified.Proofs.Search.Firstterminal.Satisfies
 import NautyVerified.Proofs.Search.Recover.Satisfies
 import NautyVerified.Proofs.Search.Emit
