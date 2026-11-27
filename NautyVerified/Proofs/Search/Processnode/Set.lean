@@ -85,4 +85,17 @@ theorem Stats.cast {st' : Search n} (h : Stats m S st pre) (e : statView st' = s
   exact ⟨e1 ▸ h.numorbits, e2 ▸ h.numgenerators, e3 ▸ h.numnodes, e4 ▸ h.numbadleaves,
     e5 ▸ h.maxlevel, h.maxlevelW, e6 ▸ h.tctotal, e7 ▸ h.canupdates, h.fits⟩
 
+/-- The fields of the search state held in arrays. -/
+def arrView (st : Search n) :=
+  (st.lab, st.ptn, st.orbits, st.active, st.fixedpts, st.firstlab, st.canonlab, st.firstcode,
+    st.canoncode, st.firsttc, st.canong, st.samerows, st.autos)
+
+theorem Arrays.cast {st' : Search n} (h : Arrays m S ctx st) (e : arrView st' = arrView st) :
+    Arrays m S ctx st' := by
+  simp only [arrView, Prod.mk.injEq] at e
+  obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13⟩ := e
+  exact ⟨e1 ▸ h.lab, e2 ▸ h.ptn, e3 ▸ h.orbits, e4 ▸ h.active, e5 ▸ h.fixedpts, h.workperm,
+    e6 ▸ h.firstlab, e7 ▸ h.canonlab, e8 ▸ h.firstcode, e9 ▸ h.canoncode, e10 ▸ h.firsttc,
+    e11 ▸ e12 ▸ h.canong, e13 ▸ h.autos, h.graph⟩
+
 end NautyVerified.Proofs.Search

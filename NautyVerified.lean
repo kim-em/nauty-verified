@@ -144,6 +144,7 @@ import NautyVerified.Proofs.Search.Processnode.State
 import NautyVerified.Proofs.Search.Processnode.Set
 import NautyVerified.Proofs.Search.Processnode.Calls
 import NautyVerified.Proofs.Search.Processnode.Canon
+import NautyVerified.Proofs.Search.Processnode.Stores
 import NautyVerified.Proofs.Refine.Frame
 import NautyVerified.Proofs.Refine.Trivial
 import NautyVerified.Proofs.Refine.Pop

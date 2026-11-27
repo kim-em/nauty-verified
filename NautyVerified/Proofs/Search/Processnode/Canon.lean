@@ -63,6 +63,7 @@ theorem wp_updatecan {f : function} {Q : Post} {le : temp_env} (c : PCtx m₀ m�
     (hcl : ∀ i < n, st.canonlab[i]! < n) (hcs : ∀ v < n, ∃ i < n, st.canonlab[i]! = v)
     (hQ : ∀ m', PAt m₀ m₁ m' S ctx bsr
         { st with canong := updatecan ctx st.canong st.canonlab st.samerows } nsp →
+      CanongAt m' S (updatecan ctx st.canong st.canonlab st.samerows) n →
       (∀ v, SrAt m bsr v → SrAt m' bsr v) → Q.normal E0 e le m') :
     Wp xi ge f updatecanCall Q e le m := by
   have hs := h.search
@@ -136,7 +137,7 @@ theorem wp_updatecan {f : function} {Q : Post} {le : temp_env} (c : PCtx m₀ m�
     refine hQ m' (PAt.call c h hu ?_ ?_ hv hwm hwk
       ((hs.scalars.unch hu (by all_notW hd, notW)).cast rfl)
       ((hs.stats.unch hu (notW _ (by simp [SLoc.blocks]) (by sep_ne hd) (by sep_ne hd) (by sep_ne hd))).cast rfl)
-      ?_ ?_ (hu.access _ _ _ _ hsrW h.srW)) fun v hv' => hv'.unch hu hsrW
+      ?_ ?_ (hu.access _ _ _ _ hsrW h.srW)) ⟨⟨cw', hg'.arr, hg'.rep⟩⟩ fun v hv' => hv'.unch hu hsrW
     · rintro z (rfl | rfl | rfl | ⟨hc, rfl⟩ | ⟨hnv, rfl⟩)
       · exact .inl (by simp [SLoc.wr, wrG, SLoc.wrV])
       · exact .inr (.inl (by decide))
