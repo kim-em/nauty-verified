@@ -17,3 +17,7 @@ name = "NautyVerified"
 [[lean_exe]]
 name = "nvCompile"
 root = "NautyVerified.Build.Main"
+
+[[lean_exe]]
+name = "nvInterp"
+root = "NautyVerified.Exec.Main"

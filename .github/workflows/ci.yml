@@ -38,3 +38,6 @@ jobs:
           auto-config: false
           build: true
           use-mathlib-cache: false
+
+      - name: Interpreter on the pinned Clight against fixtures
+        run: scripts/run_interp.sh
