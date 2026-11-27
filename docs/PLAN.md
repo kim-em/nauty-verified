@@ -292,6 +292,14 @@ Conventions settled while doing these:
   return it in their post.
 - Facts about the `workperm` block are needed only when `n > 0`: with
   capacity 0 the block is arbitrary and may coincide with a caller's array.
+- `refineLoop`'s fuel `4 * n + 8` is never exhausted (`Spec/RefineFuel.lean`):
+  `refineFuel st` (`|active| + (n - numcells)` while `numcells < n`, else 0)
+  drops on every `refineStep`, because each insertion into `active` comes
+  with a `numcells` increment (and `nontrivialFix` erases `maxpos`, which is
+  `cell1` or already active). The C loop of `refine` carries
+  `refineLoop … (4n+8) st₀ = refineLoop … F st ∧ refineFuel st < F`, using
+  `refineFuel_lt_init`, `refineLoop_next` and `refineLoop_stop`; no invariant
+  on `lab` or `ptn` is needed.
 - A function writing into part of a caller's array (a row of `canong`, a
   slice of the workspace) also reports `Outside m m' b lo hi`: block `b`
   changed only in `[lo, hi)`. `ArrayAt.outside` and `GraphAt.setRow` rebuild

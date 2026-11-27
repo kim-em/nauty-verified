@@ -77,6 +77,7 @@ import NautyVerified.Proofs.Updatecan.Rows
 import NautyVerified.Proofs.Updatecan.Satisfies
 import NautyVerified.Spec.WordCmp
 import NautyVerified.Spec.Testcanlab
+import NautyVerified.Spec.RefineFuel
 import NautyVerified.Proofs.Testcanlab.Syntax
 import NautyVerified.Proofs.Testcanlab.Cmp
 import NautyVerified.Proofs.Testcanlab.Rows
