@@ -42,3 +42,4 @@ import NautyVerified.Proofs.Prune.LongPair
 import NautyVerified.Proofs.Prune.Long
 import NautyVerified.Proofs.Alloc.Blocks
 import NautyVerified.Proofs.Alloc.Malloc
+import NautyVerified.Proofs.Alloc.Zalloc

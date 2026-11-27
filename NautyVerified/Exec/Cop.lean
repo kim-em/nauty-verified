@@ -175,4 +175,21 @@ end PtrCmp
       some (.Vlong (Lib.Integers.Int64.not x)) :=
   rfl
 
+section LongMixed
+variable (x y : Lib.Integers.int64) (n : Lib.Integers.int)
+
+@[simp, cop] theorem lt_ll : sem_binary_operation ce .Olt (.Vlong x) (Tlong .Unsigned a)
+    (.Vlong y) (Tlong .Unsigned b) m = some (Val.of_bool (Lib.Integers.Int64.ltu x y)) := rfl
+@[simp, cop] theorem add_li : sem_binary_operation ce .Oadd (.Vlong x) (Tlong .Unsigned a)
+    (.Vint n) (Tint .I32 .Signed b) m =
+      some (.Vlong (Lib.Integers.Int64.add x (Lib.Integers.Int64.repr (Lib.Integers.Int.signed n)))) :=
+  rfl
+@[simp, cop] theorem cast_i_uc : sem_cast (.Vint n) (Tint .I32 .Signed a) (Tint .I8 .Unsigned b) m =
+    some (.Vint (Lib.Integers.Int.zero_ext (zOfInt 8) n)) := rfl
+end LongMixed
+
+@[simp, cop] theorem bool_ptr (blk : block) (ofs : ptrofs) (t : type) :
+    bool_val (.Vptr blk ofs) (Tpointer t a) m =
+      if Mem.weak_valid_pointer m blk (Ptrofs.unsigned ofs) then some true else none := rfl
+
 end NautyVerified.Exec

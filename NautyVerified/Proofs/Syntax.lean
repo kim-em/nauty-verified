@@ -28,6 +28,9 @@ abbrev tdouble : type := .Tfloat .F64 at0
 abbrev tptr (t : type) : type := .Tpointer t at0
 abbrev tarray (t : type) (n : Int) : type := .Tarray t (zOfInt n) at0
 
+/-- A function type with the default calling convention. -/
+abbrev tfun (args : List type) (res : type) : type := .Tfunction args res Common.AST.cc_default
+
 /-- A literal identifier. -/
 abbrev idOf (n : Nat) : Common.AST.ident := PArith.BinPos.Pos.of_nat n
 
