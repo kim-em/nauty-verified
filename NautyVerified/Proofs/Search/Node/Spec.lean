@@ -11,8 +11,11 @@ pinned `inf = nautyInf`, `tcLevel = 100`:
 - the returned `int` and `needshortprune` encode the `Exit` (`exitValue`);
 - memory holds the resulting search state (after the first leaf, so
   `pre = false`);
-- the trace writes the generators found below the node (`gensWords` of the
-  new `genTrace` entries) and reads `nauty_kill_request` as 0 (`Emits`):
+- the trace writes `Em first level numcells st`, what nauty emits below the
+  node (the `genWords` of `workperm` at each leaf where `numgenerators`
+  increases, as `processnodeSpec` states it; `Em` is a parameter, to be
+  instantiated by the emitted sequence of the re-pinned HexGraphIso run), and
+  reads `nauty_kill_request` as 0 (`Emits`):
   `Satisfies` asks for one execution, and the one chosen is the one whose
   volatile reads return 0, as the end-to-end theorem assumes (`VloadsZero`);
 - the target-cell list keeps its first `level - 1` nodes, and has at least
@@ -99,7 +102,7 @@ def NodeFrame (m m' : mem) (S : SLoc) (chain : List (block × block)) (level : N
 /-- The node specification, for `first = true` (`firstpathnode0`, entered
 before the first leaf) and `first = false` (`othernode0`). -/
 def nodeSpec {n : Nat} (xi : ExternalCalls) (NodeOk : Bool → Nat → Nat → Search n → Prop)
-    (first : Bool) (S : SLoc) (ctx : Ctx n) (st : Search n) (level numcells : Nat)
+    (Em : Bool → Nat → Nat → Search n → List Int) (first : Bool) (S : SLoc) (ctx : Ctx n) (st : Search n) (level numcells : Nat)
     (chain : List (block × block)) : FunSpec where
   pre args m := args = [.Vptr S.bl S.lofs, .Vptr S.bp S.pofs, .Vint (ir level),
       .Vint (ir numcells), .Vptr (tcParent chain level) Ptrofs.zero] ∧
@@ -110,21 +113,23 @@ def nodeSpec {n : Nat} (xi : ExternalCalls) (NodeOk : Bool → Nat → Nat → S
     let r := hexNode first ctx level numcells st
     v = .Vint (ir (exitValue level r.1).1) ∧
     SearchAt m' S ctx r.2 false (exitValue level r.1).2 ∧
-    Emits t (gensWords (r.2.genTrace.toList.drop st.genTrace.size) n) ∧
+    Emits t (Em first level numcells st) ∧
     (∃ chain', TcChain m' S.M Block.tcnode0 chain' ∧ TcOk m' S chain' ∧ level ≤ chain'.length ∧
       chain'.take (level - 1) = chain.take (level - 1)) ∧
     NodeFrame m m' S chain level
 
 /-- `firstpathnode0`. -/
 abbrev firstpathnodeSpec {n : Nat} (xi : ExternalCalls)
-    (NodeOk : Bool → Nat → Nat → Search n → Prop) (S : SLoc) (ctx : Ctx n) (st : Search n)
+    (NodeOk : Bool → Nat → Nat → Search n → Prop) (Em : Bool → Nat → Nat → Search n → List Int)
+    (S : SLoc) (ctx : Ctx n) (st : Search n)
     (level numcells : Nat) (chain : List (block × block)) : FunSpec :=
-  nodeSpec xi NodeOk true S ctx st level numcells chain
+  nodeSpec xi NodeOk Em true S ctx st level numcells chain
 
 /-- `othernode0`. -/
 abbrev othernodeSpec {n : Nat} (xi : ExternalCalls)
-    (NodeOk : Bool → Nat → Nat → Search n → Prop) (S : SLoc) (ctx : Ctx n) (st : Search n)
+    (NodeOk : Bool → Nat → Nat → Search n → Prop) (Em : Bool → Nat → Nat → Search n → List Int)
+    (S : SLoc) (ctx : Ctx n) (st : Search n)
     (level numcells : Nat) (chain : List (block × block)) : FunSpec :=
-  nodeSpec xi NodeOk false S ctx st level numcells chain
+  nodeSpec xi NodeOk Em false S ctx st level numcells chain
 
 end NautyVerified.Proofs.Search
