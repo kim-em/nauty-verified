@@ -192,6 +192,9 @@ variable (x y : Lib.Integers.int64) (n : Lib.Integers.int)
     (.Vlong y) (Tlong .Unsigned b) m = some (.Vlong (Lib.Integers.Int64.mul x y)) := rfl
 @[simp, cop] theorem cast_ip (t : type) : sem_cast (.Vint n) (Tint .I32 .Signed a) (Tpointer t b) m =
     some (.Vlong (Lib.Integers.Int64.repr (Lib.Integers.Int.signed n))) := rfl
+@[simp, cop] theorem cast_ib : sem_cast (.Vint n) (Tint .I32 .Signed a) (Tint .IBool .Signed b) m =
+    some (.Vint (if Lib.Integers.Int.eq n Lib.Integers.Int.zero then Lib.Integers.Int.zero
+      else Lib.Integers.Int.one)) := rfl
 end LongMixed
 
 @[simp, cop] theorem eq_pl (blk : block) (ofs : ptrofs) (t1 t2 : type) (y : Lib.Integers.int64) :
