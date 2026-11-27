@@ -65,7 +65,8 @@ def refineSpec {n : Nat} (L : Loc) (ctx : Ctx n) (lab ptn : Array Nat) (active :
     ((capW = L.capW ∧ bW = L.bW) ∨ ¬ Mem.valid_block m bW) ∧
     ((capS = L.capS ∧ bS = L.bS) ∨ ¬ Mem.valid_block m bS) ∧
     ((capB = L.capB ∧ bB = L.bB) ∨ ¬ Mem.valid_block m bB) ∧
-    Unch m m' (fun z => L.writes z ∨ z = L.bk ∨ dyn3Set m L.capW L.bW L.capS L.bS L.capB L.bB z)
+    Unch m m' (fun z => (z = L.bl ∨ z = L.bp ∨ z = L.bn ∨ z = L.bc ∨ z = L.ba) ∨ z = L.bk ∨
+      dyn3Set m L.capW L.bW L.capS L.bS L.capB L.bB z)
 
 /-- The temporaries on entry. -/
 def entryTemps (L : Loc) (n : Nat) : temp_env :=
@@ -418,7 +419,7 @@ theorem refine_satisfies_of {xi : ExternalCalls} (hT : TrivialPass xi) (hN : Non
     · exact .inl (.inr (.inl h))
     · exact .inl (.inr (.inr (.inl h)))
     · exact .inl (.inr (.inr (.inr (.inl h))))
-    · exact .inl (.inr (.inr (.inr (.inr (.inl h)))))
+    · exact .inl (.inr (.inr (.inr (.inr h))))
     · rcases hnew hpos.1 hbW z h with h' | h'
       · exact .inr (.inr (.inr (.inr (.inr (.inr (.inr (.inr (.inl h'))))))))
       · exact .inr (.inr (.inr (.inr (.inr (.inr (.inr (.inr (.inr (.inr (.inr h'))))))))))
