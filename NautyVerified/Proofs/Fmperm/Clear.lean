@@ -26,7 +26,7 @@ theorem wp_clearWp {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
     {vals : Nat → val} {n : Nat} (hge : PTree.get id.wp e = none)
     (hp : 0 < n → Mem.load .Mint64 m Block.nautilWorkperm (zOfInt 0) = some (.Vptr b Ptrofs.zero))
     (harr : ArrayAt m .Mint32 b 0 vals n) (hn : n < 2147483648)
-    (hbw : Block.nautilWorkperm ≠ b) (hnv : PTree.get id.n le = some (.Vint (ir n)))
+    (hbw : 0 < n → Block.nautilWorkperm ≠ b) (hnv : PTree.get id.n le = some (.Vint (ir n)))
     (hQ : ∀ le' m', ArrayAt m' .Mint32 b 0 (fun _ => .Vint (ir 0)) n → Unch m m' (· = b) →
       (∀ k, k ≠ id.i → k ≠ id.t5 → PTree.get k le' = PTree.get k le) → Q.normal E0 e le' m') :
     Wp xi ge f clearWp Q e le m := by
@@ -62,7 +62,7 @@ theorem wp_clearWp {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
           (PTree.set id.t5 (.Vint (ir ((v : Int) - 1))) le')) = some (.Vint (ir ((v - 1 : Nat) : Int))) := by
         rw [temps_gss]; congr 3; omega
       wp_step; wp_step
-      refine wp_gstore hge find_nautilWorkperm (by rw [hu.load _ _ _ hbw]; exact hp (by omega)) harr' hn (tv id.i) (v - 1) (by omega)
+      refine wp_gstore hge find_nautilWorkperm (by rw [hu.load _ _ _ (hbw (by omega))]; exact hp (by omega)) harr' hn (tv id.i) (v - 1) (by omega)
         hiv rfl (ci 0 tint) 0 rfl rfl ?_
       intro m'' harr'' hu''
       refine ⟨v - 1, by omega, by simp, rfl, by omega, hiv, ?_, hu.trans hu'', fun k h1 h2 => by

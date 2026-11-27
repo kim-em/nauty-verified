@@ -167,7 +167,8 @@ theorem wp_dynalloc1 {f : function} {Q : Post} {le : temp_env} {m : mem}
     (hD : DynAt m bp bs c cap b)
     (hx : PTree.get x le = some (.Vint (ir n))) (hn : n < 2147483648) (hcn : c * n < 2 ^ 62)
     (hQ : ∀ le' m' cap' b', DynAt m' bp bs c cap' b' → n ≤ cap' →
-      Unch m m' (fun z => z = bs ∨ z = bp ∨ z = b ∨ z = b') → (b' = b ∨ ¬ Mem.valid_block m b') →
+      Unch m m' (fun z => z = bs ∨ z = bp ∨ (0 < cap ∧ z = b) ∨ (¬ Mem.valid_block m b' ∧ z = b')) →
+      ((cap' = cap ∧ b' = b) ∨ ¬ Mem.valid_block m b') →
       (∀ k, k ≠ t1 → k ≠ t2 → PTree.get k le' = PTree.get k le) →
       Q.normal E0 empty_env le' m') :
     Wp xi ge f (dynalloc1 gs gp elt (.Etempvar x tint) t1 t2 msg msgLen) Q empty_env le m := by
@@ -257,19 +258,20 @@ theorem wp_dynalloc1 {f : function} {Q : Post} {le : temp_env} {m : mem}
         bne := fun _ => ⟨hbs'.symm, hbp'.symm⟩
         small := hcn
         capLt := hn }
-    refine hQ _ m4 n b' hD' (Nat.le_refl _) ?_ (.inr ?_) ?_
-    · exact (((hu1.mono fun z hz => .inr (.inr (.inl hz.2))).trans
-        (Unch.store hst2 (.inl rfl))).trans (hfr.unch.mono fun z hz => .inr (.inr (.inr hz)))).trans
-        (Unch.store hst4 (.inr (.inl rfl)))
-    · intro hv
+    have hnew : ¬ Mem.valid_block m b' := by
+      intro hv
       apply hfr.new
       apply Mem.store_valid_block_1 _ _ _ _ _ _ hst2
       unfold Mem.valid_block at hv ⊢
       rw [hnb1]; exact hv
+    refine hQ _ m4 n b' hD' (Nat.le_refl _) ?_ (.inr hnew) ?_
+    · exact (((hu1.mono fun z hz => .inr (.inr (.inl hz))).trans
+        (Unch.store hst2 (.inl rfl))).trans (hfr.unch.mono fun z hz => .inr (.inr (.inr ⟨hz ▸ hnew, hz⟩)))).trans
+        (Unch.store hst4 (.inr (.inl rfl)))
     · intro k h1 h2
       rw [temps_gso _ _ h2, temps_gso _ _ h1]
   · rw [ite_eq_right (by simpa using hnc)]
     apply wp_skip
-    exact hQ le m cap b hD (by omega) (Unch.refl _ _) (.inl rfl) (fun _ _ _ => rfl)
+    exact hQ le m cap b hD (by omega) (Unch.refl _ _) (.inl ⟨rfl, rfl⟩) (fun _ _ _ => rfl)
 
 end NautyVerified.Proofs.Alloc

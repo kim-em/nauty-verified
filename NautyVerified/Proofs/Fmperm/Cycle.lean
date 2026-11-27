@@ -50,8 +50,8 @@ structure Frame (m : mem) (le : temp_env) (bpm : block) (pofs : ptrofs) (b : blo
   psmall : ∀ x, x < n → perm[x]! < n
   pinj : ∀ x y, x < n → y < n → perm[x]! = perm[y]! → x = y
   nlt : n < 2147483648
-  bpm_b : bpm ≠ b
-  wp_b : Block.nautilWorkperm ≠ b
+  bpm_b : 0 < n → bpm ≠ b
+  wp_b : 0 < n → Block.nautilWorkperm ≠ b
 
 /-- The `do … while` loop of the cycle walk. -/
 abbrev walk : statement :=
@@ -99,7 +99,7 @@ theorem wp_walk {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {b
     have hf := h
     have hperm' : PTree.get id.perm le' = some (.Vptr bpm pofs) := by
       rw [ho _ (by decide) (by decide)]; exact h.hperm
-    have hparr := h.parr.unch hu h.bpm_b
+    have hparr := h.parr.unch hu (h.bpm_b (by omega))
     wp_step; wp_step; wp_step
     apply wp_set_eval
     rw [show Exec.evalExpr ge e le' m' (tv id.l) = _ from hlj]
@@ -112,7 +112,7 @@ theorem wp_walk {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {b
     rw [hpl]
     simp only [ints, E0_append]
     wp_step; wp_step
-    refine wp_gstore hge find_nautilWorkperm (by rw [hu.load _ _ _ h.wp_b]; exact h.wpPtr (by omega))
+    refine wp_gstore hge find_nautilWorkperm (by rw [hu.load _ _ _ (h.wp_b (by omega))]; exact h.wpPtr (by omega))
       harr h.nlt (tv id.k) (iter p j i0) hcur
       (by simp only [Exec.evalExpr]; rw [temps_gso _ _ (by decide), temps_gss]) rfl
       (ci 1 tint) 1 rfl rfl ?_
