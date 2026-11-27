@@ -24,7 +24,7 @@ open NautyVerified.Proofs.Alloc (Fresh zallocSpec zalloc_satisfies zb)
 /-- `nv_read()` in an environment without a local of that name. -/
 theorem wp_rd {Q : Post} {e : env} {le : temp_env} {m : mem} (t : ident) (x : Lib.Integers.int64)
     (he : PTree.get dense.id.nv_read e = none)
-    (hQ : Q.normal [readEv x] e (PTree.set t (.Vlong x) le) m) :
+    (hQ : Q.normal (tr1 (readEv x)) e (PTree.set t (.Vlong x) le) m) :
     Wp Statement.xi ge dense.fn.main (rd t) Q e le m := by
   refine wp_call (vf := .Vptr Block.nvRead Ptrofs.zero) (targs := []) (tres := tlong)
     (cc := cc_default) _ (readSpec x) (read_satisfies x) rfl

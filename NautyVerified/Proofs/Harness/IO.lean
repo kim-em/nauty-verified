@@ -107,7 +107,7 @@ theorem Writes.writes {t : trace} {l : List Int} (h : Writes t l) (s : trace) :
 /-- `nv_read()` returning `x`. -/
 def readSpec (x : Lib.Integers.int64) : FunSpec where
   pre args _ := args = []
-  post _ m t v m' := t = [readEv x] ∧ v = .Vlong x ∧ m' = m
+  post _ m t v m' := t = tr1 (readEv x) ∧ v = .Vlong x ∧ m' = m
 
 /-- `nv_write(x)`. -/
 def writeSpec (x : Lib.Integers.int64) : FunSpec where
@@ -120,7 +120,7 @@ theorem read_satisfies (x : Lib.Integers.int64) :
       (readSpec x) :=
   satisfies_external fun args m hargs => by
     subst hargs
-    refine ⟨[readEv x], .Vlong x, m, ?_, rfl, rfl, rfl⟩
+    refine ⟨tr1 (readEv x), .Vlong x, m, ?_, rfl, rfl, rfl⟩
     show Statement.extSem _ _ _ _ _ _ _ _
     simp only [Statement.extSem, and_self, ite_true]
     exact .intro _ m (.EVlong x) (.Vlong x) (.ev_match_long x)

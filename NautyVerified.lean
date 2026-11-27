@@ -144,3 +144,4 @@ import NautyVerified.Proofs.Harness.Options
 import NautyVerified.Proofs.Harness.Calls
 import NautyVerified.Proofs.Harness.Loop
 import NautyVerified.Proofs.Harness.Input
+import NautyVerified.Proofs.Harness.Graph
