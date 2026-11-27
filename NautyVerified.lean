@@ -81,3 +81,4 @@ import NautyVerified.Proofs.Testcanlab.Syntax
 import NautyVerified.Proofs.Testcanlab.Cmp
 import NautyVerified.Proofs.Testcanlab.Rows
 import NautyVerified.Proofs.Testcanlab.Satisfies
+import NautyVerified.Proofs.Init.Tables

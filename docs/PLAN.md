@@ -305,6 +305,21 @@ corollaries from `HexGraphIso` (`canon_iso`, `canon_invariant`,
 Corollaries lib, `hex-graph-iso-theory`'s Mathlib-facing forms.
 `#print axioms` must show only `propext`, `Classical.choice`, `Quot.sound`.
 
+Initial memory (`Proofs/Init/Tables.lean`, done): `globals` turns Clight's
+`initial_state` fact `Genv.init_mem prog = some m` into `Globals m`: the four
+copies of `bit[64]` (`BitTable`), `leftbit` (`LeftbitTable`), naugraph.c's
+`bytecount` (`BytecountTable`, entry `i` = HexGraphIso's `popCount i`), and
+`DynAt m bp bs c 0 b` for every `DYNALLSTAT` pair of nautil.c, naugraph.c and
+nauty.c (for any `c`, `b`); `valid_global` gives validity of every global's
+block. The whole initial memory is never evaluated: CompCert's proved
+`init_mem_characterization` reduces each global to its own initialiser,
+which one `kernel_rfl` per global pins (`info b`: initialiser, read-only and
+volatile flags), and `loads64`/`loads32` read an initialiser of integers back
+as loads. The file checks in about 5 seconds. `ge.genv_genv = Genv.globalenv
+prog` must be stated with `kernel_rfl` (`ge_eq`): the elaborator's `rfl`
+unfolds `globalenv` and exceeds the recursion limit. Block numbers of all
+these globals are pinned in `Proofs/Alloc/Blocks.lean`.
+
 ## Phase 7: sparse
 
 `nausparse.c`: `refine_sg` (`refineWith`, `splitCounts`), `distvals`,
