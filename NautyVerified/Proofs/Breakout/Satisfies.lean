@@ -44,7 +44,7 @@ def breakoutSpec (bl : block) (lofs : ptrofs) (bp : block) (pofs : ptrofs) (ba :
       (ints (Hex.GraphIso.Nauty.breakout n lab ptn level tc tv).2.1) n ∧
     ArrayAt m' .Mint64 ba (intOfZ (Ptrofs.unsigned aofs)) (Set.longs (Set.single tc)) M ∧
     SetRep (fun w => bv64 (Set.single tc w)) M (Hex.GraphIso.Nauty.breakout n lab ptn level tc tv).2.2 ∧
-    Unch m m' (fun b => b = bl ∨ b = bp ∨ b = ba) ∧ Alloc.Keep m m' ba
+    Unch m m' (fun b => b = bl ∨ b = bp ∨ b = ba) ∧ ∀ z ∈ [bl, bp, ba], Alloc.Keep m m' z
 
 /-- The temporaries on entry. -/
 def entryTemps (bl : block) (lofs : ptrofs) (bp : block) (pofs : ptrofs) (ba : block)
@@ -107,10 +107,10 @@ theorem breakout_satisfies {xi : ExternalCalls} (bl : block) (lofs : ptrofs) (bp
       (by rw [temps_gso _ _ (by decide), temps_gso _ _ (by decide)]; exact htv1)
       (by rw [temps_gso _ _ (by decide), temps_gss])
       (temps_gss _ _ _) htj hjt hat hsmall ?_
-    intro le3 m3 harr3 hu3 ho3
+    intro le3 m3 harr3 hu3 hk3 ho3
     wp_step; wp_step
     have hparr3 := (hparr.unch hu12 hpa).unch hu3 (Ne.symm hlp)
-    refine wp_store (ge := ge) hparr3 hn id.ptn ?_ (Breakout.tv id.tc) tc htcn ?_ rfl (Breakout.tv id.level) level ?_ rfl ?_
+    refine Refine.wp_storeV hparr3 hn id.ptn ?_ (Breakout.tv id.tc) tc htcn ?_ rfl (Breakout.tv id.level) level ?_ rfl ?_
     · rw [ho3 _ (by decide) (by decide) (by decide) (by decide)]
       rw [temps_gso _ _ (by decide), temps_gso _ _ (by decide), hT _ (by decide) (by decide)]
       simp (config := {decide := true}) only [entryTemps, temps_gso, temps_gss]
@@ -122,7 +122,7 @@ theorem breakout_satisfies {xi : ExternalCalls} (bl : block) (lofs : ptrofs) (bp
       rw [ho3 _ (by decide) (by decide) (by decide) (by decide)]
       rw [temps_gso _ _ (by decide), temps_gso _ _ (by decide), hT _ (by decide) (by decide)]
       simp (config := {decide := true}) only [entryTemps, temps_gso, temps_gss]
-    intro m4 hparr4 hu4
+    intro m4 hparr4 hu4 hk4
     rw [← ints_set (by omega)] at hparr4
     refine ⟨m4, Nextelement.free_empty m4, rfl, ?_, hparr4, ?_, ?_, ?_, ?_⟩
     · have := harr3.unch hu4 hlp
@@ -130,8 +130,8 @@ theorem breakout_satisfies {xi : ExternalCalls} (bl : block) (lofs : ptrofs) (bp
     · exact (harr2.unch hu3 (Ne.symm hla)).unch hu4 (Ne.symm hpa)
     · exact Set.setRep_single hnM htcn
     · refine ((hu12.mono ?_).trans (hu3.mono ?_)).trans (hu4.mono ?_) <;> intro b hb <;> simp_all
-    · exact (((Alloc.Keep.of_outside' hO1 harr.base_nonneg).trans
-        (Alloc.Keep.of_outside' hO2 harr1.base_nonneg)).trans (Alloc.Keep.unch hu3 (Ne.symm hla))).trans
-        (Alloc.Keep.unch hu4 (Ne.symm hpa))
+    · intro z _
+      exact ((((Alloc.KeepA.of_outside hu1 hO1 harr.base_nonneg).trans
+        (Alloc.KeepA.of_outside hu2 hO2 harr1.base_nonneg)).trans hk3).trans hk4) z
 
 end NautyVerified.Proofs.Breakout
