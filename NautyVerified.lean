@@ -66,3 +66,5 @@ import NautyVerified.Proofs.Permset.Syntax
 import NautyVerified.Proofs.Permset.Take
 import NautyVerified.Proofs.Permset.Word
 import NautyVerified.Proofs.Permset.Many
+import NautyVerified.Proofs.Permset.One
+import NautyVerified.Proofs.Permset.Satisfies
