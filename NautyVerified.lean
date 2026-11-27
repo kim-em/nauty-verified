@@ -91,6 +91,8 @@ import NautyVerified.Proofs.Search.State
 import NautyVerified.Proofs.Search.Spec
 import NautyVerified.Proofs.Top.DensenautySyntax
 import NautyVerified.Proofs.Top.NautySyntax
+import NautyVerified.Proofs.Top.Spec
+import NautyVerified.Proofs.Top.Densenauty
 import NautyVerified.Proofs.Search.Node.Spec
 import NautyVerified.Proofs.Search.Node.OtherHex
 import NautyVerified.Proofs.Search.Node.Rebuild
@@ -98,6 +100,8 @@ import NautyVerified.Proofs.Search.Step
 import NautyVerified.Proofs.Search.Node.OkOff
 import NautyVerified.Proofs.Search.Node.Compare
 import NautyVerified.Proofs.Search.Node.OtherSteps
+import NautyVerified.Proofs.Search.Node.FirstHex
+import NautyVerified.Proofs.Search.Node.OkFirst
 import NautyVerified.Proofs.Search.Frame
 import NautyVerified.Proofs.Harness.Spec
 import NautyVerified.Proofs.Search.Node.Firstpathnode
@@ -149,6 +153,7 @@ import NautyVerified.Spec.SearchInf
 import NautyVerified.Spec.SearchInfRun
 import NautyVerified.Spec.NodeOk
 import NautyVerified.Spec.NodeOkOff
+import NautyVerified.Spec.PartOk
 import NautyVerified.Spec.NtcPlace
 import NautyVerified.Spec.CountWin
 import NautyVerified.Proofs.Testcanlab.Syntax
