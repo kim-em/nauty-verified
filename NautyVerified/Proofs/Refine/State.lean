@@ -198,6 +198,26 @@ theorem Tmp.set {n : Nat} {le : temp_env} {L : Loc} {st : RefineSt n} (h : Tmp l
     · exact hx.2.2.1 hy
     · exact hx.2.2.2 hy
 
+/-- `Mem` depends only on `st`'s `lab`, `ptn`, `numcells` and `active`. -/
+theorem Mem.congr {n : Nat} {m : mem} {L : Loc} {ctx : Ctx n} {st st' : RefineSt n}
+    {aw : Nat → Lib.Integers.int64} (h : Mem m L ctx st aw) (hl : st'.lab = st.lab)
+    (hp : st'.ptn = st.ptn) (hn : st'.numcells = st.numcells) (ha : st'.active = st.active) :
+    Mem m L ctx st' aw :=
+  { h with
+    lab := by rw [hl]; exact h.lab
+    ptn := by rw [hp]; exact h.ptn
+    nc := by rw [hn]; exact h.nc
+    actRep := by rw [ha]; exact h.actRep }
+
+/-- `Tmp` depends only on `st`'s `longcode`, `hint` and `maxpos`. -/
+theorem Tmp.congr {n : Nat} {le : temp_env} {L : Loc} {st st' : RefineSt n} (h : Tmp le L st)
+    (hc : st'.longcode = st.longcode) (hh : st'.hint = st.hint) (hm : st'.maxpos = st.maxpos) :
+    Tmp le L st' :=
+  { h with
+    longcode := by rw [hc]; exact h.longcode
+    hint := by rw [hh]; exact h.hint
+    maxpos := by rw [hm]; exact h.maxpos }
+
 /-- After a step: memory, temporaries and invariants all describe `st`. -/
 def Done {n : Nat} (le : temp_env) (m : mem) (L : Loc) (ctx : Ctx n) (st : RefineSt n) : Prop :=
   ∃ aw, Mem m L ctx st aw ∧ Tmp le L st ∧ StInv n L st
