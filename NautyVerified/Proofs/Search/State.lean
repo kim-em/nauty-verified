@@ -305,6 +305,14 @@ structure SInv {n : Nat} (st : Search n) : Prop where
   firsttcRange : ∀ i < n + 2, -1 ≤ st.firsttc[i]! ∧ st.firsttc[i]! < n
   workpermSmall : ∀ i < n, st.workperm[i]! < n
   samerows : st.samerows ≤ n
+  orbitsSize : st.orbits.size = n
+  workpermSize : st.workperm.size = n
+  firstlabSize : st.firstlab.size = n
+  canonlabSize : st.canonlab.size = n
+  firstcodeSize : st.firstcode.size = n + 2
+  canoncodeSize : st.canoncode.size = n + 2
+  firsttcSize : st.firsttc.size = n + 2
+  canongSize : st.canong.size = n
 
 /-- Memory holds HexGraphIso's search state `st` for the graph `ctx`. -/
 structure SearchAt {n : Nat} (m : mem) (S : SLoc) (ctx : Ctx n) (st : Search n) (pre nsp : Bool) :
