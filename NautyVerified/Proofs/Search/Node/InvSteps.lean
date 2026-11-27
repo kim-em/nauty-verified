@@ -317,31 +317,6 @@ theorem SRest.scatter {st : Search n} (h : SRest st) (hlab : ∀ i < n, st.lab[i
       (fun x hx => h.workpermSmall x (hsz ▸ hx)) n (Nat.le_refl _) i (by omega)
     workpermSize := by simp only [scatterW_size]; exact hsz }
 
-theorem updatecan_size (ctx : Ctx n) (c : Array (VSet n)) (lab : Array Nat) (sr : Nat) :
-    (updatecan ctx c lab sr).size = c.size := by
-  rw [Spec.updatecan_eq]
-  generalize List.range' sr (n - sr) = l
-  induction l generalizing c with
-  | nil => rfl
-  | cons i l ih => simp only [List.foldl_cons, canStep]; rw [ih, Array.size_set!]
-
-theorem tclGo_range (ctx : Ctx n) (c : Array (VSet n)) (lab : Array Nat) :
-    ∀ l : List Nat, (∀ i ∈ l, i < n) →
-      (-1 ≤ (tclGo ctx c lab l).1 ∧ (tclGo ctx c lab l).1 ≤ 1) ∧ (tclGo ctx c lab l).2 ≤ n
-  | [], _ => by simp [tclGo]
-  | i :: l, hl => by
-    have hi := hl i (by simp)
-    simp only [tclGo]
-    split
-    · exact ⟨⟨by simp, by simp⟩, by simp only; omega⟩
-    · exact ⟨⟨by simp, by simp⟩, by simp only; omega⟩
-    · exact tclGo_range ctx c lab l fun j hj => hl j (by simp [hj])
-
-theorem testcanlab_range (ctx : Ctx n) (c : Array (VSet n)) (lab : Array Nat) :
-    (-1 ≤ (testcanlab ctx c lab).1 ∧ (testcanlab ctx c lab).1 ≤ 1) ∧ (testcanlab ctx c lab).2 ≤ n := by
-  rw [testcanlab_eq]
-  exact tclGo_range ctx c lab _ fun i hi => List.mem_range.1 hi
-
 /-- The last step of `classifyCanon`, for any comparison outcome `p`. -/
 theorem classifyCanon_tail (p : Search n × Nat) (h : SRest p.1) (hlab : ∀ i < n, p.1.lab[i]! < n)
     (hp : p.2 ≤ n) :
@@ -361,15 +336,15 @@ theorem SRest.classifyCanon {ctx : Ctx n} {level : Nat} {st : Search n} (h : SRe
       ∀ sr, (classifyCanon ctx level st).1 = .better sr → sr ≤ n := by
   have := h.scalars
   unfold Spec.classifyCanon
-  apply classifyCanon_tail
+  apply classifyCanon_tail <;> unfold Spec.canonTestS
   · split
     · split
       · exact { h with scalars := by simp only; omega }
-      · obtain ⟨⟨r1, r2⟩, r3⟩ := testcanlab_range ctx
+      · obtain ⟨r1, r2, r3⟩ := Spec.testcanlab_range ctx
           (updatecan ctx st.canong st.canonlab st.samerows) st.lab
         exact { h with
           samerows := Nat.le_refl _
-          canongSize := by simp only [updatecan_size]; exact h.canongSize
+          canongSize := by simp only [Spec.updatecan_size]; exact h.canongSize
           scalars := by simp only; omega }
     · exact h
   · split
@@ -378,7 +353,7 @@ theorem SRest.classifyCanon {ctx : Ctx n} {level : Nat} {st : Search n} (h : SRe
   · split
     · split
       · exact Nat.zero_le _
-      · exact (testcanlab_range ctx _ _).2
+      · exact (Spec.testcanlab_range ctx _ _).2.2
     · exact Nat.zero_le _
 
 theorem SRest.classify {ctx : Ctx n} {level numcells : Nat} {st : Search n} (h : SRest st)
