@@ -68,6 +68,7 @@ import NautyVerified.Proofs.Refine.Mash
 import NautyVerified.Proofs.Refine.Scan
 import NautyVerified.Proofs.Refine.Guard
 import NautyVerified.Proofs.Refine.Step
+import NautyVerified.Proofs.Refine.Pop
 import NautyVerified.Proofs.Isautom.Scan
 import NautyVerified.Proofs.Isautom.Satisfies
 import NautyVerified.Proofs.Permset.Syntax
