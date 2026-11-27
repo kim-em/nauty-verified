@@ -77,3 +77,4 @@ import NautyVerified.Proofs.Updatecan.Satisfies
 import NautyVerified.Spec.WordCmp
 import NautyVerified.Spec.Testcanlab
 import NautyVerified.Proofs.Testcanlab.Syntax
+import NautyVerified.Proofs.Testcanlab.Cmp
