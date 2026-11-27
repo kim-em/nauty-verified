@@ -23,6 +23,8 @@ open NautyVerified.Source
 open NautyVerified.Proofs.Set (longs BitTable)
 open Hex.GraphIso.Nauty
 
+set_option linter.unusedSimpArgs false
+
 variable {xi : ExternalCalls}
 
 /-- The `int` position `nextelement` is called with for `q`. -/
@@ -86,5 +88,157 @@ theorem wp_next {n : Nat} {f : function} {Q : Post} {le : temp_env} {m : mem} {L
     ⟨rfl, by cases q <;> simp [posOf], hq, hM1, by omega, Graph.wordsAt_of hm.act, hm.left⟩ ?_
   rintro t' v m' ⟨rfl, rfl, r, rfl, hspec⟩
   exact hQ r (next_eq hm.actRep hspec)
+
+/-- `if (t) ; else break;` on a boolean temporary. -/
+theorem wp_tail {f : function} {Q : Post} {le : temp_env} {m : mem} (t : ident) (b : Bool)
+    (h : PTree.get t le = some (.Vint (if b then Lib.Integers.Int.one else Lib.Integers.Int.zero)))
+    (hn : b = true → Q.normal E0 empty_env le m) (hb : b = false → Q.brk E0 empty_env le m) :
+    Wp xi ge f (.Sifthenelse (tv t) .Sskip .Sbreak) Q empty_env le m := by
+  apply wp_if_eval
+  simp only [Exec.evalExpr, h, typeof]
+  cases b
+  · simp only [Bool.false_eq_true, ite_false, cop]
+    rw [ite_eq_right (by decide)]
+    exact wp_break (hb rfl)
+  · simp only [ite_true, cop]
+    rw [ite_eq_left (by decide)]
+    exact wp_skip (hn rfl)
+
+/-- The loop guard: continue with `split1 = pickSplit active hint`, or break. -/
+theorem wp_guard {n : Nat} {Q : Post} {le : temp_env} {m : mem} {L : Loc} {ctx : Ctx n}
+    {st : RefineSt n} {aw : Nat → Lib.Integers.int64} (hok : Ok n L) (hm : Mem m L ctx st aw)
+    (ht : Tmp le L st) (hi : StInv n L st)
+    (hQb : ∀ le', (¬ st.numcells < n ∨ pickSplit st.active st.hint = none) → Tmp le' L st →
+      Q.brk E0 empty_env le' m)
+    (hQn : ∀ le' s, st.numcells < n → pickSplit st.active st.hint = some s → Tmp le' L st →
+      PTree.get dense.id.split1 le' = some (.Vint (ir s)) → Q.normal E0 empty_env le' m) :
+    Wp xi ge dense.fn.refine guard Q empty_env le m := by
+  have hn0 := hok.n0
+  have hnM := hok.nM
+  have hnc2 := hi.ncSmall
+  have hh := hi.hint
+  have hMl := hok.Mlt
+  have hnl := hok.nlt
+  simp only [guard, Set.sk]
+  wp_step; wp_step; wp_step
+  apply wp_if_eval
+  rw [Exec.evalExpr, eval_numcells hm ht, show Exec.evalExpr ge empty_env le m (tv dense.id.n) = _
+    from ht.n]
+  simp only [typeof, cop]
+  rw [ir_lt (a := (st.numcells : Int)) (b := n) ⟨by omega, by omega⟩ ⟨by omega, by omega⟩]
+  by_cases hlt : st.numcells < n
+  · rw [ite_eq_left (by simpa using hlt)]
+    wp_step; wp_step; wp_step; wp_step
+    apply wp_set_eval
+    simp only [Exec.evalExpr, ht.hint]
+    have ht1 : Tmp (PTree.set dense.id.split1 (.Vint (ir st.hint)) le) L st :=
+      ht.set _ (by decide)
+    have hel := Set.eval_isElement (e := empty_env) (le := PTree.set dense.id.split1
+      (.Vint (ir st.hint)) le) (s := dense.id.active) (bitId := dense.id.«naugraph:bit»)
+      (a := tv dense.id.split1) hm.act (by omega) ht1.active (by simp [Exec.evalExpr, temps_gss])
+      rfl (c := st.hint) (by omega) (by omega) hm.bit rfl find_naugraphBit
+    rw [hm.actRep.2 _ (by omega)] at hel
+    simp only [seqPost, Post.after, E0_append]
+    apply wp_if_eval
+    rw [hel]
+    cases hmem : st.active.mem st.hint
+    · simp only [typeof, cop, Bool.false_eq_true, ite_false]
+      wp_step; wp_step; wp_step; wp_step; wp_step
+      refine wp_next (q := some st.hint) (pe := tv dense.id.split1) hok hm ht1 (by simp [Exec.evalExpr, temps_gss, posOf])
+        rfl (by simp [posOf]; omega) ?_
+      intro r hr
+      simp only [set_opttemp, seqPost, Post.after, E0_append]
+      apply wp_set_eval
+      simp only [Exec.evalExpr, temps_gss, typeof, cop]
+      apply wp_set_eval
+      simp only [Exec.evalExpr, temps_gss]
+      apply wp_set_eval
+      simp (config := {decide := true}) only [Exec.evalExpr, temps_gss, temps_gso, typeof, cop]
+      have hr1 : -1 ≤ r ∧ r < 2147483648 := by
+        rcases hr with ⟨-, rfl⟩ | ⟨v, hv, rfl⟩
+        · omega
+        · have := VSet.mem_lt (VSet.nextElem_eq_some_iff.1 hv).1; omega
+      rw [ir_lt (a := r) (b := 0) ⟨by omega, by omega⟩ ⟨by decide, by decide⟩]
+      rcases hr with ⟨hnone, rfl⟩ | ⟨v, hv, rfl⟩
+      · simp only [show decide ((-1 : Int) < 0) = true from rfl, Bool.not_true, Val.of_bool,
+          Bool.false_eq_true, ite_false, cop]
+        apply wp_if_eval
+        simp only [Exec.evalExpr, temps_gss, typeof, cop]
+        rw [ite_eq_right (by decide)]
+        wp_step; wp_step; wp_step; wp_step; wp_step; wp_step
+        have ht2 : Tmp (PTree.set (idOf 710) (.Vint Lib.Integers.Int.zero) (PTree.set dense.id.split1
+            (.Vint (ir (-1))) (PTree.set (idOf 712) (.Vint (ir (-1))) (PTree.set (idOf 711)
+            (.Vint (ir (-1))) (PTree.set dense.id.split1 (.Vint (ir st.hint)) le))))) L st :=
+          (((ht1.set _ (by decide)).set _ (by decide)).set _ (by decide)).set _ (by decide)
+        refine wp_next (q := none) (pe := .Eunop .Oneg (ci 1 tint) tint) hok hm ht2 rfl rfl
+          (by simp [posOf]; omega) ?_
+        intro r2 hr2
+        simp only [set_opttemp, seqPost, Post.after, E0_append]
+        apply wp_set_eval
+        simp only [Exec.evalExpr, temps_gss, typeof, cop]
+        apply wp_set_eval
+        simp only [Exec.evalExpr, temps_gss]
+        apply wp_set_eval
+        simp (config := {decide := true}) only [Exec.evalExpr, temps_gss, temps_gso, typeof, cop]
+        have hr3 : -1 ≤ r2 ∧ r2 < 2147483648 := by
+          rcases hr2 with ⟨-, rfl⟩ | ⟨v, hv, rfl⟩
+          · omega
+          · have := VSet.mem_lt (VSet.nextElem_eq_some_iff.1 hv).1; omega
+        rw [ir_lt (a := r2) (b := 0) ⟨by omega, by omega⟩ ⟨by decide, by decide⟩]
+        have ht3 := (((ht2.set (x := idOf 713) (.Vint (ir r2)) (by decide)).set (x := idOf 714)
+          (.Vint (ir r2)) (by decide)).set (x := dense.id.split1) (.Vint (ir r2)) (by decide))
+        rcases hr2 with ⟨hnone2, rfl⟩ | ⟨v, hv, rfl⟩
+        · simp only [show decide ((-1 : Int) < 0) = true from rfl, Bool.not_true, Val.of_bool,
+            Bool.false_eq_true, ite_false, cop]
+          apply wp_set_eval
+          simp only [Exec.evalExpr, temps_gss, typeof, cop]
+          refine wp_tail (idOf 709) false (by rw [temps_gss]; rfl) (fun h => absurd h (by decide))
+            (fun _ => ?_)
+          exact hQb _ (.inr (by simp [pickSplit, hmem, hnone, hnone2])) ((ht3.set _ (by decide)).set _
+            (by decide))
+        · simp only [show decide ((v : Int) < 0) = false by simp, Bool.not_false, Val.of_bool,
+            ite_true, cop]
+          apply wp_set_eval
+          simp only [Exec.evalExpr, temps_gss, typeof, cop]
+          have hvn := VSet.mem_lt (VSet.nextElem_eq_some_iff.1 hv).1
+          refine wp_tail (idOf 709) true (by rw [temps_gss]; rfl) (fun _ => ?_)
+            (fun h => absurd h (by decide))
+          refine hQn _ v hlt (by simp [pickSplit, hmem, hnone, hv]) ((ht3.set _ (by decide)).set _
+            (by decide)) ?_
+          simp (config := {decide := true}) only [temps_gso, temps_gss]
+      · simp only [show decide ((v : Int) < 0) = false by simp, Bool.not_false, Val.of_bool,
+          ite_true, cop]
+        apply wp_if_eval
+        simp only [Exec.evalExpr, temps_gss, typeof, cop]
+        rw [ite_eq_left (by decide)]
+        wp_step; wp_step
+        apply wp_set_eval
+        simp only [Exec.evalExpr, typeof, cop]
+        simp only [seqPost, Post.after, E0_append]
+        have hvn := VSet.mem_lt (VSet.nextElem_eq_some_iff.1 hv).1
+        refine wp_tail (idOf 709) true (by rw [temps_gss]; rfl) (fun _ => ?_) (fun h => absurd h (by decide))
+        refine hQn _ v hlt (by simp [pickSplit, hmem, hv])
+          ((((ht1.set _ (by decide)).set _ (by decide)).set _ (by decide)).set _ (by decide) |>.set _
+            (by decide)) ?_
+        simp (config := {decide := true}) only [temps_gso, temps_gss]
+    · simp only [typeof, cop, ite_true]
+      apply wp_set_eval
+      simp only [Exec.evalExpr]
+      apply wp_if_eval
+      simp only [Exec.evalExpr, temps_gss, typeof, cop]
+      rw [ite_eq_left (by decide)]
+      wp_step; wp_step
+      apply wp_set_eval
+      simp only [Exec.evalExpr, typeof, cop]
+      simp only [seqPost, Post.after, E0_append]
+      refine wp_tail (idOf 709) true (by rw [temps_gss]; rfl) (fun _ => ?_) (fun h => absurd h (by decide))
+      refine hQn _ st.hint hlt (by simp [pickSplit, hmem]) ((ht1.set _ (by decide)).set _ (by decide)) ?_
+      rw [temps_gso _ _ (by decide), temps_gso _ _ (by decide), temps_gss]
+  · rw [ite_eq_right (by simpa using hlt)]
+    apply wp_set_eval
+    simp only [Exec.evalExpr, seqPost, Post.after, E0_append]
+    refine wp_tail (idOf 709) false (by rw [temps_gss]; rfl) (fun h => absurd h (by decide))
+      (fun _ => ?_)
+    exact hQb _ (.inl hlt) (ht.set _ (by decide))
 
 end NautyVerified.Proofs.Refine
