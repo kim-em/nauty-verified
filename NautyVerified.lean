@@ -95,6 +95,9 @@ import NautyVerified.Proofs.Top.Spec
 import NautyVerified.Proofs.Top.Densenauty
 import NautyVerified.Proofs.Top.NautyAlloc
 import NautyVerified.Proofs.Top.NautySizes
+import NautyVerified.Proofs.Top.Init
+import NautyVerified.Proofs.Top.Copy
+import NautyVerified.Proofs.Top.Fields
 import NautyVerified.Proofs.Search.Node.Spec
 import NautyVerified.Proofs.Search.Node.OtherHex
 import NautyVerified.Proofs.Search.Node.Rebuild
