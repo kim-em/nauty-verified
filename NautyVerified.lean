@@ -73,3 +73,4 @@ import NautyVerified.Spec.InvPerm
 import NautyVerified.Proofs.Updatecan.Inv
 import NautyVerified.Spec.Updatecan
 import NautyVerified.Proofs.Updatecan.Rows
+import NautyVerified.Proofs.Updatecan.Satisfies

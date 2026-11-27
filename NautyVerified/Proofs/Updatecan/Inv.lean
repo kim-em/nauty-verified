@@ -92,4 +92,19 @@ theorem wp_inv {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {bl
   · rintro le' m' ⟨-, -, -, harr, hu, hkp, ho⟩
     exact hQ le' m' harr hu hkp ho
 
+/-- When `lab` hits every vertex, the loop writes HexGraphIso's `invPerm lab`. -/
+theorem written_full (lab : Array Nat) (n : Nat) (vals : Nat → val) (hsz : lab.size = n)
+    (hsurj : ∀ p < n, ∃ j < n, lab[j]! = p) {p : Nat} (hp : p < n) :
+    written lab n vals n p = ints (invPerm lab) p := by
+  simp only [written, ints, ite_eq_left (hsurj p hp), invPerm, hsz]
+
+theorem invPerm_small (lab : Array Nat) (n : Nat) (hsz : lab.size = n) :
+    ∀ p < n, (invPerm lab)[p]! < n := by
+  intro p hp
+  rw [invPerm, hsz]
+  exact invPerm_go_lt lab _ n (fun q => by
+    by_cases hq : q < n
+    · simp [hq]; omega
+    · simp [hq]; omega) n (Nat.le_refl _) p
+
 end NautyVerified.Proofs.Updatecan
