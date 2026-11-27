@@ -32,7 +32,8 @@ def permsetSpec {n : Nat} (b1 : block) (o1 : ptrofs) (w1 : Nat → Lib.Integers.
     b2 ≠ b1 ∧ b2 ≠ bp ∧ b2 ≠ Block.nautilBit ∧ b2 ≠ Block.leftbit ∧ 0 < M ∧ M < 33554432
   post _ m t _ m' := t = E0 ∧ ∃ w2',
     ArrayAt m' .Mint64 b2 (intOfZ (Ptrofs.unsigned o2)) (longs w2') M ∧
-    SetRep (fun w => bv64 (w2' w)) M (s.permset perm) ∧ Unch m m' (· = b2)
+    SetRep (fun w => bv64 (w2' w)) M (s.permset perm) ∧ Unch m m' (· = b2) ∧
+    Outside m m' b2 (intOfZ (Ptrofs.unsigned o2)) (intOfZ (Ptrofs.unsigned o2) + 8 * M)
 
 def entryTemps (b1 : block) (o1 : ptrofs) (b2 : block) (o2 : ptrofs) (bp : block) (po : ptrofs)
     (M : Nat) : temp_env :=
@@ -73,11 +74,11 @@ theorem permset_satisfies {xi : ExternalCalls} {n : Nat} (b1 : block) (o1 : ptro
     · subst h1
       rw [ite_eq_left (by simp)]
       refine wp_one hf harr2 ?_
-      intro le' m' w2' harr' hrep' hu
-      exact ⟨m', Nextelement.free_empty m', rfl, w2', harr', hrep', hu⟩
+      intro le' m' w2' harr' hrep' hu hout
+      exact ⟨m', Nextelement.free_empty m', rfl, w2', harr', hrep', hu, hout⟩
     · rw [ite_eq_right (by simp; omega)]
       refine wp_many hf hM harr2 ?_
-      intro le' m' w2' harr' hrep' hu
-      exact ⟨m', Nextelement.free_empty m', rfl, w2', harr', hrep', hu⟩
+      intro le' m' w2' harr' hrep' hu hout
+      exact ⟨m', Nextelement.free_empty m', rfl, w2', harr', hrep', hu, hout⟩
 
 end NautyVerified.Proofs.Permset

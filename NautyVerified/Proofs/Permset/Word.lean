@@ -149,6 +149,7 @@ theorem wp_word {Q : Post} {f : function} {le : temp_env} {m : mem} {n : Nat} {b
     (hQ : ∀ le' m' w2' acc', ArrayAt m' .Mint64 b2 (intOfZ (Ptrofs.unsigned o2)) (longs w2') M →
       SetRep (fun w => bv64 (w2' w)) M acc' → Covers acc' s perm (fun u => u < 64 * (w0 + 1)) →
       Unch m m' (· = b2) →
+      Outside m m' b2 (intOfZ (Ptrofs.unsigned o2)) (intOfZ (Ptrofs.unsigned o2) + 8 * M) →
       (∀ y, y ≠ id.setw → y ≠ id.pos → y ≠ id.b → y ≠ id.t3 → PTree.get y le' = PTree.get y le) →
       Q.normal E0 empty_env le' m') :
     Wp xi ge f word Q empty_env le m := by
@@ -165,6 +166,7 @@ theorem wp_word {Q : Post} {f : function} {le : temp_env} {m : mem} {n : Nat} {b
       (∀ j < 64, (bv64 x).getMsbD j = true → (bv64 (w1 w0)).getMsbD j = true) ∧
       ArrayAt m' .Mint64 b2 (intOfZ (Ptrofs.unsigned o2)) (longs w2') M ∧
       SetRep (fun w => bv64 (w2' w)) M acc' ∧ Covers acc' s perm (Done w0 x) ∧ Unch m m' (· = b2) ∧
+      Outside m m' b2 (intOfZ (Ptrofs.unsigned o2)) (intOfZ (Ptrofs.unsigned o2) + 8 * M) ∧
       ∀ y, y ≠ id.setw → y ≠ id.pos → y ≠ id.b → y ≠ id.t3 → PTree.get y le' = PTree.get y le
   wp_step; wp_step; wp_step
   apply wp_set_eval
@@ -175,8 +177,9 @@ theorem wp_word {Q : Post} {f : function} {le : temp_env} {m : mem} {n : Nat} {b
       hcov.congr fun u hu => ⟨fun h => .inl h, fun h => by
         rcases h with h | ⟨h1, h2⟩
         · exact h
-        · rw [hmem u hu h1] at h2; cases h2⟩, Unch.refl _ _, fun y h1 _ _ _ => temps_gso _ _ h1⟩
-  · rintro v t e' le' m' ⟨rfl, rfl, x, w2', acc', rfl, hsw, hsub, harr', hrep', hcov', hu, ho⟩
+        · rw [hmem u hu h1] at h2; cases h2⟩, Unch.refl _ _, Outside.refl _ _ _ _,
+      fun y h1 _ _ _ => temps_gso _ _ h1⟩
+  · rintro v t e' le' m' ⟨rfl, rfl, x, w2', acc', rfl, hsw, hsub, harr', hrep', hcov', hu, hout, ho⟩
     have hf := (h.temps fun y h1 h2 h3 _ _ _ _ h8 => ho y h1 h2 h3 h8).unch hu
     have hw' : PTree.get id.w le' = some (.Vint (ir w0)) := by
       rw [ho _ (by decide) (by decide) (by decide) (by decide)]; exact hw
@@ -189,7 +192,7 @@ theorem wp_word {Q : Post} {f : function} {le : temp_env} {m : mem} {n : Nat} {b
     · rw [hx]
       simp only [decide_true, Bool.not_true, cop, Bool.false_eq_true, ite_false]
       apply wp_break
-      refine hQ le' m' w2' acc' harr' hrep' (hcov'.congr fun u hu => ?_) hu ho
+      refine hQ le' m' w2' acc' harr' hrep' (hcov'.congr fun u hu => ?_) hu hout ho
       simp only [Done, hx]
       simp only [show ∀ i, (0 : BitVec 64).getMsbD i = false from fun i => BitVec.getMsbD_zero, and_true]
       omega
@@ -225,13 +228,14 @@ theorem wp_word {Q : Post} {f : function} {le : temp_env} {m : mem} {n : Nat} {b
       apply wp_set_eval
       rw [hpe]
       simp only [ints]
-      refine Set.wp_addElement (s := id.set2) harr' (by omega)
+      refine Set.wp_addElement' (s := id.set2) harr' (by omega)
         (by rw [temps_gso _ _ (by decide), ho1 _ (by decide) (by decide) (by decide)]; exact hf.hset2)
         (by simp only [Exec.evalExpr]; rw [temps_gss]) rfl (by omega) (by omega) hf.bit rfl ?_
-      intro m3 harr3 hu3
+      intro m3 harr3 hu3 hout3
       refine ⟨(bv64 (clearBit x k)).toNat, clearBit_lt x hk, rfl, rfl, clearBit x k, _, _, rfl,
         by rw [temps_gso _ _ (by decide)]; exact hsw1, fun j hj hb => ?_, harr3,
-        Set.setRep_add hrep' hpu, hcov'.insert hu0s hpu _ (Done.clear hk), hu.trans hu3, ?_⟩
+        Set.setRep_add hrep' hpu, hcov'.insert hu0s hpu _ (Done.clear hk), hu.trans hu3,
+        hout.trans hout3, ?_⟩
       · rw [getMsbD_clearBit x hk64 hj hk.2.1] at hb
         simp only [Bool.and_eq_true] at hb
         exact hsub j hj hb.1

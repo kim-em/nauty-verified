@@ -27,41 +27,45 @@ theorem wp_many {Q : Post} {f : function} {le : temp_env} {m : mem} {n : Nat} {b
     (harr2 : ArrayAt m .Mint64 b2 (intOfZ (Ptrofs.unsigned o2)) (longs w2) M)
     (hQ : ∀ le' m' w2', ArrayAt m' .Mint64 b2 (intOfZ (Ptrofs.unsigned o2)) (longs w2') M →
       SetRep (fun w => bv64 (w2' w)) M (s.permset perm) → Unch m m' (· = b2) →
+      Outside m m' b2 (intOfZ (Ptrofs.unsigned o2)) (intOfZ (Ptrofs.unsigned o2) + 8 * M) →
       Q.normal E0 empty_env le' m') :
     Wp xi ge f many Q empty_env le m := by
   have hMlt := h.Mlt
   have hnM := h.rep1.1
   wp_step
-  refine Set.wp_emptySet (by decide) (by decide) (by decide) harr2 hM (by omega) h.hset2 h.hm ?_
-  intro le1 m1 harr1 hu1 ho1
+  refine Set.wp_emptySet' (by decide) (by decide) (by decide) harr2 hM (by omega) h.hset2 h.hm ?_
+  intro le1 m1 harr1 hu1 hout1 ho1
   have hf1 := (h.temps fun y _ _ _ _ h5 _ h7 _ => ho1 y h5 h7).unch hu1
   let Inv := fun (k : Nat) (le' : temp_env) (m' : mem) => k ≤ M ∧
     PTree.get id.w le' = some (.Vint (ir k)) ∧ ∃ w2' acc, Frame m' le' b1 o1 w1 s bp po perm b2 o2 M ∧
       ArrayAt m' .Mint64 b2 (intOfZ (Ptrofs.unsigned o2)) (longs w2') M ∧
       SetRep (fun w => bv64 (w2' w)) M acc ∧ Covers acc s perm (fun u => u < 64 * k) ∧
-      Unch m m' (· = b2)
+      Unch m m' (· = b2) ∧
+      Outside m m' b2 (intOfZ (Ptrofs.unsigned o2)) (intOfZ (Ptrofs.unsigned o2) + 8 * M)
   let Mid := fun (k : Nat) (le' : temp_env) (m' : mem) =>
     PTree.get id.w le' = some (.Vint (ir k)) ∧ k < M ∧ ∃ w2' acc,
       Frame m' le' b1 o1 w1 s bp po perm b2 o2 M ∧
       ArrayAt m' .Mint64 b2 (intOfZ (Ptrofs.unsigned o2)) (longs w2') M ∧
       SetRep (fun w => bv64 (w2' w)) M acc ∧ Covers acc s perm (fun u => u < 64 * (k + 1)) ∧
-      Unch m m' (· = b2)
+      Unch m m' (· = b2) ∧
+      Outside m m' b2 (intOfZ (Ptrofs.unsigned o2)) (intOfZ (Ptrofs.unsigned o2) + 8 * M)
   refine wp_forLoop id.w id.m word M (by omega) Inv Mid ?_ ?_ ?_ ?_ ?_
   · rintro k le' m' ⟨hk, hw, w2', acc, hf, -⟩
     exact ⟨hk, hw, hf.hm⟩
   · refine ⟨Nat.zero_le _, temps_gss _ _ _, _, VSet.empty,
       hf1.temps fun y _ _ _ h4 _ _ _ _ => temps_gso _ _ h4, harr1, Set.setRep_zero hnM,
-      covers_empty s perm, hu1⟩
-  · rintro k le' m' hk ⟨-, hw, w2', acc, hf, harr', hrep', hcov', hu⟩
+      covers_empty s perm, hu1, hout1⟩
+  · rintro k le' m' hk ⟨-, hw, w2', acc, hf, harr', hrep', hcov', hu, hout⟩
     refine wp_word hf w2' acc harr' hrep' hcov' hw hk ?_
-    intro le2 m2 w2'' acc' harr2 hrep2 hcov2 hu2 ho2
+    intro le2 m2 w2'' acc' harr2 hrep2 hcov2 hu2 hout2 ho2
     exact ⟨rfl, by rw [ho2 _ (by decide) (by decide) (by decide) (by decide)]; exact hw, hk, w2'', acc',
-      (hf.temps fun y h1 h2 h3 _ _ _ _ h8 => ho2 y h1 h2 h3 h8).unch hu2, harr2, hrep2, hcov2, hu.trans hu2⟩
-  · rintro k le' m' ⟨hw, hk, w2', acc, hf, harr', hrep', hcov', hu⟩
+      (hf.temps fun y h1 h2 h3 _ _ _ _ h8 => ho2 y h1 h2 h3 h8).unch hu2, harr2, hrep2, hcov2, hu.trans hu2,
+      hout.trans hout2⟩
+  · rintro k le' m' ⟨hw, hk, w2', acc, hf, harr', hrep', hcov', hu, hout⟩
     exact ⟨hw, by omega, temps_gss _ _ _, w2', acc, hf.temps fun y _ _ _ h4 _ _ _ _ => temps_gso _ _ h4,
-      harr', hrep', hcov', hu⟩
-  · rintro le' m' ⟨-, -, w2', acc, hf, harr', hrep', hcov', hu⟩
-    refine hQ le' m' w2' harr' ?_ hu
+      harr', hrep', hcov', hu, hout⟩
+  · rintro le' m' ⟨-, -, w2', acc, hf, harr', hrep', hcov', hu, hout⟩
+    refine hQ le' m' w2' harr' ?_ hu hout
     rw [← covers_image (hcov'.congr fun u hu => ⟨fun _ => trivial, fun _ => by
       have := VSet.mem_lt hu; omega⟩) h.psmall]
     exact hrep'
