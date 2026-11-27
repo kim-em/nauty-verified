@@ -195,7 +195,7 @@ theorem wp_nodeTarget {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_e
     simp only [ite_true, cop]
     rfl
   · rintro t v m' ⟨⟨rfl, hT, hZ, hC, cW', bW', cS', bS', cB', bB', dW', dS', dB', fW, fS, fB, hU,
-      pWS', pWB', pSB'⟩, hgrow⟩
+      pWS', pWB', pSB', -⟩, hgrow⟩
     have hX : ∀ z ∈ S.blocks, ¬ (z = bt ∨ z = bz ∨ z = bc) := by
       rintro z hzm (e | e | e)
       · exact tS (e ▸ hzm)

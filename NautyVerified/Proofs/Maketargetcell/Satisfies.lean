@@ -1,3 +1,4 @@
+import NautyVerified.Proofs.Alloc.KeepV
 import NautyVerified.Proofs.Maketargetcell.Loops
 import NautyVerified.Proofs.Targetcell.Satisfies
 
@@ -67,7 +68,8 @@ def maketargetcellSpec {n : Nat} (bg : block) (gofs : ptrofs) (gw : Nat → Lib.
       ((capB' = capB ∧ bB' = bB) ∨ ¬ Mem.valid_block m bB') ∧
       Unch m m' (fun z => dyn3Set m capP bP capS bS capB bB z ∨ z = bt ∨ z = bz ∨ z = bc) ∧
       (0 < capP' → 0 < capS' → bP' ≠ bS') ∧ (0 < capP' → 0 < capB' → bP' ≠ bB') ∧
-      (0 < capS' → 0 < capB' → bS' ≠ bB')
+      (0 < capS' → 0 < capB' → bS' ≠ bB') ∧
+      ∀ z ∈ [bt, bz, bc], Keep m m' z
 
 def entryTemps (bg : block) (gofs : ptrofs) (bl : block) (lofs : ptrofs) (bp : block)
     (pofs : ptrofs) (level : Nat) (bt : block) (tofs : ptrofs) (bz : block) (zofs : ptrofs)
@@ -282,6 +284,16 @@ theorem maketargetcell_satisfies {xi : ExternalCalls} {n : Nat} (bg : block) (go
         fun hc => Keep.unch hU15 (nb bB' bB capB capB' hfB (fun z hz => (hout.out z (by
           rcases hz with h | h | h <;> simp [h])).2.2.2.2.2.2.2.2.2) hc),
       hfP, hfS, hfB, (hU.mono fun _ h => .inl h).trans (hU15.mono fun _ h => .inr h), hPS', hPB',
-      hSB'⟩
+      hSB', fun z hz => ?_⟩
+    have kA : Alloc.KeepA m1 m5 :=
+      (((Alloc.KeepA.storeArr hzarr1 hst2).trans (Alloc.KeepA.of_outside hu3 hout3
+        (htarr1.unch hu2 tz).base_nonneg)).trans (Alloc.KeepA.of_outside hu4 hout4
+        htarr3.base_nonneg)).trans (Alloc.KeepA.storeArr hcarr4 hst5)
+    refine (Keep.unch hU (oND z ?_)).trans (kA z)
+    simp only [List.mem_cons, List.not_mem_nil, or_false] at hz
+    rcases hz with h | h | h
+    · exact .inl h
+    · exact .inr (.inl h)
+    · exact .inr (.inr (.inl h))
 
 end NautyVerified.Proofs.Maketargetcell
