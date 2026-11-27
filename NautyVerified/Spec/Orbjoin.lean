@@ -129,4 +129,32 @@ theorem chaseList_root {o : Array Nat} {n : Nat} (hd : Descending o n) :
         simp only [chaseList, hr, beq_iff_eq, ite_false]
         exact ih.2.2 l' (by simp at hl'; omega)
 
+theorem chase_lt {o : Array Nat} {n : Nat} (hd : Descending o n) {j : Nat} (hj : j < n) :
+    chaseList o (List.range n) j < n :=
+  (chaseList_root hd (List.range n) j hj (by simpa using hj)).2.1
+
+/-- `join` keeps the forest descending. -/
+theorem join_desc {o map : Array Nat} {n : Nat} (hd : Descending o n) {i : Nat} (hi : i < n)
+    (hm : map[i]! < n) : Descending (join map n o i) n := by
+  have ha := chase_lt hd (Nat.lt_of_le_of_lt (hd.2 i hi) hi)
+  have hb := chase_lt hd (Nat.lt_of_le_of_lt (hd.2 _ hm) hm)
+  unfold join
+  split
+  · dsimp only
+    split
+    · exact hd.set hb (by omega)
+    · split
+      · exact hd.set ha (by omega)
+      · exact hd
+  · exact hd
+
+/-- The first loop of `orbjoin` keeps the forest descending. -/
+theorem joins_desc {o map : Array Nat} {n : Nat} (hd : Descending o n)
+    (hm : ∀ i < n, map[i]! < n) :
+    ∀ k ≤ n, Descending ((List.range k).foldl (join map n) o) n
+  | 0, _ => hd
+  | k + 1, hk => by
+    rw [List.range_succ, List.foldl_append, List.foldl_cons, List.foldl_nil]
+    exact join_desc (joins_desc hd hm k (by omega)) (by omega) (hm k (by omega))
+
 end NautyVerified.Spec

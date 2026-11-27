@@ -101,6 +101,35 @@ theorem store_array {m : mem} {chunk : memory_chunk} {b : block} {base : Int}
       rw [Int.mul_add, Int.mul_one] at hhi
       omega
 
+/-- A store outside an array's region preserves it. -/
+theorem ArrayAt.store_away {m m' : mem} {chunk : memory_chunk} {b : block} {base : Int}
+    {vals : Nat → val} {n : Nat} (h : ArrayAt m chunk b base vals n)
+    {chunk' : memory_chunk} {b' : block} {ofs' : Z} {v : val}
+    (hst : Mem.store chunk' m b' ofs' v = some m')
+    (hfar : b ≠ b' ∨ intOfZ ofs' + csize chunk' ≤ base ∨ base + csize chunk * n ≤ intOfZ ofs') :
+    ArrayAt m' chunk b base vals n := by
+  refine ⟨h.base_nonneg, h.fits, fun i hi => ?_, fun i hi =>
+    Mem.store_valid_access_1 _ _ _ _ _ _ hst _ _ _ _ (h.writable i hi)⟩
+  rw [Mem.load_store_other _ _ _ _ _ _ hst _ _ _ ?_]
+  · exact h.load i hi
+  have hs := csize_pos chunk
+  rcases hfar with hb | hlo | hhi
+  · exact .inl hb
+  · right; right
+    change ZArith.BinInt.Z.le (ZArith.BinInt.Z.add _ _) _
+    simp only [Z_le_iff, intOfZ_add, elemOfs, intOfZ_zOfInt]
+    have := Int.mul_nonneg (Int.le_of_lt hs) (Int.natCast_nonneg i)
+    simp only [csize] at this hlo hs ⊢
+    omega
+  · right; left
+    change ZArith.BinInt.Z.le (ZArith.BinInt.Z.add _ _) _
+    simp only [Z_le_iff, intOfZ_add, elemOfs, intOfZ_zOfInt]
+    have : (i : Int) + 1 ≤ n := by omega
+    have := Int.mul_le_mul_of_nonneg_left this (Int.le_of_lt hs)
+    simp only [csize] at this hhi ⊢
+    rw [Int.mul_add, Int.mul_one] at this
+    omega
+
 /-- C's `p + i`, for `p` pointing at offset `base` and an `int` index `i`
 inside the array, is the address of element `i`. -/
 theorem addr_elem (ofs : Lib.Integers.ptrofs) (sz : Z) (chunk : memory_chunk)
