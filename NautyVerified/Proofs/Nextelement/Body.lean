@@ -193,4 +193,70 @@ theorem wp_loopBody {Q : Post} {b : block} {ofs : ptrofs} {n : Nat} {pos : Int}
     rw [show ((64 * w + r : Nat) : Int) = (w : Int) * 64 + (r : Int) by push_cast; omega] at this
     exact this
 
+/-- Initialisation of the scan establishes the invariant. -/
+theorem wp_initW {Q : Post} {le : temp_env} {m : mem} {b : block} {ofs : ptrofs} {n : Nat}
+    {pos : Int} {ws : Nat → Lib.Integers.int64}
+    (hset1 : PTree.get id.set1 le = some (.Vptr b ofs))
+    (hm : PTree.get id.m le = some (.Vint (ir n)))
+    (hpos : PTree.get id.pos le = some (.Vint (ir pos))) (hp1 : -1 ≤ pos) (hp2 : pos < 64 * n)
+    (hn1 : 1 ≤ n) (hn : 64 * n < 2147483648) (hw : WordsAt m b ofs ws n)
+    (hQ : ∀ k le', LoopInv b ofs n pos ws m k E0 empty_env le' m → Q.normal E0 empty_env le' m) :
+    Wp xi ge Source.dense.fn.nextelement initW Q empty_env le m := by
+  simp only [initW, sif]
+  wp_step; wp_step; wp_step
+  simp only [Exec.evalExpr, hpos, typeof, cop,
+    ir_lt (a := pos) (b := 0) ⟨by omega, by omega⟩ ⟨by decide, by decide⟩]
+  by_cases hneg : pos < 0
+  · rw [ite_eq_left (by simpa using hneg)]
+    have hp : pos = -1 := by omega
+    subst hp
+    wp_step; wp_step; wp_step
+    apply wp_set_eval
+    simp only [Exec.evalExpr, seqPost, Post.after, E0_append]
+    wp_step; wp_step
+    apply wp_set_eval
+    rw [eval_word (by simp (config := {decide := true}) only [temps_gso, hset1]) hw 0 (by omega)
+      (by omega) _ rfl rfl]
+    simp only [Post.after, E0_append]
+    apply hQ n
+    refine ⟨rfl, rfl, rfl, ?_, ?_, 0, ws 0, ?_, temps_gss _ _ _, by omega, good_start_neg, by omega⟩
+    · simp (config := {decide := true}) only [temps_gso, hset1]
+    · simp (config := {decide := true}) only [temps_gso, hm]
+    · simp (config := {decide := true}) only [temps_gso, temps_gss]
+  · rw [ite_eq_right (by simpa using hneg)]
+    have hpi : InInt pos := ⟨by omega, by omega⟩
+    have h6 : Lib.Integers.Int.ltu (ir 6) Lib.Integers.Int.iwordsize = true := by decide
+    wp_step; wp_step; wp_step
+    apply wp_set_eval
+    simp only [Exec.evalExpr, hpos, typeof, cop, h6, ite_true, ir_shr6 hpi]
+    simp only [seqPost, Post.after, E0_append]
+    wp_step; wp_step
+    apply wp_set_eval
+    have hq : (pos / 64).toNat < n := by omega
+    have hidx : Exec.evalExpr ge empty_env (PTree.set id.w (.Vint (ir (pos / 64))) le) m
+        (.Etempvar id.w tint) = some (.Vint (ir ((pos / 64).toNat : Int))) := by
+      simp only [Exec.evalExpr, temps_gss]
+      congr 3; omega
+    have hmask : Exec.evalExpr ge empty_env (PTree.set id.w (.Vint (ir (pos / 64))) le) m
+        (.Ebinop .Oand (.Etempvar id.pos tint) (ci 63 tint) tint) =
+          some (.Vint (ir ((pos % 64).toNat : Int))) := by
+      simp (config := {decide := true}) only [Exec.evalExpr, temps_gso, hpos, typeof, cop,
+        ir_and63 (a := pos) (by omega) (by omega)]
+      congr 3; omega
+    obtain ⟨xm, hxm, hbv⟩ := eval_bitmask _ (pos % 64).toNat (by omega) hmask rfl
+    rw [Exec.evalExpr, eval_word (by simp (config := {decide := true}) only [temps_gso, hset1])
+      hw (pos / 64).toNat hq (by omega) _ hidx rfl, hxm]
+    simp only [typeof, cop]
+    apply hQ (n - (pos / 64).toNat)
+    refine ⟨rfl, rfl, rfl, ?_, ?_, (pos / 64).toNat, _, ?_, temps_gss _ _ _, hq, ?_, rfl⟩
+    · simp (config := {decide := true}) only [temps_gso, hset1]
+    · simp (config := {decide := true}) only [temps_gso, hm]
+    · simp (config := {decide := true}) only [temps_gso, temps_gss]
+      congr 3; omega
+    · have hg := good_start (ws := fun i => bv64 (ws i)) (n := n) pos.toNat
+      rw [show pos.toNat / 64 = (pos / 64).toNat by omega,
+        show pos.toNat % 64 = (pos % 64).toNat by omega,
+        show ((pos.toNat : Nat) : Int) = pos by omega] at hg
+      simpa [bv64_and, hbv] using hg
+
 end NautyVerified.Proofs.Nextelement

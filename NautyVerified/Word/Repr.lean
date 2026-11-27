@@ -72,6 +72,9 @@ theorem ir_shr {a : _root_.Int} (s : Nat) (ha : InInt a) (hs : s < 32) :
   rw [bv32_shr, toInt_ir ha, toNat_ir (by omega) (by omega), bv32_ir]
   simp
 
+theorem ir_shr6 {a : _root_.Int} (ha : InInt a) :
+    Lib.Integers.Int.shr (ir a) (ir 6) = ir (a / 64) := ir_shr 6 ha (by decide)
+
 theorem ir_shl6 {a : _root_.Int} (h0 : 0 ≤ a) (ha : a < 4294967296) :
     Lib.Integers.Int.shl (ir a) (ir 6) = ir (a * 64) := by
   apply bv32_inj.1
