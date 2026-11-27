@@ -115,6 +115,7 @@ structure Ok (n : Nat) (L : Loc) : Prop where
   capW : n ≤ L.capW
   capS : L.M ≤ L.capS
   capB : n + 2 ≤ L.capB
+  nlt : n < 1073741824
 
 /-- Memory holds the refinement state `st`, with the `active` words `aw`. -/
 structure Mem {n : Nat} (m : mem) (L : Loc) (ctx : Ctx n) (st : RefineSt n)
