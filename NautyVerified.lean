@@ -88,6 +88,7 @@ import NautyVerified.Proofs.Search.Frame
 import NautyVerified.Proofs.Harness.Spec
 import NautyVerified.Proofs.Search.Node.Firstpathnode
 import NautyVerified.Proofs.Search.Node.Othernode
+import NautyVerified.Proofs.Search.Node.Env
 import NautyVerified.Proofs.Refine.Frame
 import NautyVerified.Proofs.Refine.Trivial
 import NautyVerified.Proofs.Refine.Pop
