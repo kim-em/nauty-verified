@@ -1,5 +1,7 @@
 import NautyVerified.Proofs.Search.Node.Steps
 import NautyVerified.Proofs.Search.Node.Compare
+import NautyVerified.Proofs.Search.Node.Fields
+import NautyVerified.Proofs.Cheapautom.Satisfies
 
 /-!
 # More straight-line steps of `othernode0`
@@ -171,5 +173,85 @@ theorem wp_tcReset {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
       { h.arrays with } { h.stats with } ?_
     obtain ⟨s1, s2, s3, s4, -, s6⟩ := h.inv.scalars
     exact { h.inv with scalars := ⟨s1, s2, s3, s4, show level - 1 < 2147483648 by omega, s6⟩ }
+
+/-- `t713 = (*dispatch.cheapautom)(ptn, level, digraph, n); if (!t713) noncheaplevel = level + 1;`:
+HexGraphIso's `cheapCheck false`. -/
+theorem wp_cheap {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {S : SLoc}
+    {ctx : Ctx n} {st : Search n} {pre nsp : Bool} {level : Nat} (h : SearchAt m S ctx st pre nsp)
+    (hE1 : PTree.get dense.id.«nauty:dispatch» e = none)
+    (hE2 : PTree.get dense.id.«nauty:digraph» e = none)
+    (hE3 : PTree.get dense.id.«nauty:n» e = none)
+    (hE4 : PTree.get dense.id.«nauty:noncheaplevel» e = none)
+    (hptn : PTree.get dense.id.ptn le = some (.Vptr S.bp S.pofs))
+    (hlev : PTree.get dense.id.level le = some (.Vint (ir level))) (h1 : 1 ≤ level) (hn : level ≤ n)
+    (hQ : ∀ le' m', SearchAt m' S ctx (cheapCheck false level st) pre nsp →
+      Unch m m' (· ∈ [Block.noncheaplevel]) → (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
+      (∀ x, x ≠ idOf 713 → PTree.get x le' = PTree.get x le) → Q.normal E0 e le' m') :
+    Wp xi ge f (.Ssequence (sk (.Scall (some (idOf 713))
+      (.Ederef (.Efield (.Evar dense.id.«nauty:dispatch» (Cfrontend.Ctypes.Tstruct dense.id.«_1027» Cfrontend.Ctypes.noattr))
+        dense.id.«cheapautom» (tptr (tfun [tptr tint, tint, tint, tint] tint)))
+        (tfun [tptr tint, tint, tint, tint] tint))
+      [.Etempvar dense.id.ptn (tptr tint), tv dense.id.level, .Evar dense.id.«nauty:digraph» tint,
+       .Evar dense.id.«nauty:n» tint])) Othernode.cheap) Q e le m := by
+  have hnl := h.nlt
+  have hI := h.inv
+  wp_step; wp_step; wp_step
+  refine wp_call (vf := .Vptr Block.cheapautomFn Ptrofs.zero) (targs := [tptr tint, tint, tint, tint])
+    (tres := tint) (cc := Common.AST.cc_default) (.Internal dense.fn.cheapautom) _
+    (Cheapautom.cheapautom_satisfies S.bp S.pofs st.ptn level n) ?_ ?_ ?_
+    (by simp [Common.Globalenvs.Genv.find_funct, funct_cheapautomFn]) rfl
+    ⟨rfl, h.arrays.ptn, hI.ptnSize, fun x hx => by
+        rcases hI.ptnVals x hx with hv | hv
+        · omega
+        · rw [hv]; decide,
+      by have := hI.ptnLast; omega, hnl, by omega⟩ ?_
+  · rfl
+  · simp only [Exec.evalExpr, Exec.evalLvalue, Exec.lvalOfVar, hE1, find_dispatch, typeof,
+      Exec.derefLoc, Cfrontend.Ctypes.access_mode, field_dCheapautom, Mem.loadv, Alloc.Mptr_eq]
+    rw [show Ptrofs.unsigned (Ptrofs.add Ptrofs.zero (Ptrofs.repr (zOfInt 40))) = zOfInt 40 from rfl,
+      h.fixed.dCheapautom.load]
+  · simp only [Exec.evalExprlist, Exec.evalExpr, hptn, hlev, tv, Exec.lvalOfVar, hE2, hE3,
+      find_digraph, find_n, Exec.derefLoc, Cfrontend.Ctypes.access_mode, Mem.loadv,
+      show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl, h.fixed.digraph.load, h.fixed.nn.load,
+      typeof, cop]
+  rintro t v m'' ⟨rfl, hmm, rfl⟩
+  rw [hmm]
+  simp only [set_opttemp, seqPost, Post.after, E0_append]
+  simp only [Othernode.cheap, sk]
+  apply wp_if_eval
+  simp only [Exec.evalExpr, temps_gss, tv, typeof, cop]
+  by_cases hc : Hex.GraphIso.Nauty.cheapautom st.ptn level n = true
+  · simp only [hc, ite_true]
+    rw [ite_eq_right (by decide)]
+    apply wp_skip
+    have : cheapCheck false level st = st := by unfold cheapCheck; simp [hc]
+    exact hQ _ m (by rw [this]; exact h) (Unch.refl _ _) (fun _ h => h)
+      fun x hx => temps_gso _ _ hx
+  · simp only [hc, Bool.false_eq_true, ite_false]
+    rw [ite_eq_left (by decide)]
+    wp_step; wp_step
+    refine wp_gint hE4 find_noncheaplevel h.scalars.noncheaplevel.writable
+      (x := (level : Int) + 1)
+      (by rw [show Exec.evalExpr ge e (PTree.set (idOf 713) (.Vint (ir 0)) le) m
+          (.Ebinop .Oadd (tv dense.id.level) (ci 1 tint) tint) = some (.Vint (ir ((level : Int) + 1))) by
+            simp only [Exec.evalExpr, tv]; rw [temps_gso _ _ (by decide), hlev]; simp [typeof, cop]]) rfl ?_
+    intro m' iNC hu hv
+    have hU : Unch m m' (· ∈ [Block.noncheaplevel]) := hu.mono fun z hz => by simp [hz]
+    have hcc : cheapCheck false level st = { st with noncheaplevel := level + 1 } := by
+      unfold cheapCheck; simp [hc]
+    refine hQ _ m' ?_ hU hv fun x hx => temps_gso _ _ hx
+    rw [hcc]
+    have sc := h.scalars
+    refine h.setScalars hU (fun z hz => by simp at hz; subst hz; decide)
+      ⟨sc.gcaFirst.unch hU (by decide), sc.gcaCanon.unch hU (by decide),
+        show IntAt m' Block.noncheaplevel (((level + 1 : Nat)) : Int) by push_cast; exact iNC,
+        sc.allsamelevel.unch hU (by decide), sc.eqlevFirst.unch hU (by decide),
+        sc.eqlevCanon.unch hU (by decide), sc.compCanon.unch hU (by decide),
+        sc.samerows.unch hU (by decide), sc.canonlevel.unch hU (by decide),
+        sc.stabvertex.unch hU (by decide), sc.cosetindex.unch hU (by decide),
+        sc.needshortprune.unch hU (by decide)⟩
+      { h.arrays with } { h.stats with } ?_
+    obtain ⟨s1, s2, -, s4⟩ := h.inv.scalars
+    exact { h.inv with scalars := ⟨s1, s2, show level + 1 < 2147483648 by omega, s4⟩ }
 
 end NautyVerified.Proofs.Search
