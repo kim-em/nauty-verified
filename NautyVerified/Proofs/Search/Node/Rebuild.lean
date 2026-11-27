@@ -39,8 +39,7 @@ theorem SLoc.wr_sub (S : SLoc) : ∀ z ∈ S.wr, z ∈ S.blocks := by
 
 /-- The blocks of `S` that are not globals. -/
 def SLoc.vars (S : SLoc) : List block :=
-  [S.bg, S.bl, S.bp, S.bo, S.bst, S.bc, S.bws, S.bA, S.bF, S.bWP, S.bFL, S.bCL, S.bFC, S.bCC,
-   S.bTC, S.bUA]
+  [S.bg, S.bl, S.bp, S.bo, S.bst, S.bc, S.bws, S.bA, S.bF, S.bWP, S.bFL, S.bCL, S.bFC, S.bCC, S.bTC, S.bUA]
 
 theorem SLoc.wrV_sub (S : SLoc) : ∀ y ∈ S.wrV, y ∈ S.vars := by
   intro y hy
@@ -65,7 +64,8 @@ def globs : List block :=
    Block.naugraphWorkperm, Block.naugraphWorkpermSz, Block.naugraphWorkset,
    Block.naugraphWorksetSz, Block.naugraphBucket, Block.naugraphBucketSz, Block.nautilWorkperm,
    Block.nautilWorkpermSz, Program.Block.nautyBit, Block.naugraphBit, Block.nautilBit,
-   Block.naugraphBytecount, Block.leftbit]
+   Block.naugraphBytecount, Block.leftbit, Block.mininvarlevel, Block.maxinvarlevel,
+   Block.invararg]
 
 theorem SLoc.blocks_split (S : SLoc) : S.blocks = S.vars ++ globs := rfl
 
@@ -75,14 +75,14 @@ theorem SLoc.vars_ne {S : SLoc} (hd : S.blocks.Pairwise (· ≠ ·)) :
   rw [SLoc.blocks_split, List.pairwise_append] at hd
   exact hd.2.2
 
-/-- `¬ z ∈ L` for a global `z` and `L` within `S.wr`. -/
-macro "not_wr " hL:ident hv:ident : tactic =>
-  `(tactic| (
-    intro hzL
-    have hw := $hL _ hzL
-    rcases List.mem_append.1 hw with h | h
-    · exact absurd h (by decide)
-    · exact $hv _ (SLoc.wrV_sub _ _ h) _ (by decide) rfl))
+/-- Globals not written directly are outside any `L` within `S.wr`. -/
+theorem not_wr_all {S : SLoc} {L : List block} (hv : ∀ a ∈ S.vars, ∀ b ∈ globs, a ≠ b)
+    (hL : ∀ z ∈ L, z ∈ S.wr) {l : List block} (h1 : ∀ z ∈ l, z ∉ wrG) (h2 : ∀ z ∈ l, z ∈ globs) :
+    ∀ z ∈ l, ¬ z ∈ L := by
+  intro z hz hzL
+  rcases List.mem_append.1 (hL z hzL) with h | h
+  · exact h1 z hz h
+  · exact hv _ (SLoc.wrV_sub _ _ h) _ (h2 z hz) rfl
 
 theorem SearchAt.rebuild {n : Nat} {m m' : mem} {S : SLoc} {ctx : Ctx n} {st st' : Search n}
     {pre nsp pre' nsp' : Bool} (h : SearchAt m S ctx st pre nsp) {L : List block}
@@ -101,11 +101,7 @@ theorem SearchAt.rebuild {n : Nat} {m m' : mem} {S : SLoc} {ctx : Ctx n} {st st'
         Program.Block.nautyCanonlab, Program.Block.nautyCanonlabSz, Program.Block.nautyFirstcode,
         Program.Block.nautyFirstcodeSz, Program.Block.nautyCanoncode,
         Program.Block.nautyCanoncodeSz, Program.Block.nautyFirsttc, Program.Block.nautyFirsttcSz],
-        ¬ z ∈ L := by
-      intro z hz
-      simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
-      rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
-        rfl | rfl | rfl <;> not_wr hL hv
+        ¬ z ∈ L := not_wr_all hv hL (by decide) (by decide)
     simp only [List.forall_mem_cons] at hg hK
     obtain ⟨g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, g11, g12, g13, g14, g15, g16, -⟩ := hg
     obtain ⟨k1, k2, k3, k4, k5, k6, k7, k8, -⟩ := hK
@@ -120,21 +116,14 @@ theorem SearchAt.rebuild {n : Nat} {m m' : mem} {S : SLoc} {ctx : Ctx n} {st st'
       firsttc := hD.firsttc.keep hu g15 g16 fun _ => k8 }
   exact
     { h with
-      fixed := h.fixed.unch hu fun z hz => by
-        simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
-        rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
-          rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> not_wr hL hv
+      fixed := h.fixed.unch hu (not_wr_all hv hL (by decide) (by decide))
       scalars := hsc
       stats := hst
       arrays := har
       dyns := hdy
-      work := h.work.unch hu (fun z hz => by
-          simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
-          rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> not_wr hL hv)
+      work := h.work.unch hu (not_wr_all hv hL (by decide) (by decide))
         fun z hz hzL => h.work_not hz (SLoc.wr_sub S z (hL z hzL))
-      tables := h.tables.unch hu fun z hz => by
-        simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
-        rcases hz with rfl | rfl | rfl | rfl | rfl <;> not_wr hL hv
+      tables := h.tables.unch hu (not_wr_all hv hL (by decide) (by decide))
       inv := hinv }
 
 end NautyVerified.Proofs.Search
