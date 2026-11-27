@@ -19,6 +19,8 @@ abbrev ge : genv := globalenv dense.locals
 namespace Block
 def nextelement : Common.Values.block := PArith.BinPos.Pos.of_nat 13
 def leftbit : Common.Values.block := PArith.BinPos.Pos.of_nat 284
+/-- nautil.c's static `bit[64]`. -/
+def nautilBit : Common.Values.block := PArith.BinPos.Pos.of_nat 215
 end Block
 
 kernel_rfl find_nextelement :
@@ -26,6 +28,9 @@ kernel_rfl find_nextelement :
 
 kernel_rfl find_leftbit :
   Genv.find_symbol ge.genv_genv dense.id.«nautil:leftbit» = some Block.leftbit
+
+kernel_rfl find_nautilBit :
+  Genv.find_symbol ge.genv_genv dense.id.«nautil:bit» = some Block.nautilBit
 
 kernel_rfl funct_nextelement :
   Genv.find_funct_ptr ge.genv_genv Block.nextelement = some (.Internal dense.fn.nextelement)
