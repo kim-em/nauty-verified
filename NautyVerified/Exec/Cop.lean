@@ -143,6 +143,29 @@ variable (x : Lib.Integers.int) (y : Lib.Integers.int64)
 
 end Cast
 
+section PtrCmp
+variable (b1 b2 : block) (o1 o2 : ptrofs) (t1 t2 : type) (n : Lib.Integers.int)
+
+@[simp, cop] theorem sub_pi : sem_binary_operation ce .Osub (.Vptr b1 o1) (Tpointer t1 a)
+    (.Vint n) (Tint .I32 .Signed b) m =
+      some (.Vptr b1 (Ptrofs.sub o1 (Ptrofs.mul (Ptrofs.repr (sizeof ce t1)) (Ptrofs.of_ints n)))) :=
+  rfl
+
+@[simp, cop] theorem gt_pp : sem_binary_operation ce .Ogt (.Vptr b1 o1) (Tpointer t1 a)
+    (.Vptr b2 o2) (Tpointer t2 b) m =
+      (CompCert4Lean.Common.Values.Val.cmplu_bool (Mem.valid_pointer m) .Cgt
+        (.Vptr b1 o1) (.Vptr b2 o2)).map Val.of_bool := rfl
+
+@[simp, cop] theorem lt_pp : sem_binary_operation ce .Olt (.Vptr b1 o1) (Tpointer t1 a)
+    (.Vptr b2 o2) (Tpointer t2 b) m =
+      (CompCert4Lean.Common.Values.Val.cmplu_bool (Mem.valid_pointer m) .Clt
+        (.Vptr b1 o1) (.Vptr b2 o2)).map Val.of_bool := rfl
+
+@[simp, cop] theorem cast_pp (t : type) : sem_cast (.Vptr b1 o1) (Tpointer t1 a) (Tpointer t b) m =
+    some (.Vptr b1 o1) := rfl
+
+end PtrCmp
+
 @[simp, cop] theorem neg_i (x : Lib.Integers.int) :
     sem_unary_operation .Oneg (.Vint x) (Tint .I32 .Signed a) m = some (.Vint (Lib.Integers.Int.neg x)) :=
   rfl

@@ -21,3 +21,4 @@ import NautyVerified.Logic.Array
 import NautyVerified.Proofs.Orbjoin.Chase
 import NautyVerified.Proofs.Orbjoin.Join
 import NautyVerified.Proofs.Orbjoin.Satisfies
+import NautyVerified.Logic.Pointer
