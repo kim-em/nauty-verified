@@ -1,3 +1,4 @@
+import NautyVerified.Proofs.Alloc.KeepV
 import NautyVerified.Proofs.Fmptn.Scan
 
 /-!
@@ -66,7 +67,7 @@ theorem wp_single {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} 
     (hQ : ∀ m', Frame m' le bl lofs bp pofs lab ptn n level →
       Sets m' le bf fofs bm mofs n M (addW wf lab[c]!) (addW wm lab[c]!)
         (fx.insert lab[c]!) (mc.insert lab[c]!) →
-      Unch m m' (fun b => b = bf ∨ b = bm) → Q.normal E0 e le m') :
+      Unch m m' (fun b => b = bf ∨ b = bm) → Alloc.KeepA m m' → Q.normal E0 e le m') :
     Wp xi ge f single Q e le m := by
   have hlc := h.lsmall c hc
   have hn := h.nlt
@@ -75,16 +76,18 @@ theorem wp_single {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} 
       Exec.evalExpr ge e le m' (at_ id.lab (tv id.i)) = some (.Vint (ir (lab[c]! : Int))) :=
     fun m' hf => eval_at hf.larr hf.nlt id.lab hf.hlab (tv id.i) c hc hi rfl
   wp_step
-  refine Set.wp_addElement hs.farr hs.Mlt hs.hfix (hev m h) rfl (by omega) (by omega) hs.bit he ?_
-  intro m1 harr1 hu1
+  refine Set.wp_addElement' hs.farr hs.Mlt hs.hfix (hev m h) rfl (by omega) (by omega) hs.bit he ?_
+  intro m1 harr1 hu1 hO1
   have hf1 := h.unch hu1 (Ne.symm hd.fl) (Ne.symm hd.fp)
-  refine Set.wp_addElement (hs.marr.unch hu1 (Ne.symm hd.fm)) hs.Mlt hs.hmcr (hev m1 hf1) rfl
+  refine Set.wp_addElement' (hs.marr.unch hu1 (Ne.symm hd.fm)) hs.Mlt hs.hmcr (hev m1 hf1) rfl
     (by omega) (by omega) (hs.bit.unch hu1 hd.bf) he ?_
-  intro m2 harr2 hu2
+  intro m2 harr2 hu2 hO2
   apply hQ m2 (hf1.unch hu2 (Ne.symm hd.ml) (Ne.symm hd.mp))
     ⟨hs.hfix, hs.hmcr, harr1.unch hu2 hd.fm, harr2, Set.setRep_add hs.frep hlc,
       Set.setRep_add hs.mrep hlc, (hs.bit.unch hu1 hd.bf).unch hu2 hd.bm, hs.Mlt, hs.nM⟩
-  exact (hu1.mono fun b hb => .inl hb).trans (hu2.mono fun b hb => .inr hb)
+  · exact (hu1.mono fun b hb => .inl hb).trans (hu2.mono fun b hb => .inr hb)
+  · exact (Alloc.KeepA.of_outside hu1 hO1 hs.farr.base_nonneg).trans
+      (Alloc.KeepA.of_outside hu2 hO2 (hs.marr.unch hu1 (Ne.symm hd.fm)).base_nonneg)
 
 theorem wp_cell {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {bl : block}
     {lofs : ptrofs} {bp : block} {pofs : ptrofs} {bf : block} {fofs : ptrofs} {bm : block}
@@ -98,7 +101,7 @@ theorem wp_cell {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {b
       Frame m' le' bl lofs bp pofs lab ptn n level →
       Sets m' le' bf fofs bm mofs n M wf (addW wm (scanMin lab (List.range' (c + 1) (c2 - c)) lab[c]!))
         fx (mc.insert (scanMin lab (List.range' (c + 1) (c2 - c)) lab[c]!)) →
-      Unch m m' (fun b => b = bf ∨ b = bm) →
+      Unch m m' (fun b => b = bf ∨ b = bm) → Alloc.KeepA m m' →
       (∀ k, k ≠ id.i → k ≠ id.lmin → k ≠ id.t3 → PTree.get k le' = PTree.get k le) →
       Q.normal E0 e le' m') :
     Wp xi ge f cell Q e le m := by
@@ -122,11 +125,12 @@ theorem wp_cell {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {b
     h.temps fun k h1 h2 h3 _ _ _ _ => by rw [ho2 k h1 h2 h3, ho1 k h2]
   have hsm := scanMin_lt (lab := lab) (B := n) (List.range' (c + 1) (c2 - c)) lab[c]!
     (fun x hx => h.lsmall x (by simp [List.mem_range'] at hx; omega)) (h.lsmall c (by omega))
-  refine Set.wp_addElement hs2.marr hs2.Mlt hs2.hmcr hl2 rfl (by omega) (by omega) hs2.bit he ?_
-  intro m3 harr3 hu3
+  refine Set.wp_addElement' hs2.marr hs2.Mlt hs2.hmcr hl2 rfl (by omega) (by omega) hs2.bit he ?_
+  intro m3 harr3 hu3 hO3
   refine hQ le2 m3 hi2 (hf2.unch hu3 (Ne.symm hd.ml) (Ne.symm hd.mp))
     ⟨hs2.hfix, hs2.hmcr, hs2.farr.unch hu3 hd.fm, harr3, hs2.frep, Set.setRep_add hs2.mrep hsm,
-      hs2.bit.unch hu3 hd.bm, hs2.Mlt, hs2.nM⟩ (hu3.mono fun b hb => .inr hb) ?_
+      hs2.bit.unch hu3 hd.bm, hs2.Mlt, hs2.nM⟩ (hu3.mono fun b hb => .inr hb)
+    (Alloc.KeepA.of_outside hu3 hO3 hs2.marr.base_nonneg) ?_
   intro k h1 h2 h3
   rw [ho2 k h1 h2 h3, ho1 k h2]
 
@@ -139,7 +143,7 @@ theorem wp_loop_fmptn {f : function} {Q : Post} {e : env} {le : temp_env} {m : m
     (hlast : ptn[n - 1]! ≤ level) (hi : PTree.get id.i le = some (.Vint (ir 0)))
     (hQ : ∀ le' m' wf' wm', Frame m' le' bl lofs bp pofs lab ptn n level →
       Sets m' le' bf fofs bm mofs n M wf' wm' (fmptn lab ptn level n).1 (fmptn lab ptn level n).2 →
-      Unch m m' (fun b => b = bf ∨ b = bm) →
+      Unch m m' (fun b => b = bf ∨ b = bm) → Alloc.KeepA m m' →
       (∀ k, k ≠ id.i → k ≠ id.lmin → k ≠ id.t3 → PTree.get k le' = PTree.get k le) →
       Q.normal E0 e le' m') :
     Wp xi ge f loop Q e le m := by
@@ -152,16 +156,18 @@ theorem wp_loop_fmptn {f : function} {Q : Post} {e : env} {le : temp_env} {m : m
     (I := fun v t e' le' m' => t = E0 ∧ e = e' ∧ ∃ c wf wm fx mc F, c ≤ n ∧ v = n - c ∧
       n - c ≤ F ∧ (cells.go ptn level n F c).foldl (cellStep lab) (fx, mc) = R ∧
       PTree.get id.i le' = some (.Vint (ir c)) ∧ Frame m' le' bl lofs bp pofs lab ptn n level ∧
-      Sets m' le' bf fofs bm mofs n M wf wm fx mc ∧ Unch m m' (fun b => b = bf ∨ b = bm) ∧ Oth le')
+      Sets m' le' bf fofs bm mofs n M wf wm fx mc ∧ Unch m m' (fun b => b = bf ∨ b = bm) ∧
+      Alloc.KeepA m m' ∧ Oth le')
     (J := fun v t e' le' m' => t = E0 ∧ e = e' ∧ ∃ c c2 wf wm fx mc F, c ≤ c2 ∧ c2 < n ∧
       v = n - c ∧ n - (c2 + 1) ≤ F ∧
       (cells.go ptn level n F (c2 + 1)).foldl (cellStep lab) (fx, mc) = R ∧
       PTree.get id.i le' = some (.Vint (ir c2)) ∧ Frame m' le' bl lofs bp pofs lab ptn n level ∧
-      Sets m' le' bf fofs bm mofs n M wf wm fx mc ∧ Unch m m' (fun b => b = bf ∨ b = bm) ∧ Oth le')
+      Sets m' le' bf fofs bm mofs n M wf wm fx mc ∧ Unch m m' (fun b => b = bf ∨ b = bm) ∧
+      Alloc.KeepA m m' ∧ Oth le')
     ?_ ?_ (n := n - 0)
     ⟨rfl, rfl, 0, wf, wm, _, _, n, Nat.zero_le _, rfl, by omega, rfl, hi, h, hs, Unch.refl _ _,
-      fun _ _ _ _ => rfl⟩
-  · rintro v t e' le' m' ⟨rfl, rfl, c, wf, wm, fx, mc, F, hcn, rfl, hF, hfold, hic, hf, hs', hu, ho⟩
+      Alloc.KeepA.refl _, fun _ _ _ _ => rfl⟩
+  · rintro v t e' le' m' ⟨rfl, rfl, c, wf, wm, fx, mc, F, hcn, rfl, hF, hfold, hic, hf, hs', hu, hk, ho⟩
     wp_step; wp_step; wp_step
     apply wp_if_eval
     rw [Exec.evalExpr, show Exec.evalExpr ge e le' m' (tv id.i) = _ from hic,
@@ -191,9 +197,9 @@ theorem wp_loop_fmptn {f : function} {Q : Post} {e : env} {le : temp_env} {m : m
         rw [hce] at hfold
         simp only [cellStep, beq_self_eq_true, ite_true] at hfold
         refine wp_single hf hs' hd he hc hic ?_
-        intro m2 hf2 hs2 hu2
+        intro m2 hf2 hs2 hu2 hk2
         exact ⟨by simp, rfl, c, c, _, _, _, _, F, Nat.le_refl _, hc, rfl, by omega, hfold, hic, hf2,
-          hs2, hu.trans hu2, ho⟩
+          hs2, hu.trans hu2, hk.trans hk2, ho⟩
       · rw [ite_eq_right (by simp; omega)]
         have hce : c < cellEnd ptn level c := by
           rcases Nat.lt_or_ge c (cellEnd ptn level c) with hlt | hge
@@ -204,9 +210,9 @@ theorem wp_loop_fmptn {f : function} {Q : Post} {e : env} {le : temp_env} {m : m
         have hne : (c == cellEnd ptn level c) = false := by simp; omega
         simp only [cellStep, hne] at hfold
         refine wp_cell hf hs' hd he hce hsp.2.1 hsp.2.2.1 hsp.2.2.2 hic ?_
-        intro le2 m3 hi2 hf2 hs2 hu3 ho2
+        intro le2 m3 hi2 hf2 hs2 hu3 hk3 ho2
         exact ⟨by simp, rfl, c, cellEnd ptn level c, _, _, _, _, F, Nat.le_of_lt hce, hsp.2.1, rfl, by omega,
-          hfold, hi2, hf2, hs2, hu.trans hu3, fun k h1 h2 h3 => by rw [ho2 k h1 h2 h3, ho k h1 h2 h3]⟩
+          hfold, hi2, hf2, hs2, hu.trans hu3, hk.trans hk3, fun k h1 h2 h3 => by rw [ho2 k h1 h2 h3, ho k h1 h2 h3]⟩
     · rw [ite_eq_right (by simpa using hc)]
       apply wp_break
       have hcn' : c = n := by omega
@@ -214,10 +220,10 @@ theorem wp_loop_fmptn {f : function} {Q : Post} {e : env} {le : temp_env} {m : m
       rw [cells_go_ge _ _ _ _ _ hc, List.foldl_nil] at hfold
       have h1 : (fmptn lab ptn level c).1 = fx := by rw [hR, ← hfold]
       have h2 : (fmptn lab ptn level c).2 = mc := by rw [hR, ← hfold]
-      have := hQ le' m' wf wm hf (by rw [h1, h2]; exact hs') hu ho
+      have := hQ le' m' wf wm hf (by rw [h1, h2]; exact hs') hu hk ho
       simpa using this
   · rintro v t e' le' m' ⟨rfl, rfl, c, c2, wf, wm, fx, mc, F, hcc, hc2, rfl, hF, hfold, hic, hf, hs',
-      hu, ho⟩
+      hu, hk, ho⟩
     wp_step; wp_step
     apply wp_set_eval
     rw [Exec.evalExpr, show Exec.evalExpr ge e le' m' (tv id.i) = _ from hic]
@@ -226,6 +232,6 @@ theorem wp_loop_fmptn {f : function} {Q : Post} {e : env} {le : temp_env} {m : m
         PTree.get k le' := fun k hk => temps_gso _ _ hk
     refine ⟨n - (c2 + 1), by omega, by simp, trivial, c2 + 1, wf, wm, fx, mc, F, by omega, rfl, hF,
       hfold, by rw [temps_gss]; rfl, hf.temps fun k h1 _ _ _ _ _ _ => hoth k h1,
-      hs'.temps fun k h1 _ _ _ _ _ _ => hoth k h1, hu, fun k h1 h2 h3 => by rw [hoth k h1, ho k h1 h2 h3]⟩
+      hs'.temps fun k h1 _ _ _ _ _ _ => hoth k h1, hu, hk, fun k h1 h2 h3 => by rw [hoth k h1, ho k h1 h2 h3]⟩
 
 end NautyVerified.Proofs.Fmptn

@@ -40,7 +40,7 @@ def fmptnSpec (bl : block) (lofs : ptrofs) (bp : block) (pofs : ptrofs) (bf : bl
     ArrayAt m' .Mint64 bm (intOfZ (Ptrofs.unsigned mofs)) (longs wm') M ∧
     SetRep (fun w => bv64 (wf' w)) M (fmptn lab ptn level n).1 ∧
     SetRep (fun w => bv64 (wm' w)) M (fmptn lab ptn level n).2 ∧
-    Unch m m' (fun b => b = bf ∨ b = bm)
+    Unch m m' (fun b => b = bf ∨ b = bm) ∧ Alloc.KeepA m m'
 
 /-- The temporaries on entry. -/
 def entryTemps (bl : block) (lofs : ptrofs) (bp : block) (pofs : ptrofs) (bf : block)
@@ -70,17 +70,18 @@ theorem fmptn_satisfies {xi : ExternalCalls} (bl : block) (lofs : ptrofs) (bp : 
     rw [Source.dense.fn.fmptn.fn_body_eq, body_eq]
     simp only [body]
     wp_step
-    refine Set.wp_emptySet (by decide) (by decide) (by decide) hfarr hM hM2
+    refine Set.wp_emptySet' (vals := Set.longs wf) (by decide) (by decide) (by decide) hfarr hM hM2
       (by simp (config := {decide := true}) only [entryTemps, temps_gso, temps_gss])
       (by simp (config := {decide := true}) only [entryTemps, temps_gso, temps_gss]) ?_
-    intro le1 m1 harr1 hu1 ho1
+    intro le1 m1 harr1 hu1 hO1 ho1
     wp_step
-    refine Set.wp_emptySet (by decide) (by decide) (by decide) (hmarr.unch hu1 (Ne.symm hd.fm)) hM hM2
+    refine Set.wp_emptySet' (vals := Set.longs wm) (by decide) (by decide) (by decide)
+      (hmarr.unch hu1 (Ne.symm hd.fm)) hM hM2
       (by rw [ho1 _ (by decide) (by decide)]
           simp (config := {decide := true}) only [entryTemps, temps_gso, temps_gss])
       (by rw [ho1 _ (by decide) (by decide)]
           simp (config := {decide := true}) only [entryTemps, temps_gso, temps_gss]) ?_
-    intro le2 m2 harr2 hu2 ho2
+    intro le2 m2 harr2 hu2 hO2 ho2
     wp_step; wp_step; wp_step; wp_step
     let le3 := PTree.set id.i (.Vint (ir 0)) le2
     have hT : ∀ k, k ≠ id.i → k ≠ id.es → k ≠ id.t1 → k ≠ id.es1 → k ≠ id.t2 →
@@ -111,8 +112,10 @@ theorem fmptn_satisfies {xi : ExternalCalls} (bl : block) (lofs : ptrofs) (bp : 
         bit := (hbit.unch hu1 hd.bf).unch hu2 hd.bm
         Mlt := hM2, nM := hnM }
     refine wp_loop_fmptn hf hs hd rfl hps hlast (temps_gss _ _ _) ?_
-    intro le' m' wf' wm' hf' hs' hu' ho'
+    intro le' m' wf' wm' hf' hs' hu' hk' ho'
     exact ⟨m', Nextelement.free_empty m', rfl, wf', wm', hs'.farr, hs'.marr, hs'.frep, hs'.mrep,
-      ((hu1.mono fun b hb => .inl hb).trans (hu2.mono fun b hb => .inr hb)).trans hu'⟩
+      ((hu1.mono fun b hb => .inl hb).trans (hu2.mono fun b hb => .inr hb)).trans hu',
+      ((Alloc.KeepA.of_outside hu1 hO1 hfarr.base_nonneg).trans (Alloc.KeepA.of_outside hu2 hO2
+        (hmarr.unch hu1 (Ne.symm hd.fm)).base_nonneg)).trans hk'⟩
 
 end NautyVerified.Proofs.Fmptn
