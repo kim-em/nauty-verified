@@ -17,3 +17,4 @@ import NautyVerified.Proofs.Nextelement.Body
 import NautyVerified.Proofs.Nextelement.Satisfies
 import NautyVerified.Statement.Dense
 import NautyVerified.Statement.Compiler
+import NautyVerified.Logic.Array
