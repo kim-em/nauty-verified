@@ -360,6 +360,21 @@ Conventions settled while doing these:
   for `n + 2`) and `firsttc` (zero-filled by the allocator, `-1` in Hex); both
   are absorbed by `Spec/SearchInf.lean`.
 
+- nauty.c's leaf functions are proved over `SearchAt` (`Proofs/Search/State.lean`):
+  `firstterminal_satisfies`, `recover_satisfies`, and `automCb_emit` (the
+  harness's `emit_generator` as `AutomCb Statement.xi`). `Proofs/Search/Frame.lean`
+  moves `SearchAt` across memory changes; `sep_ne hd` proves two blocks of
+  `S.blocks` distinct by locating them in the list. Spec changes made for these
+  proofs: `SInv` records the sizes of the search's arrays (stores match
+  `Array.set!` only in range) and bounds the level-valued statics by `2^31`
+  (the C compares them as `int`s); `Stats` records that the `statsblk` lies
+  below `2^64`; `AutomCb` asks for the permutation's entries to be below `2^31`;
+  `processnodeSpec`'s trace writes the leaf's permutation exactly when
+  `numgenerators` goes up, because nauty does not report a code-2 automorphism
+  that leaves the orbits unchanged, while HexGraphIso's `genTrace` records it.
+  The last point also affects the final statement: `expected` writes
+  `genTrace`, which is more than nauty emits.
+
 ## Phase 6: dense end-to-end
 
 Shape of the composition: `main`'s specification (`Proofs/Harness/`) is an

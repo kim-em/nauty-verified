@@ -78,6 +78,7 @@ def efS : Common.AST.external_function → String
 
 def ind (n : Nat) : String := "".pushn ' ' n
 
+mutual
 partial def stS (d : Nat) : statement → String
   | .Sskip => ".Sskip"
   | .Sassign a b => s!"(.Sassign {exS nm a} {exS nm b})"
@@ -96,9 +97,18 @@ partial def stS (d : Nat) : statement → String
   | .Scontinue => ".Scontinue"
   | .Sreturn none => "(.Sreturn none)"
   | .Sreturn (some a) => s!"(.Sreturn (some {exS nm a}))"
-  | .Sswitch a _ => s!"(.Sswitch {exS nm a} _)"
+  | .Sswitch a sl => s!"(.Sswitch {exS nm a}\n{ind (d+2)}{lsS (d+2) sl})"
   | .Slabel _ s => s!"(.Slabel _ {stS d s})"
   | .Sgoto _ => "(.Sgoto _)"
+
+partial def lsS (d : Nat) : labeled_statements → String
+  | .LSnil => ".LSnil"
+  | .LScons c st rest =>
+      let c := match c with
+        | some z => s!"(some (zOfInt {CompCert4Lean.Foundation.Numbers.Rocq.Coq.intOfZ z}))"
+        | none => "none"
+      s!"(.LScons {c}\n{ind (d+2)}{stS (d+2) st}\n{ind (d+2)}{lsS (d+2) rest})"
+end
 
 def names : Nat → Option String := fun i =>
   NautyVerified.Source.dense.keys[i - 1]?

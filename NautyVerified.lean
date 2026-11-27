@@ -100,6 +100,7 @@ import NautyVerified.Proofs.Search.Node.Prologue
 import NautyVerified.Proofs.Search.Firstterminal.Satisfies
 import NautyVerified.Proofs.Search.Recover.Satisfies
 import NautyVerified.Proofs.Search.Emit
+import NautyVerified.Proofs.Search.Processnode.Syntax
 import NautyVerified.Proofs.Refine.Frame
 import NautyVerified.Proofs.Refine.Trivial
 import NautyVerified.Proofs.Refine.Pop

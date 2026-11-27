@@ -96,7 +96,10 @@ def exitValue (level : Nat) : Exit → Int × Bool
   | .fuel => (level, false)
 
 /-- `processnode(lab, ptn, level, numcells)` off the first path: HexGraphIso's
-`classify` then `leafExit`, writing the generators found. -/
+`classify` then `leafExit`. nauty calls `userautomproc` exactly when it counts a
+new generator, so the trace writes the leaf's permutation iff `numgenerators`
+went up. (HexGraphIso's `genTrace` also records code-2 permutations that leave
+the orbits unchanged, which nauty does not report.) -/
 def processnodeSpec {n : Nat} (xi : ExternalCalls) (S : SLoc) (ctx : Ctx n) (st : Search n)
     (level numcells : Nat) : FunSpec where
   pre args m := args = [.Vptr S.bl S.lofs, .Vptr S.bp S.pofs, .Vint (ir level),
@@ -106,7 +109,7 @@ def processnodeSpec {n : Nat} (xi : ExternalCalls) (S : SLoc) (ctx : Ctx n) (st 
     let r := leafExit (classify ctx level numcells st).1 level (classify ctx level numcells st).2
     v = .Vint (ir (exitValue level r.1).1) ∧
     SearchAt m' S ctx r.2 false (exitValue level r.1).2 ∧
-    Writes t (gensWords (r.2.genTrace.toList.drop st.genTrace.size) n) ∧
+    Writes t (if r.2.numgenerators = st.numgenerators + 1 then genWords r.2.workperm n else []) ∧
     SFrame m m' S
 
 end NautyVerified.Proofs.Search
