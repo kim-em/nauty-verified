@@ -28,7 +28,7 @@ def orbjoinSpec (bo : block) (ofs : ptrofs) (bm : block) (mofs : ptrofs) (o mp :
     bo ≠ bm ∧ n < 2147483648 ∧ (∀ i < n, mp[i]! < n) ∧ Descending o n
   post _ m t v m' := t = E0 ∧ v = .Vint (ir (Hex.GraphIso.Nauty.orbjoin o mp n).2) ∧
     ArrayAt m' .Mint32 bo (intOfZ (Ptrofs.unsigned ofs))
-      (ints (Hex.GraphIso.Nauty.orbjoin o mp n).1) n ∧ Unch m m' bo
+      (ints (Hex.GraphIso.Nauty.orbjoin o mp n).1) n ∧ Unch m m' (· = bo)
 
 def entryTemps (bo : block) (ofs : ptrofs) (bm : block) (mofs : ptrofs) (n : Nat) : temp_env :=
   PTree.set id.n (.Vint (ir n)) (PTree.set id.map (.Vptr bm mofs)

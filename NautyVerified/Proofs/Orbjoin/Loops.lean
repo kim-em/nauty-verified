@@ -27,13 +27,13 @@ theorem wp_joinLoop {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem
     {bo : block} {ofs : ptrofs} {bm : block} {mofs : ptrofs} {o mp : Array Nat} {n : Nat}
     (h : Frame m le bo ofs bm mofs o mp n)
     (hQ : ∀ le' m', Frame m' le' bo ofs bm mofs ((List.range n).foldl (join mp n) o) mp n →
-      Unch m m' bo → Q.normal E0 e le' m') :
+      Unch m m' (· = bo) → Q.normal E0 e le' m') :
     Wp xi ge f (forI joinStep) Q e le m := by
   refine wp_forLoop (xi := xi) id.i id.n joinStep n h.nlt
     (fun k le m' => Frame m' le bo ofs bm mofs ((List.range k).foldl (join mp n) o) mp n ∧
-      Unch m m' bo ∧ k ≤ n ∧ PTree.get id.i le = some (.Vint (ir k)))
+      Unch m m' (· = bo) ∧ k ≤ n ∧ PTree.get id.i le = some (.Vint (ir k)))
     (fun k le m' => Frame m' le bo ofs bm mofs ((List.range (k + 1)).foldl (join mp n) o) mp n ∧
-      Unch m m' bo ∧ k < n ∧ PTree.get id.i le = some (.Vint (ir k))) ?_ ?_ ?_ ?_ ?_
+      Unch m m' (· = bo) ∧ k < n ∧ PTree.get id.i le = some (.Vint (ir k))) ?_ ?_ ?_ ?_ ?_
   · rintro k le m ⟨hf, -, hk, hi⟩
     exact ⟨hk, hi, hf.hn⟩
   · refine ⟨h.temps fun k hk => ?_, Unch.refl _ _, Nat.zero_le _, temps_gss _ _ _⟩
@@ -54,7 +54,7 @@ theorem wp_compressStep {f : function} {Q : Post} {e : env} {le : temp_env} {m :
     (h : Frame m le bo ofs bm mofs o mp n) {k : Nat} (hk : k < n)
     (hiv : PTree.get id.i le = some (.Vint (ir k)))
     (hjv : PTree.get id.j1 le = some (.Vint (ir c)))
-    (hQ : ∀ le' m', Frame m' le' bo ofs bm mofs (compress (o, c) k).1 mp n → Unch m m' bo →
+    (hQ : ∀ le' m', Frame m' le' bo ofs bm mofs (compress (o, c) k).1 mp n → Unch m m' (· = bo) →
       PTree.get id.i le' = some (.Vint (ir k)) →
       PTree.get id.j1 le' = some (.Vint (ir (compress (o, c) k).2)) → Q.normal E0 e le' m') :
     Wp xi ge f compressStep Q e le m := by
@@ -113,14 +113,14 @@ theorem wp_compressLoop {f : function} {Q : Post} {e : env} {le : temp_env} {m :
     (hjv : PTree.get id.j1 le = some (.Vint (ir 0)))
     (hQ : ∀ le' m', Frame m' le' bo ofs bm mofs ((List.range n).foldl compress (o, 0)).1 mp n →
       PTree.get id.j1 le' = some (.Vint (ir ((List.range n).foldl compress (o, 0)).2)) →
-      Unch m m' bo → Q.normal E0 e le' m') :
+      Unch m m' (· = bo) → Q.normal E0 e le' m') :
     Wp xi ge f (forI compressStep) Q e le m := by
   refine wp_forLoop (xi := xi) id.i id.n compressStep n h.nlt
     (fun k le m' => Frame m' le bo ofs bm mofs ((List.range k).foldl compress (o, 0)).1 mp n ∧
-      Unch m m' bo ∧ k ≤ n ∧ PTree.get id.i le = some (.Vint (ir k)) ∧
+      Unch m m' (· = bo) ∧ k ≤ n ∧ PTree.get id.i le = some (.Vint (ir k)) ∧
       PTree.get id.j1 le = some (.Vint (ir ((List.range k).foldl compress (o, 0)).2)))
     (fun k le m' => Frame m' le bo ofs bm mofs ((List.range (k + 1)).foldl compress (o, 0)).1 mp n ∧
-      Unch m m' bo ∧ k < n ∧ PTree.get id.i le = some (.Vint (ir k)) ∧
+      Unch m m' (· = bo) ∧ k < n ∧ PTree.get id.i le = some (.Vint (ir k)) ∧
       PTree.get id.j1 le = some (.Vint (ir ((List.range (k + 1)).foldl compress (o, 0)).2)))
     ?_ ?_ ?_ ?_ ?_
   · rintro k le m ⟨hf, -, hk, hi, -⟩
