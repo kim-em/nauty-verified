@@ -1,0 +1,41 @@
+# Factoring of naugraph.c's `refine` for scripts/factor_clight.py.
+SK = '(.Ssequence .Sskip ?s)'
+MACROS = [
+  ('sk', ['s'], SK),
+  ('tv', ['x'], '(.Etempvar ?x tint)'),
+  ('pv', ['x'], '(.Etempvar ?x (tptr tulong))'),
+  ('pi', ['x'], '(.Etempvar ?x (tptr tint))'),
+  ('ix', ['p', 'a'], '(.Ederef (.Ebinop .Oadd (pi ?p) ?a (tptr tint)) tint)'),
+  ('gix', ['p', 'a'], '(.Ederef (.Ebinop .Oadd (.Evar ?p (tptr tint)) ?a (tptr tint)) tint)'),
+  ('setWord', ['s', 'a'],
+   '(.Ederef (.Ebinop .Oadd (pv ?s) (.Ebinop .Oshr ?a (ci 6 tint) tint) (tptr tulong)) tulong)'),
+  ('bitOf', ['b', 'a'],
+   '(.Ederef (.Ebinop .Oadd (.Evar ?b (tarray tulong 64)) (.Ebinop .Oand ?a (ci 63 tint) tint) (tptr tulong)) tulong)'),
+  ('isElement', ['s', 'b', 'a'],
+   '(.Ebinop .One (.Ebinop .Oand (setWord ?s ?a) (bitOf ?b ?a) tulong) (ci 0 tint) tint)'),
+  ('addElementB', ['s', 'b', 'a'],
+   '(.Ssequence .Sskip (.Sassign (setWord ?s ?a) (.Ebinop .Oor (setWord ?s ?a) (bitOf ?b ?a) tulong)))'),
+  ('delElementB', ['s', 'b', 'a'],
+   '(.Ssequence .Sskip (.Sassign (setWord ?s ?a) (.Ebinop .Oand (setWord ?s ?a) (.Eunop .Onotint (bitOf ?b ?a) tulong) tulong)))'),
+  ('mash', ['e'],
+   '(.Sset id.«longcode» (.Ebinop .Oand (.Ebinop .Oadd (.Ebinop .Oxor (.Etempvar id.«longcode» tlong) (ci 27421 tint) tlong) ?e tlong) (ci 32767 tint) tlong))'),
+  ('scanEnd', ['x', 'y'],
+   '(.Ssequence (.Ssequence .Sskip (.Sset ?x (tv ?y))) (.Sloop (.Ssequence (.Ssequence .Sskip (.Sifthenelse (.Ebinop .Ogt (ix id.«ptn» (tv ?x)) (tv id.«level») tint) .Sskip .Sbreak)) .Sskip) (.Ssequence .Sskip (.Sset ?x (.Ebinop .Oadd (tv ?x) (ci 1 tint) tint)))))'),
+  ('byteAt', ['k'],
+   '(.Ederef (.Ebinop .Oadd (.Evar id.«naugraph:bytecount» (tarray tint 256)) (.Ebinop .Oand (.Ebinop .Oshr (.Etempvar id.«x» tulong) (ci ?k tint) tulong) (ci 255 tint) tulong) (tptr tint)) tint)'),
+  ('byte0', [],
+   '(.Ederef (.Ebinop .Oadd (.Evar id.«naugraph:bytecount» (tarray tint 256)) (.Ebinop .Oand (.Etempvar id.«x» tulong) (ci 255 tint) tulong) (tptr tint)) tint)'),
+  ('popcount', [],
+   '(.Ebinop .Oadd (.Ebinop .Oadd (.Ebinop .Oadd (.Ebinop .Oadd (.Ebinop .Oadd (.Ebinop .Oadd (.Ebinop .Oadd (byteAt 56) (byteAt 48) tint) (byteAt 40) tint) (byteAt 32) tint) (byteAt 24) tint) (byteAt 16) tint) (byteAt 8) tint) (byte0) tint)'),
+  ('popLoop', ['a', 'b', 'c', 'd'],
+   '(.Ssequence (.Ssequence .Sskip (.Sset id.«c1» (tv id.«m»))) (.Sloop (.Ssequence (.Ssequence (.Ssequence (.Ssequence .Sskip (.Sset ?a (.Ecast (.Ebinop .Osub (tv id.«c1») (ci 1 tint) tint) tint))) (.Sset id.«c1» (tv ?a))) (.Sifthenelse (.Ebinop .Oge (tv ?a) (ci 0 tint) tint) .Sskip .Sbreak)) (.Ssequence (.Ssequence (.Ssequence (.Ssequence (.Ssequence (.Ssequence (.Ssequence .Sskip (.Sset ?b (pv id.«set1»))) (.Sset id.«set1» (.Ebinop .Oadd (pv ?b) (ci 1 tint) (tptr tulong)))) (.Sset ?c (pv id.«set2»))) (.Sset id.«set2» (.Ebinop .Oadd (pv ?c) (ci 1 tint) (tptr tulong)))) (.Sset ?d (.Ecast (.Ebinop .Oand (.Ederef (pv ?b) tulong) (.Ederef (pv ?c) tulong) tulong) tulong))) (.Sset id.«x» (.Etempvar ?d tulong))) (.Sifthenelse (.Ebinop .One (.Etempvar ?d tulong) (ci 0 tint) tint) (.Ssequence .Sskip (.Sset id.«cnt» (.Ebinop .Oadd (tv id.«cnt») (popcount) tint))) .Sskip))) .Sskip))'),
+  ('dynalloc1', ['gs', 'gp', 'elt', 'sz', 't1', 't2', 'msg', 'len'],
+   '(.Ssequence .Sskip (.Sifthenelse (.Ebinop .Ogt (.Ecast ?sz tulong) (.Evar ?gs tulong) tint) (.Ssequence (.Ssequence .Sskip (.Sifthenelse (.Evar ?gs tulong) (.Ssequence .Sskip (.Scall none (.Evar id.«free» (tfun [(tptr Tvoid)] Tvoid)) [(.Evar ?gp (tptr ?elt))])) .Sskip)) (.Ssequence (.Ssequence .Sskip (.Sassign (.Evar ?gs tulong) ?sz)) (.Ssequence (.Ssequence (.Ssequence (.Ssequence .Sskip (.Scall (some ?t1) (.Evar id.«nauty_zalloc» (tfun [tulong] (tptr Tvoid))) [(.Ebinop .Omul (.Ecast ?sz tulong) (.Ecast (.Esizeof ?elt tulong) tulong) tulong)])) (.Sset ?t2 (.Ecast (.Ecast (.Etempvar ?t1 (tptr Tvoid)) (tptr ?elt)) (tptr ?elt)))) (.Sassign (.Evar ?gp (tptr ?elt)) (.Etempvar ?t2 (tptr ?elt)))) (.Sifthenelse (.Ebinop .Oeq (.Etempvar ?t2 (tptr ?elt)) (.Ecast (ci 0 tint) (tptr Tvoid)) tint) (.Ssequence .Sskip (.Scall none (.Evar id.«alloc_error» (tfun [(tptr tschar)] Tvoid)) [(.Evar ?msg (tarray tschar ?len))])) .Sskip)))) .Sskip))'),
+]
+PIECES = [
+  ('guard', 110), ('step', 149), ('trivial', 176), ('cellLoopT', 184), ('swapLoop', 222),
+  ('trivSplit', 251), ('nontrivial', 307), ('fillWS', 328), ('cellLoopN', 353), ('cellN', 382),
+  ('countRest', 451), ('splitN', 550), ('scanLoop', 573), ('placeLoop', 647), ('copyLoop', 669),
+  ('fixN', 684), ('mainLoop', 108), ('finish', 697),
+]
+TOP = 'body'
