@@ -12,7 +12,9 @@ pinned `inf = nautyInf`, `tcLevel = 100`:
 - memory holds the resulting search state (after the first leaf, so
   `pre = false`);
 - the trace writes the generators found below the node (`gensWords` of the
-  new `genTrace` entries);
+  new `genTrace` entries) and reads `nauty_kill_request` as 0 (`Emits`):
+  `Satisfies` asks for one execution, and the one chosen is the one whose
+  volatile reads return 0, as the end-to-end theorem assumes (`VloadsZero`);
 - the target-cell list keeps its first `level - 1` nodes, and has at least
   `level` nodes afterwards (node `level - 1`, allocated if missing, owns
   this level's target cell).
@@ -41,6 +43,32 @@ open CompCert4Lean.Foundation.Numbers.Rocq.Coq CompCert4Lean.Lib.Maps CompCert4L
 open NautyVerified NautyVerified.Logic NautyVerified.Program NautyVerified.Word NautyVerified.Spec
 open NautyVerified.Source
 open Hex.GraphIso.Nauty
+
+/-- `t` writes the values `l`, reads no input, and reads 0 from every volatile
+location. -/
+def Emits (t : trace) (l : List Int) : Prop :=
+  Statement.writes t = l ∧ Statement.reads t = [] ∧ Statement.VloadsZero t
+
+theorem Writes.writes {t : trace} {l : List Int} (h : Writes t l) : Statement.writes t = l := by
+  induction h with
+  | nil => rfl
+  | cons x r _ ih => simp [Statement.writes, ih]
+
+theorem Writes.reads {t : trace} {l : List Int} (h : Writes t l) : Statement.reads t = [] := by
+  induction h with
+  | nil => rfl
+  | cons x r _ ih => simpa [Statement.reads] using ih
+
+theorem Writes.vloadsZero {t : trace} {l : List Int} (h : Writes t l) : Statement.VloadsZero t := by
+  induction h with
+  | nil => intro _ _ _ _ hm; cases hm
+  | cons x r _ ih =>
+    intro c i o ev hm
+    cases hm with
+    | tail _ hm => exact ih c i o ev hm
+
+theorem Writes.emits {t : trace} {l : List Int} (h : Writes t l) : Emits t l :=
+  ⟨h.writes, h.reads, h.vloadsZero⟩
 
 /-- The node fuel HexGraphIso uses at `level`. -/
 abbrev nodeFuel (n level : Nat) : Nat := n + 3 - level
@@ -82,7 +110,7 @@ def nodeSpec {n : Nat} (xi : ExternalCalls) (NodeOk : Bool → Nat → Nat → S
     let r := hexNode first ctx level numcells st
     v = .Vint (ir (exitValue level r.1).1) ∧
     SearchAt m' S ctx r.2 false (exitValue level r.1).2 ∧
-    Writes t (gensWords (r.2.genTrace.toList.drop st.genTrace.size) n) ∧
+    Emits t (gensWords (r.2.genTrace.toList.drop st.genTrace.size) n) ∧
     (∃ chain', TcChain m' S.M Block.tcnode0 chain' ∧ TcOk m' S chain' ∧ level ≤ chain'.length ∧
       chain'.take (level - 1) = chain.take (level - 1)) ∧
     NodeFrame m m' S chain level
