@@ -100,6 +100,8 @@ import NautyVerified.Proofs.Top.Init
 import NautyVerified.Proofs.Top.Copy
 import NautyVerified.Proofs.Top.Fields
 import NautyVerified.Proofs.Top.Head
+import NautyVerified.Proofs.Top.Check
+import NautyVerified.Proofs.Top.NautyMain
 import NautyVerified.Proofs.Search.Node.Spec
 import NautyVerified.Proofs.Search.Node.OtherHex
 import NautyVerified.Proofs.Search.Node.Rebuild
