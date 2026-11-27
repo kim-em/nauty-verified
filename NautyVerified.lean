@@ -53,3 +53,4 @@ import NautyVerified.Spec.Cycle
 import NautyVerified.Proofs.Fmperm.Clear
 import NautyVerified.Proofs.Fmperm.Cycle
 import NautyVerified.Proofs.Fmperm.Loop
+import NautyVerified.Proofs.Alloc.Keep

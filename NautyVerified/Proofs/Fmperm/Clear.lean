@@ -27,7 +27,8 @@ theorem wp_clearWp {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
     (hp : 0 < n → Mem.load .Mint64 m Block.nautilWorkperm (zOfInt 0) = some (.Vptr b Ptrofs.zero))
     (harr : ArrayAt m .Mint32 b 0 vals n) (hn : n < 2147483648)
     (hbw : 0 < n → Block.nautilWorkperm ≠ b) (hnv : PTree.get id.n le = some (.Vint (ir n)))
-    (hQ : ∀ le' m', ArrayAt m' .Mint32 b 0 (fun _ => .Vint (ir 0)) n → Unch m m' (· = b) →
+    (hQ : ∀ le' m', ArrayAt m' .Mint32 b 0 (fun _ => .Vint (ir 0)) n →
+      Unch m m' (fun z => 0 < n ∧ z = b) → Alloc.Keep m m' b →
       (∀ k, k ≠ id.i → k ≠ id.t5 → PTree.get k le' = PTree.get k le) → Q.normal E0 e le' m') :
     Wp xi ge f clearWp Q e le m := by
   wp_step; wp_step; wp_step
@@ -35,13 +36,13 @@ theorem wp_clearWp {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
   simp only [Exec.evalExpr, hnv, E0_append]
   let I := fun (v : Nat) (t : trace) (e' : env) (le' : temp_env) (m' : mem) => t = E0 ∧ e = e' ∧
     v ≤ n ∧ PTree.get id.i le' = some (.Vint (ir v)) ∧
-    ArrayAt m' .Mint32 b 0 (clearedAbove vals v) n ∧ Unch m m' (· = b) ∧
-    ∀ k, k ≠ id.i → k ≠ id.t5 → PTree.get k le' = PTree.get k le
+    ArrayAt m' .Mint32 b 0 (clearedAbove vals v) n ∧ Unch m m' (fun z => 0 < n ∧ z = b) ∧
+    Alloc.Keep m m' b ∧ ∀ k, k ≠ id.i → k ≠ id.t5 → PTree.get k le' = PTree.get k le
   refine wp_loop (I := I) (J := fun v t e' le' m' => ∃ v', v' < v ∧ I v' t e' le' m') ?_ ?_
     (n := n) ⟨rfl, rfl, Nat.le_refl _, temps_gss _ _ _,
       harr.congr fun k hk => by simp [clearedAbove, Nat.not_le.2 hk],
-      Unch.refl _ _, fun k hk _ => temps_gso _ _ hk⟩
-  · rintro v t e' le' m' ⟨rfl, rfl, hv, hi, harr', hu, ho⟩
+      Unch.refl _ _, Alloc.Keep.refl _ _, fun k hk _ => temps_gso _ _ hk⟩
+  · rintro v t e' le' m' ⟨rfl, rfl, hv, hi, harr', hu, hk, ho⟩
     wp_step; wp_step; wp_step; wp_step; wp_step
     apply wp_set_eval
     simp only [Exec.evalExpr, hi, typeof, cop, ir_sub]
@@ -54,7 +55,7 @@ theorem wp_clearWp {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
     · subst h0
       rw [ite_eq_right (by simp)]
       apply wp_break
-      simpa using hQ _ m' (harr'.congr fun k _ => by simp [clearedAbove]) hu
+      simpa using hQ _ m' (harr'.congr fun k _ => by simp [clearedAbove]) hu hk
         fun k h1 h2 => by rw [temps_gso _ _ h1, temps_gso _ _ h2, ho k h1 h2]
     · rw [ite_eq_left (by simp; omega)]
       apply wp_skip
@@ -62,10 +63,11 @@ theorem wp_clearWp {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
           (PTree.set id.t5 (.Vint (ir ((v : Int) - 1))) le')) = some (.Vint (ir ((v - 1 : Nat) : Int))) := by
         rw [temps_gss]; congr 3; omega
       wp_step; wp_step
-      refine wp_gstore hge find_nautilWorkperm (by rw [hu.load _ _ _ (hbw (by omega))]; exact hp (by omega)) harr' hn (tv id.i) (v - 1) (by omega)
+      refine wp_gstore hge find_nautilWorkperm (by rw [hu.load _ _ _ (fun h => hbw (by omega) h.2)]; exact hp (by omega)) harr' hn (tv id.i) (v - 1) (by omega)
         hiv rfl (ci 0 tint) 0 rfl rfl ?_
-      intro m'' harr'' hu''
-      refine ⟨v - 1, by omega, by simp, rfl, by omega, hiv, ?_, hu.trans hu'', fun k h1 h2 => by
+      intro m'' harr'' hu'' hk''
+      refine ⟨v - 1, by omega, by simp, rfl, by omega, hiv, ?_,
+        hu.trans (hu''.mono fun z hz => ⟨by omega, hz⟩), hk.trans hk'', fun k h1 h2 => by
         rw [temps_gso _ _ h1, temps_gso _ _ h2, ho k h1 h2]⟩
       refine harr''.congr fun k _ => ?_
       simp only [upd, clearedAbove]

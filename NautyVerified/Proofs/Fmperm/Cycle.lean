@@ -71,8 +71,8 @@ theorem wp_walk {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {b
     (hi : PTree.get id.i le = some (.Vint (ir i0))) (hl : PTree.get id.l le = some (.Vint (ir i0)))
     (hi0 : i0 < n)
     (hQ : ∀ le' m', ArrayAt m' .Mint32 b 0 (seenVals (mark perm i0 (List.range n) seen i0)) n →
-      Unch m m' (· = b) → (∀ x, x ≠ id.k → x ≠ id.l → PTree.get x le' = PTree.get x le) →
-      Q.normal E0 e le' m') :
+      Unch m m' (· = b) → Alloc.Keep m m' b →
+      (∀ x, x ≠ id.k → x ≠ id.l → PTree.get x le' = PTree.get x le) → Q.normal E0 e le' m') :
     Wp xi ge f walk Q e le m := by
   let p : Nat → Nat := fun x => perm[x]!
   have hp : ∀ x, x < n → p x < n := h.psmall
@@ -83,18 +83,19 @@ theorem wp_walk {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {b
     ∃ j sj F, j < r ∧ v = r - j ∧ (∀ k, 1 ≤ k → k ≤ j → iter p k i0 ≠ i0) ∧
       PTree.get id.l le' = some (.Vint (ir (iter p j i0 : Nat))) ∧
       ArrayAt m' .Mint32 b 0 (seenVals sj) n ∧ sj.size = n ∧ r - j ≤ F.length ∧
-      mark perm i0 F sj (iter p j i0) = R ∧ Unch m m' (· = b) ∧
+      mark perm i0 F sj (iter p j i0) = R ∧ Unch m m' (· = b) ∧ Alloc.Keep m m' b ∧
       ∀ x, x ≠ id.k → x ≠ id.l → PTree.get x le' = PTree.get x le
   let J := fun (v : Nat) (t : trace) (e' : env) (le' : temp_env) (m' : mem) => t = E0 ∧ e = e' ∧
     ∃ j sj F, j < r ∧ v = r - j ∧ (∀ k, 1 ≤ k → k ≤ j → iter p k i0 ≠ i0) ∧
       PTree.get id.l le' = some (.Vint (ir (iter p (j + 1) i0 : Nat))) ∧
       ArrayAt m' .Mint32 b 0 (seenVals (sj.set! (iter p j i0) true)) n ∧ sj.size = n ∧
       r - j ≤ F.length ∧ mark perm i0 F sj (iter p j i0) = R ∧ Unch m m' (· = b) ∧
-      ∀ x, x ≠ id.k → x ≠ id.l → PTree.get x le' = PTree.get x le
+      Alloc.Keep m m' b ∧ ∀ x, x ≠ id.k → x ≠ id.l → PTree.get x le' = PTree.get x le
   refine wp_loop (I := I) (J := J) ?_ ?_ (n := r - 0)
     ⟨rfl, rfl, 0, seen, List.range n, by omega, rfl, fun k h1 h2 => absurd h2 (by omega), hl,
-      warr, hsz, by simp; omega, rfl, Unch.refl _ _, fun _ _ _ => rfl⟩
-  · rintro v t e' le' m' ⟨rfl, rfl, j, sj, F, hj, rfl, hfirst, hlj, harr, hsj, hF, hmark, hu, ho⟩
+      warr, hsz, by simp; omega, rfl, Unch.refl _ _, Alloc.Keep.refl _ _, fun _ _ _ => rfl⟩
+  · rintro v t e' le' m' ⟨rfl, rfl, j, sj, F, hj, rfl, hfirst, hlj, harr, hsj, hF, hmark, hu, hk,
+      ho⟩
     have hcur := iter_lt hp j i0 hi0
     have hf := h
     have hperm' : PTree.get id.perm le' = some (.Vptr bpm pofs) := by
@@ -116,13 +117,15 @@ theorem wp_walk {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {b
       harr h.nlt (tv id.k) (iter p j i0) hcur
       (by simp only [Exec.evalExpr]; rw [temps_gso _ _ (by decide), temps_gss]) rfl
       (ci 1 tint) 1 rfl rfl ?_
-    intro m'' harr' hu'
+    intro m'' harr' hu' hk'
     rw [← seenVals_set (by rw [hsj]; exact hcur)] at harr'
-    refine ⟨by simp, rfl, j, sj, F, hj, rfl, hfirst, ?_, harr', hsj, hF, hmark, hu.trans hu', ?_⟩
+    refine ⟨by simp, rfl, j, sj, F, hj, rfl, hfirst, ?_, harr', hsj, hF, hmark, hu.trans hu',
+      hk.trans hk', ?_⟩
     · rw [temps_gss]; rfl
     · intro x h1 h2
       rw [temps_gso _ _ h2, temps_gso _ _ h1, ho x h1 h2]
-  · rintro v t e' le' m' ⟨rfl, rfl, j, sj, F, hj, rfl, hfirst, hlj, harr, hsj, hF, hmark, hu, ho⟩
+  · rintro v t e' le' m' ⟨rfl, rfl, j, sj, F, hj, rfl, hfirst, hlj, harr, hsj, hF, hmark, hu, hk,
+      ho⟩
     have hnext := iter_lt hp (j + 1) i0 hi0
     have hi' : PTree.get id.i le' = some (.Vint (ir i0)) := by
       rw [ho _ (by decide) (by decide)]; exact hi
@@ -144,7 +147,7 @@ theorem wp_walk {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {b
       have hb' : perm[iter p j i0]! = i0 := hstep ▸ hback
       rw [mark, hb', beq_self_eq_true, ite_eq_left rfl] at hmark
       rw [hmark] at harr
-      simpa using hQ le' m' harr hu ho
+      simpa using hQ le' m' harr hu hk ho
     · rw [ite_eq_left (by simp; omega)]
       apply wp_skip
       have hj1 : j + 1 < r := by
@@ -155,7 +158,7 @@ theorem wp_walk {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {b
       rw [mark, ite_eq_right (by simpa [← hstep] using hback)] at hmark
       refine ⟨r - (j + 1), by omega, by simp, rfl, j + 1, sj.set! (iter p j i0) true, F', hj1, rfl,
         fun k h1 h2 => ?_, hlj, harr, by rw [Array.size_set!, hsj], by simp at hF; omega,
-        by rw [hstep]; exact hmark, hu, ho⟩
+        by rw [hstep]; exact hmark, hu, hk, ho⟩
       rcases Nat.lt_or_ge k (j + 1) with h3 | h3
       · exact hfirst k h1 (by omega)
       · rw [show k = j + 1 by omega]; exact hback

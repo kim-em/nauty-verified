@@ -1,4 +1,4 @@
-import NautyVerified.Proofs.Alloc.Dyn
+import NautyVerified.Proofs.Alloc.Keep
 import NautyVerified.Logic.Ints
 
 /-!
@@ -56,7 +56,7 @@ theorem wp_gstore {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
     (rhs : expr) (x : Int) (hrhs : Exec.evalExpr ge e le m rhs = some (.Vint (ir x)))
     (hrty : typeof rhs = tint)
     (hQ : ∀ m', ArrayAt m' .Mint32 b 0 (upd vals c (.Vint (ir x))) n → Unch m m' (· = b) →
-      Q.normal E0 e le m') :
+      Keep m m' b → Q.normal E0 e le m') :
     Wp xi ge f (.Sassign (gat g a) rhs) Q e le m := by
   obtain ⟨m', hst, harr', -⟩ := store_array harr hc (.Vint (ir x)) rfl
   apply wp_assign_eval
@@ -66,6 +66,7 @@ theorem wp_gstore {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
   show match Mem.store .Mint32 m b (Ptrofs.unsigned _) _ with
     | some m' => Q.normal E0 e le m' | none => False
   rw [addr_int c (by omega), hst]
-  exact hQ m' harr' (Unch.store hst rfl)
+  exact hQ m' harr' (Unch.store hst rfl) (Keep.store hst (by
+    simp only [elemOfs, intOfZ_zOfInt, show csize .Mint32 = 4 from rfl]; omega))
 
 end NautyVerified.Proofs.Alloc
