@@ -182,6 +182,8 @@ structure Stats {n : Nat} (m : mem) (S : SLoc) (st : Search n) (pre : Bool) : Pr
   maxlevelW : Mem.valid_access m .Mint32 S.bst (zOfInt (S.sb + 40)) .Writable
   tctotal : FieldAt m .Mint64 S.bst (S.sb + 48) (.Vlong (lr st.tctotal))
   canupdates : FieldAt m .Mint64 S.bst (S.sb + 56) (.Vlong (lr st.canupdates))
+  /-- The `statsblk` (88 bytes) lies inside the address space. -/
+  fits : S.sb + 88 < 2 ^ 64
 
 /-- `canong`'s first `samerows` rows represent `st.canong`. -/
 structure CanongAt {n : Nat} (m : mem) (S : SLoc) (rows : Array (VSet n)) (samerows : Nat) :

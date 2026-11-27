@@ -91,6 +91,7 @@ import NautyVerified.Proofs.Search.Node.Othernode
 import NautyVerified.Proofs.Search.Node.Env
 import NautyVerified.Proofs.Harness.IO
 import NautyVerified.Proofs.Harness.Syntax
+import NautyVerified.Proofs.Search.Ops
 import NautyVerified.Proofs.Refine.Frame
 import NautyVerified.Proofs.Refine.Trivial
 import NautyVerified.Proofs.Refine.Pop
