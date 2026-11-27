@@ -435,4 +435,75 @@ theorem wp_codeCanon {f : function} {Q : Post} {e : env} {le : temp_env} {m : me
     · exact .inr (.inl hz)).trans (hu₂.mono fun z hz => by
     simp at hz ⊢; exact .inr (.inr hz))
 
+/-- `t711 = numcells < n && (eqlev_first == level || (getcanon && comp_canon >= 0))`: whether
+`othernode0` needs a target cell, `chooseTarget false`'s condition. -/
+theorem wp_target {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {S : SLoc}
+    {ctx : Ctx n} {st : Search n} {pre nsp : Bool} {level nc : Nat} {bnc : block}
+    (h : SearchAt m S ctx st pre nsp)
+    (hEn : PTree.get dense.id.«nauty:n» e = none)
+    (hE0 : PTree.get dense.id.«nauty:getcanon» e = none)
+    (hE1 : PTree.get dense.id.«nauty:comp_canon» e = none)
+    (hE3 : PTree.get dense.id.«nauty:eqlev_first» e = none)
+    (hnc : PTree.get dense.id.numcells e = some (bnc, tint))
+    (hncv : Mem.load .Mint32 m bnc (zOfInt 0) = some (.Vint (ir nc))) (hncl : nc ≤ n)
+    (hlev : PTree.get dense.id.level le = some (.Vint (ir level))) (hln : level ≤ n)
+    (hQ : ∀ le', PTree.get (idOf 711) le' = some (Val.of_bool
+        (decide (nc < n ∧ (st.eqlevFirst = level ∨ 0 ≤ st.compCanon)))) →
+      (∀ x, x ≠ idOf 711 → PTree.get x le' = PTree.get x le) → Q.normal E0 e le' m) :
+    Wp xi ge f Othernode.target Q e le m := by
+  have hnl := h.nlt
+  obtain ⟨-, -, -, -, hef, -, -, hc1, hc2, -⟩ := h.inv.scalars
+  have hcast : ∀ b : Bool, Cfrontend.Cop.sem_cast (Val.of_bool b) tint tbool m =
+      some (Val.of_bool b) := fun b => by cases b <;> rfl
+  have hncE : Exec.evalExpr ge e le m (.Evar dense.id.numcells tint) = some (.Vint (ir nc)) := by
+    simp only [Exec.evalExpr, Exec.lvalOfVar, hnc, Exec.derefLoc, Cfrontend.Ctypes.access_mode,
+      Mem.loadv, show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl, hncv]
+    simp [hncv, show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl]
+  simp only [Othernode.target, sk]
+  apply wp_if_eval
+  rw [Exec.evalExpr, hncE, eval_gint hEn find_n h.fixed.nn]
+  simp only [typeof, cop]
+  rw [ir_lt (a := (nc : Int)) (b := (n : Int)) ⟨by omega, by omega⟩ ⟨by omega, by omega⟩]
+  by_cases hlt : nc < n
+  · rw [ite_eq_left (by simpa using hlt)]
+    wp_step; wp_step
+    apply wp_if_eval
+    rw [Exec.evalExpr, eval_gint hE3 find_eqlevFirst h.scalars.eqlevFirst,
+      show Exec.evalExpr ge e le m (tv dense.id.level) = _ from hlev]
+    simp only [typeof, cop]
+    rw [ir_eq (a := (st.eqlevFirst : Int)) (b := (level : Int)) ⟨by omega, by omega⟩
+      ⟨by omega, by omega⟩]
+    by_cases heq : st.eqlevFirst = level
+    · rw [ite_eq_left (by simp [heq])]
+      wp_step; wp_step
+      apply wp_set_eval
+      simp only [Exec.evalExpr, typeof, cop]
+      exact hQ _ (by rw [temps_gss]; simp [hlt, heq]; rfl) fun x hx => temps_gso _ _ hx
+    · rw [ite_eq_right (by simp; omega)]
+      wp_step; wp_step
+      apply wp_if_eval
+      rw [eval_gint hE0 find_getcanon h.fixed.getcanon]
+      simp only [typeof, cop]
+      rw [ite_eq_left (by decide)]
+      wp_step; wp_step; wp_step; wp_step
+      apply wp_set_eval
+      rw [Exec.evalExpr, Exec.evalExpr, eval_gint hE1 find_compCanon h.scalars.compCanon]
+      simp only [Exec.evalExpr, typeof, cop]
+      rw [ir_lt (a := st.compCanon) (b := 0) ⟨by omega, by omega⟩ ⟨by decide, by decide⟩]
+      have hb : (!decide (st.compCanon < 0)) = decide (0 ≤ st.compCanon) := by
+        by_cases h0 : st.compCanon < 0 <;> simp [h0] <;> omega
+      rw [hb, hcast]
+      simp only [seqPost, Post.after, E0_append]
+      apply wp_set_eval
+      simp only [Exec.evalExpr, temps_gss, typeof, hcast]
+      simp only [seqPost, Post.after, E0_append]
+      apply wp_set_eval
+      simp only [Exec.evalExpr, temps_gss, typeof, hcast]
+      refine hQ _ (by rw [temps_gss]; simp [hlt, heq]) fun x hx => ?_
+      rw [temps_gso _ _ hx, temps_gso _ _ hx, temps_gso _ _ hx]
+  · rw [ite_eq_right (by simpa using hlt)]
+    apply wp_set_eval
+    simp only [Exec.evalExpr]
+    exact hQ _ (by rw [temps_gss]; simp [hlt]; rfl) fun x hx => temps_gso _ _ hx
+
 end NautyVerified.Proofs.Search
