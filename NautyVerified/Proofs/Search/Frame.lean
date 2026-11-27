@@ -70,8 +70,32 @@ theorem FieldAt.unch {m m' : mem} {W : block → Prop} {chunk : memory_chunk} {b
 /-- `∀ z ∈ [b₁, …], ¬ W z` for `W` a disjunction of equalities with blocks of the
 same distinct list. -/
 macro "sep_all " hd:term : tactic =>
-  `(tactic| (simp only [List.forall_mem_cons, List.mem_nil_iff, false_implies, implies_true,
-      and_true, not_or] <;> (repeat' constructor) <;> sep_ne $hd))
+  `(tactic| (simp only [List.forall_mem_cons] <;>
+    simp only [List.mem_nil_iff, false_implies, implies_true, and_true, not_or, List.mem_cons,
+      or_false] <;> (repeat' constructor) <;> sep_ne $hd))
+
+/-- `¬ b ∈ [b₁, …]` for distinct blocks. -/
+macro "sep_notin " hd:term : tactic =>
+  `(tactic| (simp only [List.mem_cons, List.mem_nil_iff, or_false, not_or] <;>
+    (repeat' constructor) <;> sep_ne $hd))
+
+theorem _root_.NautyVerified.Logic.Unch.snoc {m m₁ m₂ : mem} {w : List block} {b : block} (h : Unch m m₁ (· ∈ w))
+    (hu : Unch m₁ m₂ (· = b)) : Unch m m₂ (· ∈ b :: w) :=
+  (h.mono fun _ hz => List.mem_cons_of_mem _ hz).trans
+    (hu.mono fun _ hz => by rw [hz]; exact List.mem_cons_self)
+
+/-- Carry facts `h₁ …` across `hu : Unch m m' (· = b)`, each about a block other than `b`
+(distinctness from `hd`). -/
+macro "fwd " hd:ident ppSpace hu:ident " [" hs:ident* "]" : tactic => do
+  let tacs ← hs.mapM fun h =>
+    `(tactic| replace $h:ident := ($h).unch $hu (fun e => absurd e (by sep_ne $hd)))
+  `(tactic| ($[$tacs]*))
+
+/-- Carry `Keep` facts `h₁ …` across `hu : Unch m m' (· = b)`. -/
+macro "fwdK " hd:ident ppSpace hu:ident " [" hs:ident* "]" : tactic => do
+  let tacs ← hs.mapM fun h =>
+    `(tactic| replace $h:ident := ($h).trans (Keep.unch $hu (fun e => absurd e (by sep_ne $hd))))
+  `(tactic| ($[$tacs]*))
 
 theorem Fixed.unch {n : Nat} {m m' : mem} {S : SLoc} {W : block → Prop} (h : Fixed n m S)
     (hu : Unch m m' W)
@@ -181,6 +205,57 @@ theorem WorkAt.unch {n : Nat} {m m' : mem} {S : SLoc} {L : List block} {W : bloc
     dS.keep hu g3 g4 fun hc => Keep.unch hu (hwk _ (.inr (.inl ⟨cS, hc, dS⟩))),
     dB.keep hu g5 g6 fun hc => Keep.unch hu (hwk _ (.inr (.inr (.inl ⟨cB, hc, dB⟩)))),
     dN.keep hu g7 g8 fun hc => Keep.unch hu (hwk _ (.inr (.inr (.inr ⟨cN, hc, dN⟩)))), rest⟩⟩
+
+theorem lr_nat_inj {a b : Nat} (ha : a < 2147483648) (hb : b < 2147483648)
+    (h : lr (a : Int) = lr (b : Int)) : a = b := by
+  have := congrArg (fun x => (bv64 x).toNat) h
+  simp only [bv64_repr, intOfZ_zOfInt, BitVec.toNat_ofInt] at this
+  have e : ∀ x : Nat, x < 2147483648 → ((x : Int) % ((2 ^ 64 : Nat) : Int)).toNat = x := by
+    intro x hx; rw [Int.emod_eq_of_lt (by omega) (by omega)]; simp
+  rw [e a ha, e b hb] at this
+  exact this
+
+/-- Two `DynAt`s of one pair agree on the block when the capacity is positive. -/
+theorem _root_.NautyVerified.Proofs.Alloc.DynAt.same_block {m : mem} {bp bs : block} {c c' cap cap' : Nat} {b b' : block}
+    (h : DynAt m bp bs c cap b) (h' : DynAt m bp bs c' cap' b') (hc : 0 < cap) : b' = b := by
+  have hcc : cap' = cap := by
+    have := h.capLd.symm.trans h'.capLd
+    simp only [Option.some.injEq, val.Vlong.injEq] at this
+    exact (lr_nat_inj h.capLt h'.capLt this).symm
+  have := (h.ptr hc).symm.trans (h'.ptr (hcc ▸ hc))
+  simp only [Option.some.injEq, val.Vptr.injEq] at this
+  exact this.1.symm
+
+/-- A work block in use is none of the blocks of `S`. -/
+theorem SearchAt.work_not {n : Nat} {m : mem} {S : SLoc} {ctx : Ctx n} {st : Search n}
+    {pre nsp : Bool} (h : SearchAt m S ctx st pre nsp) {z : block} (hz : IsWork m z) :
+    z ∉ S.blocks := by
+  obtain ⟨cW, bW, cS, bS, cB, bB, cN, bN, dW, dS, dB, dN, nW, nS, nB, nN, -⟩ := h.work.arr
+  rcases hz with ⟨c, hc, d⟩ | ⟨c, hc, d⟩ | ⟨c, hc, d⟩ | ⟨c, hc, d⟩
+  · have := d.same_block dW hc
+    have hcW : 0 < cW := by
+      have := d.capLd.symm.trans dW.capLd
+      simp only [Option.some.injEq, val.Vlong.injEq] at this
+      have := lr_nat_inj d.capLt dW.capLt this; omega
+    exact this ▸ nW hcW
+  · have := d.same_block dS hc
+    have hcS : 0 < cS := by
+      have := d.capLd.symm.trans dS.capLd
+      simp only [Option.some.injEq, val.Vlong.injEq] at this
+      have := lr_nat_inj d.capLt dS.capLt this; omega
+    exact this ▸ nS hcS
+  · have := d.same_block dB hc
+    have hcB : 0 < cB := by
+      have := d.capLd.symm.trans dB.capLd
+      simp only [Option.some.injEq, val.Vlong.injEq] at this
+      have := lr_nat_inj d.capLt dB.capLt this; omega
+    exact this ▸ nB hcB
+  · have := d.same_block dN hc
+    have hcN : 0 < cN := by
+      have := d.capLd.symm.trans dN.capLd
+      simp only [Option.some.injEq, val.Vlong.injEq] at this
+      have := lr_nat_inj d.capLt dN.capLt this; omega
+    exact this ▸ nN hcN
 
 /-- `SearchAt` across a change avoiding every block of `S` and the work blocks in use. -/
 theorem SearchAt.unch {n : Nat} {m m' : mem} {S : SLoc} {ctx : Ctx n} {st : Search n}

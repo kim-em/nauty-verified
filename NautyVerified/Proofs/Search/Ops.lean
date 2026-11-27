@@ -28,7 +28,8 @@ theorem wp_gint {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {g
     {b : block} (hge : PTree.get g e = none) (hg : Genv.find_symbol ge.genv_genv g = some b)
     (hw : Mem.valid_access m .Mint32 b (zOfInt 0) .Writable) {rhs : expr} {x : Int}
     (hr : Exec.evalExpr ge e le m rhs = some (.Vint (ir x))) (hrt : typeof rhs = tint)
-    (hQ : ∀ m', IntAt m' b x → Unch m m' (· = b) → Q.normal E0 e le m') :
+    (hQ : ∀ m', IntAt m' b x → Unch m m' (· = b) →
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) → Q.normal E0 e le m') :
     Wp xi ge f (.Sassign (.Evar g tint) rhs) Q e le m := by
   obtain ⟨m', hst⟩ := Mem.valid_access_store _ _ _ _ (.Vint (ir x)) hw
   apply wp_assign_eval
@@ -38,6 +39,7 @@ theorem wp_gint {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {g
     hst]
   exact hQ m' ⟨by rw [Mem.load_store_same _ _ _ _ _ _ hst]; rfl,
     Mem.store_valid_access_1 _ _ _ _ _ _ hst _ _ _ _ hw⟩ (Unch.store hst rfl)
+    (fun z hz => Mem.store_valid_block_1 _ _ _ _ _ _ hst _ hz)
 
 theorem eval_gint {e : env} {le : temp_env} {m : mem} {g : ident} {b : block} {x : Int}
     (hge : PTree.get g e = none) (hg : Genv.find_symbol ge.genv_genv g = some b)
@@ -45,6 +47,32 @@ theorem eval_gint {e : env} {le : temp_env} {m : mem} {g : ident} {b : block} {x
   simp only [Exec.evalExpr, Exec.lvalOfVar, hge, hg, Exec.derefLoc, Cfrontend.Ctypes.access_mode,
     Mem.loadv, show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl]
   exact h.load
+
+/-- `g[a] = rhs` for an `int *` global, with validity preserved. -/
+theorem wp_gstoreV {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
+    {g : Common.AST.ident} {bg b : block} {vals : Nat → val} {n : Nat}
+    (hge : PTree.get g e = none) (hg : Genv.find_symbol ge.genv_genv g = some bg)
+    (hp : Mem.load .Mint64 m bg (zOfInt 0) = some (.Vptr b Ptrofs.zero))
+    (harr : ArrayAt m .Mint32 b 0 vals n) (hn : n < 2147483648)
+    (a : expr) (c : Nat) (hc : c < n)
+    (ha : Exec.evalExpr ge e le m a = some (.Vint (ir c))) (hty : typeof a = tint)
+    (rhs : expr) (x : Int) (hrhs : Exec.evalExpr ge e le m rhs = some (.Vint (ir x)))
+    (hrty : typeof rhs = tint)
+    (hQ : ∀ m', ArrayAt m' .Mint32 b 0 (upd vals c (.Vint (ir x))) n → Unch m m' (· = b) →
+      Alloc.Keep m m' b → (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
+      Q.normal E0 e le m') :
+    Wp xi ge f (.Sassign (Alloc.gat g a) rhs) Q e le m := by
+  obtain ⟨m', hst, harr', -⟩ := store_array harr hc (.Vint (ir x)) rfl
+  apply wp_assign_eval
+  simp only [Exec.evalLvalue, Exec.evalExpr, Exec.lvalOfVar, hge, hg, ha, hty, hrhs, hrty]
+  simp only [typeof, cop, Exec.derefLoc, Cfrontend.Ctypes.access_mode, Mem.loadv, Alloc.Mptr_eq,
+    show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl, hp, Exec.assignLoc, Mem.storev]
+  show match Mem.store .Mint32 m b (Ptrofs.unsigned _) _ with
+    | some m' => Q.normal E0 e le m' | none => False
+  rw [Alloc.addr_int c (by omega), hst]
+  exact hQ m' harr' (Unch.store hst rfl) (Alloc.Keep.store hst (by
+    simp only [elemOfs, intOfZ_zOfInt, show csize .Mint32 = 4 from rfl]; omega))
+    (fun z hz => Mem.store_valid_block_1 _ _ _ _ _ _ hst _ hz)
 
 /-! ## `short` values -/
 
@@ -121,7 +149,7 @@ theorem wp_gstoreS {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
     (hrhs : Exec.evalExpr ge e le m rhs = some (.Vint (ir x)))
     (hrty : typeof rhs = tint ∨ typeof rhs = tshort)
     (hQ : ∀ m', ArrayAt m' .Mint16signed b 0 (upd vals c (.Vint (ir x))) n → Unch m m' (· = b) →
-      Alloc.Keep m m' b → Q.normal E0 e le m') :
+      Alloc.Keep m m' b → (∀ z, Mem.valid_block m z → Mem.valid_block m' z) → Q.normal E0 e le m') :
     Wp xi ge f (.Sassign (gats g a) rhs) Q e le m := by
   have hse := sign_ext16_ir (a := (x : Int)) (by omega) (by omega)
   obtain ⟨m', hst, harr', -⟩ := store_array harr hc (.Vint (ir x))
@@ -137,6 +165,45 @@ theorem wp_gstoreS {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
   rw [addr_short c (by omega), hst] <;>
   exact hQ m' harr' (Unch.store hst rfl) (Alloc.Keep.store hst (by
     simp only [elemOfs, intOfZ_zOfInt, show csize .Mint16signed = 2 from rfl]; omega))
+    (fun z hz => Mem.store_valid_block_1 _ _ _ _ _ _ hst _ hz)
+
+theorem shorts_set {o : Array Nat} {j : Nat} (hj : j < o.size) (v : Nat) :
+    shorts (o.set! j v) = upd (shorts o) j (.Vint (ir (v : Int))) := by
+  funext i
+  simp only [shorts, upd]
+  by_cases h : i = j
+  · subst h; rw [ite_eq_left rfl, Array.getElem!_set!_self _ _ _ hj]
+  · rw [ite_eq_right h, Array.getElem!_set!_ne _ _ _ _ (Ne.symm h)]
+
+theorem intsZ_set {o : Array Int} {j : Nat} (hj : j < o.size) (v : Int) :
+    intsZ (o.set! j v) = upd (intsZ o) j (.Vint (ir v)) := by
+  funext i
+  simp only [intsZ, upd]
+  by_cases h : i = j
+  · subst h; rw [ite_eq_left rfl, Array.getElem!_set!_self _ _ _ hj]
+  · rw [ite_eq_right h, Array.getElem!_set!_ne _ _ _ _ (Ne.symm h)]
+
+/-! ## Stores and `FieldAt` -/
+
+/-- After storing `w` at a field, it holds `load_result w`. -/
+theorem FieldAt.store_same {m m' : mem} {chunk : memory_chunk} {b : block} {off : Int} {w : val}
+    (hst : Mem.store chunk m b (zOfInt off) w = some m')
+    (hw : Mem.valid_access m chunk b (zOfInt off) .Writable) :
+    FieldAt m' chunk b off (Val.load_result chunk w) :=
+  ⟨Mem.load_store_same _ _ _ _ _ _ hst, Mem.store_valid_access_1 _ _ _ _ _ _ hst _ _ _ _ hw⟩
+
+/-- A store into the same block at a disjoint byte range leaves a field. -/
+theorem FieldAt.store_other {m m' : mem} {chunk c' : memory_chunk} {b : block} {off off' : Int}
+    {v w : val} (h : FieldAt m chunk b off v) (hst : Mem.store c' m b (zOfInt off') w = some m')
+    (hd : off + csize chunk ≤ off' ∨ off' + csize c' ≤ off) : FieldAt m' chunk b off v := by
+  refine ⟨?_, Mem.store_valid_access_1 _ _ _ _ _ _ hst _ _ _ _ h.writable⟩
+  rw [Mem.load_store_other _ _ _ _ _ _ hst _ _ _ (.inr (by
+    rcases hd with hd | hd
+    · left; change intOfZ _ ≤ intOfZ _; simp only [intOfZ_add, intOfZ_zOfInt]
+      exact hd
+    · right; change intOfZ _ ≤ intOfZ _; simp only [intOfZ_add, intOfZ_zOfInt]
+      exact hd))]
+  exact h.load
 
 /-! ## `statsblk` members -/
 
