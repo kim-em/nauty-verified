@@ -27,13 +27,16 @@ abbrev w : Common.AST.ident := dense.id.w
 abbrev leftbit : Common.AST.ident := NautyVerified.Source.dense.id.«nautil:leftbit»
 end id
 
-abbrev sw : expr := .Etempvar id.setwd tulong
+/-- The word temporary `FIRSTBITNZ` reads (`setwd` here; `permset` uses `setw`). -/
+abbrev sw (x : Common.AST.ident := id.setwd) : expr := .Etempvar x tulong
 
-/-- `setwd & C`. -/
-abbrev tst (c : Int) : expr := .Ebinop .Oand sw (cl c tulong) tulong
+/-- `x & C`. -/
+abbrev tst (c : Int) (x : Common.AST.ident := id.setwd) : expr :=
+  .Ebinop .Oand (sw x) (cl c tulong) tulong
 
-/-- `setwd >> s`. -/
-abbrev shr (s : Int) : expr := .Ebinop .Oshr sw (ci s tint) tulong
+/-- `x >> s`. -/
+abbrev shr (s : Int) (x : Common.AST.ident := id.setwd) : expr :=
+  .Ebinop .Oshr (sw x) (ci s tint) tulong
 
 /-- One leaf of `FIRSTBITNZ`: `r = c + leftbit[idx]`, with SimplExpr's two casts. -/
 abbrev leaf (r : Common.AST.ident) (c : Int) (idx : expr) : statement :=
@@ -49,23 +52,23 @@ abbrev leaf (r : Common.AST.ident) (c : Int) (idx : expr) : statement :=
 /-- `.Ssequence .Sskip (if a then s1 else s2)`, SimplExpr's shape for `if`. -/
 abbrev sif (a : expr) (s1 s2 : statement) : statement := .Ssequence .Sskip (.Sifthenelse a s1 s2)
 
-/-- The inlined `FIRSTBITNZ(setwd)`, writing its result to `r`. -/
-abbrev fbTree (r : Common.AST.ident) : statement :=
-  sif (tst 18446744069414584320)
-    (sif (tst 18446462598732840960)
-      (sif (tst 18374686479671623680)
-        (leaf r 0 (.Ebinop .Oand (shr 56) (cl 255 tulong) tulong))
-        (leaf r 8 (shr 48)))
-      (sif (tst 280375465082880)
-        (leaf r 16 (shr 40))
-        (leaf r 24 (shr 32))))
-    (sif (tst 4294901760)
-      (sif (tst 4278190080)
-        (leaf r 32 (shr 24))
-        (leaf r 40 (shr 16)))
-      (sif (tst 65280)
-        (leaf r 48 (shr 8))
-        (leaf r 56 sw)))
+/-- The inlined `FIRSTBITNZ(x)`, writing its result to `r`. -/
+abbrev fbTree (r : Common.AST.ident) (x : Common.AST.ident := id.setwd) : statement :=
+  sif (tst 18446744069414584320 x)
+    (sif (tst 18446462598732840960 x)
+      (sif (tst 18374686479671623680 x)
+        (leaf r 0 (.Ebinop .Oand (shr 56 x) (cl 255 tulong) tulong))
+        (leaf r 8 (shr 48 x)))
+      (sif (tst 280375465082880 x)
+        (leaf r 16 (shr 40 x))
+        (leaf r 24 (shr 32 x))))
+    (sif (tst 4294901760 x)
+      (sif (tst 4278190080 x)
+        (leaf r 32 (shr 24 x))
+        (leaf r 40 (shr 16 x)))
+      (sif (tst 65280 x)
+        (leaf r 48 (shr 8 x))
+        (leaf r 56 (sw x))))
 
 /-- `*(set1 + i)`. -/
 abbrev word (i : expr) : expr :=
