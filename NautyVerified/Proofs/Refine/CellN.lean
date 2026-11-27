@@ -387,4 +387,168 @@ theorem wp_splitN {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc} {ctx 
         exact ⟨h0, h1, h2, h3, h4, h5, h6⟩
       rw [g6 z h0, temps_gso _ _ h0, g4 z h0 h7, g3 z h0, g2 z hz2, g1 z h0 h3 h1]
 
+/-- The temporaries one cell assigns. -/
+def cellTemps : List Common.AST.ident :=
+  cntTemps ++ [idOf 718, idOf 719, idOf 720, idOf 721, idOf 722, idOf 723] ++ splitTemps
+
+theorem wp_cellN {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc} {ctx : Ctx n}
+    {st : RefineSt n} {aw : Nat → Lib.Integers.int64} {ws : VSet n}
+    {wsw : Nat → Lib.Integers.int64} {cell1 cell2 : Nat} {bv0 wv0 : Nat → val}
+    (hf : CFrame m L ctx st.lab ws wsw) (hm : Mem m L ctx st aw) (ht : Tmp le L st)
+    (hso : StOk n L.level st) (hb0 : SBound n st st cell1 cell1) (h12 : cell1 < cell2)
+    (h2n : cell2 < n)
+    (hcl1 : PTree.get dense.id.cell1 le = some (.Vint (ir cell1)))
+    (hcl2 : PTree.get dense.id.cell2 le = some (.Vint (ir cell2)))
+    (hbkt : ArrayAt m .Mint32 L.bB 0 bv0 L.capB)
+    (hwp : ArrayAt m .Mint32 L.bW 0 wv0 L.capW)
+    (hQ : ∀ le' m' aw', Mem m' L ctx (nontrivialCell ctx L.level ws cell1 cell2 st) aw' →
+      Tmp le' L (nontrivialCell ctx L.level ws cell1 cell2 st) →
+      CellOut n L.level st (nontrivialCell ctx L.level ws cell1 cell2 st) cell1 cell2 →
+      (∃ bv, ArrayAt m' .Mint32 L.bB 0 bv L.capB) → (∃ wv, ArrayAt m' .Mint32 L.bW 0 wv L.capW) →
+      Unch m m' L.writes → Keep m m' L.bB → Keep m m' L.bW →
+      (∀ z, z ∉ cellTemps → PTree.get z le' = PTree.get z le) →
+      Q.normal E0 empty_env le' m' ∧ Q.cont E0 empty_env le' m') :
+    Wp xi ge Source.dense.fn.refine cellN Q empty_env le m := by
+  have hok := hf.ok
+  have d := hok.wd
+  have hnl := hok.nlt
+  have hcapB := hf.capB
+  have hcB := hok.capB
+  have hli := hf.labs cell1 (by omega)
+  obtain ⟨cv0, hcv0⟩ := hm.cnt
+  simp only [cellN, Set.sk]
+  wp_step; wp_step; wp_step
+  apply wp_set_eval
+  simp only [Exec.evalExpr, hcl1]
+  have ht1 : Tmp (PTree.set dense.id.i (.Vint (ir cell1)) le) L st := ht.set _ (by decide)
+  refine wp_cntHead (by decide) hok ht1 hf.graph hf.larr hf.wsA hf.wsR hf.wsp (temps_gss _ _ _)
+    (by omega) hli hf.bytes ?_
+  intro le2 hcnt2 g2
+  have hc0 : ws.cardInter ctx.g[st.lab[cell1]!]! = (countsOf ctx st.lab ws cell1 cell2)[0]! := by
+    rw [countsOf_get ctx st.lab ws (by omega), Nat.add_zero]
+  rw [hc0] at hcnt2
+  generalize hcs : countsOf ctx st.lab ws cell1 cell2 = cs at *
+  have hlen : cs.length = cell2 + 1 - cell1 := by rw [← hcs, countsOf_length]
+  have hc0n : cs[0]! ≤ n := by rw [← hcs]; exact countsOf_le ctx st.lab ws cell1 cell2 0
+  wp_step; wp_step; wp_step; wp_step; wp_step; wp_step; wp_step
+  apply wp_set_eval
+  simp only [Exec.evalExpr, hcnt2, typeof, cop]
+  apply wp_set_eval
+  simp only [Exec.evalExpr, temps_gss]
+  apply wp_set_eval
+  simp only [Exec.evalExpr, temps_gso _ _ (show idOf 722 ≠ dense.id.bmax by decide), temps_gss,
+    typeof, cop]
+  apply wp_set_eval
+  simp only [Exec.evalExpr, temps_gss]
+  have hT2 : Tmp le2 L st := ht1.away [dense.id.c1, idOf 718, idOf 719, idOf 720, idOf 721,
+    dense.id.x, dense.id.set1, dense.id.set2, dense.id.cnt] (by decide) fun z hz => by
+      simp only [List.mem_cons, List.not_mem_nil, or_false, not_or] at hz
+      obtain ⟨h0, h1, h2, h3, h4, h5, h6, h7, h8⟩ := hz
+      exact g2 z h0 h1 h2 h3 h4 h5 h6 h7 h8
+  let c0 := ((cs[0]! : Nat) : Int)
+  let le3 := PTree.set dense.id.bmin (.Vint (ir c0)) (PTree.set (idOf 723) (.Vint (ir c0))
+    (PTree.set dense.id.bmax (.Vint (ir c0)) (PTree.set (idOf 722) (.Vint (ir c0)) le2)))
+  have ht3 : Tmp le3 L st := (((hT2.set _ (by decide)).set _ (by decide)).set _ (by decide)).set _
+    (by decide)
+  have g3 : ∀ z, z ≠ dense.id.bmin → z ≠ idOf 723 → z ≠ dense.id.bmax → z ≠ idOf 722 →
+      PTree.get z le3 = PTree.get z le2 := fun z h1 h2 h3 h4 => by
+    simp only [le3]; rw [temps_gso _ _ h1, temps_gso _ _ h2, temps_gso _ _ h3, temps_gso _ _ h4]
+  have hi3 : PTree.get dense.id.i le3 = some (.Vint (ir cell1)) := by
+    rw [g3 _ (by decide) (by decide) (by decide) (by decide),
+      g2 _ (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
+        (by decide) (by decide), temps_gss]
+  have hcnt3 : PTree.get dense.id.cnt le3 = some (.Vint (ir c0)) := by
+    rw [g3 _ (by decide) (by decide) (by decide) (by decide)]; exact hcnt2
+  refine wp_storeV hcv0 (by omega) dense.id.count ht3.count (tv dense.id.i) cell1 (by omega) hi3 rfl
+    (tv (idOf 723)) c0 (by show PTree.get _ _ = _; simp (disch := decide) only [le3, temps_gso, temps_gss])
+    rfl ?_
+  intro m1 hca1 hu1
+  have hbkp1 : Mem.load .Mint64 m1 Block.naugraphBucket (zOfInt 0) =
+      some (.Vptr L.bB Ptrofs.zero) := by rw [hu1.load _ _ _ (Ne.symm d.bc_g4)]; exact hf.bkp
+  have hbkt1 := hbkt.unch hu1 (Ne.symm d.bc_bB)
+  wp_step; wp_step; wp_step
+  refine wp_gstore rfl find_naugraphBucket hbkp1 hbkt1 hcapB (tv dense.id.cnt) cs[0]! (by omega)
+    hcnt3 rfl (ci 1 tint) 1 rfl rfl ?_
+  intro m2 hbk2 hu2 hk2
+  have hu12 : Unch m m2 (fun z => z = L.bc ∨ z = L.bB) :=
+    (hu1.mono fun z hz => .inl hz).trans (hu2.mono fun z hz => .inr hz)
+  have hf2 := hf.unch (hu12.mono fun z hz => by rcases hz with h | h <;> simp [h])
+  have hne0 : 0 < cs.length := by omega
+  wp_step
+  refine wp_countRest (cv0 := cv0) (bv0 := bv0) hf2 ht3 h12 h2n hi3
+    (by rw [g3 _ (by decide) (by decide) (by decide) (by decide),
+      g2 _ (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
+        (by decide) (by decide), temps_gso _ _ (by decide)]; exact hcl2)
+    (by rw [hcs, pmin_zero hne0]; simp only [le3, temps_gss]; rfl)
+    (by rw [hcs, pmax_zero hne0]; simp (disch := decide) only [le3, temps_gso, temps_gss]; rfl)
+    (by
+      rw [hcs]
+      refine (hca1.unch hu2 d.bc_bB).congr fun p _ => ?_
+      simp only [cntVals, upd]
+      by_cases hp : p = cell1
+      · subst hp; rw [ite_eq_left rfl, ite_eq_left (by omega), Nat.sub_self]
+      · rw [ite_eq_right hp, ite_eq_right (by omega)])
+    (by
+      rw [hcs]
+      refine hbk2.congr fun v _ => ?_
+      simp only [bktVals, upd, pmin_zero hne0, pmax_zero hne0, pmult_zero hne0]
+      by_cases hv : v = cs[0]!
+      · subst hv; simp
+      · rw [ite_eq_right hv, ite_eq_right (by omega)]) ?_
+  intro le4 m4 hmin4 hmax4 hca4 hbk4 hu4 hk4 g4
+  rw [hcs] at hmin4 hmax4 hca4 hbk4
+  have hk : cell2 - cell1 + 1 = cs.length := by omega
+  rw [pmin_last hk] at hmin4
+  rw [pmax_last hk] at hmax4
+  have hu14 : Unch m m4 (fun z => z = L.bc ∨ z = L.bB) := hu12.trans hu4
+  have hf4 := hf.unch (hu14.mono fun z hz => by rcases hz with h | h <;> simp [h])
+  have hkB : Keep m m4 L.bB := ((Keep.unch hu1 (Ne.symm d.bc_bB)).trans hk2).trans hk4
+  have hkW : Keep m m4 L.bW := Keep.unch hu14 (by
+    rintro (h | h)
+    · exact d.bc_bW h.symm
+    · exact d.bW_bB h)
+  have hm4 : Mem m4 L ctx st aw := hm.away hok (hu14.mono fun z hz => by
+    rcases hz with h | h
+    · exact .inl h
+    · exact .inr (.inl h)) hkB hkW ⟨_, hca4⟩
+  have hwp4 := hwp.unch hu14 (by
+    rintro (h | h)
+    · exact d.bc_bW h.symm
+    · exact d.bW_bB h)
+  have g43 : ∀ z, z ∉ cntTemps → z ≠ idOf 723 → z ≠ idOf 722 → z ≠ idOf 718 → z ≠ idOf 719 →
+      z ≠ idOf 720 → z ≠ idOf 721 → PTree.get z le4 = PTree.get z le := fun z hz h1 h2 h3 h4 h5 h6 => by
+    have hzs : ∀ y ∈ cntTemps, z ≠ y := fun y hy h => hz (h ▸ hy)
+    simp only [cntTemps, List.mem_cons, List.not_mem_nil, or_false, forall_eq_or_imp,
+      forall_eq] at hzs
+    obtain ⟨a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14⟩ := hzs
+    rw [g4 z hz, g3 z a11 h1 a12 h2, g2 z a5 h3 h4 h5 h6 a10 a2 a3 a4, temps_gso _ _ a0]
+  have hcl14 : PTree.get dense.id.cell1 le4 = some (.Vint (ir cell1)) := by
+    rw [g43 _ (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)]
+    exact hcl1
+  have hcl24 : PTree.get dense.id.cell2 le4 = some (.Vint (ir cell2)) := by
+    rw [g43 _ (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)]
+    exact hcl2
+  have ht4 : Tmp le4 L st := ht.away (cntTemps ++ [idOf 723, idOf 722, idOf 718, idOf 719,
+    idOf 720, idOf 721]) (by decide) fun z hz => by
+      simp only [List.mem_append, not_or, List.mem_cons, List.not_mem_nil, or_false] at hz
+      obtain ⟨h0, h1, h2, h3, h4, h5, h6⟩ := hz
+      exact g43 z h0 h1 h2 h3 h4 h5 h6
+  rw [← hcs] at hmin4 hmax4 hca4 hbk4 hcs
+  refine wp_splitN (wv0 := wv0) (bv0 := bv0) hf4 hm4 ht4 hso hb0 h12 h2n hmin4 hmax4 hcl14 hcl24 hca4
+    (hbk4.congr fun v _ => ?_) hwp4 ?_
+  · have hk' : cell2 - cell1 + 1 = (countsOf ctx st.lab ws cell1 cell2).length := by
+      rw [countsOf_length]; omega
+    simp only [bktVals, pmin_last hk', pmax_last hk', pmult_last hk']
+  intro le5 m5 aw5 hm5 ht5 hco5 hbk5 hwk5 hu5 hkB5 hkW5 g5
+  refine hQ le5 m5 aw5 hm5 ht5 hco5 hbk5 hwk5 ?_ (hkB.trans hkB5) (hkW.trans hkW5) ?_
+  · refine (hu14.mono fun z hz => ?_).trans hu5
+    rcases hz with h | h
+    · exact .inr (.inr (.inr (.inl h)))
+    · exact .inr (.inr (.inr (.inr (.inr (.inr (.inr h))))))
+  · intro z hz
+    simp only [cellTemps, List.mem_append, not_or, List.mem_cons, List.not_mem_nil, or_false] at hz
+    obtain ⟨⟨h0, h1, h2, h3, h4, h5, h6⟩, h7⟩ := hz
+    rw [g5 z h7]
+    exact g43 z h0 h6 h5 h1 h2 h3 h4
+
 end NautyVerified.Proofs.Refine
