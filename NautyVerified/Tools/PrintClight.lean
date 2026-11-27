@@ -51,7 +51,8 @@ def unS : unary_operation → String
 partial def exS : expr → String
   | .Econst_int i t => s!"(ci {intOfZ i.intval} {tyS nm t})"
   | .Econst_long i t => s!"(cl {intOfZ i.intval} {tyS nm t})"
-  | .Econst_float _ _ => "(cfloat)"
+  | .Econst_float f t =>
+      s!"(.Econst_float (CompCert4Lean.Lib.Floats.Float.of_bits (NautyVerified.Word.lr {intOfZ (Lib.Integers.Int64.unsigned (CompCert4Lean.Lib.Floats.Float.to_bits f))})) {tyS nm t})"
   | .Econst_single _ _ => "(csingle)"
   | .Evar i t => s!"(.Evar {idS nm i} {tyS nm t})"
   | .Etempvar i t => s!"(.Etempvar {idS nm i} {tyS nm t})"
@@ -64,6 +65,17 @@ partial def exS : expr → String
   | .Esizeof t t' => s!"(.Esizeof {tyS nm t} {tyS nm t'})"
   | .Ealignof t t' => s!"(.Ealignof {tyS nm t} {tyS nm t'})"
 
+def chunkS : Common.AST.memory_chunk → String
+  | .Mint8signed => ".Mint8signed" | .Mint8unsigned => ".Mint8unsigned"
+  | .Mint16signed => ".Mint16signed" | .Mint16unsigned => ".Mint16unsigned"
+  | .Mint32 => ".Mint32" | .Mint64 => ".Mint64" | .Mfloat32 => ".Mfloat32"
+  | .Mfloat64 => ".Mfloat64" | .Many32 => ".Many32" | .Many64 => ".Many64" | .Mbool => ".Mbool"
+
+def efS : Common.AST.external_function → String
+  | .EF_vload c => s!"(.EF_vload {chunkS c})"
+  | .EF_vstore c => s!"(.EF_vstore {chunkS c})"
+  | _ => "_"
+
 def ind (n : Nat) : String := "".pushn ' ' n
 
 partial def stS (d : Nat) : statement → String
@@ -73,9 +85,9 @@ partial def stS (d : Nat) : statement → String
   | .Scall r a l =>
       let r := match r with | some i => s!"(some {idS nm i})" | none => "none"
       s!"(.Scall {r} {exS nm a} [{", ".intercalate (l.map (exS nm))}])"
-  | .Sbuiltin r _ _ l =>
+  | .Sbuiltin r ef tl l =>
       let r := match r with | some i => s!"(some {idS nm i})" | none => "none"
-      s!"(.Sbuiltin {r} _ _ [{", ".intercalate (l.map (exS nm))}])"
+      s!"(.Sbuiltin {r} {efS ef} [{", ".intercalate (tl.map (tyS nm))}] [{", ".intercalate (l.map (exS nm))}])"
   | .Ssequence a b => s!"(.Ssequence\n{ind (d+2)}{stS (d+2) a}\n{ind (d+2)}{stS (d+2) b})"
   | .Sifthenelse c a b =>
       s!"(.Sifthenelse {exS nm c}\n{ind (d+2)}{stS (d+2) a}\n{ind (d+2)}{stS (d+2) b})"
