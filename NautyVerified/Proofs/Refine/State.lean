@@ -182,6 +182,21 @@ theorem Tmp.temps {n : Nat} {le le' : temp_env} {L : Loc} {st : RefineSt n} (h :
   hint := by rw [hle _ (.inr (.inr (.inl rfl)))]; exact h.hint
   maxpos := by rw [hle _ (.inr (.inr (.inr rfl)))]; exact h.maxpos
 
+/-- Assigning a temporary that is not an argument, `longcode`, `hint` or
+`maxpos` keeps `Tmp`; the side condition closes by `decide` for concrete names. -/
+theorem Tmp.set {n : Nat} {le : temp_env} {L : Loc} {st : RefineSt n} (h : Tmp le L st)
+    {x : Common.AST.ident} (v : val)
+    (hx : x ∉ args ∧ x ≠ dense.id.longcode ∧ x ≠ dense.id.hint ∧ x ≠ dense.id.maxpos) :
+    Tmp (PTree.set x v le) L st :=
+  h.temps fun y hy => by
+    apply temps_gso
+    rintro rfl
+    rcases hy with hy | hy | hy | hy
+    · exact hx.1 hy
+    · exact hx.2.1 hy
+    · exact hx.2.2.1 hy
+    · exact hx.2.2.2 hy
+
 /-- After a step: memory, temporaries and invariants all describe `st`. -/
 def Done {n : Nat} (le : temp_env) (m : mem) (L : Loc) (ctx : Ctx n) (st : RefineSt n) : Prop :=
   ∃ aw, Mem m L ctx st aw ∧ Tmp le L st ∧ StInv n L st
