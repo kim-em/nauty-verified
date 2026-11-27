@@ -91,6 +91,20 @@ theorem bvp_inj {x y : Lib.Integers.ptrofs} : bvp x = bvp y ↔ x = y := toBV_in
     intOfZ_Int64_unsigned]
   exact ofInt_toNat (bv64 y)
 
+@[simp] theorem intOfZ_Int_signed (x : Lib.Integers.int) :
+    intOfZ (Lib.Integers.Int.signed x) = (bv32 x).toInt := intOfZ_signed (by decide) x
+@[simp] theorem intOfZ_Int64_signed (x : Lib.Integers.int64) :
+    intOfZ (Lib.Integers.Int64.signed x) = (bv64 x).toInt := intOfZ_signed (by decide) x
+@[simp] theorem bv32_lt (x y : Lib.Integers.int) :
+    Lib.Integers.Int.lt x y = decide ((bv32 x).toInt < (bv32 y).toInt) := toBV_lt (by decide) x y
+@[simp] theorem bv32_shr (x y : Lib.Integers.int) :
+    bv32 (Lib.Integers.Int.shr x y) = BitVec.ofInt 32 ((bv32 x).toInt / 2 ^ (bv32 y).toNat) :=
+  toBV_shr (by decide) x y
+@[simp] theorem bvp_of_ints (x : Lib.Integers.int) :
+    bvp (Ptrofs.of_ints x) = BitVec.ofInt 64 (bv32 x).toInt := by
+  rw [show Ptrofs.of_ints x = Ptrofs.repr (Lib.Integers.Int.signed x) from rfl, bvp_repr,
+    intOfZ_Int_signed]
+
 theorem Int_add_repr (a b : Z) :
     Lib.Integers.Int.add (Lib.Integers.Int.repr a) (Lib.Integers.Int.repr b) =
       Lib.Integers.Int.repr (ZArith.BinInt.Z.add a b) :=

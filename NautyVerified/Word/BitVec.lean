@@ -147,6 +147,46 @@ theorem toBV_of_nat_lt (n : Nat) (h : n < 2 ^ bits) :
   simp only [toNat_toBV, Int.ofNat_lt]
   split <;> rename_i h <;> simp [h]
 
+theorem intOfZ_two_power_nat (n : Nat) : intOfZ (two_power_nat n) = 2 ^ n := by
+  simp only [ZArith.Zpower.two_power_nat, ZArith.BinInt.Z.pow, intOfZ_of_nat]
+  rw [if_neg (by omega), intOfZ_zOfInt]
+  simp only [Int.toNat_natCast]
+  rfl
+
+theorem intOfZ_signed (hb : 0 < bits) (x : Word bits) : intOfZ (signed x) = (toBV x).toInt := by
+  unfold signed
+  simp only
+  rw [zltSelect_eq, BitVec.toInt_eq_toNat_cond]
+  have hu := intOfZ_unsigned x
+  have hpow : (2 : Int) ^ bits = 2 * 2 ^ (bits - 1) := by
+    rw [← Int.pow_succ']; congr 1; omega
+  have hpowN : (2 : Nat) ^ bits = 2 * 2 ^ (bits - 1) := by
+    rw [← Nat.pow_succ']; congr 1; omega
+  simp only [intOfZ_two_power_nat, intOfZ_sub, hu]
+  have hc : (2 : Int) ^ (bits - 1) = ((2 ^ (bits - 1) : Nat) : Int) := by push_cast; rfl
+  have hc' : (2 : Int) ^ bits = ((2 ^ bits : Nat) : Int) := by push_cast; rfl
+  by_cases h : 2 * (toBV x).toNat < 2 ^ bits
+  · rw [ite_eq_left (by rw [hc]; omega), ite_eq_left h]
+    exact hu
+  · rw [ite_eq_right (by rw [hc]; omega), ite_eq_right h]
+    show intOfZ (ZArith.BinInt.Z.sub _ (two_power_nat bits)) = _
+    rw [intOfZ_sub, hu, intOfZ_two_power_nat, hc']
+
+@[simp] theorem toBV_lt (hb : 0 < bits) (x y : Word bits) :
+    WordCore.lt x y = decide ((toBV x).toInt < (toBV y).toInt) := by
+  unfold WordCore.lt
+  rw [zltSelect_eq, intOfZ_signed hb, intOfZ_signed hb]
+  split <;> rename_i h <;> simp [h]
+
+theorem toBV_shr (hb : 0 < bits) (x y : Word bits) :
+    toBV (shr x y) = BitVec.ofInt bits ((toBV x).toInt / 2 ^ (toBV y).toNat) := by
+  rw [shr, toBV_repr]
+  simp only [ZArith.BinInt.Z.shiftr, intOfZ_unsigned, Int.natCast_nonneg, ite_true,
+    intOfZ_zOfInt, Int.toNat_natCast, toNat_toBV, intOfZ_signed hb]
+  rw [show Int.pow 2 y.val = ((2 ^ y.val : Nat) : Int) by rw [Int.natCast_pow]; rfl]
+  push_cast
+  rfl
+
 end Word
 
 end NautyVerified.Word
