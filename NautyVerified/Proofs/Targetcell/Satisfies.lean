@@ -310,7 +310,7 @@ theorem targetcell_satisfies {xi : ExternalCalls} {n : Nat} (bg : block) (gofs :
       apply wp_return_some_eval
       simp only [Exec.evalExpr, g1 _ (.inr (.inr (.inr (.inr (.inr (.inl rfl)))))), ehint, typeof, cop,
         Source.dense.fn.targetcell.fn_return_eq, Nextelement.free_empty]
-      refine ⟨rfl, ?_, Post.refl hpre.dP hpre.dS hpre.dB⟩
+      refine ⟨rfl, ?_, hpre.post_refl⟩
       rw [tc_hint _ _ _ _ _ _ hok, Int.toNat_of_nonneg hok.1]
     · rw [decide_eq_false hok, ite_eq_right (by decide)]
       have gv : ∀ x, x = id.g ∨ x = id.lab ∨ x = id.ptn ∨ x = id.level ∨ x = id.tc_level ∨
@@ -378,7 +378,7 @@ theorem targetcell_satisfies {xi : ExternalCalls} {n : Nat} (bg : block) (gofs :
           apply wp_return_some_eval
           simp only [Exec.evalExpr, temps_gss, typeof, cop, Source.dense.fn.targetcell.fn_return_eq,
             Nextelement.free_empty]
-          refine ⟨rfl, ?_, Post.refl hpre.dP hpre.dS hpre.dB⟩
+          refine ⟨rfl, ?_, hpre.post_refl⟩
           rw [hres, ite_eq_right (by omega)]; rfl
         · rw [ite_eq_right (by simp; omega)]
           wp_step; wp_step
@@ -387,7 +387,7 @@ theorem targetcell_satisfies {xi : ExternalCalls} {n : Nat} (bg : block) (gofs :
           apply wp_return_some_eval
           simp only [Exec.evalExpr, temps_gss, typeof, cop, Source.dense.fn.targetcell.fn_return_eq,
             Nextelement.free_empty]
-          refine ⟨rfl, ?_, Post.refl hpre.dP hpre.dS hpre.dB⟩
+          refine ⟨rfl, ?_, hpre.post_refl⟩
           rw [hres, ite_eq_left (by omega)]
 
 end NautyVerified.Proofs.Targetcell

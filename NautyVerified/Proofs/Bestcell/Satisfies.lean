@@ -201,7 +201,7 @@ theorem bestcell_satisfies {xi : ExternalCalls} {n : Nat} (bg : block) (gofs : p
           (nd _ gP.2.2.2.1.symm gS.2.2.2.1.symm gB.2.2.2.1.symm) fun _ => hmod.2.2.1,
         hDB.keep hmod.1 (nd _ gP.2.2.2.2.1.symm gS.2.2.2.2.1.symm gB.2.2.2.2.1.symm)
           (nd _ gP.2.2.2.2.2.1.symm gS.2.2.2.2.2.1.symm gB.2.2.2.2.2.1.symm) fun _ => hmod.2.2.2,
-        hfP, hfS, hfB, hU.trans (hmod.1.mono memD)⟩
+        hfP, hfS, hfB, hU.trans (hmod.1.mono memD), hPS, hPB, hSB⟩
     -- `i = nnt = 0;`
     wp_step; wp_step; wp_step; wp_step; wp_step
     apply wp_set_eval

@@ -56,7 +56,8 @@ structure Pre {n : Nat} (m : mem) (bg : block) (gofs : ptrofs) (gw : Nat → Lib
   nM : n ≤ 64 * M
 
 /-- What `bestcell` and `targetcell` leave: the three `DYNALLSTAT` pairs, each
-either as before or a block not valid before, and only `dyn3Set` changed. -/
+either as before or a block not valid before, pairwise distinct when in use,
+and only `dyn3Set` changed. -/
 def Post (m m' : mem) (capP : Nat) (bP : block) (capS : Nat) (bS : block) (capB : Nat)
     (bB : block) : Prop :=
   ∃ capP' bP' capS' bS' capB' bB', DynAt m' WP WPS 4 capP' bP' ∧ DynAt m' WS WSS 8 capS' bS' ∧
@@ -64,13 +65,27 @@ def Post (m m' : mem) (capP : Nat) (bP : block) (capS : Nat) (bS : block) (capB 
     ((capP' = capP ∧ bP' = bP) ∨ ¬ Mem.valid_block m bP') ∧
     ((capS' = capS ∧ bS' = bS) ∨ ¬ Mem.valid_block m bS') ∧
     ((capB' = capB ∧ bB' = bB) ∨ ¬ Mem.valid_block m bB') ∧
-    Unch m m' (dyn3Set m capP bP capS bS capB bB)
+    Unch m m' (dyn3Set m capP bP capS bS capB bB) ∧
+    (0 < capP' → 0 < capS' → bP' ≠ bS') ∧ (0 < capP' → 0 < capB' → bP' ≠ bB') ∧
+    (0 < capS' → 0 < capB' → bS' ≠ bB')
 
 theorem Post.refl {m : mem} {capP capS capB : Nat} {bP bS bB : block}
-    (hP : DynAt m WP WPS 4 capP bP) (hS : DynAt m WS WSS 8 capS bS) (hB : DynAt m BK BKS 4 capB bB) :
+    (hP : DynAt m WP WPS 4 capP bP) (hS : DynAt m WS WSS 8 capS bS) (hB : DynAt m BK BKS 4 capB bB)
+    (hPS : 0 < capP → 0 < capS → bP ≠ bS) (hPB : 0 < capP → 0 < capB → bP ≠ bB)
+    (hSB : 0 < capS → 0 < capB → bS ≠ bB) :
     Post m m capP bP capS bS capB bB :=
   ⟨capP, bP, capS, bS, capB, bB, hP, hS, hB, .inl ⟨rfl, rfl⟩, .inl ⟨rfl, rfl⟩, .inl ⟨rfl, rfl⟩,
-    Unch.refl _ _⟩
+    Unch.refl _ _, hPS, hPB, hSB⟩
+
+/-- `Post.refl` with the separation `Pre` records. -/
+theorem Pre.post_refl {n : Nat} {m : mem} {bg : block} {gofs : ptrofs}
+    {gw : Nat → Lib.Integers.int64} {grows : Array (VSet n)} {bl : block} {lofs : ptrofs}
+    {lab : Array Nat} {bp : block} {pofs : ptrofs} {ptn : Array Nat} {level M capP : Nat}
+    {bP : block} {capS : Nat} {bS : block} {capB : Nat} {bB : block}
+    (h : Pre m bg gofs gw grows bl lofs lab bp pofs ptn level M capP bP capS bS capB bB) :
+    Post m m capP bP capS bS capB bB :=
+  Post.refl h.dP h.dS h.dB (fun hc => (h.sP hc).2.2.2.2.2.1) (fun hc => (h.sP hc).2.2.2.2.2.2)
+    (fun hc => (h.sS hc).2.2.2.2.2)
 
 def bestcellSpec {n : Nat} (bg : block) (gofs : ptrofs) (gw : Nat → Lib.Integers.int64)
     (grows : Array (VSet n)) (bl : block) (lofs : ptrofs) (lab : Array Nat) (bp : block)

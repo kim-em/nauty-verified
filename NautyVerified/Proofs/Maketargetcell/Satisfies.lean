@@ -65,7 +65,9 @@ def maketargetcellSpec {n : Nat} (bg : block) (gofs : ptrofs) (gw : Nat → Lib.
       ((capP' = capP ∧ bP' = bP) ∨ ¬ Mem.valid_block m bP') ∧
       ((capS' = capS ∧ bS' = bS) ∨ ¬ Mem.valid_block m bS') ∧
       ((capB' = capB ∧ bB' = bB) ∨ ¬ Mem.valid_block m bB') ∧
-      Unch m m' (fun z => dyn3Set m capP bP capS bS capB bB z ∨ z = bt ∨ z = bz ∨ z = bc)
+      Unch m m' (fun z => dyn3Set m capP bP capS bS capB bB z ∨ z = bt ∨ z = bz ∨ z = bc) ∧
+      (0 < capP' → 0 < capS' → bP' ≠ bS') ∧ (0 < capP' → 0 < capB' → bP' ≠ bB') ∧
+      (0 < capS' → 0 < capB' → bS' ≠ bB')
 
 def entryTemps (bg : block) (gofs : ptrofs) (bl : block) (lofs : ptrofs) (bp : block)
     (pofs : ptrofs) (level : Nat) (bt : block) (tofs : ptrofs) (bz : block) (zofs : ptrofs)
@@ -147,7 +149,8 @@ theorem maketargetcell_satisfies {xi : ExternalCalls} {n : Nat} (bg : block) (go
         typeof, cop])
       (by simp [Common.Globalenvs.Genv.find_funct, funct_targetcell]) rfl
       ⟨rfl, hpre, hhn, hh0, htc⟩ ?_
-    rintro t v m1 ⟨rfl, rfl, capP', bP', capS', bS', capB', bB', hDP, hDS, hDB, hfP, hfS, hfB, hU⟩
+    rintro t v m1 ⟨rfl, rfl, capP', bP', capS', bS', capB', bB', hDP, hDS, hDB, hfP, hfS, hfB, hU,
+      hPS', hPB', hSB'⟩
     simp only [set_opttemp, E0_append]
     have hr := targetcell_mem ⟨grows⟩ lab ptn level tcLevel hint hpre.psize hpre.plast hhn hx hxg
     generalize hR : Hex.GraphIso.Nauty.targetcell ⟨grows⟩ lab ptn level tcLevel hint = r at hr
@@ -278,7 +281,7 @@ theorem maketargetcell_satisfies {xi : ExternalCalls} {n : Nat} (bg : block) (go
         (nO _ (Ne.symm oT.2.2.2.2.2.2.1) (Ne.symm oZ.2.2.2.2.2.2.1) (Ne.symm oC.2.2.2.2.2.2.1))
         fun hc => Keep.unch hU15 (nb bB' bB capB capB' hfB (fun z hz => (hout.out z (by
           rcases hz with h | h | h <;> simp [h])).2.2.2.2.2.2.2.2.2) hc),
-      hfP, hfS, hfB, ?_⟩
-    exact (hU.mono fun _ h => .inl h).trans (hU15.mono fun _ h => .inr h)
+      hfP, hfS, hfB, (hU.mono fun _ h => .inl h).trans (hU15.mono fun _ h => .inr h), hPS', hPB',
+      hSB'⟩
 
 end NautyVerified.Proofs.Maketargetcell
