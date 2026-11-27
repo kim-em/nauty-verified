@@ -226,6 +226,14 @@ def rowWords {n : Nat} (m : Nat) (s : Nauty.VSet n) : List Int :=
 /-- `SETWORDSNEEDED(n)`. -/
 def setwordsNeeded (n : Nat) : Nat := (n + 63) / 64
 
+/-- A count as a C `int` holds it (modulo `2^32`, signed), which is what
+`nv_write` receives for the `int` members of `statsblk`. -/
+def asInt (v : Nat) : Int := (BitVec.ofNat 32 v).toInt
+
+/-- A count as an `unsigned long` member of `statsblk` cast to `long`
+(modulo `2^64`, signed). -/
+def asLong (v : Nat) : Int := (BitVec.ofNat 64 v).toInt
+
 /-- The final search state of HexGraphIso's dense search on `G`. -/
 def finalState {n k : Nat} (G : Colored n k) : Nauty.Search n :=
   let (lab0, cellEnds) := Nauty.initialPartition G
@@ -234,7 +242,9 @@ def finalState {n k : Nat} (G : Colored n k) : Nauty.Search n :=
 /-- What `dense_main` writes when nauty computes what HexGraphIso computes:
 each emitted generator (tag 1), the canonical labelling (2), the orbits (3),
 the canonical graph's setwords (4) and the statistics (5), the last of which,
-`errstatus`, is 0. -/
+`errstatus`, is 0. The statistics are written as the C types hold them
+(`asInt`, `asLong`): nothing bounds the search's counters, and nauty never
+reads them back to make a decision. -/
 def expected {n k : Nat} (G : Colored n k) : List Int :=
   let r := Nauty.runColoredTraced G
   let m := setwordsNeeded n
@@ -242,7 +252,8 @@ def expected {n k : Nat} (G : Colored n k) : List Int :=
   (2 :: r.result.canonlab.toList.map (fun (i : Nat) => (i : Int))) ++
   (3 :: (finalState G).orbits.toList.map (fun (i : Nat) => (i : Int))) ++
   (4 :: r.result.canong.toList.flatMap (rowWords m)) ++
-  [5, (r.result.numorbits : Int), r.result.numgenerators, r.result.numnodes,
-    r.result.numbadleaves, r.result.maxlevel, r.result.tctotal, r.result.canupdates, 0]
+  [5, asInt r.result.numorbits, asInt r.result.numgenerators, asLong r.result.numnodes,
+    asLong r.result.numbadleaves, asInt r.result.maxlevel, asLong r.result.tctotal,
+    asLong r.result.canupdates, 0]
 
 end NautyVerified.Statement

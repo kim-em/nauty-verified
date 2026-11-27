@@ -383,9 +383,21 @@ terminates with `writes t = expected G`); every behaviour consistent with
 `ins` is that one by determinism of Clight steps up to the results of
 external calls (`nv_write`'s event result is arbitrary but does not affect
 the state), and Phase 3's backward simulation carries the behaviour to the
-binary. The written statistics need HexGraphIso bounds (`numgenerators`,
-`numnodes`, … fit the C types) to read back as the exact naturals of
-`expected`.
+binary. Decisions taken with Kim on the final statement (2026-11-27):
+
+- The statistics in `expected` are compared modulo their C types
+  (`Statement.asInt`, `Statement.asLong`): no bound on the search's counters
+  holds for every graph with `n ≤ maxN`, and nauty never reads them back to
+  decide anything, so the theorem stays unconditional.
+- nauty does not report every admitted automorphism: in `processnode`'s
+  code-2 case it skips `userautomproc` when `orbjoin` leaves the orbit count
+  unchanged, while the pinned hex-graph-iso v0.10.0 pushes onto `genTrace`
+  regardless. `expected` must write HexGraphIso's emitted sequence
+  (`SearchState.emitted`, hex-dev PR #11048); nauty-verified re-pins
+  hex-graph-iso to the release containing it and switches `expected` to
+  `TraceRun.emitted`. Until then the C-side specs state the trace directly
+  (`genWords workperm n` exactly when `numgenerators` increases), which holds
+  for both versions.
 
 Compose Phase 5 with Phase 3 into `densenauty_binary_correct`; derive the
 corollaries from `HexGraphIso` (`canon_iso`, `canon_invariant`,
