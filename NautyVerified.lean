@@ -18,6 +18,7 @@ import NautyVerified.Proofs.Nextelement.Satisfies
 import NautyVerified.Statement.Dense
 import NautyVerified.Statement.Compiler
 import NautyVerified.Logic.Array
+import NautyVerified.Logic.Ints
 import NautyVerified.Proofs.Orbjoin.Chase
 import NautyVerified.Proofs.Orbjoin.Join
 import NautyVerified.Proofs.Orbjoin.Satisfies
@@ -25,3 +26,5 @@ import NautyVerified.Logic.Pointer
 import NautyVerified.Spec.Setwords
 import NautyVerified.Logic.PtrArith
 import NautyVerified.Proofs.Breakout.Clear
+import NautyVerified.Proofs.Breakout.Add
+import NautyVerified.Proofs.Breakout.Rotate
