@@ -50,10 +50,16 @@ inductive WriteStep : Senv.t → List val → Common.Memory.mem → trace → va
 def readSem : extcall_sem := ReadStep
 def writeSem : extcall_sem := WriteStep
 
-/-- The external functions: `nv_read`, `nv_write`, and no others. -/
-def extSem (name : RString) (_ : Common.AST.signature) : extcall_sem :=
-  if name = nameRead then readSem
-  else if name = nameWrite then writeSem
+/-- The signatures `nv_io.h` declares: `long nv_read(void)`, `void nv_write(long)`. -/
+def sigRead : Common.AST.signature := { sig_args := [], sig_res := .Xlong, sig_cc := Common.AST.cc_default }
+def sigWrite : Common.AST.signature :=
+  { sig_args := [.Xlong], sig_res := .Xvoid, sig_cc := Common.AST.cc_default }
+
+/-- The external functions: `nv_read` and `nv_write` at their declared
+signatures, and nothing else. -/
+def extSem (name : RString) (sg : Common.AST.signature) : extcall_sem :=
+  if name = nameRead ∧ sg = sigRead then readSem
+  else if name = nameWrite ∧ sg = sigWrite then writeSem
   else fun _ _ _ _ _ _ => False
 
 /-- The environment of the end-to-end theorem. -/
