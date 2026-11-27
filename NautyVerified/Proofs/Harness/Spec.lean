@@ -106,6 +106,7 @@ def densenautySpec {n k : Nat} (G : Colored n k) (gens : List (Array Nat)) (bg b
       .Vint (ir (wordsOf n)), .Vint (ir n), .Vptr bc Ptrofs.zero] ∧
     (∃ m₀, Genv.init_mem Init.prog = some m₀ ∧
       Unch m₀ m (fun z => z = Block.options ∨ ¬ Mem.valid_block m₀ z) ∧
+      (∀ z, Mem.valid_block m₀ z → Mem.valid_block m z) ∧
       ∀ z ∈ [bg, bl, bp, bo, bst, bc], ¬ Mem.valid_block m₀ z ∧ Mem.valid_block m z) ∧
     OptionsAt m ∧
     (∃ gw, GraphAt m bg Ptrofs.zero gw (rowsOf G) (wordsOf n)) ∧

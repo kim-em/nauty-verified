@@ -4,8 +4,9 @@ import NautyVerified.Proofs.Alloc.Keep
 /-!
 # `updatecan` meets its specification
 
-`updatecanSpec`: called with a graph `g`, the current best graph `canong`
-(both `n` rows of `M` words), a labelling `lab` hitting every vertex and
+`updatecanSpec`: called with a graph `g` and the current best graph `canong`
+(both `n` rows of `M` words, of which only `canong`'s first `samerows` need
+represent anything, since `updatecan` overwrites the rest), a labelling `lab` hitting every vertex and
 `samerows`, nauty's `updatecan` leaves `canong` holding HexGraphIso's
 `updatecan ⟨g⟩ canong lab samerows`. `DYNALLOC1` may replace naugraph.c's
 `workperm` (`DynAt`); nothing else changes.
@@ -33,7 +34,7 @@ def updatecanSpec {n : Nat} (bg : block) (gofs : ptrofs) (gw : Nat → Lib.Integ
     (b0 : block) : FunSpec where
   pre args m := args = [.Vptr bg gofs, .Vptr bc cofs, .Vptr bl lofs, .Vint (ir samerows),
       .Vint (ir M), .Vint (ir n)] ∧
-    GraphAt m bg gofs gw grows M ∧ GraphAt m bc cofs cw canong M ∧ canong.size = n ∧
+    GraphAt m bg gofs gw grows M ∧ Graph.RowsAt m bc cofs cw canong samerows M ∧ canong.size = n ∧
     ArrayAt m .Mint32 bl (intOfZ (Ptrofs.unsigned lofs)) (ints lab) n ∧ lab.size = n ∧
     (∀ j < n, lab[j]! < n) ∧ (∀ p < n, ∃ j < n, lab[j]! = p) ∧
     DynAt m WP WPS 4 cap b0 ∧ LeftbitTable m ∧ BitTable m Block.nautilBit ∧
@@ -108,7 +109,7 @@ theorem updatecan_satisfies {xi : ExternalCalls} {n : Nat} (bg : block) (gofs : 
     have og := hout bg hvg gWPS.2.2.symm gWP.2.2.symm (fun ⟨h1, h2⟩ => (hb0 h1).2.2.1 h2.symm)
     have obit := hout _ hvbit (by decide) (by decide) (fun ⟨h1, h2⟩ => (hb0 h1).2.2.2.1 h2.symm)
     have olb := hout _ hvlb (by decide) (by decide) (fun ⟨h1, h2⟩ => (hb0 h1).2.2.2.2 h2.symm)
-    have hcg1 : GraphAt m1 bc cofs cw canong M := ⟨hcg.arr.unch hu1 oc, hcg.rep⟩
+    have hcg1 : Graph.RowsAt m1 bc cofs cw canong samerows M := ⟨hcg.arr.unch hu1 oc, hcg.rep⟩
     have hg1 : GraphAt m1 bg gofs gw grows M := ⟨hg.arr.unch hu1 og, hg.rep⟩
     have hlarr1 := hlarr.unch hu1 ol
     have hbit1 := hbit.unch hu1 obit
@@ -172,7 +173,7 @@ theorem updatecan_satisfies {xi : ExternalCalls} {n : Nat} (bg : block) (gofs : 
         cW := fun hn0 => ((hbD (by omega)).1).symm
         cbit := gBit.1.symm, clb := gLb.1.symm, cwp := gWP.1.symm
         M1 := hM1, Mlt := hM2, nM := hnM }
-    have hcg2 : GraphAt m2 bc cofs cw canong M := ⟨hcg1.arr.unch hu2 (nb _ fun h => (hbD h).1), hcg1.rep⟩
+    have hcg2 : Graph.RowsAt m2 bc cofs cw canong samerows M := ⟨hcg1.arr.unch hu2 (nb _ fun h => (hbD h).1), hcg1.rep⟩
     have hsrv : PTree.get Updatecan.id.samerows le2 = some (.Vint (ir samerows)) := by
       rw [hT2 _ (by decide) (by decide) (by decide)]
       simp (config := {decide := true}) only [entryTemps, temps_gso, temps_gss]

@@ -55,7 +55,7 @@ def testcanlabSpec {n : Nat} (bg : block) (gofs : ptrofs) (gw : Nat → Lib.Inte
     ∃ capP' bP' capS' bS', DynAt m' WP WPS 4 capP' bP' ∧ DynAt m' WS WSS 8 capS' bS' ∧
       n ≤ capP' ∧ M ≤ capS' ∧
       ((capP' = capP ∧ bP' = bP) ∨ ¬ Mem.valid_block m bP') ∧
-      ((capS' = capS ∧ bS' = bS) ∨ ¬ Mem.valid_block m bS') ∧
+      ((capS' = capS ∧ bS' = bS) ∨ ¬ Mem.valid_block m bS') ∧ (0 < capP' → bP' ≠ bS') ∧
       Unch m m' (fun z => z = bs ∨ z = WPS ∨ z = WP ∨ z = WSS ∨ z = WS ∨ (0 < capP ∧ z = bP) ∨
         (0 < capS ∧ z = bS) ∨ (¬ Mem.valid_block m bP' ∧ z = bP') ∨ (¬ Mem.valid_block m bS' ∧ z = bS'))
 
@@ -328,7 +328,7 @@ theorem testcanlab_satisfies {xi : ExternalCalls} {n : Nat} (bg : block) (gofs :
         · exact hnv (h ▸ hgP _ hvWPS)
       refine ⟨trivial, trivial, harr4, capP', bP', capS', bS',
         hDP3.keep hu4 ?_ ?_ fun hc => Keep.unch hu4 ?_,
-        hDS3.keep hu4 ?_ ?_ fun _ => hk4, hcapP, hcapS, hbP', ?_,
+        hDS3.keep hu4 ?_ ?_ fun _ => hk4, hcapP, hcapS, hbP', ?_, hPS,
         hU3.trans (hu4.mono fun z hz => ?_)⟩
       · rintro (h | h)
         · exact hS.2.2.2.2.2.2.1 h.symm

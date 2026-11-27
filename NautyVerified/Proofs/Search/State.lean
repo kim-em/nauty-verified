@@ -328,6 +328,11 @@ structure SInv {n : Nat} (st : Search n) : Prop where
     st.eqlevFirst < 2147483648 ∧ -1 ≤ st.eqlevCanon ∧ st.eqlevCanon < 2147483648 ∧
     -1 ≤ st.compCanon ∧ st.compCanon ≤ 1 ∧ st.canonlevel < 2147483648 ∧
     st.stabvertex < 2147483648 ∧ st.cosetindex < 2147483648
+  /-- The workspace holds `wsPairs` pairs. -/
+  wsCap : st.wsCap = wsPairs
+  maxlevelLe : st.maxlevel ≤ n
+  numorbitsLe : st.numorbits ≤ n
+  orbitsDesc : Hex.GraphIso.Nauty.Orbit.Descending st.orbits n
 
 /-- Memory holds HexGraphIso's search state `st` for the graph `ctx`. -/
 structure SearchAt {n : Nat} (m : mem) (S : SLoc) (ctx : Ctx n) (st : Search n) (pre nsp : Bool) :

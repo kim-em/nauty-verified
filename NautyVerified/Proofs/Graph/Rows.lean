@@ -134,4 +134,66 @@ theorem GraphAt.setRow {n : Nat} {m m' : mem} {bc : block} {cofs : ptrofs}
       · have := Nat.mul_le_mul_left M (show i + 1 ≤ v by omega)
         rw [Nat.mul_add, Nat.mul_one] at this; omega
 
+/-- The first `k` rows of an array of `n` rows of `M` words represent `rows`:
+what `updatecan` needs of `canong`, whose rows from `samerows` on it overwrites. -/
+structure RowsAt {n : Nat} (m : mem) (bg : block) (gofs : ptrofs) (gw : Nat → Lib.Integers.int64)
+    (rows : Array (VSet n)) (k M : Nat) : Prop where
+  arr : ArrayAt m .Mint64 bg (intOfZ (Ptrofs.unsigned gofs)) (longs gw) (M * n)
+  rep : ∀ v < k, SetRep (fun w => bv64 (gw (M * v + w))) M rows[v]!
+
+theorem RowsAt.graphAt {n : Nat} {m : mem} {bg : block} {gofs : ptrofs}
+    {gw : Nat → Lib.Integers.int64} {rows : Array (VSet n)} {M : Nat}
+    (h : RowsAt m bg gofs gw rows n M) : GraphAt m bg gofs gw rows M := ⟨h.arr, h.rep⟩
+
+/-- Row `v` of the array, through a pointer to it. -/
+theorem RowsAt.row {n : Nat} {m : mem} {bg : block} {gofs : ptrofs} {gw : Nat → Lib.Integers.int64}
+    {rows : Array (VSet n)} {k M : Nat} (h : RowsAt m bg gofs gw rows k M) {v : Nat} (hv : v < n) :
+    ArrayAt m .Mint64 bg (intOfZ (Ptrofs.unsigned (ptrTo (intOfZ (Ptrofs.unsigned gofs)) 8 (M * v))))
+      (longs fun i => gw (M * v + i)) M :=
+  Prune.Long.slice_at h.arr (M * v) M (by
+    have := Nat.mul_le_mul_left M (show v + 1 ≤ n by omega)
+    rw [Nat.mul_add, Nat.mul_one] at this; exact this)
+
+/-- Replacing row `k` of an array whose first `k` rows are represented. -/
+theorem RowsAt.setRow {n : Nat} {m m' : mem} {bc : block} {cofs : ptrofs}
+    {cw : Nat → Lib.Integers.int64} {rows : Array (VSet n)} {M i : Nat}
+    (h : RowsAt m bc cofs cw rows i M) (hi : i < n) (hsz : rows.size = n)
+    {w' : Nat → Lib.Integers.int64} {r : VSet n}
+    (h' : ArrayAt m' .Mint64 bc (intOfZ (Ptrofs.unsigned (ptrTo (intOfZ (Ptrofs.unsigned cofs)) 8 (M * i))))
+      (longs w') M)
+    (hrep : SetRep (fun w => bv64 (w' w)) M r)
+    (ho : Outside m m' bc (intOfZ (Ptrofs.unsigned (ptrTo (intOfZ (Ptrofs.unsigned cofs)) 8 (M * i))))
+      (intOfZ (Ptrofs.unsigned (ptrTo (intOfZ (Ptrofs.unsigned cofs)) 8 (M * i))) + 8 * M)) :
+    RowsAt m' bc cofs (rowSet cw M i w') (rows.set! i r) (i + 1) M := by
+  have hf := h.arr.fits
+  have hb := h.arr.base_nonneg
+  have h8 : csize .Mint64 = 8 := rfl
+  rw [h8] at hf
+  have hle : M * i + M ≤ M * n := by
+    have := Nat.mul_le_mul_left M (show i + 1 ≤ n by omega); rw [Nat.mul_add, Nat.mul_one] at this
+    exact this
+  have hu : intOfZ (Ptrofs.unsigned (ptrTo (intOfZ (Ptrofs.unsigned cofs)) 8 (M * i))) =
+      intOfZ (Ptrofs.unsigned cofs) + 8 * ((M * i : Nat) : Int) := by
+    apply unsigned_ptrTo <;> push_cast at hf ⊢ <;> omega
+  rw [hu] at h' ho
+  refine ⟨?_, fun v hv => ?_⟩
+  · have := ArrayAt.outside h.arr (M * i) M (by rw [h8]; exact h')
+      (by rw [h8, Int.mul_add, ← Int.add_assoc]; exact ho)
+    refine this.congr fun u _ => ?_
+    simp only [rowSet, longs]
+    split <;> rfl
+  · by_cases hvi : v = i
+    · subst hvi
+      rw [Array.getElem!_set!_self _ _ _ (by omega)]
+      refine setRep_congr hrep fun w hw => ?_
+      simp only [rowSet]
+      rw [ite_eq_left ⟨by omega, by omega⟩, show M * v + w - M * v = w by omega]
+    · rw [Array.getElem!_set!_ne _ _ _ _ (Ne.symm hvi)]
+      refine setRep_congr (h.rep v (by omega)) fun w hw => ?_
+      simp only [rowSet]
+      rw [ite_eq_right]
+      rintro ⟨h1, h2⟩
+      have := Nat.mul_le_mul_left M (show v + 1 ≤ i by omega)
+      rw [Nat.mul_add, Nat.mul_one] at this; omega
+
 end NautyVerified.Proofs.Graph

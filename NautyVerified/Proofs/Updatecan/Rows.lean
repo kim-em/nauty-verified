@@ -98,7 +98,7 @@ theorem wp_rows {Q : Post} {le : temp_env} {m : mem} {n : Nat} {bg : block} {gof
     {cw : Nat → Lib.Integers.int64} {canong : Array (VSet n)} {bl : block} {lofs : ptrofs}
     {lab : Array Nat} {bW : block} {M samerows : Nat}
     (h : Frame m le bg gofs gw grows bc cofs bl lofs lab bW M)
-    (hcg : GraphAt m bc cofs cw canong M) (hcsz : canong.size = n) (hsr : samerows ≤ n)
+    (hcg : Graph.RowsAt m bc cofs cw canong samerows M) (hcsz : canong.size = n) (hsr : samerows ≤ n)
     (hsrv : PTree.get id.samerows le = some (.Vint (ir samerows)))
     (hQ : ∀ le' m' cw', GraphAt m' bc cofs cw'
         (Hex.GraphIso.Nauty.updatecan ⟨grows⟩ canong lab samerows) M →
@@ -115,13 +115,13 @@ theorem wp_rows {Q : Post} {le : temp_env} {m : mem} {n : Nat} {bg : block} {gof
     e' = empty_env ∧ ∃ c cw', samerows ≤ c ∧ c ≤ n ∧ v = n - c ∧
       PTree.get id.i le' = some (.Vint (ir c)) ∧
       PTree.get id.ph le' = some (.Vptr bc (ptrTo basec 8 (M * c))) ∧
-      GraphAt m' bc cofs cw' (C c) M ∧ Unch m m' (· = bc) ∧
+      Graph.RowsAt m' bc cofs cw' (C c) c M ∧ Unch m m' (· = bc) ∧
       ∀ x, x ≠ id.i → x ≠ id.ph → PTree.get x le' = PTree.get x le
   let J := fun (v : Nat) (t : trace) (e' : env) (le' : temp_env) (m' : mem) => t = E0 ∧
     e' = empty_env ∧ ∃ c cw', samerows ≤ c ∧ c < n ∧ v = n - c ∧
       PTree.get id.i le' = some (.Vint (ir c)) ∧
       PTree.get id.ph le' = some (.Vptr bc (ptrTo basec 8 (M * c))) ∧
-      GraphAt m' bc cofs cw' (C (c + 1)) M ∧ Unch m m' (· = bc) ∧
+      Graph.RowsAt m' bc cofs cw' (C (c + 1)) (c + 1) M ∧ Unch m m' (· = bc) ∧
       ∀ x, x ≠ id.i → x ≠ id.ph → PTree.get x le' = PTree.get x le
   wp_step; wp_step; wp_step; wp_step
   apply wp_set_eval
@@ -186,11 +186,11 @@ theorem wp_rows {Q : Post} {le : temp_env} {m : mem} {n : Nat} {bg : block} {gof
               Exec.derefLoc, Cfrontend.Ctypes.access_mode, Mem.loadv, Alloc.Mptr_eq,
               show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl, hf.wptr (by omega), typeof, cop])
         (by simp [Common.Globalenvs.Genv.find_funct, funct_permset]) type_permset
-        ⟨rfl, hf.graph.row hlc, hf.graph.rep _ hlc, Graph.GraphAt.row hcg' hc, hf.warr, hf.wsmall,
+        ⟨rfl, hf.graph.row hlc, hf.graph.rep _ hlc, hcg'.row hc, hf.warr, hf.wsmall,
           hf.lb, hf.bit, hf.cg, hf.cW (by omega), hf.cbit, hf.clb, hM1, hMlt⟩ ?_
       rintro t r m2 ⟨rfl, w2', harr2, hrep2, hu2, hout2⟩
       refine ⟨by simp, rfl, c, Graph.rowSet cw' M c w2', hsc, hc, rfl, hi, hph, ?_, hu.trans hu2, ho⟩
-      have := Graph.GraphAt.setRow hcg' hc hcsz' harr2 hrep2 hout2
+      have := Graph.RowsAt.setRow hcg' hc hcsz' harr2 hrep2 hout2
       have hC : C (c + 1) = (C c).set! c (grows[lab[c]!]!.permset (invPerm lab)) := by
         simp only [C]
         rw [show c + 1 - samerows = (c - samerows) + 1 by omega, foldl_range'_succ,
@@ -204,7 +204,7 @@ theorem wp_rows {Q : Post} {le : temp_env} {m : mem} {n : Nat} {bg : block} {gof
       have hC : C c = Hex.GraphIso.Nauty.updatecan ⟨grows⟩ canong lab samerows := by
         simp only [C]; rw [updatecan_eq]
       rw [hC] at hcg'
-      simpa using hQ le' m' cw' hcg' hu ho
+      simpa using hQ le' m' cw' hcg'.graphAt hu ho
   · rintro v t e' le' m' ⟨rfl, rfl, c, cw', hsc, hcn, rfl, hi, hph, hcg', hu, ho⟩
     have hf := (h.temps ho).unch hu
     wp_step; wp_step; wp_step

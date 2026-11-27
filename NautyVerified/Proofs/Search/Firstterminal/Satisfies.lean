@@ -380,7 +380,8 @@ theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx :
                 obtain ⟨-, -, a3, -, -, -, -, -, -, -, a11, a12⟩ := hinv.scalars
                 have := h.nlt
                 exact ⟨by simp; omega, by simp; omega, a3, by simp; omega, by simp; omega,
-                  by simp, by simp; omega, by simp, by simp, by simp; omega, a11, a12⟩ }
+                  by simp, by simp; omega, by simp, by simp, by simp; omega, a11, a12⟩
+              maxlevelLe := by simp only []; omega }
           n0 := h.n0, nlt := h.nlt, nM := h.nM, M1 := h.M1, Mlt := h.Mlt }
     · exact ⟨hU16.mono fun z hz => .inl (by revert hz; revert z; simp [SLoc.blocks]), hV⟩
 

@@ -374,6 +374,16 @@ Conventions settled while doing these:
   that leaves the orbits unchanged, while HexGraphIso's `genTrace` records it.
   The last point also affects the final statement: `expected` writes
   `genTrace`, which is more than nauty emits.
+- For `processnode`: `updatecanSpec` asks only that `canong`'s first
+  `samerows` rows represent anything (`Graph.RowsAt`), since `updatecan`
+  overwrites the rest and `CanongAt` says no more; `testcanlabSpec` states
+  that its two reallocated work blocks differ; `SInv` adds `wsCap = 500`,
+  `maxlevel ≤ n`, `numorbits ≤ n` and the orbit forest being descending
+  (`orbjoin`'s precondition; the C compares `maxlevel` and `numorbits` as
+  `int`s). `Proofs/Search/Step.lean` composes frames across calls that
+  reallocate the work arrays (`SStep`, `WorkMono`, `WorkAt.next`,
+  `SearchAt.rebuildW`); `Spec/Processnode.lean` restates `classify` in the
+  C's order.
 
 ## Phase 6: dense end-to-end
 
