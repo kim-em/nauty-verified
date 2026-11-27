@@ -64,3 +64,4 @@ import NautyVerified.Proofs.Isautom.Scan
 import NautyVerified.Proofs.Isautom.Satisfies
 import NautyVerified.Proofs.Permset.Syntax
 import NautyVerified.Proofs.Permset.Take
+import NautyVerified.Proofs.Permset.Word
