@@ -151,3 +151,4 @@ import NautyVerified.Proofs.Harness.Input
 import NautyVerified.Proofs.Harness.Graph
 import NautyVerified.Proofs.Harness.Part
 import NautyVerified.Proofs.Harness.PartC
+import NautyVerified.Proofs.Harness.Output
