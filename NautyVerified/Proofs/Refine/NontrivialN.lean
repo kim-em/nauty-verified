@@ -84,6 +84,7 @@ structure PassInvN {n : Nat} (le : temp_env) (m0 m : mem) (L : Loc) (ctx : Ctx n
     (stc : RefineSt n) : Prop where
   mem : ∃ aw, Mem m L ctx stc aw
   unch : Unch m0 m (cellW L)
+  keep : Alloc.KeepA m0 m
   tmp : Tmp le L stc
   sp : Sp le m
   pn : p ≤ n
@@ -121,7 +122,7 @@ def CellPass (xi : ExternalCalls) (f : function) (cn : statement) (T : List Comm
       Tmp le' L (nontrivialCell ctx L.level ws cell1 cell2 st) →
       CellOut n L.level st (nontrivialCell ctx L.level ws cell1 cell2 st) cell1 cell2 →
       (∃ bv, ArrayAt m' .Mint32 L.bB 0 bv L.capB) → (∃ wv, ArrayAt m' .Mint32 L.bW 0 wv L.capW) →
-      Unch m m' (cellW L) → Keep m m' L.bB → Keep m m' L.bW →
+      Unch m m' (cellW L) → Alloc.KeepA m m' →
       (∀ z, z ∉ T → PTree.get z le' = PTree.get z le) →
       Q.normal E0 empty_env le' m' ∧ Q.cont E0 empty_env le' m') →
     Wp xi ge f cn Q empty_env le m
@@ -223,11 +224,12 @@ theorem wp_cellLoopN {cn : statement} {T : List Common.AST.ident}
         have hb0 : SBound n stc stc c c := ⟨rfl, hP.ok.ptnSize, hP.small, hP.code, hP.hint, hP.maxpos,
           by omega⟩
         refine hCP hSp1 hf hm ht1 hP.ok hb0 hlt hen' hc1 hcell2 hbv0 hwv0 ?_
-        intro le2 m2 aw2 hm2 ht2 hco2 _ _ hu2 _ _ g2
+        intro le2 m2 aw2 hm2 ht2 hco2 _ _ hu2 hk2 g2
         have hJ : J (n - c) E0 empty_env le2 m2 := by
           refine ⟨rfl, rfl, c, en, _, Nat.le_of_lt hlt, hen', rfl, ?_,
             { mem := ⟨aw2, hm2⟩
               unch := hP.unch.trans hu2
+              keep := hP.keep.trans hk2
               tmp := ht2
               sp := hSo.temps (hSo.unch hSp1 hu2 fun z hz => hz) fun z hz =>
                 g2 z fun h => hz (List.mem_cons_of_mem _ (List.mem_cons_of_mem _ h))
@@ -283,7 +285,7 @@ theorem wp_fillWS {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Nat} 
     (hbit : Set.BitTable m Block.naugraphBit)
     (hQ : ∀ le' m' w', ArrayAt m' .Mint64 L.bS 0 (longs w') L.M →
       SetRep (fun w => bv64 (w' w)) L.M (worksetOf n lab split1 split2) →
-      Unch m m' (· = L.bS) → Keep m m' L.bS →
+      Unch m m' (· = L.bS) → Alloc.KeepA m m' →
       (∀ z, z ≠ dense.id.i → PTree.get z le' = PTree.get z le) → Q.normal E0 empty_env le' m') :
     Wp xi ge f fillWS Q empty_env le m := by
   have hn := hok.nlt
@@ -296,21 +298,21 @@ theorem wp_fillWS {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Nat} 
       PTree.get dense.id.i le' = some (.Vint (ir (split1 + k : Nat))) ∧
       ArrayAt m' .Mint64 L.bS 0 (longs w) L.M ∧
       SetRep (fun x => bv64 (w x)) L.M (wsPre lab split1 k : VSet n) ∧
-      Unch m m' (· = L.bS) ∧ Keep m m' L.bS ∧
+      Unch m m' (· = L.bS) ∧ Alloc.KeepA m m' ∧
       (∀ z, z ≠ dense.id.i → PTree.get z le' = PTree.get z le)
   let J := fun (v : Nat) (t : trace) (e' : env) (le' : temp_env) (m' : mem) => t = E0 ∧
     e' = empty_env ∧ ∃ k w, k < len ∧ v = len - k ∧
       PTree.get dense.id.i le' = some (.Vint (ir (split1 + k : Nat))) ∧
       ArrayAt m' .Mint64 L.bS 0 (longs w) L.M ∧
       SetRep (fun x => bv64 (w x)) L.M (wsPre lab split1 (k + 1) : VSet n) ∧
-      Unch m m' (· = L.bS) ∧ Keep m m' L.bS ∧
+      Unch m m' (· = L.bS) ∧ Alloc.KeepA m m' ∧
       (∀ z, z ≠ dense.id.i → PTree.get z le' = PTree.get z le)
   simp only [fillWS, Set.sk]
   wp_step; wp_step; wp_step
   apply wp_set_eval
   simp only [Exec.evalExpr, hs1, E0_append]
   refine wp_loop (I := I) (J := J) ?_ ?_ (n := len) ⟨rfl, rfl, 0, w0, Nat.zero_le _, rfl,
-    by simp, hwsA, by simpa [wsPre] using hwsR, Unch.refl _ _, Keep.refl _ _,
+    by simp, hwsA, by simpa [wsPre] using hwsR, Unch.refl _ _, Alloc.KeepA.refl _,
     fun z hz => temps_gso _ _ hz⟩
   · rintro v t e' le' m' ⟨rfl, rfl, k, w, hk, rfl, hik, hwk, hrk, hu, hkp, ho⟩
     have hs2' : PTree.get dense.id.split2 le' = some (.Vint (ir split2)) := by
@@ -341,7 +343,7 @@ theorem wp_fillWS {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Nat} 
         (by omega) (by omega) rfl find_naugraphBit (hbit.unch hu (Ne.symm d.bS_g6)) ?_
       intro m1 hw1 hu1 _ hk1
       refine ⟨by simp, rfl, k, Set.addW w lab[split1 + k]!, by omega, rfl, hik, hw1, ?_,
-        hu.trans hu1, hkp.trans hk1, ho⟩
+        hu.trans hu1, hkp.trans (Alloc.KeepA.of_keep hu1 hk1), ho⟩
       rw [wsPre_succ]
       exact Set.setRep_add hrk hlk
   · rintro v t e' le' m' ⟨rfl, rfl, k, w, hk, rfl, hik, hwk, hrk, hu, hkp, ho⟩
@@ -392,7 +394,7 @@ theorem wp_nontrivial : NontrivialPass xi := by
   have hm2 : Mem m2 L ctx st aw := by
     obtain ⟨cv, hcv⟩ := hm1.cnt
     exact hm1.frame hok (hu2.mono fun z hz => .inr (.inr (.inr (.inr (.inr (.inr (.inl hz)))))))
-      (Keep.unch hu2 d.bW_bS) hk2 (Keep.unch hu2 (Ne.symm d.bS_bB)) (hm1.lab.unch hu2 d.bl_bS)
+      (Keep.unch hu2 d.bW_bS) (hk2 L.bS) (Keep.unch hu2 (Ne.symm d.bS_bB)) (hm1.lab.unch hu2 d.bl_bS)
       (hm1.ptn.unch hu2 d.bp_bS) (hm1.nc.unch hu2 d.bn_bS) (hm1.act.unch hu2 d.ba_bS) hm1.actRep
       ⟨cv, hcv.unch hu2 d.bc_bS⟩
   have ht2 : Tmp le2 L st := ht1.temps fun x hx => g2 x (by
@@ -428,6 +430,7 @@ theorem wp_nontrivial : NontrivialPass xi := by
     hok ⟨hso.labSize, hso.labOk, hso.ptnSize, hso.ptnEnd⟩
     { mem := ⟨aw, hm2.congr rfl rfl rfl rfl⟩
       unch := Unch.refl _ _
+      keep := Alloc.KeepA.refl _
       tmp := ht3.set _ (by decide)
       sp := ⟨hw2, hr2, hwsp2⟩
       pn := Nat.zero_le _
@@ -446,6 +449,7 @@ theorem wp_nontrivial : NontrivialPass xi := by
     { ok := hP.ok, ptnSmall := hP.small,
       ncSmall := by have := hP.nc; have h2 : st1.numcells = st.numcells := rfl; omega,
       hint := hP.hint, maxpos := hP.maxpos, code := hP.code }⟩ ?_
+    (((Alloc.KeepA.of_keep hu1 hk1).trans hk2).trans hP.keep)
   refine ((hu1.trans hu2).mono fun z hz => .inr (.inr (.inr (.inr (.inr (.inr (.inl hz))))))).trans
     (hP.unch.mono fun z hz => ?_)
   rcases hz with h | h | h | h | h | h | h

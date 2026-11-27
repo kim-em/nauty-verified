@@ -105,7 +105,7 @@ def dorefSpec {n : Nat} (xi : ExternalCalls) (L : Loc) (ctx : Ctx n) (lab ptn : 
     Unch m m₁ (fun z => z = NWPS ∨ z = NWP ∨ (0 < capN ∧ z = bN) ∨ ¬ Mem.valid_block m z) ∧
     (∀ z, Mem.valid_block m z → Mem.valid_block m₁ z) ∧
     (refineSpec L ctx lab ptn active numcells aw).post (refArgs L n) m₁ E0 .Vundef m₂ ∧
-    Unch m₂ m' (· = bq) ∧
+    Unch m₂ m' (· = bq) ∧ Alloc.KeepA m₂ m' ∧
     ArrayAt m' .Mint32 bq (intOfZ (Ptrofs.unsigned qofs)) (fun _ => .Vint (ir 0)) 1 ∧
     DynAt m' NWP NWPS 4 capN' bN' ∧ n ≤ capN' ∧
     ((capN' = capN ∧ bN' = bN) ∨ ¬ Mem.valid_block m bN')
@@ -233,7 +233,7 @@ theorem doref_satisfies {xi : ExternalCalls} {n : Nat} (L : Loc) (ctx : Ctx n)
       simp (config := {decide := true}) only [entryTemps, temps_gso, temps_gss, typeof, cop]
     · rintro t v m2 hpost
       have hpost' := hpost
-      obtain ⟨rfl, cW, bW', cS, bS', cB, bB', aw', -, -, -, -, -, -, -, hu2⟩ := hpost
+      obtain ⟨rfl, cW, bW', cS, bS', cB, bB', aw', -, -, -, -, -, -, -, hu2, -⟩ := hpost
       simp only [set_opttemp, seqPost, Post.after, E0_append]
       -- minlev, maxlev
       have hmi2 : PTree.get dense.id.mininvarlev le2 = some (.Vint mi) := by
@@ -353,7 +353,7 @@ theorem doref_satisfies {xi : ExternalCalls} {n : Nat} (L : Loc) (ctx : Ctx n)
       have hu3 : Unch m2 m3 (· = bq) := Unch.store hst rfl
       have hbNq : 0 < capN' → bN' ≠ bq := fun hc => Ne.symm (Alloc.ne_new hbN' hvq hqbN hc)
       refine ⟨m3, Nextelement.free_empty m3, by simp, m1, m2, capN', bN',
-        huN.mono fun z hz => ?_, hgN, hpost', hu3,
+        huN.mono fun z hz => ?_, hgN, hpost', hu3, Alloc.KeepA.storeArr hq2 hst,
         harr3.congr fun i hi => by simp [upd, show i = 0 by omega],
         hDN2.keep hu3 (Ne.symm hqN) (Ne.symm hqNS) (fun hc => Keep.unch hu3 (hbNq hc)), hcN, hbN'⟩
       rcases hz with h | h | h | ⟨hnv, rfl⟩

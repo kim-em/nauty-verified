@@ -90,6 +90,7 @@ theorem wp_nontrivial1 : NontrivialPass1 xi := by
     hok ⟨hso.labSize, hso.labOk, hso.ptnSize, hso.ptnEnd⟩
     { mem := ⟨aw, hm.congr rfl rfl rfl rfl⟩
       unch := Unch.refl _ _
+      keep := Alloc.KeepA.refl _
       tmp := ht3.set _ (by decide)
       sp := ⟨w, by rw [temps_gso _ _ (by decide), temps_gso _ _ (by decide)]; exact hw, hr⟩
       pn := Nat.zero_le _
@@ -107,7 +108,7 @@ theorem wp_nontrivial1 : NontrivialPass1 xi := by
   refine hQ le' m' ⟨aw', hm', hP.tmp,
     { ok := hP.ok, ptnSmall := hP.small,
       ncSmall := by have := hP.nc; have h2 : st1.numcells = st.numcells := rfl; omega,
-      hint := hP.hint, maxpos := hP.maxpos, code := hP.code }⟩ ?_
+      hint := hP.hint, maxpos := hP.maxpos, code := hP.code }⟩ ?_ hP.keep
   refine hP.unch.mono fun z hz => ?_
   rcases hz with h | h | h | h | h | h | h
   · exact .inl h

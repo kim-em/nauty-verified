@@ -1,3 +1,4 @@
+import NautyVerified.Proofs.Alloc.KeepV
 import NautyVerified.Proofs.Refine.State
 
 /-!
@@ -51,7 +52,7 @@ theorem wp_storeV {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} 
     (rhs : expr) (x : Int) (hrhs : Exec.evalExpr ge e le m rhs = some (.Vint (ir x)))
     (hrty : typeof rhs = tint)
     (hQ : ∀ m', ArrayAt m' .Mint32 bo (intOfZ (Ptrofs.unsigned ofs)) (upd vals c (.Vint (ir x))) n →
-      Unch m m' (· = bo) → Q.normal E0 e le m') :
+      Unch m m' (· = bo) → Alloc.KeepA m m' → Q.normal E0 e le m') :
     Wp xi ge f (.Sassign (.Ederef (.Ebinop .Oadd (.Etempvar p (tptr tint)) a (tptr tint)) tint) rhs)
       Q e le m := by
   obtain ⟨m', hst, harr', -⟩ := store_array harr hc (.Vint (ir x)) rfl
@@ -61,6 +62,6 @@ theorem wp_storeV {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} 
   show match Mem.store .Mint32 m bo (Ptrofs.unsigned _) _ with
     | some m' => Q.normal E0 e le m' | none => False
   rw [addr_int_at ofs harr hc hn, hst]
-  exact hQ m' harr' (Unch.store hst rfl)
+  exact hQ m' harr' (Unch.store hst rfl) (Alloc.KeepA.storeArr harr hst)
 
 end NautyVerified.Proofs.Refine

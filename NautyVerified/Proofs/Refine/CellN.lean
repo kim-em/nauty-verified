@@ -70,7 +70,7 @@ theorem wp_fixN {D : Dialect} (hD : D.Sem) {f : function} {Q : Post} {le : temp_
     (hcl1 : PTree.get dense.id.cell1 le = some (.Vint (ir cell1))) (hc : cell1 < n)
     (hmp : st.maxpos < n)
     (hQ : ∀ m' aw', Mem m' L ctx (nontrivialFix cell1 st) aw' → Unch m m' (· = L.ba) →
-      Q.normal E0 empty_env le m') :
+      Alloc.KeepA m m' → Q.normal E0 empty_env le m') :
     Wp xi ge f (fixNG D) Q empty_env le m := by
   have hnM := hok.nM
   have hnl := hok.nlt
@@ -90,15 +90,16 @@ theorem wp_fixN {D : Dialect} (hD : D.Sem) {f : function} {Q : Post} {le : temp_
     simp only [ite_true]
     wp_step
     refine hD.addE hMok hMl hm.act ht.active hcl1 rfl (by omega) hm.bit rfl ?_
-    intro m1 hact1 hu1
+    intro m1 hact1 hu1 hk1
     have hrep1 := Set.setRep_add hm.actRep hc
     have hm1 := hm.setAct hok hu1 hact1 hrep1
     refine hD.delE hMok hMl hact1 ht.active ht.maxpos rfl (by omega) (hm1.bit) rfl ?_
-    intro m2 hact2 hu2
+    intro m2 hact2 hu2 hk2
     have hm2 := hm1.setAct hok hu2 hact2 (Set.setRep_del hrep1 (by omega))
     simp only [E0_append]
     refine hQ m2 _ (hm2.congr (by simp [nontrivialFix, hmem]) (by simp [nontrivialFix, hmem])
       (by simp [nontrivialFix, hmem]) (by simp [nontrivialFix, hmem])) (hu1.trans hu2)
+      (hk1.trans hk2)
   · simp only [Val.of_bool, ite_true]
     rw [show Cfrontend.Cop.sem_unary_operation .Onotbool Vtrue tint m = some Vfalse from rfl]
     dsimp only
@@ -107,6 +108,7 @@ theorem wp_fixN {D : Dialect} (hD : D.Sem) {f : function} {Q : Post} {le : temp_
     apply wp_skip
     refine hQ m aw (hm.congr (by simp [nontrivialFix, hmem]) (by simp [nontrivialFix, hmem])
       (by simp [nontrivialFix, hmem]) (by simp [nontrivialFix, hmem])) (Unch.refl _ _)
+      (Alloc.KeepA.refl _)
 
 theorem le_cmax {cs : List Nat} {c : Nat} (h : c ∈ cs) : c ≤ cmax cs := by
   obtain ⟨o, ho, rfl⟩ := List.mem_iff_getElem.1 h
@@ -206,7 +208,7 @@ theorem wp_splitN {D : Dialect} (hD : D.Sem) {t : Common.AST.ident} (hT : NTemps
       Tmp le' L (nontrivialCell ctx L.level ws cell1 cell2 st) →
       CellOut n L.level st (nontrivialCell ctx L.level ws cell1 cell2 st) cell1 cell2 →
       (∃ bv, ArrayAt m' .Mint32 L.bB 0 bv L.capB) → (∃ wv, ArrayAt m' .Mint32 L.bW 0 wv L.capW) →
-      Unch m m' (cellW L) → Keep m m' L.bB → Keep m m' L.bW →
+      Unch m m' (cellW L) → Alloc.KeepA m m' →
       (∀ z, z ∉ splitTempsG t → PTree.get z le' = PTree.get z le) →
       Q.normal E0 empty_env le' m' ∧ Q.cont E0 empty_env le' m') :
     Wp xi ge f (splitNG D t) Q empty_env le m := by
@@ -242,7 +244,7 @@ theorem wp_splitN {D : Dialect} (hD : D.Sem) {t : Common.AST.ident} (hT : NTemps
           push_cast; rfl) rfl (by omega) ?_
     apply wp_continue
     simp only [E0_append]
-    refine (hQ _ m aw ?_ ?_ ?_ ⟨_, hbkt⟩ ⟨_, hwp⟩ (Unch.refl _ _) (Keep.refl _ _) (Keep.refl _ _)
+    refine (hQ _ m aw ?_ ?_ ?_ ⟨_, hbkt⟩ ⟨_, hwp⟩ (Unch.refl _ _) (Alloc.KeepA.refl _)
       ?_).2
     · rw [heq]; exact hm.congr rfl rfl rfl rfl
     · rw [heq]; exact ht.setCode _
@@ -305,7 +307,7 @@ theorem wp_splitN {D : Dialect} (hD : D.Sem) {t : Common.AST.ident} (hT : NTemps
     refine wp_placeLoop hT (cs := cs) (A := cmin cs) (B := cmax cs) hok hcapW hcapB hlen h12 h2n
       (fun c hc => ⟨cmin_le hc, le_cmax hc⟩) hBn (temps_gss _ _ _) hcl23 ht3.count ht3.lab hlab2
       hf2.labs hcnt2 (hbk2.congr fun v _ => startVals_curVals cs cell1 bv0 v) hf2.bkp hwp2 hf2.wpp ?_
-    intro le4 m4 hwk4 hbk4 hu4 hkB4 hkW4 g4
+    intro le4 m4 hwk4 hbk4 hu4 hk4 g4
     generalize hTw : writeSegment st.lab cell1 (segmentOf st.lab cell1 cs (countValues cs)) = T at *
     have hso2 := nontrivialCell_stOk (ctx := ctx) (workset := ws) (cell1 := cell1) hso h2n
     rw [hne] at hso2
@@ -365,7 +367,7 @@ theorem wp_splitN {D : Dialect} (hD : D.Sem) {t : Common.AST.ident} (hT : NTemps
       rw [place_target hlen h12 h2n hls q hq1 hq2, hTw, ite_eq_left ⟨by omega, hTv q (by omega)⟩]
     · rw [← hTw]
       exact writeSegment_outside _ _ _ _ (by rw [hsegl, hlen]; omega)
-    intro le6 m6 hla6 hu6 g6
+    intro le6 m6 hla6 hu6 hk6 g6
     have hcnt4 := hcnt2.unch hu4 (by
       rintro (h | h)
       · exact d.bc_bB h
@@ -373,7 +375,7 @@ theorem wp_splitN {D : Dialect} (hD : D.Sem) {t : Common.AST.ident} (hT : NTemps
     have hm4 : Mem m4 L ctx W aw2 := hm2.away hok (hu4.mono fun z hz => by
       rcases hz with h | h
       · exact .inr (.inl h)
-      · exact .inr (.inr h)) hkB4 hkW4 ⟨_, hcnt4⟩
+      · exact .inr (.inr h)) (hk4 L.bB) (hk4 L.bW) ⟨_, hcnt4⟩
     have hm6 := hm4.setLab hok hu6 hla6
     have ht6 : Tmp le6 L { W with lab := T } :=
       (ht5.temps fun x hx => g6 x (by
@@ -389,7 +391,7 @@ theorem wp_splitN {D : Dialect} (hD : D.Sem) {t : Common.AST.ident} (hT : NTemps
       exact hcl1
     wp_step; wp_step
     refine wp_fixN hD hMok hok hm6 ht6 hcl16 (by omega) hsb2.maxpos ?_
-    intro m7 aw7 hm7 hu7
+    intro m7 aw7 hm7 hu7 hk7
     have hfix : nontrivialFix cell1 { W with lab := T } = nontrivialCell ctx L.level ws cell1 cell2 st :=
       hne.symm
     have hfx : ∀ s : RefineSt n, (nontrivialFix cell1 s).ptn = s.ptn ∧
@@ -397,7 +399,7 @@ theorem wp_splitN {D : Dialect} (hD : D.Sem) {t : Common.AST.ident} (hT : NTemps
         (nontrivialFix cell1 s).maxpos = s.maxpos ∧ (nontrivialFix cell1 s).longcode = s.longcode :=
       fun s => by simp only [nontrivialFix]; split <;> exact ⟨rfl, rfl, rfl, rfl, rfl⟩
     obtain ⟨f1, f2, f3, f4, f5⟩ := hfx { W with lab := T }
-    refine (hQ le6 m7 aw7 (hfix ▸ hm7) ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_).1
+    refine (hQ le6 m7 aw7 (hfix ▸ hm7) ?_ ?_ ?_ ?_ ?_ ?_ ?_).1
     · rw [← hfix]; exact ht6.congr f5 f3 f4
     · rw [← hfix]
       refine ⟨hfix ▸ hso2, ?_, ?_, ?_, ?_, ?_⟩
@@ -419,10 +421,7 @@ theorem wp_splitN {D : Dialect} (hD : D.Sem) {t : Common.AST.ident} (hT : NTemps
       · rcases hz with h | h
         · exact .inr (.inr (.inr (.inr (.inr (.inr h)))))
         · exact .inr (.inr (.inr (.inr (.inr (.inl h)))))
-    · exact ((hk2.trans hkB4).trans (Keep.unch hu6 d.bl_bB.symm)).trans
-        (Keep.unch hu7 (Ne.symm d.ba_bB))
-    · exact (((Keep.unch hu2 (nS d.bp_bW d.ba_bW d.bn_bW (Ne.symm d.bW_bB))).trans hkW4).trans
-        (Keep.unch hu6 d.bl_bW.symm)).trans (Keep.unch hu7 (Ne.symm d.ba_bW))
+    · exact ((hk2.trans hk4).trans hk6).trans hk7
     · intro z hz
       simp only [splitTempsG, List.mem_cons, List.not_mem_nil, or_false, not_or] at hz
       obtain ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩ := hz
@@ -456,7 +455,7 @@ theorem wp_cellN {hd1 hd2 : statement → statement} {hts1 hts2 : List Common.AS
       Tmp le' L (nontrivialCell ctx L.level ws cell1 cell2 st) →
       CellOut n L.level st (nontrivialCell ctx L.level ws cell1 cell2 st) cell1 cell2 →
       (∃ bv, ArrayAt m' .Mint32 L.bB 0 bv L.capB) → (∃ wv, ArrayAt m' .Mint32 L.bW 0 wv L.capW) →
-      Unch m m' (cellW L) → Keep m m' L.bB → Keep m m' L.bW →
+      Unch m m' (cellW L) → Alloc.KeepA m m' →
       (∀ z, z ∉ cellTempsG t1 t2 t3 hts2 hts1 tA tB t → PTree.get z le' = PTree.get z le) →
       Q.normal E0 empty_env le' m' ∧ Q.cont E0 empty_env le' m') :
     Wp xi ge f (cellNG hd1 tA tB (countRestG hd2 t1 t2 t3) (splitNG D t)) Q empty_env le m := by
@@ -510,7 +509,7 @@ theorem wp_cellN {hd1 hd2 : statement → statement} {hts1 hts2 : List Common.AS
       show PTree.get _ _ = _
       simp only [le3]; rw [temps_gso _ _ (show tB ≠ dense.id.bmin by nscr), temps_gss])
     rfl ?_
-  intro m1 hca1 hu1
+  intro m1 hca1 hu1 hk1
   have hbkp1 : Mem.load .Mint64 m1 Block.naugraphBucket (zOfInt 0) =
       some (.Vptr L.bB Ptrofs.zero) := by rw [hu1.load _ _ _ (Ne.symm d.bc_g4)]; exact hf.bkp
   have hbkt1 := hbkt.unch hu1 (Ne.symm d.bc_bB)
@@ -565,15 +564,11 @@ theorem wp_cellN {hd1 hd2 : statement → statement} {hts1 hts2 : List Common.AS
   rw [pmax_last hk] at hmax4
   have hu14 : Unch m m4 (fun z => z = L.bc ∨ z = L.bB) := hu12.trans hu4
   have hf4 := hf.unch (hu14.mono fun z hz => by rcases hz with h | h <;> simp [h])
-  have hkB : Keep m m4 L.bB := ((Keep.unch hu1 (Ne.symm d.bc_bB)).trans hk2).trans hk4
-  have hkW : Keep m m4 L.bW := Keep.unch hu14 (by
-    rintro (h | h)
-    · exact d.bc_bW h.symm
-    · exact d.bW_bB h)
+  have hkA : Alloc.KeepA m m4 := (hk1.trans (Alloc.KeepA.of_keep hu2 hk2)).trans hk4
   have hm4 : Mem m4 L ctx st aw := hm.away hok (hu14.mono fun z hz => by
     rcases hz with h | h
     · exact .inl h
-    · exact .inr (.inl h)) hkB hkW ⟨_, hca4⟩
+    · exact .inr (.inl h)) (hkA L.bB) (hkA L.bW) ⟨_, hca4⟩
   have hwp4 := hwp.unch hu14 (by
     rintro (h | h)
     · exact d.bc_bW h.symm
@@ -596,8 +591,8 @@ theorem wp_cellN {hd1 hd2 : statement → statement} {hts1 hts2 : List Common.AS
   · have hk' : cell2 - cell1 + 1 = (countsOf ctx st.lab ws cell1 cell2).length := by
       rw [countsOf_length]; omega
     simp only [bktVals, pmin_last hk', pmax_last hk', pmult_last hk']
-  intro le5 m5 aw5 hm5 ht5 hco5 hbk5 hwk5 hu5 hkB5 hkW5 g5
-  refine hQ le5 m5 aw5 hm5 ht5 hco5 hbk5 hwk5 ?_ (hkB.trans hkB5) (hkW.trans hkW5) ?_
+  intro le5 m5 aw5 hm5 ht5 hco5 hbk5 hwk5 hu5 hk5 g5
+  refine hQ le5 m5 aw5 hm5 ht5 hco5 hbk5 hwk5 ?_ (hkA.trans hk5) ?_
   · refine (hu14.mono fun z hz => ?_).trans hu5
     rcases hz with h | h
     · exact .inr (.inr (.inr (.inl h)))

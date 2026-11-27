@@ -1,3 +1,4 @@
+import NautyVerified.Proofs.Alloc.KeepV
 import NautyVerified.Proofs.Refine.CountN
 import NautyVerified.Proofs.Refine.WindowN
 import NautyVerified.Spec.CountWin
@@ -283,7 +284,7 @@ theorem wp_countRest {hd : statement → statement} {t1 t2 t3 : Common.AST.ident
         (cntVals (countsOf ctx st.lab ws cell1 cell2) cell1 (cell2 - cell1) cv0) n →
       ArrayAt m' .Mint32 L.bB 0
         (bktVals (countsOf ctx st.lab ws cell1 cell2) (cell2 - cell1) bv0) L.capB →
-      Unch m m' (fun z => z = L.bc ∨ z = L.bB) → Keep m m' L.bB →
+      Unch m m' (fun z => z = L.bc ∨ z = L.bB) → Alloc.KeepA m m' →
       (∀ z, z ∉ cntTempsG t1 t2 t3 hts → PTree.get z le' = PTree.get z le) →
       Q.normal E0 empty_env le' m') :
     Wp xi ge f (countRestG hd t1 t2 t3) Q empty_env le m := by
@@ -302,11 +303,11 @@ theorem wp_countRest {hd : statement → statement} {t1 t2 t3 : Common.AST.ident
       PTree.get dense.id.bmax le' = some (.Vint (ir (pmax cs k : Nat))) ∧
       ArrayAt m' .Mint32 L.bc L.cb (cntVals cs cell1 k cv0) n ∧
       ArrayAt m' .Mint32 L.bB 0 (bktVals cs k bv0) L.capB ∧
-      Unch m m' (fun z => z = L.bc ∨ z = L.bB) ∧ Keep m m' L.bB ∧
+      Unch m m' (fun z => z = L.bc ∨ z = L.bB) ∧ Alloc.KeepA m m' ∧
       (∀ z, z ∉ cntTempsG t1 t2 t3 hts → PTree.get z le' = PTree.get z le)
   refine wp_loop (I := I) (J := fun v tr e' le' m' => ∃ v', v' < v ∧ I v' tr e' le' m') ?_ ?_
     (n := F) ⟨rfl, rfl, 0, Nat.zero_le _, rfl, by simpa using hi, hbmin, hbmax, hcnt, hbkt,
-      Unch.refl _ _, Keep.refl _ _, fun _ _ => rfl⟩
+      Unch.refl _ _, Alloc.KeepA.refl _, fun _ _ => rfl⟩
   · rintro v tr e' le' m' ⟨rfl, rfl, k, hk, rfl, hik, hmin, hmax, hca, hba, hu, hkp, ho⟩
     have hc2' : PTree.get dense.id.cell2 le' = some (.Vint (ir cell2)) := by
       rw [ho _ (by nscr)]; exact hc2
@@ -406,7 +407,8 @@ theorem wp_countRest {hd : statement → statement} {t1 t2 t3 : Common.AST.ident
         (by rw [eval_add_ii hread rfl (x := ((pmult cs k cs[k + 1]! : Nat) : Int)) (y := 1)
           (show Exec.evalExpr ge empty_env le5 m5 (ci 1 tint) = some (.Vint (ir 1)) from rfl) rfl])
         rfl ?_
-      intro m6 hba6 hu6 hk6
+      intro m6 hba6 hu6 hk6'
+      have hk6 := Alloc.KeepA.of_keep hu6 hk6'
       dsimp only
       have hu46 : Unch m' m6 (· = L.bB) := (hu4.trans hu5).trans hu6
       have hca6 := hca.unch hu46 d.bc_bB
@@ -422,7 +424,7 @@ theorem wp_countRest {hd : statement → statement} {t1 t2 t3 : Common.AST.ident
       wp_step; wp_step
       refine wp_storeV hca6 (by omega) dense.id.count ht5.count (tv dense.id.i) (cell1 + (k + 1))
         (by omega) hi5 rfl (tv dense.id.cnt) (cs[k + 1]! : Nat) hcnt5 rfl ?_
-      intro m7 hca7 hu7
+      intro m7 hca7 hu7 hk7
       have hba7 := hba6.unch hu7 (Ne.symm d.bc_bB)
       refine ⟨F - (k + 1), by omega, by simp, rfl, k + 1, by omega, rfl, hi5, ?_, ?_,
         hca7.congr fun p _ => cnt_inc cs cell1 k cv0 p, hba7.congr fun v _ => bkt_inc cs k hk1 bv0 v,
@@ -430,7 +432,7 @@ theorem wp_countRest {hd : statement → statement} {t1 t2 t3 : Common.AST.ident
       · rw [ho5 _ (by nscr) (by nscr), pmin_succ hk1]; exact hmin4
       · rw [pmax_succ hk1]; exact hmax5
       · refine ((hu.trans (hu46.mono fun z hz => .inr hz)).trans (hu7.mono fun z hz => .inl hz))
-      · exact ((hkp.trans ((hk4.trans hk5).trans hk6))).trans (Keep.unch hu7 (Ne.symm d.bc_bB))
+      · exact ((hkp.trans ((hk4.trans hk5).trans hk6))).trans hk7
       · intro z hz
         have hs : ∀ y ∈ cntTempsG t1 t2 t3 hts, z ≠ y := fun y hy h => hz (h ▸ hy)
         rw [ho5 z (hs _ (by simp)) (hs _ (by simp)), ho4 z (hs _ (by simp)) (hs _ (by simp)),

@@ -66,7 +66,8 @@ def refineSpec {n : Nat} (L : Loc) (ctx : Ctx n) (lab ptn : Array Nat) (active :
     ((capS = L.capS ∧ bS = L.bS) ∨ ¬ Mem.valid_block m bS) ∧
     ((capB = L.capB ∧ bB = L.bB) ∨ ¬ Mem.valid_block m bB) ∧
     Unch m m' (fun z => (z = L.bl ∨ z = L.bp ∨ z = L.bn ∨ z = L.bc ∨ z = L.ba) ∨ z = L.bk ∨
-      dyn3Set m L.capW L.bW L.capS L.bS L.capB L.bB z)
+      dyn3Set m L.capW L.bW L.capS L.bS L.capB L.bB z) ∧
+    ∀ z ∈ [L.bl, L.bp, L.bn, L.bc, L.ba, L.bk], Keep m m' z
 
 /-- The temporaries on entry. -/
 def entryTemps (L : Loc) (n : Nat) : temp_env :=
@@ -385,7 +386,7 @@ theorem refine_satisfies_of {xi : ExternalCalls} (hT : TrivialPass xi) (hN : Non
       { ok := hok0, ptnSmall := hps, ncSmall := by simp [st₀, initSt]; omega
         hint := hn0, maxpos := hn0, code := by simp [st₀, initSt]; omega }
     refine wp_mainLoop hT hN hok hcS ⟨aw, hm3, ht4, hi0⟩ ?_
-    intro le5 m5 ⟨aw5, hm5, ht5, hi5⟩ hu5
+    intro le5 m5 ⟨aw5, hm5, ht5, hi5⟩ hu5 hkA5
     have hkn : ¬ dyn3Set m L.capW L.bW L.capS L.bS L.capB L.bB L.bk :=
       hp.notDyn (.inl (by simp)) (hv _ (by simp))
     have hkw : ¬ (L.withWork capW bW capS bS capB bB).writes L.bk := by
@@ -401,7 +402,7 @@ theorem refine_satisfies_of {xi : ExternalCalls} (hT : TrivialPass xi) (hN : Non
       · exact pw_ne this 6 9 (by decide) (by simp [Loc.blocks]) h
     have hk5 : ArrayAt m5 .Mint32 L.bk L.kb kv 1 := (hk.unch hu3 hkn).unch hu5 hkw
     refine wp_finish hok hm5 ht5 hi5 (kv := kv) hk5 ?_
-    intro m6 harr6 hu6
+    intro m6 harr6 hu6 hkA6
     have hpos : 0 < capW ∧ 0 < capS ∧ 0 < capB := ⟨by omega, by have := hp.M1; omega, by omega⟩
     have hnew : ∀ {cap cap' : Nat} {b b' : block}, 0 < cap' →
         ((cap' = cap ∧ b' = b) ∨ ¬ Mem.valid_block m b') → ∀ z, z = b' →
@@ -410,7 +411,9 @@ theorem refine_satisfies_of {xi : ExternalCalls} (hT : TrivialPass xi) (hN : Non
       · exact .inl ⟨hc, rfl⟩
       · exact .inr hnv
     refine ⟨m6, Nextelement.free_empty m6, by simp, capW, bW, capS, bS, capB, bB, aw5,
-      (hm5.unchCode hok hu6).congr rfl rfl rfl rfl, harr6, hcW, hcB, hbW, hbS, hbB, ?_⟩
+      (hm5.unchCode hok hu6).congr rfl rfl rfl rfl, harr6, hcW, hcB, hbW, hbS, hbB, ?_,
+      fun z hz => ((Keep.unch hu3 (hp.notDyn (.inl (List.mem_cons_of_mem _ hz))
+        (hv z (List.mem_cons_of_mem _ hz))) : Keep m m3 z).trans (hkA5 z)).trans (hkA6 z)⟩
     refine ((hu3.mono fun z hz => .inr (.inr hz)).trans (hu5.mono fun z hz => ?_)).trans
       (hu6.mono fun z hz => .inr (.inl hz))
     unfold dyn3Set

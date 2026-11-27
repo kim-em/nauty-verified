@@ -61,6 +61,7 @@ import NautyVerified.Proofs.Fmperm.Clear
 import NautyVerified.Proofs.Fmperm.Cycle
 import NautyVerified.Proofs.Fmperm.Loop
 import NautyVerified.Proofs.Alloc.Keep
+import NautyVerified.Proofs.Alloc.KeepV
 import NautyVerified.Proofs.Fmperm.Satisfies
 import NautyVerified.Proofs.Cheapautom.Syntax
 import NautyVerified.Proofs.Cheapautom.Loop

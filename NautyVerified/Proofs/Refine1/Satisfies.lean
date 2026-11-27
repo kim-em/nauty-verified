@@ -229,7 +229,7 @@ theorem refine1_satisfies_of {xi : ExternalCalls} (hN : NontrivialPass1 xi)
     have hM1 : D1.okM (L.withWork capW bW L.capS bS capB bB).M := hL
     refine wp_mainLoopG D1_sem (by decide) hM1 hok (fun hm ht hi hnc hs hsp hQ =>
         wp_trivial1 hM1 hok hm ht hi hnc hs hsp hQ) (hN hok hL) ⟨aw, hm3, ht4, hi0⟩ ?_
-    intro le5 m5 ⟨aw5, hm5, ht5, hi5⟩ hu5
+    intro le5 m5 ⟨aw5, hm5, ht5, hi5⟩ hu5 hkA5
     have hkn : ¬ dyn3Set m L.capW L.bW L.capS L.bS L.capB L.bB L.bk :=
       hp.notDyn (.inl (by simp)) (hv _ (by simp))
     have hkw : ¬ (L.withWork capW bW L.capS bS capB bB).writes L.bk := by
@@ -245,7 +245,7 @@ theorem refine1_satisfies_of {xi : ExternalCalls} (hN : NontrivialPass1 xi)
       · exact pw_ne this 6 9 (by decide) (by simp [Loc.blocks]) h
     have hk5 : ArrayAt m5 .Mint32 L.bk L.kb kv 1 := (hk.unch hu3 hkn).unch hu5 hkw
     refine wp_finish hok hm5 ht5 hi5 (kv := kv) hk5 ?_
-    intro m6 harr6 hu6
+    intro m6 harr6 hu6 hkA6
     have hpos : 0 < capW ∧ 0 < capB := ⟨by omega, by omega⟩
     have hnew : ∀ {cap cap' : Nat} {b b' : block}, 0 < cap' →
         ((cap' = cap ∧ b' = b) ∨ ¬ Mem.valid_block m b') → ∀ z, z = b' →
@@ -254,7 +254,9 @@ theorem refine1_satisfies_of {xi : ExternalCalls} (hN : NontrivialPass1 xi)
       · exact .inl ⟨hc, rfl⟩
       · exact .inr hnv
     refine ⟨m6, Nextelement.free_empty m6, by simp, capW, bW, L.capS, bS, capB, bB, aw5,
-      (hm5.unchCode hok hu6).congr rfl rfl rfl rfl, harr6, hcW, hcB, hbW, hbS, hbB, ?_⟩
+      (hm5.unchCode hok hu6).congr rfl rfl rfl rfl, harr6, hcW, hcB, hbW, hbS, hbB, ?_,
+      fun z hz => ((Keep.unch hu3 (hp.notDyn (.inl (List.mem_cons_of_mem _ hz))
+        (hv z (List.mem_cons_of_mem _ hz))) : Keep m m3 z).trans (hkA5 z)).trans (hkA6 z)⟩
     refine ((hu3.mono fun z hz => .inr (.inr hz)).trans (hu5.mono fun z hz => ?_)).trans
       (hu6.mono fun z hz => .inr (.inl hz))
     unfold dyn3Set

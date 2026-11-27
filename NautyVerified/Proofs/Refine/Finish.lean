@@ -88,7 +88,7 @@ theorem wp_finish {f : function} {n : Nat} {Q : Post} {le : temp_env} {m : mem} 
     (hk : ArrayAt m .Mint32 L.bk L.kb kv 1)
     (hQ : ∀ m', ArrayAt m' .Mint32 L.bk L.kb (fun _ => .Vint (ir
         (Hex.GraphIso.Nauty.cleanup (Hex.GraphIso.Nauty.mash st.longcode st.numcells) : Nat))) 1 →
-      Unch m m' (· = L.bk) →
+      Unch m m' (· = L.bk) → Alloc.KeepA m m' →
       Q.normal E0 empty_env (PTree.set dense.id.longcode
         (.Vlong (lr (Hex.GraphIso.Nauty.mash st.longcode st.numcells : Nat))) le) m') :
     Wp xi ge f finish Q empty_env le m := by
@@ -118,5 +118,6 @@ theorem wp_finish {f : function} {n : Nat} {Q : Post} {le : temp_env} {m : mem} 
     rw [show csize .Mint32 * ((0 : Nat) : Int) = 0 by simp, Int.add_zero, Loc.kb, zOfInt_intOfZ],
     hst]
   exact hQ m' (harr'.congr fun i hi => by simp [upd, show i = 0 by omega]) (Unch.store hst rfl)
+    (Alloc.KeepA.storeArr hk hst)
 
 end NautyVerified.Proofs.Refine

@@ -228,7 +228,7 @@ theorem wp_grpAct {D : Dialect} (hD : D.Sem) {f : function} {Q : Post} {le : tem
         active := if (c1 != cell1) = true then st.active.insert c1 else st.active
         numcells := if (c1 != cell1) = true then st.numcells + 1 else st.numcells
         hint := if (c1 != cell1) = true ∧ (k == 1) = true then c1 else st.hint } →
-      Unch m m' (fun z => z = L.ba ∨ z = L.bn) →
+      Unch m m' (fun z => z = L.ba ∨ z = L.bn) → Alloc.KeepA m m' →
       (∀ z, z ≠ dense.id.hint → PTree.get z le' = PTree.get z le) →
       Q.normal E0 empty_env le' m') :
     Wp xi ge f (grpAct D) Q empty_env le m := by
@@ -245,14 +245,14 @@ theorem wp_grpAct {D : Dialect} (hD : D.Sem) {f : function} {Q : Post} {le : tem
     apply wp_skip
     have hb : (c1 != c1) = false := by simp
     simp only [hb, Bool.false_eq_true, ite_false, false_and] at hQ
-    exact hQ le m aw hm ht (Unch.refl _ _) fun _ _ => rfl
+    exact hQ le m aw hm ht (Unch.refl _ _) (Alloc.KeepA.refl _) fun _ _ => rfl
   · rw [ite_eq_left (by simp; omega)]
     have hb : (c1 != cell1) = true := by simpa using hce
     simp only [hb, ite_true, true_and] at hQ
     wp_step
     refine hD.addE hMok hMl hm.act ht.active (tv dense.id.c1 |> fun _ => hc1) rfl
       (by omega) hm.bit rfl ?_
-    intro m1 hact1 hu1
+    intro m1 hact1 hu1 hk1
     have hm1 := hm.setAct hok hu1 hact1 (Set.setRep_add hm.actRep hcn)
     wp_step; wp_step; wp_step
     apply wp_if_eval
@@ -275,9 +275,9 @@ theorem wp_grpAct {D : Dialect} (hD : D.Sem) {f : function} {Q : Post} {le : tem
       refine wp_cellStore hm1'.nc ht1.numcells (x := ((st.numcells + 1 : Nat) : Int)) ?_ rfl ?_
       · rw [eval_add_ii (eval_cell hm1'.nc ht1.numcells) rfl (y := 1) rfl rfl]
         push_cast; rfl
-      · intro m2 hnc2 hu2
+      · intro m2 hnc2 hu2 hk2
         have hm2 := hm1'.setNc hok hu2 hnc2
-        refine hQ le1 m2 (Set.addW aw c1) ?_ ?_ ?_ ho1
+        refine hQ le1 m2 (Set.addW aw c1) ?_ ?_ ?_ (hk1.trans hk2) ho1
         · by_cases hk1 : (k == 1) = true
           · rw [ite_eq_left hk1]; have := hh1 hk1; subst this; exact hm2.congr rfl rfl rfl rfl
           · rw [ite_eq_right hk1]; have := hh2 hk1; subst this; exact hm2.congr rfl rfl rfl rfl
@@ -307,7 +307,7 @@ theorem wp_grpPtn {f : function} {Q : Post} {le : temp_env} {n : Nat} {L : Loc} 
     (hk : 0 < k) (hck : c1 + k ≤ cell2 + 1) (h2n : cell2 < n)
     (hQ : ∀ m', Mem m' L ctx { st with
         ptn := if c1 + k ≤ cell2 then st.ptn.set! (c1 + k - 1) L.level else st.ptn } aw →
-      Unch m m' (· = L.bp) → Q.normal E0 empty_env le m') :
+      Unch m m' (· = L.bp) → Alloc.KeepA m m' → Q.normal E0 empty_env le m') :
     Wp xi ge f grpPtn Q empty_env le m := by
   have hnl := hok.nlt
   have hlv := hok.levlt
@@ -321,15 +321,15 @@ theorem wp_grpPtn {f : function} {Q : Post} {le : temp_env} {n : Nat} {L : Loc} 
     have hidx : Exec.evalExpr ge empty_env le m
         (.Ebinop .Osub (tv dense.id.c2) (ci 1 tint) tint) = some (.Vint (ir (c1 + k - 1 : Nat))) := by
       simp only [Exec.evalExpr, hc2, typeof, cop, ir_sub]; congr 3; omega
-    refine wp_store hm.ptn (by omega) dense.id.ptn ht.ptn _ (c1 + k - 1) (by omega) hidx rfl
+    refine wp_storeV hm.ptn (by omega) dense.id.ptn ht.ptn _ (c1 + k - 1) (by omega) hidx rfl
       (tv dense.id.level) L.level ht.level rfl ?_
-    intro m' harr hu
-    refine hQ m' ?_ hu
+    intro m' harr hu hk
+    refine hQ m' ?_ hu hk
     rw [ite_eq_left h]
     exact hm.setPtn hok hu (by rw [ints_set (by omega)]; exact harr)
   · rw [ite_eq_right (by simp; omega)]
     apply wp_skip
-    refine hQ m ?_ (Unch.refl _ _)
+    refine hQ m ?_ (Unch.refl _ _) (Alloc.KeepA.refl _)
     rw [ite_eq_right h]
     exact hm
 
@@ -350,7 +350,7 @@ theorem wp_group {D : Dialect} (hD : D.Sem) {f : function} {Q : Post} {le : temp
     (hQ : ∀ le' m' aw', Mem m' L ctx (windowStep L.level cell1 cell2 v c1 (c1 + k) mc st) aw' →
       Tmp le' L (windowStep L.level cell1 cell2 v c1 (c1 + k) mc st) →
       ArrayAt m' .Mint32 L.bB 0 (upd bv v (.Vint (ir c1))) L.capB →
-      Unch m m' (fun z => z = L.bp ∨ z = L.ba ∨ z = L.bn ∨ z = L.bB) → Keep m m' L.bB →
+      Unch m m' (fun z => z = L.bp ∨ z = L.ba ∨ z = L.bn ∨ z = L.bB) → Alloc.KeepA m m' →
       PTree.get dense.id.c1 le' = some (.Vint (ir (c1 + k : Nat))) →
       PTree.get dense.id.maxcell le' =
         some (.Vint (ir (if Int.ofNat k > mc then (k : Int) else mc))) →
@@ -411,7 +411,7 @@ theorem wp_group {D : Dialect} (hD : D.Sem) {f : function} {Q : Post} {le : temp
     (by rw [g3 _ (by decide) (by decide)]; rw [temps_gso _ _ (by decide)]; exact hc2)
     (by rw [g3' _ (by decide) (by decide) (by decide) (by decide)]; exact hcl1)
     (by omega) (by omega) (by omega) ?_
-  intro le4 m4 aw4 hm4 ht4 hu4 g4
+  intro le4 m4 aw4 hm4 ht4 hu4 hk4 g4
   dsimp only
   wp_step; wp_step; wp_step
   have hsz4 : ({ s3 with
@@ -423,7 +423,7 @@ theorem wp_group {D : Dialect} (hD : D.Sem) {f : function} {Q : Post} {le : temp
     (by rw [g4 _ (by decide), g3 _ (by decide) (by decide), temps_gso _ _ (by decide)]; exact hc2)
     (by rw [g4 _ (by decide), g3' _ (by decide) (by decide) (by decide) (by decide)]; exact hcl2)
     hk hck h2n ?_
-  intro m5 hm5 hu5
+  intro m5 hm5 hu5 hk5
   wp_step; wp_step
   apply wp_set_eval
   simp only [Exec.evalExpr]
@@ -453,10 +453,7 @@ theorem wp_group {D : Dialect} (hD : D.Sem) {f : function} {Q : Post} {le : temp
       · exact .inr (.inl h)
       · exact .inr (.inr (.inl h))
     · exact .inl hz
-  · refine hk1.trans ((Keep.unch hu4 ?_).trans (Keep.unch hu5 (Ne.symm d.bp_bB)))
-    rintro (h | h)
-    · exact d.ba_bB h.symm
-    · exact d.bn_bB h.symm
+  · exact (Alloc.KeepA.of_keep hu1 hk1).trans (hk4.trans hk5)
   · rw [temps_gso _ _ (by decide), g4 _ (by decide)]; exact hmc3
   · intro z hz
     simp only [List.mem_cons, List.not_mem_nil, or_false, not_or] at hz
@@ -488,7 +485,7 @@ theorem wp_scanLoop {D : Dialect} (hD : D.Sem) {f : function} {Q : Post} {le : t
       SBound n st (windowScan L.level cell1 cell2 (countsOf ctx st.lab ws cell1 cell2)
         (countValues (countsOf ctx st.lab ws cell1 cell2)) cell1 (-1) st) cell1 (cell2 + 1) →
       ArrayAt m' .Mint32 L.bB 0 (startVals (countsOf ctx st.lab ws cell1 cell2) cell1 bv0) L.capB →
-      Unch m m' (fun z => z = L.bp ∨ z = L.ba ∨ z = L.bn ∨ z = L.bB) → Keep m m' L.bB →
+      Unch m m' (fun z => z = L.bp ∨ z = L.ba ∨ z = L.bn ∨ z = L.bB) → Alloc.KeepA m m' →
       (∀ z, z ∉ [dense.id.i, dense.id.c1, dense.id.c2, dense.id.maxcell, dense.id.maxpos,
         dense.id.hint, dense.id.longcode] → PTree.get z le' = PTree.get z le) →
       Q.normal E0 empty_env le' m') :
@@ -530,7 +527,7 @@ theorem wp_scanLoop {D : Dialect} (hD : D.Sem) {f : function} {Q : Post} {le : t
     windowScan L.level cell1 cell2 cs (List.range' j (B + 1 - j)) c1 mc s = S ∧
     Mem m' L ctx s aw' ∧ Tmp le' L s ∧ SBound n st s cell1 c1 ∧
     ArrayAt m' .Mint32 L.bB 0 (bk j) L.capB ∧
-    Unch m m' (fun z => z = L.bp ∨ z = L.ba ∨ z = L.bn ∨ z = L.bB) ∧ Keep m m' L.bB ∧ Oth le'
+    Unch m m' (fun z => z = L.bp ∨ z = L.ba ∨ z = L.bn ∨ z = L.bB) ∧ Alloc.KeepA m m' ∧ Oth le'
   let I := fun (v : Nat) (tr : trace) (e' : env) (le' : temp_env) (m' : mem) => tr = E0 ∧
     e' = empty_env ∧ ∃ j, v = B + 1 - j ∧ PTree.get dense.id.i le' = some (.Vint (ir j)) ∧ P j le' m'
   let J := fun (v : Nat) (tr : trace) (e' : env) (le' : temp_env) (m' : mem) => tr = E0 ∧
@@ -538,7 +535,7 @@ theorem wp_scanLoop {D : Dialect} (hD : D.Sem) {f : function} {Q : Post} {le : t
       P (j + 1) le' m'
   refine wp_loop (I := I) (J := J) ?_ ?_ (n := B + 1 - A) ⟨rfl, rfl, A, rfl, hi, cell1, -1, st, aw,
     Nat.le_refl _, by omega, ?_, hc1, hmc, by decide, by omega, rfl, hm, ht, hb0,
-    hbkt.congr fun v _ => ?_, Unch.refl _ _, Keep.refl _ _, fun _ _ => rfl⟩
+    hbkt.congr fun v _ => ?_, Unch.refl _ _, Alloc.KeepA.refl _, fun _ _ => rfl⟩
   · rintro v tr e' le' m' ⟨rfl, rfl, j, rfl, hij, c1, mc, s, aw', hj1, hj2, hc1e, hc1', hmc',
       hmc1, hmc2, hS, hms, hts, hsb, hbk, hu, hk, ho⟩
     have hbmax' : PTree.get dense.id.bmax le' = some (.Vint (ir (B : Nat))) := by

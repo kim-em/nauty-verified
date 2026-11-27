@@ -1,3 +1,4 @@
+import NautyVerified.Proofs.Refine.Arr
 import NautyVerified.Proofs.Refine.Frame
 import NautyVerified.Proofs.Refine.Mash
 import NautyVerified.Proofs.Refine.Scan
@@ -235,7 +236,7 @@ theorem wp_swap {D : Dialect} (hD : D.Sem) {f : function} {Q : Post} {e : env} {
     (hQ : ∀ le' m' (lab' : Array Nat) (c1 : Nat) (c2 : Int),
       splitCellLoop rows[v]! (cell2 - cell1 + 2) lab cell1 cell2 = (lab', (c1 : Int), c2) →
       ArrayAt m' .Mint32 bl (intOfZ (Ptrofs.unsigned lofs)) (ints lab') n → Unch m m' (· = bl) →
-      SwapOut (n := n) lab lab' cell1 cell2 c1 c2 → (c1 : Int) = c2 + 1 →
+      Alloc.KeepA m m' → SwapOut (n := n) lab lab' cell1 cell2 c1 c2 → (c1 : Int) = c2 + 1 →
       PTree.get dense.id.c1 le' = some (.Vint (ir c1)) →
       PTree.get dense.id.c2 le' = some (.Vint (ir c2)) →
       (∀ x, x ≠ dense.id.c1 → x ≠ dense.id.c2 → x ≠ dense.id.labc1 →
@@ -246,17 +247,17 @@ theorem wp_swap {D : Dialect} (hD : D.Sem) {f : function} {Q : Post} {e : env} {
   let I := fun (k : Nat) (t : trace) (e' : env) (le' : temp_env) (m' : mem) => t = E0 ∧ e' = e ∧
     ∃ (lab' : Array Nat) (c1 : Nat) (c2 : Int) (F : Nat),
       ArrayAt m' .Mint32 bl (intOfZ (Ptrofs.unsigned lofs)) (ints lab') n ∧ Unch m m' (· = bl) ∧
-      SwapOut (n := n) lab lab' cell1 cell2 c1 c2 ∧ k = (c2 - c1 + 1).toNat ∧ k < F ∧
+      Alloc.KeepA m m' ∧ SwapOut (n := n) lab lab' cell1 cell2 c1 c2 ∧ k = (c2 - c1 + 1).toNat ∧ k < F ∧
       R = splitCellLoop rows[v]! F lab' c1 c2 ∧
       PTree.get dense.id.c1 le' = some (.Vint (ir c1)) ∧
       PTree.get dense.id.c2 le' = some (.Vint (ir c2)) ∧
       ∀ x, x ≠ dense.id.c1 → x ≠ dense.id.c2 → x ≠ dense.id.labc1 → PTree.get x le' = PTree.get x le
   refine wp_loop (I := I) (J := fun k t e' le' m' => ∃ k', k' < k ∧ I k' t e' le' m') ?_ ?_
     (n := cell2 + 1 - cell1)
-    ⟨rfl, rfl, lab, cell1, cell2, cell2 - cell1 + 2, harr, Unch.refl _ _,
+    ⟨rfl, rfl, lab, cell1, cell2, cell2 - cell1 + 2, harr, Unch.refl _ _, Alloc.KeepA.refl _,
       ⟨hsz, hsmall, fun _ _ => rfl, Nat.le_refl _, by omega, by omega⟩, by omega, by omega, rfl,
       hc1, hc2, fun _ _ _ _ => rfl⟩
-  · rintro k t e' le' m' ⟨rfl, rfl, lab', c1, c2, F, harr', hu, hs, rfl, hF, hR, hc1', hc2', ho⟩
+  · rintro k t e' le' m' ⟨rfl, rfl, lab', c1, c2, F, harr', hu, hk, hs, rfl, hF, hR, hc1', hc2', ho⟩
     wp_step; wp_step; wp_step
     apply wp_if_eval
     simp only [Exec.evalExpr, hc1', hc2', typeof, cop]
@@ -266,7 +267,7 @@ theorem wp_swap {D : Dialect} (hD : D.Sem) {f : function} {Q : Post} {e : env} {
     · rw [ite_eq_right (by simpa using hlt)]
       apply wp_break
       have hRe : R = (lab', (c1 : Int), c2) := by rw [hR]; exact splitCellLoop_stop _ _ _ hlt
-      exact hQ le' m' lab' c1 c2 hRe harr' hu hs (by omega) hc1' hc2' ho
+      exact hQ le' m' lab' c1 c2 hRe harr' hu hk hs (by omega) hc1' hc2' ho
     · rw [ite_eq_left (by simpa using hlt)]
       apply wp_skip
       have hc2nat : c2 = (c2.toNat : Int) := by omega
@@ -305,7 +306,7 @@ theorem wp_swap {D : Dialect} (hD : D.Sem) {f : function} {Q : Post} {e : env} {
         simp only [Exec.evalExpr]
         rw [temps_gso _ _ (by decide), hc1']
         simp only [typeof, cop, ir_add]
-        refine ⟨(c2 - (c1 + 1 : Nat) + 1).toNat, by omega, rfl, rfl, lab', c1 + 1, c2, F', harr', hu,
+        refine ⟨(c2 - (c1 + 1 : Nat) + 1).toNat, by omega, rfl, rfl, lab', c1 + 1, c2, F', harr', hu, hk,
           ⟨hs.size, hs.small, hs.outside, by omega, by omega, hs.hi⟩, rfl, by omega, ?_, ?_, ?_, ?_⟩
         · rw [hR, hstep, ite_eq_left hmem]; push_cast; rfl
         · rw [temps_gss]; push_cast; rfl
@@ -325,16 +326,16 @@ theorem wp_swap {D : Dialect} (hD : D.Sem) {f : function} {Q : Post} {e : env} {
           hc2n' hc2e rfl
         have hsz' := hs.size
         wp_step; wp_step; wp_step
-        refine wp_store harr' hn dense.id.lab hlab2 (tv dense.id.c1) c1 hc1n hc1e2 rfl
+        refine wp_storeV harr' hn dense.id.lab hlab2 (tv dense.id.c1) c1 hc1n hc1e2 rfl
           (ix dense.id.lab (tv dense.id.c2)) (lab'[c2.toNat]! : Nat) hl2 rfl ?_
-        intro m2 harr2 hu2
+        intro m2 harr2 hu2 hk2
         rw [← ints_set (by omega)] at harr2
         let lab1 := lab'.set! c1 lab'[c2.toNat]!
         have hsz1 : lab1.size = n := by simp [lab1, hsz']
         wp_step; wp_step; wp_step
-        refine wp_store harr2 hn dense.id.lab hlab2 (tv dense.id.c2) c2.toNat hc2n' hc2e rfl
+        refine wp_storeV harr2 hn dense.id.lab hlab2 (tv dense.id.c2) c2.toNat hc2n' hc2e rfl
           (tv dense.id.labc1) (lab'[c1]! : Nat) hl1v rfl ?_
-        intro m3 harr3 hu3
+        intro m3 harr3 hu3 hk3
         rw [← ints_set (by simp [hsz']; omega)] at harr3
         wp_step; wp_step
         apply wp_set_eval
@@ -353,7 +354,7 @@ theorem wp_swap {D : Dialect} (hD : D.Sem) {f : function} {Q : Post} {e : env} {
             · subst h1; rw [Array.getElem!_set!_self _ _ _ (by omega)]; exact hsm _ hc2n'
             · rw [Array.getElem!_set!_ne _ _ _ _ (Ne.symm h1)]; exact hsm j hj
         refine ⟨(c2 - 1 - c1 + 1).toNat, by omega, rfl, rfl, lab1.set! c2.toNat lab'[c1]!, c1, c2 - 1,
-          F', harr3, (hu.trans (hu2.mono fun _ h => h)).trans hu3,
+          F', harr3, (hu.trans (hu2.mono fun _ h => h)).trans hu3, (hk.trans hk2).trans hk3,
           ⟨by simp [hsz1], hsmall2, fun j hj => ?_, hs.lo, by omega, by omega⟩,
           rfl, by omega, ?_, ?_, ?_, ?_⟩
         · simp only [lab1]
@@ -391,7 +392,7 @@ theorem wp_cellStore {f : function} {Q : Post} {e : env} {le : temp_env} {m : me
     (hp : PTree.get p le = some (.Vptr b ofs))
     (hr : Exec.evalExpr ge e le m rhs = some (.Vint (ir x))) (hty : typeof rhs = tint)
     (hQ : ∀ m', ArrayAt m' .Mint32 b (intOfZ (Ptrofs.unsigned ofs)) (fun _ => .Vint (ir x)) 1 →
-      Unch m m' (· = b) → Q.normal E0 e le m') :
+      Unch m m' (· = b) → Alloc.KeepA m m' → Q.normal E0 e le m') :
     Wp xi ge f (.Sassign (.Ederef (pi p) tint) rhs) Q e le m := by
   obtain ⟨m', hst, harr', -⟩ := store_array h (show 0 < 1 by decide) (.Vint (ir x)) rfl
   apply wp_assign_eval
@@ -400,6 +401,7 @@ theorem wp_cellStore {f : function} {Q : Post} {e : env} {le : temp_env} {m : me
     Cfrontend.Ctypes.access_mode, Mem.storev]
   rw [ofs_cell ofs, hst]
   exact hQ m' (harr'.congr fun i hi => by simp [upd, show i = 0 by omega]) (Unch.store hst rfl)
+    (Alloc.KeepA.storeArr h hst)
 
 /-- `Tmp` for a new state, from the temporaries holding its scalars. -/
 theorem Tmp.update {n : Nat} {le le' : temp_env} {L : Loc} {st st' : RefineSt n}
@@ -475,7 +477,7 @@ theorem wp_trivSplit {D : Dialect} (hD : D.Sem) {tA tB : Common.AST.ident} (hsA 
     (hc2 : PTree.get dense.id.c2 le = some (.Vint (ir c2)))
     (hQ : ∀ le' m' aw', Mem m' L ctx (trivialSplit L.level cell1 cell2 c1 c2 st) aw' →
       Tmp le' L (trivialSplit L.level cell1 cell2 c1 c2 st) →
-      Unch m m' (fun z => z = L.bp ∨ z = L.bn ∨ z = L.ba) →
+      Unch m m' (fun z => z = L.bp ∨ z = L.bn ∨ z = L.ba) → Alloc.KeepA m m' →
       (∀ x, x ≠ tB → x ≠ tA → x ≠ dense.id.longcode → x ≠ dense.id.hint →
         PTree.get x le' = PTree.get x le) → Q.normal E0 empty_env le' m') :
     Wp xi ge f (trivSplitG D tA tB) Q empty_env le m := by
@@ -489,7 +491,7 @@ theorem wp_trivSplit {D : Dialect} (hD : D.Sem) {tA tB : Common.AST.ident} (hsA 
   have stop : ∀ v, ¬ ((cell1 : Int) ≤ c2 ∧ c1 ≤ cell2) →
       Q.normal E0 empty_env (PTree.set tA v le) m := fun v h => by
     rw [trivialSplit_stop L.level cell1 cell2 c1 c2 st h] at hQ
-    exact hQ _ m aw hm (ht.set (x := tA) v hsA.tmp) (Unch.refl _ _)
+    exact hQ _ m aw hm (ht.set (x := tA) v hsA.tmp) (Unch.refl _ _) (Alloc.KeepA.refl _)
       fun x _ h2 _ _ => temps_gso _ _ h2
   wp_step; wp_step; wp_step
   apply wp_if_eval
@@ -517,9 +519,9 @@ theorem wp_trivSplit {D : Dialect} (hD : D.Sem) {tA tB : Common.AST.ident} (hsA 
         fun _ => by show PTree.get _ _ = _; rw [ho2 _ (by scr)]; exact hc2
       -- ptn[c2] = level
       wp_step; wp_step; wp_step
-      refine wp_store hm.ptn (by omega) dense.id.ptn ht2.ptn (tv dense.id.c2) k hkn (hc2e _) rfl
+      refine wp_storeV hm.ptn (by omega) dense.id.ptn ht2.ptn (tv dense.id.c2) k hkn (hc2e _) rfl
         (tv dense.id.level) L.level ht2.level rfl ?_
-      intro m1 hp1 hu1
+      intro m1 hp1 hu1 hk1
       rw [← ints_set (by omega)] at hp1
       -- longcode = MASH(longcode, c2)
       wp_step; wp_step; wp_step
@@ -545,7 +547,7 @@ theorem wp_trivSplit {D : Dialect} (hD : D.Sem) {tA tB : Common.AST.ident} (hsA 
         push_cast; rfl
       wp_step; wp_step; wp_step
       refine wp_cellStore hnc1 hnum3 hne rfl ?_
-      intro m2 hnc2 hu2
+      intro m2 hnc2 hu2 hk2
       have hu12 : Unch m m2 (fun z => z = L.bp ∨ z = L.bn ∨ z = L.ba) :=
         (hu1.mono fun _ h => .inl h).trans (hu2.mono fun _ h => .inr (.inl h))
       have hact2 := (hm.act.unch hu1 (Ne.symm hpa)).unch hu2 (Ne.symm hna)
@@ -569,10 +571,10 @@ theorem wp_trivSplit {D : Dialect} (hD : D.Sem) {tA tB : Common.AST.ident} (hsA 
           trivialSplit L.level cell1 cell2 c1 k st =
             { splitMid L.level k st with active := st.active.insert x, hint := h' } →
           ArrayAt m' .Mint64 L.ba L.ab (longs (Set.addW aw x)) L.M → Unch m2 m' (· = L.ba) →
-          PTree.get dense.id.hint le' = some (.Vint (ir h')) →
+          Alloc.KeepA m2 m' → PTree.get dense.id.hint le' = some (.Vint (ir h')) →
           (∀ y, y ≠ dense.id.hint → y ≠ tB → PTree.get y le' = PTree.get y le3) →
           Q.normal E0 empty_env le' m' := by
-        intro x h' le' m' hx heq harr' hu' hh ho'
+        intro x h' le' m' hx heq harr' hu' hk' hh ho'
         have hu : Unch m m' (fun z => z = L.bp ∨ z = L.bn ∨ z = L.ba) :=
           hu12.trans (hu'.mono fun _ h => .inr (.inr h))
         have hw : Unch m m' L.writes := hu.mono fun _ h => by
@@ -614,7 +616,7 @@ theorem wp_trivSplit {D : Dialect} (hD : D.Sem) {tA tB : Common.AST.ident} (hsA 
             · exact hcp h.symm
             · exact hcnb h.symm
             · exact hca h
-        refine hQ le' m' (Set.addW aw x) hmem' ?_ hu ?_
+        refine hQ le' m' (Set.addW aw x) hmem' ?_ hu ((hk1.trans hk2).trans hk') ?_
         · rw [heq]
           refine ht.update (fun y hy => ?_) ?_ hh ?_
           · rw [ho' y (by rintro rfl; first | (revert hy; decide) | exact a0 hy | exact b0 hy) (by rintro rfl; first | (revert hy; decide) | exact a0 hy | exact b0 hy),
@@ -644,7 +646,7 @@ theorem wp_trivSplit {D : Dialect} (hD : D.Sem) {tA tB : Common.AST.ident} (hsA 
         refine hD.addE hMok hok.Mlt hact2
           (by rw [ho4 _ (by scr)]; exact hact3) hc1_4 rfl
           (by have := hok.nM; omega) hbit2 rfl ?_
-        intro m4 harr4 hu4
+        intro m4 harr4 hu4 hk4
         wp_step; wp_step; wp_step
         simp only [show PTree.get dense.id.c1 le4 = _ from hc1_4,
           show PTree.get dense.id.cell2 le4 = some (.Vint (ir cell2)) by
@@ -658,12 +660,12 @@ theorem wp_trivSplit {D : Dialect} (hD : D.Sem) {tA tB : Common.AST.ident} (hsA 
           wp_step; wp_step
           apply wp_set_eval
           rw [show Exec.evalExpr ge empty_env le4 m4 (tv dense.id.c1) = some (.Vint (ir c1)) from hc1_4]
-          refine fin c1 c1 _ m4 (by omega) ?_ harr4 hu4 (temps_gss _ _ _) fun y h1 h2 => ?_
+          refine fin c1 c1 _ m4 (by omega) ?_ harr4 hu4 hk4 (temps_gss _ _ _) fun y h1 h2 => ?_
           · rw [heq0, ite_eq_left he]; rfl
           · rw [temps_gso _ _ h1, ho4 _ h2]
         · rw [ite_eq_right (by simp; omega)]
           apply wp_skip
-          refine fin c1 st.hint _ m4 (by omega) ?_ harr4 hu4 ?_ fun y _ h2 => ho4 _ h2
+          refine fin c1 st.hint _ m4 (by omega) ?_ harr4 hu4 hk4 ?_ fun y _ h2 => ho4 _ h2
           · rw [heq0, ite_eq_right he]; rfl
           · rw [ho4 _ (by scr), ho3 _ (by scr), ho2 _ (by scr)]; exact ht.hint
       · rw [ite_eq_right (by simp [hM])]
@@ -694,7 +696,7 @@ theorem wp_trivSplit {D : Dialect} (hD : D.Sem) {tA tB : Common.AST.ident} (hsA 
           refine hD.addE hMok hok.Mlt hact2
             (by rw [ho4 _ (by scr)]; exact hact3) hc1_4 rfl
             (by have := hok.nM; omega) hbit2 rfl ?_
-          intro m4 harr4 hu4
+          intro m4 harr4 hu4 hk4
           wp_step; wp_step; wp_step
           simp only [show PTree.get dense.id.c1 le4 = _ from hc1_4,
             show PTree.get dense.id.cell2 le4 = some (.Vint (ir cell2)) by
@@ -708,12 +710,12 @@ theorem wp_trivSplit {D : Dialect} (hD : D.Sem) {tA tB : Common.AST.ident} (hsA 
             wp_step; wp_step
             apply wp_set_eval
             rw [show Exec.evalExpr ge empty_env le4 m4 (tv dense.id.c1) = some (.Vint (ir c1)) from hc1_4]
-            refine fin c1 c1 _ m4 (by omega) ?_ harr4 hu4 (temps_gss _ _ _) fun y h1 h2 => ?_
+            refine fin c1 c1 _ m4 (by omega) ?_ harr4 hu4 hk4 (temps_gss _ _ _) fun y h1 h2 => ?_
             · rw [heq0, ite_eq_left he]; rfl
             · rw [temps_gso _ _ h1, ho4 _ h2]
           · rw [ite_eq_right (by simp; omega)]
             apply wp_skip
-            refine fin c1 st.hint _ m4 (by omega) ?_ harr4 hu4 ?_ fun y _ h2 => ho4 _ h2
+            refine fin c1 st.hint _ m4 (by omega) ?_ harr4 hu4 hk4 ?_ fun y _ h2 => ho4 _ h2
             · rw [heq0, ite_eq_right he]; rfl
             · rw [ho4 _ (by scr), ho3 _ (by scr), ho2 _ (by scr)]; exact ht.hint
         · rw [show (!decide ((k : Int) - cell1 < cell2 - c1)) = false by simp; omega]
@@ -732,7 +734,7 @@ theorem wp_trivSplit {D : Dialect} (hD : D.Sem) {tA tB : Common.AST.ident} (hsA 
           refine hD.addE hMok hok.Mlt hact2
             (by rw [ho4 _ (by scr)]; exact hact3) hcl_4 rfl
             (by have := hok.nM; omega) hbit2 rfl ?_
-          intro m4 harr4 hu4
+          intro m4 harr4 hu4 hk4
           wp_step; wp_step; wp_step
           simp only [show PTree.get dense.id.cell1 le4 = _ from hcl_4,
             show PTree.get dense.id.c2 le4 = some (.Vint (ir k)) by
@@ -746,12 +748,12 @@ theorem wp_trivSplit {D : Dialect} (hD : D.Sem) {tA tB : Common.AST.ident} (hsA 
             wp_step; wp_step
             apply wp_set_eval
             rw [show Exec.evalExpr ge empty_env le4 m4 (tv dense.id.cell1) = some (.Vint (ir cell1)) from hcl_4]
-            refine fin cell1 cell1 _ m4 (by omega) ?_ harr4 hu4 (temps_gss _ _ _) fun y h1 h2 => ?_
+            refine fin cell1 cell1 _ m4 (by omega) ?_ harr4 hu4 hk4 (temps_gss _ _ _) fun y h1 h2 => ?_
             · rw [heq0, ite_eq_left (show (k : Int).toNat = cell1 from he)]; rfl
             · rw [temps_gso _ _ h1, ho4 _ h2]
           · rw [ite_eq_right (by simp; omega)]
             apply wp_skip
-            refine fin cell1 st.hint _ m4 (by omega) ?_ harr4 hu4 ?_ fun y _ h2 => ho4 _ h2
+            refine fin cell1 st.hint _ m4 (by omega) ?_ harr4 hu4 hk4 ?_ fun y _ h2 => ho4 _ h2
             · rw [heq0, ite_eq_right (show ¬ (k : Int).toNat = cell1 from he)]; rfl
             · rw [ho4 _ (by scr), ho3 _ (by scr), ho2 _ (by scr)]; exact ht.hint
     · rw [show (!decide ((cell2 : Int) < c1)) = false by simp; omega]
@@ -828,6 +830,7 @@ structure PassInv {n : Nat} (le : temp_env) (m0 m : mem) (L : Loc) (ctx : Ctx n)
     (st0 : RefineSt n) (v0 : Nat) (R : RefineSt n) (p : Nat) (stc : RefineSt n) : Prop where
   mem : ∃ aw, Mem m L ctx stc aw
   unch : Unch m0 m L.writes
+  keep : Alloc.KeepA m0 m
   tmp : Tmp le L stc
   gptr : PTree.get dense.id.gptr le =
     some (.Vptr L.bg (ptrTo (intOfZ (Ptrofs.unsigned L.gofs)) 8 (L.M * v0)))
@@ -936,7 +939,7 @@ theorem wp_cellLoopT {D : Dialect} (hD : D.Sem) {tA tB : Common.AST.ident} (hsA 
           (by rw [ho2 _ (by scr) (by scr), ho1 _ (by scr)]; exact ht.lab)
           (by rw [← hle2, temps_gso _ _ (by scr), temps_gss])
           (by rw [← hle2, temps_gss]) ?_
-        intro le3 m3 lab' c1 c2 hRs harr3 hu3 hs hcc hc13 hc23 ho3
+        intro le3 m3 lab' c1 c2 hRs harr3 hu3 hk3 hs hcc hc13 hc23 ho3
         have ho13 : ∀ x, x ≠ dense.id.c1 → x ≠ dense.id.c2 → x ≠ dense.id.labc1 → x ≠ dense.id.cell2 →
             PTree.get x le3 = PTree.get x le' := fun x h1 h2 h3 h4 => by
           rw [ho3 x h1 h2 h3, ho2 x h1 h2, ho1 x h4]
@@ -963,7 +966,7 @@ theorem wp_cellLoopT {D : Dialect} (hD : D.Sem) {tA tB : Common.AST.ident} (hsA 
           (by rw [ho13 _ (by scr) (by scr) (by scr) (by scr)]; exact hc)
           (by rw [ho3 _ (by scr) (by scr) (by scr), ho2 _ (by scr) (by scr)]; exact hcell2)
           hc13 hc23 ?_
-        intro le4 m4 aw4 hm4 ht4 hu4 ho4
+        intro le4 m4 aw4 hm4 ht4 hu4 hk4 ho4
         have hTC : trivialCell L.level ctx.g[v0]! c en stc =
             trivialSplit L.level c en (c1 : Int) c2 stL := by
           rw [trivialCell_ne _ _ _ hce', hRs]
@@ -999,6 +1002,7 @@ theorem wp_cellLoopT {D : Dialect} (hD : D.Sem) {tA tB : Common.AST.ident} (hsA 
               · exact .inr (.inl h)
               · exact .inr (.inr (.inl h))
               · exact .inr (.inr (.inr (.inr (.inl h))))))
+            keep := hP.keep.trans (hk3.trans hk4)
             tmp := ht4
             gptr := by
               rw [ho4 _ (by scr) (by scr) (by scr) (by scr),
@@ -1043,7 +1047,7 @@ def TrivialPassG (xi : ExternalCalls) (D : Dialect) (tA tB : Common.AST.ident) (
     D.okM L.M → Ok n L → Mem m L ctx st aw → Tmp le L st → StInv n L st → st.numcells < n →
     PTree.get dense.id.split1 le = some (.Vint (ir split1)) → split1 < n →
     (∀ le' m', Done le' m' L ctx (Hex.GraphIso.Nauty.refineTrivial ctx L.level split1 st) →
-      Unch m m' L.writes → Q.normal E0 empty_env le' m') →
+      Unch m m' L.writes → Alloc.KeepA m m' → Q.normal E0 empty_env le' m') →
     Wp xi ge f (trivialG D tA tB) Q empty_env le m
 
 /-- The trivial-splitter pass is HexGraphIso's `refineTrivial`, in either dialect. -/
@@ -1080,6 +1084,7 @@ theorem wp_trivialG {D : Dialect} (hD : D.Sem) {tA tB : Common.AST.ident} (hsA :
   refine wp_cellLoopT hD hsA hsB hAB (st0 := st) (v0 := st.lab[split1]!) hMok hok hv0 hok0
     { mem := ⟨aw, hm⟩
       unch := Unch.refl _ _
+      keep := Alloc.KeepA.refl _
       tmp := (ht.set _ (by decide)).set _ (by decide)
       gptr := by rw [temps_gso _ _ (by decide), temps_gss]
       pn := Nat.zero_le _
@@ -1095,7 +1100,7 @@ theorem wp_trivialG {D : Dialect} (hD : D.Sem) {tA tB : Common.AST.ident} (hsA :
   obtain ⟨aw', hm'⟩ := hP.mem
   exact hQ le' m' ⟨aw', hm', hP.tmp,
     { ok := hP.ok, ptnSmall := hP.small, ncSmall := by have := hP.nc; omega, hint := hP.hint,
-      maxpos := hP.maxpos, code := hP.code }⟩ hP.unch
+      maxpos := hP.maxpos, code := hP.code }⟩ hP.unch hP.keep
 
 
 /-- `refine`'s pass for a trivial splitting cell is HexGraphIso's `refineTrivial`. -/

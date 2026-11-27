@@ -1,3 +1,4 @@
+import NautyVerified.Proofs.Alloc.KeepV
 import NautyVerified.Proofs.Refine.Frame
 import NautyVerified.Proofs.Alloc.Global
 
@@ -52,7 +53,7 @@ theorem wp_widenLo {f : function} {Q : Post} {le : temp_env} {m : mem} {t : Comm
     (hbg : Block.naugraphBucket ≠ bB) (hB : B < cap) (hcap : cap < 2147483648) (hcc : c < cap)
     (hQ : ∀ le' m', PTree.get dense.id.bmin le' = some (.Vint (ir (min B c : Nat))) →
       ArrayAt m' .Mint32 bB 0 (fun v => if min B c ≤ v ∧ v < B then .Vint (ir 0) else bv v) cap →
-      Unch m m' (· = bB) → Keep m m' bB →
+      Unch m m' (· = bB) → Alloc.KeepA m m' →
       (∀ z, z ≠ dense.id.bmin → z ≠ t → PTree.get z le' = PTree.get z le) →
       Q.normal E0 empty_env le' m') :
     Wp xi ge f (widenLo t) Q empty_env le m := by
@@ -60,12 +61,12 @@ theorem wp_widenLo {f : function} {Q : Post} {le : temp_env} {m : mem} {t : Comm
     e' = empty_env ∧ ∃ j, min B c ≤ j ∧ j ≤ B ∧ v = j - min B c ∧
       PTree.get dense.id.bmin le' = some (.Vint (ir (j : Nat))) ∧
       ArrayAt m' .Mint32 bB 0 (fun v => if j ≤ v ∧ v < B then .Vint (ir 0) else bv v) cap ∧
-      Unch m m' (· = bB) ∧ Keep m m' bB ∧
+      Unch m m' (· = bB) ∧ Alloc.KeepA m m' ∧
       (∀ z, z ≠ dense.id.bmin → z ≠ t → PTree.get z le' = PTree.get z le)
   refine wp_loop (I := I) (J := fun v tr e' le' m' => ∃ v', v' < v ∧ I v' tr e' le' m') ?_ ?_
     (n := B - min B c) ⟨rfl, rfl, B, Nat.min_le_left _ _, Nat.le_refl _, rfl, hb,
       harr.congr fun v _ => (ite_eq_right (by omega)).symm,
-      Unch.refl _ _, Keep.refl _ _, fun _ _ _ => rfl⟩
+      Unch.refl _ _, Alloc.KeepA.refl _, fun _ _ _ => rfl⟩
   · rintro v tr e' le' m' ⟨rfl, rfl, j, hj1, hj2, rfl, hbj, harr', hu, hk, ho⟩
     have hc' : PTree.get dense.id.cnt le' = some (.Vint (ir c)) := by
       rw [ho _ (by decide) (Ne.symm ht2)]; exact hc
@@ -89,7 +90,7 @@ theorem wp_widenLo {f : function} {Q : Post} {le : temp_env} {m : mem} {t : Comm
         (by show PTree.get _ _ = _; rw [temps_gso _ _ ht1, temps_gss]) rfl (ci 0 tint) 0 rfl rfl ?_
       intro m2 harr2 hu2 hk2
       refine ⟨j - 1 - min B c, by omega, ⟨by simp, rfl, j - 1, by omega, by omega, rfl,
-        temps_gss _ _ _, harr2.congr fun v _ => ?_, hu.trans hu2, hk.trans hk2, fun z h1 h2 => ?_⟩⟩
+        temps_gss _ _ _, harr2.congr fun v _ => ?_, hu.trans hu2, hk.trans (Alloc.KeepA.of_keep hu2 hk2), fun z h1 h2 => ?_⟩⟩
       · simp only [upd]
         by_cases hv : v = j - 1
         · rw [ite_eq_left hv, ite_eq_left (by omega)]
@@ -116,7 +117,7 @@ theorem wp_widenHi {f : function} {Q : Post} {le : temp_env} {m : mem} {t : Comm
     (hbg : Block.naugraphBucket ≠ bB) (hB : B < cap) (hcap : cap < 2147483648) (hcc : c < cap)
     (hQ : ∀ le' m', PTree.get dense.id.bmax le' = some (.Vint (ir (max B c : Nat))) →
       ArrayAt m' .Mint32 bB 0 (fun v => if B < v ∧ v ≤ max B c then .Vint (ir 0) else bv v) cap →
-      Unch m m' (· = bB) → Keep m m' bB →
+      Unch m m' (· = bB) → Alloc.KeepA m m' →
       (∀ z, z ≠ dense.id.bmax → z ≠ t → PTree.get z le' = PTree.get z le) →
       Q.normal E0 empty_env le' m') :
     Wp xi ge f (widenHi t) Q empty_env le m := by
@@ -124,12 +125,12 @@ theorem wp_widenHi {f : function} {Q : Post} {le : temp_env} {m : mem} {t : Comm
     e' = empty_env ∧ ∃ j, B ≤ j ∧ j ≤ max B c ∧ v = max B c - j ∧
       PTree.get dense.id.bmax le' = some (.Vint (ir (j : Nat))) ∧
       ArrayAt m' .Mint32 bB 0 (fun v => if B < v ∧ v ≤ j then .Vint (ir 0) else bv v) cap ∧
-      Unch m m' (· = bB) ∧ Keep m m' bB ∧
+      Unch m m' (· = bB) ∧ Alloc.KeepA m m' ∧
       (∀ z, z ≠ dense.id.bmax → z ≠ t → PTree.get z le' = PTree.get z le)
   refine wp_loop (I := I) (J := fun v tr e' le' m' => ∃ v', v' < v ∧ I v' tr e' le' m') ?_ ?_
     (n := max B c - B) ⟨rfl, rfl, B, Nat.le_refl _, Nat.le_max_left _ _, rfl, hb,
       harr.congr fun v _ => (ite_eq_right (by omega)).symm,
-      Unch.refl _ _, Keep.refl _ _, fun _ _ _ => rfl⟩
+      Unch.refl _ _, Alloc.KeepA.refl _, fun _ _ _ => rfl⟩
   · rintro v tr e' le' m' ⟨rfl, rfl, j, hj1, hj2, rfl, hbj, harr', hu, hk, ho⟩
     have hc' : PTree.get dense.id.cnt le' = some (.Vint (ir c)) := by
       rw [ho _ (by decide) (Ne.symm ht2)]; exact hc
@@ -153,7 +154,7 @@ theorem wp_widenHi {f : function} {Q : Post} {le : temp_env} {m : mem} {t : Comm
         (by show PTree.get _ _ = _; rw [temps_gso _ _ ht1, temps_gss]) rfl (ci 0 tint) 0 rfl rfl ?_
       intro m2 harr2 hu2 hk2
       refine ⟨max B c - (j + 1), by omega, ⟨by simp, rfl, j + 1, by omega, by omega, rfl,
-        temps_gss _ _ _, harr2.congr fun v _ => ?_, hu.trans hu2, hk.trans hk2, fun z h1 h2 => ?_⟩⟩
+        temps_gss _ _ _, harr2.congr fun v _ => ?_, hu.trans hu2, hk.trans (Alloc.KeepA.of_keep hu2 hk2), fun z h1 h2 => ?_⟩⟩
       · simp only [upd]
         by_cases hv : v = j + 1
         · rw [ite_eq_left hv, ite_eq_left (by omega)]

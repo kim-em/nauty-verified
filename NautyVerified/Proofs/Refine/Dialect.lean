@@ -1,3 +1,4 @@
+import NautyVerified.Proofs.Alloc.KeepV
 import NautyVerified.Proofs.Refine.State
 import NautyVerified.Proofs.Set.One
 
@@ -59,7 +60,7 @@ structure Dialect.Sem (D : Dialect) : Prop where
     Exec.evalExpr ge e le m a = some (.Vint (ir c)) → typeof a = tint → c < 64 * M →
     BitTable m Block.naugraphBit → PTree.get dense.id.«naugraph:bit» e = none →
     (∀ m', ArrayAt m' .Mint64 ba (intOfZ (Ptrofs.unsigned ofs)) (longs (addW ws c)) M →
-      Unch m m' (· = ba) → Q.normal E0 e le m') →
+      Unch m m' (· = ba) → Alloc.KeepA m m' → Q.normal E0 e le m') →
     Wp xi ge f (D.addE s a) Q e le m
   delE : ∀ {xi : ExternalCalls} {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
     {s : Common.AST.ident} {a : expr} {ba : block} {ofs : ptrofs} {ws : Nat → Lib.Integers.int64}
@@ -69,7 +70,7 @@ structure Dialect.Sem (D : Dialect) : Prop where
     Exec.evalExpr ge e le m a = some (.Vint (ir c)) → typeof a = tint → c < 64 * M →
     BitTable m Block.naugraphBit → PTree.get dense.id.«naugraph:bit» e = none →
     (∀ m', ArrayAt m' .Mint64 ba (intOfZ (Ptrofs.unsigned ofs)) (longs (delW ws c)) M →
-      Unch m m' (· = ba) → Q.normal E0 e le m') →
+      Unch m m' (· = ba) → Alloc.KeepA m m' → Q.normal E0 e le m') →
     Wp xi ge f (D.delE s a) Q e le m
   mE : ∀ {e : env} {le : temp_env} {m : mem} {M : Nat}, D.okM M →
     PTree.get dense.id.m le = some (.Vint (ir M)) →
@@ -97,10 +98,10 @@ theorem D0_sem : D0.Sem where
     Set.eval_isElement harr (by omega) hs ha hty hc (by omega) hbit he find_naugraphBit
   addE := fun _ hM harr hs ha hty hc hbit he hQ =>
     Set.wp_addElementB harr (by omega) hs ha hty hc (by omega) find_naugraphBit hbit he
-      fun m' h1 h2 _ => hQ m' h1 h2
+      fun m' h1 h2 h3 => hQ m' h1 h2 (Alloc.KeepA.of_outside h2 h3 harr.base_nonneg)
   delE := fun _ hM harr hs ha hty hc hbit he hQ =>
     Set.wp_delElementB harr (by omega) hs ha hty hc (by omega) find_naugraphBit hbit he
-      fun m' h1 h2 _ => hQ m' h1 h2
+      fun m' h1 h2 h3 => hQ m' h1 h2 (Alloc.KeepA.of_outside h2 h3 harr.base_nonneg)
   mE := fun _ hm => ⟨hm, rfl⟩
 
 theorem D1_sem : D1.Sem where
@@ -111,11 +112,11 @@ theorem D1_sem : D1.Sem where
   addE := fun hM _ harr hs ha hty hc hbit he hQ => by
     obtain rfl : _ = 1 := hM
     exact Set.wp_addElement1 harr hs ha hty (by omega) find_naugraphBit hbit he
-      fun m' h1 h2 _ => hQ m' h1 h2
+      fun m' h1 h2 h3 => hQ m' h1 h2 (Alloc.KeepA.of_outside h2 h3 harr.base_nonneg)
   delE := fun hM _ harr hs ha hty hc hbit he hQ => by
     obtain rfl : _ = 1 := hM
     exact Set.wp_delElement1 harr hs ha hty (by omega) find_naugraphBit hbit he
-      fun m' h1 h2 _ => hQ m' h1 h2
+      fun m' h1 h2 h3 => hQ m' h1 h2 (Alloc.KeepA.of_outside h2 h3 harr.base_nonneg)
   mE := fun hM _ => by obtain rfl : _ = 1 := hM; exact ⟨rfl, rfl⟩
 
 end NautyVerified.Proofs.Refine

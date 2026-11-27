@@ -161,7 +161,7 @@ theorem wp_placeLoop {t : Common.AST.ident} (hT : NTemps [t]) {f : function} {Q 
       ArrayAt m' .Mint32 L.bW 0
         (wpVals cs A cell1 (members lab cell1 cs.length) n cs.length wv0) L.capW →
       (∃ v, ArrayAt m' .Mint32 L.bB 0 v L.capB) →
-      Unch m m' (fun z => z = L.bB ∨ z = L.bW) → Keep m m' L.bB → Keep m m' L.bW →
+      Unch m m' (fun z => z = L.bB ∨ z = L.bW) → Alloc.KeepA m m' →
       (∀ z, z ≠ dense.id.i → z ≠ t → PTree.get z le' = PTree.get z le) →
       Q.normal E0 empty_env le' m') :
     Wp xi ge f (placeLoopG t) Q empty_env le m := by
@@ -184,19 +184,19 @@ theorem wp_placeLoop {t : Common.AST.ident} (hT : NTemps [t]) {f : function} {Q 
       PTree.get dense.id.i le' = some (.Vint (ir (cell1 + o : Nat))) ∧
       ArrayAt m' .Mint32 L.bB 0 (curVals cs A B cell1 o bv0) L.capB ∧
       ArrayAt m' .Mint32 L.bW 0 (wpVals cs A cell1 mb n o wv0) L.capW ∧
-      Unch m m' (fun z => z = L.bB ∨ z = L.bW) ∧ Keep m m' L.bB ∧ Keep m m' L.bW ∧
+      Unch m m' (fun z => z = L.bB ∨ z = L.bW) ∧ Alloc.KeepA m m' ∧
       (∀ z, z ≠ dense.id.i → z ≠ t → PTree.get z le' = PTree.get z le)
   let J := fun (v : Nat) (tr : trace) (e' : env) (le' : temp_env) (m' : mem) => tr = E0 ∧
     e' = empty_env ∧ ∃ o, o < len ∧ v = len - o ∧
       PTree.get dense.id.i le' = some (.Vint (ir (cell1 + o : Nat))) ∧
       ArrayAt m' .Mint32 L.bB 0 (curVals cs A B cell1 (o + 1) bv0) L.capB ∧
       ArrayAt m' .Mint32 L.bW 0 (wpVals cs A cell1 mb n (o + 1) wv0) L.capW ∧
-      Unch m m' (fun z => z = L.bB ∨ z = L.bW) ∧ Keep m m' L.bB ∧ Keep m m' L.bW ∧
+      Unch m m' (fun z => z = L.bB ∨ z = L.bW) ∧ Alloc.KeepA m m' ∧
       (∀ z, z ≠ dense.id.i → z ≠ t → PTree.get z le' = PTree.get z le)
   refine wp_loop (I := I) (J := J) ?_ ?_ (n := len) ⟨rfl, rfl, 0, Nat.zero_le _, rfl,
     by simpa using hi, hbkt, hwp.congr fun p _ => (wpVals_zero _ _ _ _ _ _ p).symm, Unch.refl _ _,
-    Keep.refl _ _, Keep.refl _ _, fun _ _ _ => rfl⟩
-  · rintro v tr e' le' m' ⟨rfl, rfl, o, ho, rfl, hio, hbk, hwk, hu, hkB, hkW, hoth⟩
+    Alloc.KeepA.refl _, fun _ _ _ => rfl⟩
+  · rintro v tr e' le' m' ⟨rfl, rfl, o, ho, rfl, hio, hbk, hwk, hu, hkA, hoth⟩
     have nB : ∀ {z}, L.bB ≠ z → L.bW ≠ z → ¬ (z = L.bB ∨ z = L.bW) := fun h1 h2 h => by
       rcases h with h | h
       · exact h1 h.symm
@@ -212,7 +212,7 @@ theorem wp_placeLoop {t : Common.AST.ident} (hT : NTemps [t]) {f : function} {Q 
     · rw [ite_eq_right (by simp; omega)]
       apply wp_break
       subst hoL
-      exact hQ le' m' hwk ⟨_, hbk⟩ hu hkB hkW hoth
+      exact hQ le' m' hwk ⟨_, hbk⟩ hu hkA hoth
     · rw [ite_eq_left (by simp; omega)]
       apply wp_skip
       have hol : o < len := by omega
@@ -276,18 +276,17 @@ theorem wp_placeLoop {t : Common.AST.ident} (hT : NTemps [t]) {f : function} {Q 
       refine ⟨by simp, rfl, o, hol, rfl,
         by rw [temps_gso _ _ (by nscr)]; exact hio,
         (hbk1.unch hu2 (Ne.symm d.bW_bB)).congr fun v _ => curVals_succ bv0 hcm.1 hcm.2 hmul v,
-        hwk2.congr fun p _ => ?_, ?_, ?_, ?_, ?_⟩
+        hwk2.congr fun p _ => ?_, ?_, ?_, ?_⟩
       · rw [← hmbo]
         exact wpVals_succ cs A cell1 mb n o wv0 (by omega) (by rw [hmbo]; exact hlab_o) p
       · exact (hu.trans (hu1.mono fun z hz => .inl hz)).trans (hu2.mono fun z hz => .inr hz)
-      · exact (hkB.trans hk1).trans (Keep.unch hu2 d.bW_bB.symm)
-      · exact (hkW.trans (Keep.unch hu1 d.bW_bB)).trans hk2
+      · exact (hkA.trans (Alloc.KeepA.of_keep hu1 hk1)).trans (Alloc.KeepA.of_keep hu2 hk2)
       · intro z h1 h2; rw [temps_gso _ _ h2, hoth z h1 h2]
-  · rintro v tr e' le' m' ⟨rfl, rfl, o, ho, rfl, hio, hbk, hwk, hu, hkB, hkW, hoth⟩
+  · rintro v tr e' le' m' ⟨rfl, rfl, o, ho, rfl, hio, hbk, hwk, hu, hkA, hoth⟩
     wp_step; wp_step
     apply wp_set_eval
     simp only [Exec.evalExpr, hio, typeof, cop, ir_add]
-    refine ⟨len - (o + 1), by omega, by simp, rfl, o + 1, by omega, rfl, ?_, hbk, hwk, hu, hkB, hkW,
+    refine ⟨len - (o + 1), by omega, by simp, rfl, o + 1, by omega, rfl, ?_, hbk, hwk, hu, hkA,
       fun z h1 h2 => by rw [temps_gso _ _ h1, hoth z h1 h2]⟩
     rw [temps_gss]; push_cast; rw [Int.add_assoc]
 
@@ -303,7 +302,7 @@ theorem wp_copyLoop {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Nat
     (hT : ∀ q, cell1 ≤ q → q ≤ cell2 → wv q = .Vint (ir (T[q]! : Nat)))
     (hT0 : ∀ q, q < n → ¬ (cell1 ≤ q ∧ q ≤ cell2) → T[q]! = lab0[q]!)
     (hQ : ∀ le' m', ArrayAt m' .Mint32 L.bl L.lb (ints T) n → Unch m m' (· = L.bl) →
-      (∀ z, z ≠ dense.id.i → PTree.get z le' = PTree.get z le) →
+      Alloc.KeepA m m' → (∀ z, z ≠ dense.id.i → PTree.get z le' = PTree.get z le) →
       Q.normal E0 empty_env le' m') :
     Wp xi ge f copyLoop Q empty_env le m := by
   have d := hok.wd
@@ -314,17 +313,17 @@ theorem wp_copyLoop {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Nat
   let I := fun (v : Nat) (tr : trace) (e' : env) (le' : temp_env) (m' : mem) => tr = E0 ∧
     e' = empty_env ∧ ∃ o, o ≤ len ∧ v = len - o ∧
       PTree.get dense.id.i le' = some (.Vint (ir (cell1 + o : Nat))) ∧
-      ArrayAt m' .Mint32 L.bl L.lb (lv o) n ∧ Unch m m' (· = L.bl) ∧
+      ArrayAt m' .Mint32 L.bl L.lb (lv o) n ∧ Unch m m' (· = L.bl) ∧ Alloc.KeepA m m' ∧
       (∀ z, z ≠ dense.id.i → PTree.get z le' = PTree.get z le)
   let J := fun (v : Nat) (tr : trace) (e' : env) (le' : temp_env) (m' : mem) => tr = E0 ∧
     e' = empty_env ∧ ∃ o, o < len ∧ v = len - o ∧
       PTree.get dense.id.i le' = some (.Vint (ir (cell1 + o : Nat))) ∧
-      ArrayAt m' .Mint32 L.bl L.lb (lv (o + 1)) n ∧ Unch m m' (· = L.bl) ∧
+      ArrayAt m' .Mint32 L.bl L.lb (lv (o + 1)) n ∧ Unch m m' (· = L.bl) ∧ Alloc.KeepA m m' ∧
       (∀ z, z ≠ dense.id.i → PTree.get z le' = PTree.get z le)
   refine wp_loop (I := I) (J := J) ?_ ?_ (n := len) ⟨rfl, rfl, 0, Nat.zero_le _, rfl,
     by simpa using hi, hlarr.congr fun q _ => by simp only [lv]; rw [ite_eq_right (by omega)],
-    Unch.refl _ _, fun _ _ => rfl⟩
-  · rintro v tr e' le' m' ⟨rfl, rfl, o, ho, rfl, hio, hla, hu, hoth⟩
+    Unch.refl _ _, Alloc.KeepA.refl _, fun _ _ => rfl⟩
+  · rintro v tr e' le' m' ⟨rfl, rfl, o, ho, rfl, hio, hla, hu, hkA, hoth⟩
     have hcl2' : PTree.get dense.id.cell2 le' = some (.Vint (ir cell2)) := by
       rw [hoth _ (by decide)]; exact hcl2
     have hlabp' : PTree.get dense.id.lab le' = some (.Vptr L.bl L.lofs) := by
@@ -338,7 +337,7 @@ theorem wp_copyLoop {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Nat
     · rw [ite_eq_right (by simp; omega)]
       apply wp_break
       subst hoL
-      refine hQ le' m' (hla.congr fun q hq => ?_) hu hoth
+      refine hQ le' m' (hla.congr fun q hq => ?_) hu hkA hoth
       simp only [lv]
       by_cases hq2 : cell1 ≤ q ∧ q < cell1 + len
       · rw [ite_eq_left hq2]
@@ -354,8 +353,9 @@ theorem wp_copyLoop {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Nat
       wp_step; wp_step
       refine wp_storeV hla (by omega) dense.id.lab hlabp' (tv dense.id.i) (cell1 + o) (by omega) hio
         rfl _ _ hrd rfl ?_
-      intro m1 hla1 hu1
-      refine ⟨by simp, rfl, o, by omega, rfl, hio, hla1.congr fun q _ => ?_, hu.trans hu1, hoth⟩
+      intro m1 hla1 hu1 hk1
+      refine ⟨by simp, rfl, o, by omega, rfl, hio, hla1.congr fun q _ => ?_, hu.trans hu1,
+        hkA.trans hk1, hoth⟩
       simp only [lv, upd]
       by_cases hq : q = cell1 + o
       · subst hq; rw [ite_eq_left rfl, ite_eq_left (by omega)]; rfl
@@ -363,11 +363,11 @@ theorem wp_copyLoop {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Nat
         by_cases hq2 : cell1 ≤ q ∧ q < cell1 + o
         · rw [ite_eq_left hq2, ite_eq_left (by omega)]
         · rw [ite_eq_right hq2, ite_eq_right (by omega)]
-  · rintro v tr e' le' m' ⟨rfl, rfl, o, ho, rfl, hio, hla, hu, hoth⟩
+  · rintro v tr e' le' m' ⟨rfl, rfl, o, ho, rfl, hio, hla, hu, hkA, hoth⟩
     wp_step; wp_step
     apply wp_set_eval
     simp only [Exec.evalExpr, hio, typeof, cop, ir_add]
-    refine ⟨len - (o + 1), by omega, by simp, rfl, o + 1, by omega, rfl, ?_, hla, hu,
+    refine ⟨len - (o + 1), by omega, by simp, rfl, o + 1, by omega, rfl, ?_, hla, hu, hkA,
       fun z h1 => by rw [temps_gso _ _ h1, hoth z h1]⟩
     rw [temps_gss]; push_cast; rw [Int.add_assoc]
 
