@@ -64,4 +64,34 @@ theorem wp_za {Q : Post} {e : env} {le : temp_env} {m : mem} {a : expr} (t : ide
   rintro t' v m' ⟨rfl, b, rfl, hfr, hz⟩
   exact hQ b m' hfr hz
 
+/-- `Logic.wp_store`, also reporting that every valid block stays valid. -/
+theorem wp_storeV {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {bo : block}
+    {ofs : ptrofs} {o : Array Nat} {n : Nat}
+    (harr : ArrayAt m .Mint32 bo (intOfZ (Ptrofs.unsigned ofs)) (ints o) n)
+    (hn : n < 2147483648) (p : ident) (hp : PTree.get p le = some (.Vptr bo ofs))
+    (a : expr) (c : Nat) (hc : c < n)
+    (ha : Exec.evalExpr ge e le m a = some (.Vint (ir c))) (hty : typeof a = tint)
+    (rhs : expr) (x : Int) (hrhs : Exec.evalExpr ge e le m rhs = some (.Vint (ir x)))
+    (hrty : typeof rhs = tint)
+    (hQ : ∀ m', ArrayAt m' .Mint32 bo (intOfZ (Ptrofs.unsigned ofs)) (upd (ints o) c (.Vint (ir x))) n →
+      Unch m m' (· = bo) → (∀ z, Mem.valid_block m z → Mem.valid_block m' z) → Q.normal E0 e le m') :
+    Wp Statement.xi ge f (.Sassign (.Ederef (.Ebinop .Oadd (.Etempvar p (tptr tint)) a (tptr tint)) tint) rhs)
+      Q e le m := by
+  have haddr : Ptrofs.unsigned (Ptrofs.add ofs (Ptrofs.mul (Ptrofs.repr
+      (Cfrontend.Ctypes.sizeof ge.genv_cenv tint)) (Ptrofs.of_ints (ir c)))) =
+      elemOfs .Mint32 (intOfZ (Ptrofs.unsigned ofs)) c := by
+    apply addr_elem ofs _ .Mint32 rfl rfl (by omega)
+    have hf := harr.fits
+    have h4 : csize .Mint32 = 4 := rfl
+    rw [h4] at hf ⊢
+    omega
+  obtain ⟨m', hst, harr', -⟩ := store_array harr hc (.Vint (ir x)) rfl
+  apply wp_assign_eval
+  simp only [Exec.evalLvalue, Exec.evalExpr, hp, ha, hty, hrhs, hrty]
+  simp only [typeof, cop, Exec.assignLoc, Cfrontend.Ctypes.access_mode]
+  show match Mem.store .Mint32 m bo (Ptrofs.unsigned _) _ with
+    | some m' => Q.normal E0 e le m' | none => False
+  rw [haddr, hst]
+  exact hQ m' harr' (Unch.store hst rfl) fun z hz => Mem.store_valid_block_1 _ _ _ _ _ _ hst _ hz
+
 end NautyVerified.Proofs.Harness

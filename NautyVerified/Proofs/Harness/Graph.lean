@@ -30,7 +30,7 @@ theorem wp_emptyG {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} 
     (hmv : PTree.get dense.id.m le = some (.Vint (ir Mw)))
     (hnv : PTree.get dense.id.n le = some (.Vint (ir N)))
     (hQ : ∀ le' m', ArrayAt m' .Mint64 ba (intOfZ (Ptrofs.unsigned ofs)) (longs fun _ => lr 0) (Mw * N) →
-      Unch m m' (· = ba) →
+      Unch m m' (· = ba) → (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
       Outside m m' ba (intOfZ (Ptrofs.unsigned ofs)) (intOfZ (Ptrofs.unsigned ofs) + 8 * (Mw * N)) →
       (∀ k, k ≠ dense.id.es_ → k ≠ idOf 712 → PTree.get k le' = PTree.get k le) → Q.normal E0 e le' m') :
     Wp xi ge f emptyG Q e le m := by
@@ -53,18 +53,20 @@ theorem wp_emptyG {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} 
   refine wp_loop (I := fun k t e' le' m' => t = E0 ∧ e = e' ∧ k ≤ (Mw * N) ∧
       PTree.get dense.id.es_ le' = some (.Vptr ba (ptrTo base 8 k)) ∧
       ArrayAt m' .Mint64 ba base (clearedFromV vals k) (Mw * N) ∧ Unch m m' (· = ba) ∧
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) ∧
       Outside m m' ba base (base + 8 * (Mw * N)) ∧
       ∀ k', k' ≠ dense.id.es_ → k' ≠ idOf 712 → PTree.get k' le' = PTree.get k' le)
     (J := fun k t e' le' m' => ∃ k' < k, t = E0 ∧ e = e' ∧ k' ≤ (Mw * N) ∧
       PTree.get dense.id.es_ le' = some (.Vptr ba (ptrTo base 8 k')) ∧
       ArrayAt m' .Mint64 ba base (clearedFromV vals k') (Mw * N) ∧ Unch m m' (· = ba) ∧
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) ∧
       Outside m m' ba base (base + 8 * (Mw * N)) ∧
       ∀ k'', k'' ≠ dense.id.es_ → k'' ≠ idOf 712 → PTree.get k'' le' = PTree.get k'' le) ?_ ?_ (n := (Mw * N))
     ⟨rfl, rfl, Nat.le_refl _, temps_gss _ _ _, by
       refine ⟨hb, by rw [h8]; omega, fun i hi => ?_, fun i hi => harr.writable i hi⟩
       simp only [clearedFromV, ite_eq_left hi]; exact harr.load i hi,
-      Unch.refl _ _, Outside.refl _ _ _ _, fun k' hk _ => temps_gso _ _ hk⟩
-  · rintro k t e' le' m' ⟨rfl, rfl, hk, hes, harr', hu, hout, hother⟩
+      Unch.refl _ _, fun _ h => h, Outside.refl _ _ _ _, fun k' hk _ => temps_gso _ _ hk⟩
+  · rintro k t e' le' m' ⟨rfl, rfl, hk, hes, harr', hu, hgr, hout, hother⟩
     have hact' : PTree.get dense.id.g le' = some (.Vptr ba ofs) := by
       rw [hother _ (by decide) (by decide)]; exact hact
     wp_step; wp_step; wp_step
@@ -77,7 +79,7 @@ theorem wp_emptyG {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} 
       apply wp_break
       have h0 : clearedFromV vals 0 = longs fun _ => lr 0 := by funext w; simp [clearedFromV, longs]
       rw [h0] at harr'
-      exact hQ le' m' harr' hu hout hother
+      exact hQ le' m' harr' hu hgr hout hother
     · rw [ite_eq_left (by simp)]
       apply wp_skip
       simp only [E0_append]
@@ -99,7 +101,7 @@ theorem wp_emptyG {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} 
       rw [show Ptrofs.unsigned (ptrTo base 8 j) = elemOfs .Mint64 base j by
         rw [← zOfInt_intOfZ (Ptrofs.unsigned _), hu8]; rfl, hst]
       refine ⟨j, by omega, trivial, trivial, by omega, ?_, ?_, hu.trans (Unch.store hst rfl),
-        hout.trans (Outside.store harr' hj hst (Int.le_refl _) (by rw [h8]; exact Int.le_refl _)), ?_⟩
+        fun z hz => Mem.store_valid_block_1 _ _ _ _ _ _ hst _ (hgr _ hz), hout.trans (Outside.store harr' hj hst (Int.le_refl _) (by rw [h8]; exact Int.le_refl _)), ?_⟩
       · rfl
       · rw [← clearedFromV_succ]; exact harr''
       · intro k'' h1 h2
@@ -164,7 +166,7 @@ theorem wp_addEdgeS {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem
     (hbit : Set.BitTable m Block.denseMainBit) (he : PTree.get dense.id.«dense_main:bit» e = none)
     (heg : PTree.get dense.id.g e = none)
     (hQ : ∀ m', ArrayAt m' .Mint64 bg 0 (longs (setEdge Mw W X Y)) (Mw * N) → Unch m m' (· = bg) →
-      Q.normal E0 e le m') :
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) → Q.normal E0 e le m') :
     Wp xi ge f (addEdgeS x y) Q e le m := by
   have hMw : 0 < Mw := by omega
   have hMwN : Mw ≤ Mw * N := Nat.le_mul_of_pos_right _ (by omega)
@@ -214,7 +216,7 @@ theorem wp_addEdgeS {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem
   simp only [hl1, hl2, longs, cop, Mem.storev]
   rw [hu, hst]
   rw [Set.longs_upd] at harr'
-  exact hQ m' harr' (Unch.store hst rfl)
+  exact hQ m' harr' (Unch.store hst rfl) fun z hz => Mem.store_valid_block_1 _ _ _ _ _ _ hst _ hz
 
 /-! ## The rows the edges give -/
 
@@ -372,6 +374,7 @@ theorem wp_edges {Q : Post} {e : env} {le : temp_env} {m : mem} {bg : block} {Mw
     (hbb : bg ≠ Block.denseMainBit)
     (hQ : ∀ t le' m', Reads t (edgeIns es es.length) →
       ArrayAt m' .Mint64 bg 0 (longs (edgeWords Mw es es.length)) (Mw * N) → Unch m m' (· = bg) →
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
       (∀ x, x ≠ dense.id.i → x ≠ dense.id.a → x ≠ dense.id.b → x ≠ idOf 713 → x ≠ idOf 714 →
         PTree.get x le' = PTree.get x le) →
       Q.normal t e le' m') :
@@ -380,17 +383,18 @@ theorem wp_edges {Q : Post} {e : env} {le : temp_env} {m : mem} {bg : block} {Mw
     x ≠ idOf 713 → x ≠ idOf 714 → PTree.get x le' = PTree.get x le
   let Inv := fun (k : Nat) (t : trace) (le' : temp_env) (m' : mem) =>
     k ≤ es.length ∧ PTree.get dense.id.i le' = some (.Vint (ir k)) ∧ Reads t (edgeIns es k) ∧
-    ArrayAt m' .Mint64 bg 0 (longs (edgeWords Mw es k)) (Mw * N) ∧ Unch m m' (· = bg) ∧ Oth le'
+    ArrayAt m' .Mint64 bg 0 (longs (edgeWords Mw es k)) (Mw * N) ∧ Unch m m' (· = bg) ∧
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) ∧ Oth le'
   refine wp_forT (Inv := Inv) dense.id.i (tv dense.id.ne) edgeBody es.length hne ?_ ?_ ?_ ?_
-  · rintro k t le' m' ⟨hk, hi, -, -, -, ho⟩
+  · rintro k t le' m' ⟨hk, hi, -, -, -, -, ho⟩
     refine ⟨hk, hi, ?_, rfl⟩
     show PTree.get _ _ = _
     rw [ho _ (by decide) (by decide) (by decide) (by decide) (by decide)]; exact hnev
   · exact ⟨Nat.zero_le _, temps_gss _ _ _, by
       show Reads E0 _
       simp only [edgeIns, List.take_zero, List.flatMap_nil]; exact Reads.nil, harr, Unch.refl _ _,
-      fun x h1 _ _ _ _ => temps_gso _ _ h1⟩
-  · rintro k t le' m' hk ⟨-, hi, hr, ha, hu, ho⟩
+      fun _ h => h, fun x h1 _ _ _ _ => temps_gso _ _ h1⟩
+  · rintro k t le' m' hk ⟨-, hi, hr, ha, hu, hgr, ho⟩
     have hg' : PTree.get dense.id.g le' = some (.Vptr bg Ptrofs.zero) := by
       rw [ho _ (by decide) (by decide) (by decide) (by decide) (by decide)]; exact hg
     have hm' : PTree.get dense.id.m le' = some (.Vint (ir Mw)) := by
@@ -419,20 +423,20 @@ theorem wp_edges {Q : Post} {e : env} {le : temp_env} {m : mem} {bg : block} {Mw
       (by simp (config := {decide := true}) only [temps_gso]; exact hm')
       (by simp (config := {decide := true}) only [temps_gso, temps_gss])
       (by simp (config := {decide := true}) only [temps_gso, temps_gss]) hbit' he heg ?_
-    intro m1 ha1 hu1
+    intro m1 ha1 hu1 hg1
     refine wp_addEdgeS (X := B) (Y := A) dense.id.b dense.id.a ha1 hMN hB (by omega) (by omega)
       (by simp (config := {decide := true}) only [temps_gso]; exact hg')
       (by simp (config := {decide := true}) only [temps_gso]; exact hm')
       (by simp (config := {decide := true}) only [temps_gso, temps_gss])
       (by simp (config := {decide := true}) only [temps_gso, temps_gss])
       (hbit'.unch hu1 (Ne.symm hbb)) he heg ?_
-    intro m2 ha2 hu2
+    intro m2 ha2 hu2 hg2
     have hrAB : Reads (tr1 (readEv (lr (A : Int))) ++ (tr1 (readEv (lr (B : Int))) ++ E0 ++ (E0 ++ E0)))
         [(A : Int), (B : Int)] := by
       have := Reads.cons (lr (A : Int)) (Reads.cons (lr (B : Int)) Reads.nil)
       rwa [signed_lr (by omega) (by omega), signed_lr (by omega) (by omega)] at this
     refine ⟨by simp (config := {decide := true}) only [temps_gso]; exact hi, by omega, temps_gss _ _ _,
-      ?_, ?_, hu.trans (hu1.trans hu2), ?_⟩
+      ?_, ?_, hu.trans (hu1.trans hu2), fun z hz => hg2 _ (hg1 _ (hgr _ hz)), ?_⟩
     · have h := hr.append hrAB
       have he : edgeIns es (k + 1) = edgeIns es k ++ [(A : Int), (B : Int)] := by
         simp only [edgeIns, List.take_add_one, List.getElem?_eq_getElem hk, Option.toList_some,
@@ -447,7 +451,7 @@ theorem wp_edges {Q : Post} {e : env} {le : temp_env} {m : mem} {bg : block} {Mw
     · intro x h1 h2 h3 h4 h5
       rw [temps_gso _ _ h1, temps_gso _ _ h3, temps_gso _ _ h5, temps_gso _ _ h2, temps_gso _ _ h4,
         ho x h1 h2 h3 h4 h5]
-  · rintro t le' m' ⟨-, -, hr, ha, hu, ho⟩
-    exact hQ t le' m' hr ha hu ho
+  · rintro t le' m' ⟨-, -, hr, ha, hu, hgr, ho⟩
+    exact hQ t le' m' hr ha hu hgr ho
 
 end NautyVerified.Proofs.Harness

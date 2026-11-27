@@ -84,6 +84,7 @@ theorem wp_colours {Q : Post} {e : env} {le : temp_env} {m : mem} {bcol : block}
     (harr : ArrayAt m .Mint32 bcol 0 (ints (prefixArr cs N 0)) N)
     (hQ : ∀ t le' m', Reads t (cs.map (fun c : Nat => (c : Int))) →
       ArrayAt m' .Mint32 bcol 0 (ints (prefixArr cs N N)) N → Unch m m' (· = bcol) →
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
       PTree.get dense.id.maxc le' = some (.Vint (ir (maxPrefix cs N))) →
       (∀ x, x ≠ dense.id.i → x ≠ dense.id.maxc → x ≠ idOf 710 → PTree.get x le' = PTree.get x le) →
       Q.normal t e le' m') :
@@ -93,16 +94,17 @@ theorem wp_colours {Q : Post} {e : env} {le : temp_env} {m : mem} {bcol : block}
     Reads t ((cs.take k).map (fun c : Nat => (c : Int))) ∧
     ArrayAt m' .Mint32 bcol 0 (ints (prefixArr cs N k)) N ∧ Unch m m' (· = bcol) ∧
     PTree.get dense.id.maxc le' = some (.Vint (ir (maxPrefix cs k))) ∧
-    (∀ x, x ≠ dense.id.i → x ≠ dense.id.maxc → x ≠ idOf 710 → PTree.get x le' = PTree.get x le)
+    (∀ x, x ≠ dense.id.i → x ≠ dense.id.maxc → x ≠ idOf 710 → PTree.get x le' = PTree.get x le) ∧
+    (∀ z, Mem.valid_block m z → Mem.valid_block m' z)
   refine wp_forT (Inv := Inv) dense.id.i (tv dense.id.n) colourBody N hN ?_ ?_ ?_ ?_
-  · rintro k t le' m' ⟨hk, hi, -, -, -, -, ho⟩
+  · rintro k t le' m' ⟨hk, hi, -, -, -, -, ho, -⟩
     refine ⟨hk, hi, ?_, rfl⟩
     show PTree.get _ _ = _
     rw [ho _ (by decide) (by decide) (by decide)]; exact hn
   · refine ⟨Nat.zero_le _, temps_gss _ _ _, Reads.nil, harr, Unch.refl _ _, ?_,
-      fun x h1 _ _ => temps_gso _ _ h1⟩
+      fun x h1 _ _ => temps_gso _ _ h1, fun _ h => h⟩
     rw [temps_gso _ _ (by decide)]; exact hmaxc
-  · rintro k t le' m' hk ⟨-, hi, hr, ha, hu, hmx, ho⟩
+  · rintro k t le' m' hk ⟨-, hi, hr, ha, hu, hmx, ho, hgr⟩
     have hck := hcs k hk
     have hcol' : PTree.get dense.id.colour le' = some (.Vptr bcol Ptrofs.zero) := by
       rw [ho _ (by decide) (by decide) (by decide)]; exact hcol
@@ -116,9 +118,9 @@ theorem wp_colours {Q : Post} {e : env} {le : temp_env} {m : mem} {bcol : block}
         some (.Vint (ir (cs[k]! : Int))) := by
       simp only [Exec.evalExpr, le1, temps_gss, typeof, cop]
       rw [Refine.repr_unsigned_lr hck]
-    refine Logic.wp_store ha hN dense.id.colour (by rw [temps_gso _ _ (by decide)]; exact hcol')
+    refine wp_storeV ha hN dense.id.colour (by rw [temps_gso _ _ (by decide)]; exact hcol')
       (tv dense.id.i) k hk hi1 rfl _ (cs[k]! : Int) hrhs rfl ?_
-    intro m1 ha1 hu1
+    intro m1 ha1 hu1 hg1
     have ha1' : ArrayAt m1 .Mint32 bcol 0 (ints (prefixArr cs N (k + 1))) N :=
       ha1.congr fun j hj => ints_prefixArr_succ hj
     have hel : Exec.evalExpr ge e le1 m1 (ix dense.id.colour (tv dense.id.i)) =
@@ -152,22 +154,24 @@ theorem wp_colours {Q : Post} {e : env} {le : temp_env} {m : mem} {bcol : block}
       apply wp_set_eval
       rw [hel]
       refine ⟨by rw [temps_gso _ _ (by decide), temps_gso _ _ (by decide)]; exact hi, by omega,
-        temps_gss _ _ _, ?_, ha1', hu.trans hu1, ?_, ?_⟩
+        temps_gss _ _ _, ?_, ha1', hu.trans hu1, ?_, ?_, ?_⟩
       · exact hrk
       · rw [temps_gso _ _ (by decide), temps_gss, hms, Nat.max_eq_right (by omega)]
       · intro x h1 h2 h3
         rw [temps_gso _ _ h1, temps_gso _ _ h2, temps_gso _ _ h3, ho x h1 h2 h3]
+      · exact fun z hz => hg1 _ (hgr _ hz)
     · rw [ite_eq_right (by simpa using hgt)]
       apply wp_skip
       refine ⟨by rw [temps_gso _ _ (by decide)]; exact hi, by omega,
-        temps_gss _ _ _, ?_, ha1', hu.trans hu1, ?_, ?_⟩
+        temps_gss _ _ _, ?_, ha1', hu.trans hu1, ?_, ?_, ?_⟩
       · exact hrk
       · rw [temps_gso _ _ (by decide), temps_gso _ _ (by decide), hms, Nat.max_eq_left (by omega)]
         exact hmx
       · intro x h1 h2 h3
         rw [temps_gso _ _ h1, temps_gso _ _ h3, ho x h1 h2 h3]
-  · rintro t le' m' ⟨-, -, hr, ha, hu, hmx, ho⟩
-    refine hQ t le' m' ?_ ha hu hmx ho
+      · exact fun z hz => hg1 _ (hgr _ hz)
+  · rintro t le' m' ⟨-, -, hr, ha, hu, hmx, ho, hgr⟩
+    refine hQ t le' m' ?_ ha hu hgr hmx ho
     rwa [List.take_of_length_le (show cs.length ≤ N by omega)] at hr
 
 end NautyVerified.Proofs.Harness

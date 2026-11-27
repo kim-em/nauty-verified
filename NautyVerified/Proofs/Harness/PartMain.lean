@@ -68,7 +68,7 @@ theorem wp_tPart {n k : Nat} (G : Colored n k) {Q : Post} {e : env} {le : temp_e
     (hb1 : bl ≠ bcol) (hb2 : bp ≠ bcol) (hb3 : bl ≠ bp)
     (hQ : ∀ le' m', ArrayAt m' .Mint32 bl 0 (ints (initialPartition G).1) n →
       ArrayAt m' .Mint32 bp 0 (ints (harnessPtn n (initialPartition G).2)) n →
-      Unch m m' (fun z => z = bl ∨ z = bp) →
+      Unch m m' (fun z => z = bl ∨ z = bp) → (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
       (∀ x, x ≠ dense.id.c → x ≠ dense.id.j → x ≠ dense.id.pos → x ≠ dense.id.i → x ≠ idOf 715 →
         PTree.get x le' = PTree.get x le) →
       Wp Statement.xi ge dense.fn.main tOpts Q e le' m') :
@@ -90,7 +90,7 @@ theorem wp_tPart {n k : Nat} (G : Colored n k) {Q : Post} {e : env} {le : temp_e
     (by rw [temps_gso _ _ (by decide)]; exact hptn) (by rw [temps_gso _ _ (by decide)]; exact hn)
     (by rw [temps_gso _ _ (by decide)]; simpa using hmaxc) (temps_gss _ _ _) hcarr
     ⟨hlz.congr (ints_prefixArr_zero _ n), hpz.congr (ints_prefixArr_zero _ n)⟩ hb1 hb2 hb3
-    fun le1 m1 hL hu1 _ ho1 => ?_
+    fun le1 m1 hL hu1 hg1 _ ho1 => ?_
   simp only [seqPost, Post.after, E0_append]
   have hlen := listed_full (keyOf G) hKk
   have hLeq : listed (keyOf G) n (maxPrefix (colours G) n + 1) 0 = listed (keyOf G) n k 0 := by
@@ -113,9 +113,9 @@ theorem wp_tPart {n k : Nat} (G : Colored n k) {Q : Post} {e : env} {le : temp_e
       refine this.congr fun j hj => ?_
       simp [ints, prefixArr_get hj, endPtn_get hj, hj])
     (Ne.symm hb2 |> fun h => by intro h'; exact hb2 h') hb3.symm
-    fun le2 m2 hp2 hu2 ho2 => ?_
+    fun le2 m2 hp2 hu2 hg2 ho2 => ?_
   simp only [seqPost, Post.after, E0_append]
-  refine hQ le2 m2 ?_ ?_ ?_ ?_
+  refine hQ le2 m2 ?_ ?_ ?_ (fun z hz => hg2 _ (hg1 _ hz)) ?_
   · have := hL.lab.unch hu2 hb3
     rw [hlen] at this
     refine this.congr fun j hj => ?_

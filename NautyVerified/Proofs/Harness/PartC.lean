@@ -83,6 +83,7 @@ theorem wp_cellInner {Q : Post} {e : env} {le : temp_env} {m : mem} {bcol bl bp 
     (hcarr : ArrayAt m .Mint32 bcol 0 (ints (prefixArr cs N N)) N)
     (hL : Listed m bl bp N (listed key N c j)) (hb1 : bl ≠ bcol) (hb2 : bp ≠ bcol) (hb3 : bl ≠ bp)
     (hQ : ∀ le' m', Listed m' bl bp N (listed key N c (j + 1)) → Unch m m' (fun z => z = bl ∨ z = bp) →
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
       PTree.get dense.id.pos le' = some (.Vint (ir (listed key N c (j + 1)).length)) →
       (∀ x, x ≠ dense.id.pos → PTree.get x le' = PTree.get x le) → Q.normal E0 e le' m') :
     Wp Statement.xi ge dense.fn.main cellInner Q e le m := by
@@ -103,20 +104,20 @@ theorem wp_cellInner {Q : Post} {e : env} {le : temp_env} {m : mem} {bcol bl bp 
     rw [hls] at hlen
     simp only [List.length_append, List.length_singleton] at hlen
     wp_step; wp_step; wp_step
-    refine Logic.wp_store hL.lab hN dense.id.lab hlab (tv dense.id.pos) _ (by omega) hpos rfl
+    refine wp_storeV hL.lab hN dense.id.lab hlab (tv dense.id.pos) _ (by omega) hpos rfl
       (tv dense.id.j) j hjv rfl ?_
-    intro m1 hl1 hu1
+    intro m1 hl1 hu1 hg1
     simp only [seqPost, Post.after, E0_append]
     wp_step; wp_step; wp_step
-    refine Logic.wp_store (hL.ptn.unch hu1 (Ne.symm hb3)) hN dense.id.ptn hptn (tv dense.id.pos) _
+    refine wp_storeV (hL.ptn.unch hu1 (Ne.symm hb3)) hN dense.id.ptn hptn (tv dense.id.pos) _
       (by omega) hpos rfl (ci 1 tint) 1 rfl rfl ?_
-    intro m2 hp2 hu2
+    intro m2 hp2 hu2 hg2
     simp only [seqPost, Post.after, E0_append]
     wp_step; wp_step
     apply wp_set_eval
     simp only [Exec.evalExpr, hpos, typeof, cop, ir_add]
     refine hQ _ m2 ⟨?_, ?_⟩ ((hu1.mono fun z hz => .inl hz).trans (hu2.mono fun z hz => .inr hz))
-      ?_ fun x hx => temps_gso _ _ hx
+      (fun z hz => hg2 _ (hg1 _ hz)) ?_ fun x hx => temps_gso _ _ hx
     · rw [hls]
       exact ((hl1.unch hu2 hb3).congr fun x hx => prefixArr_snoc j hx).congr fun x hx => by
         simp [List.length_append]
@@ -128,7 +129,7 @@ theorem wp_cellInner {Q : Post} {e : env} {le : temp_env} {m : mem} {bcol bl bp 
     apply wp_skip
     have hls := listed_succ key N c j
     rw [ite_eq_right hk, List.append_nil] at hls
-    refine hQ le m (by rw [hls]; exact hL) (Unch.refl _ _) (by rw [hls]; exact hpos)
+    refine hQ le m (by rw [hls]; exact hL) (Unch.refl _ _) (fun _ h => h) (by rw [hls]; exact hpos)
       fun _ _ => rfl
 
 theorem wp_cells {Q : Post} {e : env} {le : temp_env} {m : mem} {bcol bl bp : block}
@@ -143,6 +144,7 @@ theorem wp_cells {Q : Post} {e : env} {le : temp_env} {m : mem} {bcol bl bp : bl
     (hcarr : ArrayAt m .Mint32 bcol 0 (ints (prefixArr cs N N)) N)
     (hL : Listed m bl bp N []) (hb1 : bl ≠ bcol) (hb2 : bp ≠ bcol) (hb3 : bl ≠ bp)
     (hQ : ∀ le' m', Listed m' bl bp N (listed key N K 0) → Unch m m' (fun z => z = bl ∨ z = bp) →
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
       PTree.get dense.id.pos le' = some (.Vint (ir (listed key N K 0).length)) →
       (∀ x, x ≠ dense.id.c → x ≠ dense.id.j → x ≠ dense.id.pos → PTree.get x le' = PTree.get x le) →
       Q.normal E0 e le' m') :
@@ -154,13 +156,14 @@ theorem wp_cells {Q : Post} {e : env} {le : temp_env} {m : mem} {bcol bl bp : bl
     t = E0 ∧ c ≤ K ∧ PTree.get dense.id.c le' = some (.Vint (ir c)) ∧
     Listed m' bl bp N (listed key N c 0) ∧
     PTree.get dense.id.pos le' = some (.Vint (ir (listed key N c 0).length)) ∧
-    Unch m m' (fun z => z = bl ∨ z = bp) ∧ Oth le'
+    (Unch m m' (fun z => z = bl ∨ z = bp) ∧ ∀ z, Mem.valid_block m z → Mem.valid_block m' z) ∧
+    Oth le'
   refine wp_forLe (Inv := Inv) dense.id.c (tv dense.id.maxc) _ K hK hK0 ?_ ?_ ?_ ?_
   · rintro c t le' m' ⟨-, hc, hcv, -, -, -, ho⟩
     refine ⟨hc, hcv, ?_, rfl⟩
     show PTree.get _ _ = _
     rw [ho _ (by decide) (by decide) (by decide)]; exact hmaxc
-  · refine ⟨rfl, Nat.zero_le _, temps_gss _ _ _, by simpa [listed] using hL, ?_, Unch.refl _ _,
+  · refine ⟨rfl, Nat.zero_le _, temps_gss _ _ _, by simpa [listed] using hL, ?_, ⟨Unch.refl _ _, fun _ h => h⟩,
       fun x h1 _ _ => temps_gso _ _ h1⟩
     rw [temps_gso _ _ (by decide)]; simpa [listed] using hpos
   · rintro c t le' m' hc ⟨rfl, -, hcv, hL', hpos', hu, ho⟩
@@ -170,7 +173,7 @@ theorem wp_cells {Q : Post} {e : env} {le : temp_env} {m : mem} {bcol bl bp : bl
       t = E0 ∧ j ≤ N ∧ PTree.get dense.id.j le'' = some (.Vint (ir j)) ∧
       Listed m'' bl bp N (listed key N c j) ∧
       PTree.get dense.id.pos le'' = some (.Vint (ir (listed key N c j).length)) ∧
-      Unch m m'' (fun z => z = bl ∨ z = bp) ∧
+      (Unch m m'' (fun z => z = bl ∨ z = bp) ∧ ∀ z, Mem.valid_block m z → Mem.valid_block m'' z) ∧
       ∀ x, x ≠ dense.id.j → x ≠ dense.id.pos → PTree.get x le'' = PTree.get x le'
     refine wp_forT (Inv := Inv') dense.id.j (tv dense.id.n) cellInner N hN ?_ ?_ ?_ ?_
     · rintro j t le'' m'' ⟨-, hj, hjv, -, -, -, ho'⟩
@@ -186,10 +189,10 @@ theorem wp_cells {Q : Post} {e : env} {le : temp_env} {m : mem} {bcol bl bp : bl
         (by rw [g2 _ (by decide) (by decide) (by decide)]; exact hlab)
         (by rw [g2 _ (by decide) (by decide) (by decide)]; exact hptn) hjv
         (by rw [ho' _ (by decide) (by decide)]; exact hcv) (by omega) hpos''
-        (hcarr.unch hu' (by rintro (h | h); exact hb1 h.symm; exact hb2 h.symm)) hL'' hb1 hb2 hb3 ?_
-      intro le3 m3 hL3 hu3 hpos3 ho3
+        (hcarr.unch hu'.1 (by rintro (h | h); exact hb1 h.symm; exact hb2 h.symm)) hL'' hb1 hb2 hb3 ?_
+      intro le3 m3 hL3 hu3 hg3 hpos3 ho3
       refine ⟨by rw [ho3 _ (by decide)]; exact hjv, rfl, by omega, temps_gss _ _ _, hL3, ?_,
-        hu'.trans hu3, fun x h1 h2 => ?_⟩
+        ⟨hu'.1.trans hu3, fun z hz => hg3 _ (hu'.2 _ hz)⟩, fun x h1 h2 => ?_⟩
       · rw [temps_gso _ _ (by decide)]; exact hpos3
       · rw [temps_gso _ _ h1, ho3 x h2, ho' x h1 h2]
     · rintro t le'' m'' ⟨rfl, -, -, hL'', hpos'', hu', ho'⟩
@@ -199,7 +202,7 @@ theorem wp_cells {Q : Post} {e : env} {le : temp_env} {m : mem} {bcol bl bp : bl
       · rw [temps_gso _ _ (by decide), ← listed_next]; exact hpos''
       · rw [temps_gso _ _ h1, ho' x h2 h3, get' x h1 h2 h3]
   · rintro t le' m' ⟨rfl, -, -, hL', hpos', hu, ho⟩
-    exact hQ le' m' hL' hu hpos' ho
+    exact hQ le' m' hL' hu.1 hu.2 hpos' ho
 
 /-- The body of `endLoop`. -/
 abbrev endBody : statement :=
@@ -268,13 +271,13 @@ theorem wp_ends {Q : Post} {e : env} {le : temp_env} {m : mem} {bcol bl bp : blo
     (hparr : ArrayAt m .Mint32 bp 0 (ints (endPtn key L N 0)) N)
     (hb1 : bp ≠ bcol) (hb2 : bp ≠ bl)
     (hQ : ∀ le' m', ArrayAt m' .Mint32 bp 0 (ints (endPtn key L N N)) N → Unch m m' (· = bp) →
-      (∀ x, x ≠ dense.id.i → x ≠ idOf 715 → PTree.get x le' = PTree.get x le) →
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) → (∀ x, x ≠ dense.id.i → x ≠ idOf 715 → PTree.get x le' = PTree.get x le) →
       Q.normal E0 e le' m') :
     Wp Statement.xi ge dense.fn.main (forT dense.id.i (tv dense.id.n) endBody) Q e le m := by
   let Inv := fun (i : Nat) (t : trace) (le' : temp_env) (m' : mem) =>
     t = E0 ∧ i ≤ N ∧ PTree.get dense.id.i le' = some (.Vint (ir i)) ∧
-    ArrayAt m' .Mint32 bp 0 (ints (endPtn key L N i)) N ∧ Unch m m' (· = bp) ∧
-    ∀ x, x ≠ dense.id.i → x ≠ idOf 715 → PTree.get x le' = PTree.get x le
+    ArrayAt m' .Mint32 bp 0 (ints (endPtn key L N i)) N ∧
+    (Unch m m' (· = bp) ∧ ∀ z, Mem.valid_block m z → Mem.valid_block m' z) ∧ ∀ x, x ≠ dense.id.i → x ≠ idOf 715 → PTree.get x le' = PTree.get x le
   have hLx : ∀ x < N, L[x]! < N := fun x hx => hLs _ (by
     rw [getElem!_pos L x (by omega)]; exact List.getElem_mem _)
   refine wp_forT (Inv := Inv) dense.id.i (tv dense.id.n) endBody N hN ?_ ?_ ?_ ?_
@@ -282,15 +285,15 @@ theorem wp_ends {Q : Post} {e : env} {le : temp_env} {m : mem} {bcol bl bp : blo
     refine ⟨hi, hiv, ?_, rfl⟩
     show PTree.get _ _ = _
     rw [ho _ (by decide) (by decide)]; exact hn
-  · exact ⟨rfl, Nat.zero_le _, temps_gss _ _ _, hparr, Unch.refl _ _, fun x h1 _ => temps_gso _ _ h1⟩
+  · exact ⟨rfl, Nat.zero_le _, temps_gss _ _ _, hparr, ⟨Unch.refl _ _, fun _ h => h⟩, fun x h1 _ => temps_gso _ _ h1⟩
   · rintro i t le' m' hi ⟨rfl, -, hiv, hp, hu, ho⟩
     have g : ∀ x, x ≠ dense.id.i → x ≠ idOf 715 → PTree.get x le' = PTree.get x le := ho
     have hcol' := (g _ (by decide) (by decide)).trans hcol
     have hlab' := (g _ (by decide) (by decide)).trans hlab
     have hptn' := (g _ (by decide) (by decide)).trans hptn
     have hn' := (g _ (by decide) (by decide)).trans hn
-    have hcarr' := hcarr.unch hu (Ne.symm hb1)
-    have hlarr' := hlarr.unch hu (Ne.symm hb2)
+    have hcarr' := hcarr.unch hu.1 (Ne.symm hb1)
+    have hlarr' := hlarr.unch hu.1 (Ne.symm hb2)
     -- the end of the loop body, once `t715` is known
     have fin : ∀ le2 (b : Bool), (b = true ↔ (i + 1 = N ∨ key L[i]! ≠ key L[i + 1]!)) →
         PTree.get (idOf 715) le2 = some (.Vint (if b then Lib.Integers.Int.one else Lib.Integers.Int.zero)) →
@@ -316,9 +319,10 @@ theorem wp_ends {Q : Post} {e : env} {le : temp_env} {m : mem} {bcol bl bp : blo
       · simp only [ite_true, cop]
         rw [ite_eq_left (by decide)]
         wp_step; wp_step
-        refine Logic.wp_store hp hN dense.id.ptn hp2 (tv dense.id.i) i hi hi2 rfl (ci 0 tint) 0 rfl rfl ?_
-        intro m2 hp3 hu2
-        refine ⟨hi2, rfl, by omega, temps_gss _ _ _, hp3.congr fun x hx => ?_, hu.trans hu2,
+        refine wp_storeV hp hN dense.id.ptn hp2 (tv dense.id.i) i hi hi2 rfl (ci 0 tint) 0 rfl rfl ?_
+        intro m2 hp3 hu2 hg2
+        refine ⟨hi2, rfl, by omega, temps_gss _ _ _, hp3.congr fun x hx => ?_,
+          ⟨hu.1.trans hu2, fun z hz => hg2 _ (hu.2 _ hz)⟩,
           fun x h1 h2 => ?_⟩
         · exact endPtn_mark (hb.1 rfl) hx
         · rw [temps_gso _ _ h1, ho2 x h1 h2]
@@ -385,6 +389,6 @@ theorem wp_ends {Q : Post} {e : env} {le : temp_env} {m : mem} {bcol bl bp : blo
           (by rw [temps_gso _ _ (by decide)]; exact hptn') fun x h1 h2 => by
             rw [temps_gso _ _ h2, ho x h1 h2]
   · rintro t le' m' ⟨rfl, -, -, hp, hu, ho⟩
-    exact hQ le' m' hp hu ho
+    exact hQ le' m' hp hu.1 hu.2 ho
 
 end NautyVerified.Proofs.Harness
