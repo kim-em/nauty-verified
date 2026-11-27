@@ -1,3 +1,4 @@
+import NautyVerified.Proofs.Alloc.KeepV
 import NautyVerified.Proofs.Breakout.Rotate
 import NautyVerified.Proofs.Nextelement.Satisfies
 import NautyVerified.Spec.Setwords
@@ -43,7 +44,7 @@ def breakoutSpec (bl : block) (lofs : ptrofs) (bp : block) (pofs : ptrofs) (ba :
       (ints (Hex.GraphIso.Nauty.breakout n lab ptn level tc tv).2.1) n ∧
     ArrayAt m' .Mint64 ba (intOfZ (Ptrofs.unsigned aofs)) (Set.longs (Set.single tc)) M ∧
     SetRep (fun w => bv64 (Set.single tc w)) M (Hex.GraphIso.Nauty.breakout n lab ptn level tc tv).2.2 ∧
-    Unch m m' (fun b => b = bl ∨ b = bp ∨ b = ba)
+    Unch m m' (fun b => b = bl ∨ b = bp ∨ b = ba) ∧ Alloc.Keep m m' ba
 
 /-- The temporaries on entry. -/
 def entryTemps (bl : block) (lofs : ptrofs) (bp : block) (pofs : ptrofs) (ba : block)
@@ -73,16 +74,16 @@ theorem breakout_satisfies {xi : ExternalCalls} (bl : block) (lofs : ptrofs) (bp
     rw [Source.dense.fn.breakout.fn_body_eq, body_eq]
     simp only [body]
     wp_step
-    refine Set.wp_emptySet (by decide) (by decide) (by decide) harr hM hM2 (by simp (config := {decide := true}) only [entryTemps, temps_gso, temps_gss])
+    refine Set.wp_emptySet' (vals := Set.longs ws) (by decide) (by decide) (by decide) harr hM hM2 (by simp (config := {decide := true}) only [entryTemps, temps_gso, temps_gss])
       (by simp (config := {decide := true}) only [entryTemps, temps_gss]) ?_
-    intro le1 m1 harr1 hu1 ho1
+    intro le1 m1 harr1 hu1 hO1 ho1
     wp_step
     have htcn : tc < n := by omega
-    refine Set.wp_addElement (c := tc) harr1 hM2
+    refine Set.wp_addElement' (c := tc) harr1 hM2
       (by rw [ho1 _ (by decide) (by decide)]; simp (config := {decide := true}) only [entryTemps, temps_gso, temps_gss])
       (by simp only [Exec.evalExpr]; rw [ho1 _ (by decide) (by decide)]; simp (config := {decide := true}) only [entryTemps, temps_gso, temps_gss])
       rfl (by omega) (by omega) (hbit.unch hu1 hba) rfl ?_
-    intro m2 harr2 hu2
+    intro m2 harr2 hu2 hO2
     have hT : ∀ k, k ≠ id.es → k ≠ id.t1 →
         PTree.get k le1 = PTree.get k (entryTemps bl lofs bp pofs ba aofs level tc tv M) := ho1
     have hu12 := hu1.trans hu2
@@ -123,11 +124,14 @@ theorem breakout_satisfies {xi : ExternalCalls} (bl : block) (lofs : ptrofs) (bp
       simp (config := {decide := true}) only [entryTemps, temps_gso, temps_gss]
     intro m4 hparr4 hu4
     rw [← ints_set (by omega)] at hparr4
-    refine ⟨m4, Nextelement.free_empty m4, rfl, ?_, hparr4, ?_, ?_, ?_⟩
+    refine ⟨m4, Nextelement.free_empty m4, rfl, ?_, hparr4, ?_, ?_, ?_, ?_⟩
     · have := harr3.unch hu4 hlp
       simpa [Hex.GraphIso.Nauty.breakout, hls] using this
     · exact (harr2.unch hu3 (Ne.symm hla)).unch hu4 (Ne.symm hpa)
     · exact Set.setRep_single hnM htcn
     · refine ((hu12.mono ?_).trans (hu3.mono ?_)).trans (hu4.mono ?_) <;> intro b hb <;> simp_all
+    · exact (((Alloc.Keep.of_outside' hO1 harr.base_nonneg).trans
+        (Alloc.Keep.of_outside' hO2 harr1.base_nonneg)).trans (Alloc.Keep.unch hu3 (Ne.symm hla))).trans
+        (Alloc.Keep.unch hu4 (Ne.symm hpa))
 
 end NautyVerified.Proofs.Breakout
