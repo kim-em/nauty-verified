@@ -321,6 +321,24 @@ Conventions settled while doing these:
   changed only in `[lo, hi)`. `ArrayAt.outside` and `GraphAt.setRow` rebuild
   the caller's whole array from it.
 
+- `refine` is proved through one state predicate (`Proofs/Refine/State.lean`):
+  `Loc` (argument blocks, the three naugraph work blocks), `Ok` (sizes and a
+  pairwise-distinct list of every block it touches), `Mem` (memory holds a
+  Hex `RefineSt`), `Tmp` (temporaries), `StInv`. Each pass goes from `Mem …
+  st` to `Mem … st'` with `Unch` over the blocks it writes, and the
+  `scripts/factor_clight.py` cut of the Clight names the pieces. The passes
+  enter `wp_iter`/`wp_mainLoop` as the props `TrivialPass`/`NontrivialPass`.
+  `refineSpec`'s post promises no workset capacity, because `refine1` (used
+  when `m = 1`) never allocates the workset. Callers reach either routine
+  through `RefineFn xi M vf` (`Proofs/Refine/Fn.lean`), as `doref` and
+  nauty.c do through `dispatch.refine`.
+- `ptn`'s "infinite" entries differ between C and Hex: `nauty()` and
+  `recover` write `NAUTY_INFINITY = 2000000002`, HexGraphIso's search
+  writes `inf = n + 2`. All readers compare `ptn[i] > level` with
+  `level ≤ n + 1`, so the C proofs are stated against Hex's search run with
+  `inf = 2000000002`, and `Spec/SearchInf.lean` proves the search's results
+  independent of `inf > n + 1`.
+
 ## Phase 6: dense end-to-end
 
 Compose Phase 5 with Phase 3 into `densenauty_binary_correct`; derive the
