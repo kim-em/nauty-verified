@@ -1,5 +1,6 @@
 import NautyVerified.Proofs.Search.Node.FirstHex
 import NautyVerified.Proofs.Search.Node.OkOff
+import NautyVerified.Spec.PartOk
 
 /-!
 # `NodeOk` along a first-path node
@@ -273,5 +274,33 @@ theorem sweepOkFirst_next {G : Colored n k} {level numcells tc tv1 tv : Nat} {ce
       exact absurd (by simp [horb tv (VSet.mem_lt htv)]) ho
     · refine ⟨t, st₀, rfl, hlevel, hok, htarget, fun v hv => VSet.nextElem_mem hv, hinv,
         .inr ⟨Generic.Past.next (fun _ => hpast rfl tv rfl), last, hd, ha⟩⟩
+
+/-- The state of an off-path sweep satisfies `PartOk`. -/
+theorem SweepOkOff.part {G : Colored n k} {level numcells tc : Nat} {cell : VSet n}
+    {cursor : Option Nat} {st : Search n} (hn : n + 2 < nautyInfinity)
+    (h : SweepOkOff G level numcells tc cell cursor st) : PartOk G level numcells st := by
+  obtain ⟨t, st₂, rfl, -, hok, -⟩ := h
+  exact PartOk.of_tw hn hok t
+
+/-- The state of a first-path sweep satisfies `PartOk`. -/
+theorem SweepOkFirst.part {G : Colored n k} {level numcells tc tv1 : Nat} {cell : VSet n}
+    {cursor : Option Nat} {st : Search n} (hn : n + 2 < nautyInfinity)
+    (h : SweepOkFirst G level numcells tc tv1 cell cursor st) : PartOk G level numcells st := by
+  obtain ⟨t, st₂, rfl, -, hok, -⟩ := h
+  exact PartOk.of_tw hn hok t
+
+/-- The target cell of a sweep is a cell of the partition: its members are in
+range and it starts at `tc`. -/
+theorem SweepOkOff.target {G : Colored n k} {level numcells tc : Nat} {cell : VSet n}
+    {cursor : Option Nat} {st : Search n} (h : SweepOkOff G level numcells tc cell cursor st) :
+    ∃ st₂, Generic.Target (fun st => st) level tc cell st₂ ∧ st₂.lab = st.lab := by
+  obtain ⟨t, st₂, rfl, -, -, htarget, -⟩ := h
+  exact ⟨st₂, htarget, rfl⟩
+
+theorem SweepOkFirst.target {G : Colored n k} {level numcells tc tv1 : Nat} {cell : VSet n}
+    {cursor : Option Nat} {st : Search n} (h : SweepOkFirst G level numcells tc tv1 cell cursor st) :
+    ∃ st₂, Generic.Target (fun st => st) level tc cell st₂ ∧ st₂.lab = st.lab := by
+  obtain ⟨t, st₂, rfl, -, -, htarget, -⟩ := h
+  exact ⟨st₂, htarget, rfl⟩
 
 end NautyVerified.Proofs.Search

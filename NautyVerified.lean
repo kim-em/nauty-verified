@@ -145,6 +145,7 @@ import NautyVerified.Spec.SearchInf
 import NautyVerified.Spec.SearchInfRun
 import NautyVerified.Spec.NodeOk
 import NautyVerified.Spec.NodeOkOff
+import NautyVerified.Spec.PartOk
 import NautyVerified.Spec.NtcPlace
 import NautyVerified.Spec.CountWin
 import NautyVerified.Proofs.Testcanlab.Syntax
