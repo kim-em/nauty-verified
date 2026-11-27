@@ -51,7 +51,7 @@ def gensWords (gs : List (Array Nat)) (n : Nat) : List Int :=
 
 /-- Block `b` holds the harness's automorphism callback: called as
 `(*userautomproc)(count, perm, orbits, numorbits, stabvertex, n)` with `perm`
-holding `p`, it writes `genWords p n` and changes no memory. -/
+holding `p` (entries below `2^31`), it writes `genWords p n` and changes no memory. -/
 def AutomCb (xi : ExternalCalls) (b : block) : Prop :=
   ∃ fd, Genv.find_funct ge.genv_genv (.Vptr b Ptrofs.zero) = some fd ∧
     type_of_fundef fd = tfun [tint, tptr tint, tptr tint, tint, tint, tint] .Tvoid ∧
@@ -60,7 +60,7 @@ def AutomCb (xi : ExternalCalls) (b : block) : Prop :=
       Satisfies xi ge fd
         { pre := fun args m => args = [.Vint count, .Vptr bp pofs, .Vptr bo oofs, .Vint no, .Vint sv,
               .Vint (ir n)] ∧ ArrayAt m .Mint32 bp (intOfZ (Ptrofs.unsigned pofs)) (ints p) n ∧
-              n < 2147483648
+              n < 2147483648 ∧ ∀ i < n, p[i]! < 2147483648
           post := fun _ m t _ m' => Writes t (genWords p n) ∧ m' = m }
 
 /-- `z` is one of the naugraph.c or nautil.c work blocks in use in `m`. -/
