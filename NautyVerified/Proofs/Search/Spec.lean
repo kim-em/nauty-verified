@@ -85,7 +85,7 @@ def firstterminalSpec {n : Nat} (S : SLoc) (ctx : Ctx n) (st : Search n) (level 
 def recoverSpec {n : Nat} (S : SLoc) (ctx : Ctx n) (st : Search n) (level : Nat) (pre : Bool) :
     FunSpec where
   pre args m := args = [.Vptr S.bp S.pofs, .Vint (ir level)] ∧ SearchAt m S ctx st pre false ∧
-    level ≤ n
+    1 ≤ level ∧ level ≤ n
   post _ m t _ m' := t = E0 ∧ SearchAt m' S ctx (Hex.GraphIso.Nauty.recover nautyInf level st) pre false ∧
     SFrame m m' S
 

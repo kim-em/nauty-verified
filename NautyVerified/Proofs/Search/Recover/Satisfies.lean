@@ -122,7 +122,7 @@ theorem recover_satisfies {n : Nat} (S : SLoc) (ctx : Ctx n) (st : Search n) (le
     · exact .nil _
     · exact Nextelement.norepet_of_nodup (by decide)
     · exact Nextelement.disjoint_of (by decide)
-  · rintro args m₀ ⟨rfl, h, hln⟩
+  · rintro args m₀ ⟨rfl, h, hl1, hln⟩
     rw [triple_iff_wp]
     rintro e le m ⟨rfl, rfl, rfl⟩
     rw [dense.fn.«nauty:recover».fn_body_eq, body_eq]
@@ -264,7 +264,7 @@ theorem recover_satisfies {n : Nat} (S : SLoc) (ctx : Ctx n) (st : Search n) (le
                 ptnSize := hFs
                 ptnVals := hFv
                 ptnLast := by
-                  rw [reopen_fold_le (show st.ptn[n - 1]! ≤ level by rw [hinv.ptnLast]; omega)]
+                  rw [reopen_fold_le (show st.ptn[n - 1]! ≤ level by have := hinv.ptnLast; omega)]
                   exact hinv.ptnLast
                 scalars := by
                   obtain ⟨b1, b2, b3, b4, b5, b6, b7, b8, b9, b10, b11, b12⟩ := hinv.scalars

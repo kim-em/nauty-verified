@@ -1,4 +1,5 @@
 import NautyVerified.Proofs.Search.Spec
+import NautyVerified.Spec.NodeOk
 
 /-!
 # Specifications of nauty.c's search nodes
@@ -28,8 +29,8 @@ none of them is a block of `S` or a work block.
 `NodeOk ctx first level numcells st` collects the HexGraphIso facts the C
 needs at a node, beyond `SearchAt`: the fuel bound is never reached, and the
 cell count is the one `refine` expects. It is a parameter of the
-specifications here; its closure under HexGraphIso's steps is a hypothesis of
-the node proofs until it is proved from HexGraphIso's invariants.
+specifications here; `firstpathnodeSpecG`/`othernodeSpecG` instantiate it
+with `SearchInf.NodeOk G` (`Spec/NodeOk.lean`).
 
 `NodeFrame m m' S chain level`: the blocks a node at `level` may change: those
 of `SFrame`, the list's nodes from index `level - 2` (the parent's `next`
@@ -131,5 +132,19 @@ abbrev othernodeSpec {n : Nat} (xi : ExternalCalls)
     (S : SLoc) (ctx : Ctx n) (st : Search n)
     (level numcells : Nat) (chain : List (block × block)) : FunSpec :=
   nodeSpec xi NodeOk Em false S ctx st level numcells chain
+
+/-- `firstpathnode0` on the graph `G`, with `NodeOk` the HexGraphIso facts of
+`Spec/NodeOk.lean`. -/
+abbrev firstpathnodeSpecG {n k : Nat} (xi : ExternalCalls) (G : Hex.GraphIso.Colored n k)
+    (Em : Bool → Nat → Nat → Search n → List Int) (S : SLoc) (st : Search n)
+    (level numcells : Nat) (chain : List (block × block)) : FunSpec :=
+  firstpathnodeSpec xi (SearchInf.NodeOk G) Em S ⟨rowsOf G⟩ st level numcells chain
+
+/-- `othernode0` on the graph `G`, with `NodeOk` the HexGraphIso facts of
+`Spec/NodeOk.lean`. -/
+abbrev othernodeSpecG {n k : Nat} (xi : ExternalCalls) (G : Hex.GraphIso.Colored n k)
+    (Em : Bool → Nat → Nat → Search n → List Int) (S : SLoc) (st : Search n)
+    (level numcells : Nat) (chain : List (block × block)) : FunSpec :=
+  othernodeSpec xi (SearchInf.NodeOk G) Em S ⟨rowsOf G⟩ st level numcells chain
 
 end NautyVerified.Proofs.Search

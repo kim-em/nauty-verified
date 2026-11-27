@@ -308,7 +308,7 @@ structure SInv {n : Nat} (st : Search n) : Prop where
   labSurj : ∀ v < n, ∃ i < n, st.lab[i]! = v
   ptnSize : st.ptn.size = n
   ptnVals : ∀ i < n, st.ptn[i]! ≤ n + 1 ∨ st.ptn[i]! = nautyInf
-  ptnLast : st.ptn[n - 1]! = 0
+  ptnLast : st.ptn[n - 1]! ≤ 1
   orbitsSmall : ∀ i < n, st.orbits[i]! < n
   codesSmall : ∀ i < n + 2, st.firstcode[i]! < 32768 ∧ st.canoncode[i]! < 32768
   firsttcRange : ∀ i < n + 2, -1 ≤ st.firsttc[i]! ∧ st.firsttc[i]! < n
