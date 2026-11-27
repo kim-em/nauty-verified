@@ -136,3 +136,4 @@ import NautyVerified.Proofs.Bestcell.Satisfies
 import NautyVerified.Proofs.Targetcell.Satisfies
 import NautyVerified.Proofs.Maketargetcell.Satisfies
 import NautyVerified.Proofs.Init.Tables
+import NautyVerified.Proofs.Harness.Options
