@@ -259,4 +259,48 @@ theorem wp_initW {Q : Post} {le : temp_env} {m : mem} {b : block} {ofs : ptrofs}
         show ((pos.toNat : Nat) : Int) = pos by omega] at hg
       simpa [bv64_and, hbv] using hg
 
+/-- The word scan returns what `NextSpec` describes. -/
+theorem wp_scan {Q : Post} {b : block} {ofs : ptrofs} {n : Nat} {pos : Int}
+    {ws : Nat → Lib.Integers.int64} {m₀ : mem} (hn : 64 * n < 2147483648)
+    (hw : WordsAt m₀ b ofs ws n) (hlb : LeftbitTable m₀)
+    (hQ : ∀ r : Int, NextSpec (fun i => bv64 (ws i)) n pos r → Q.ret E0 (.Vint (ir r)) m₀)
+    {k : Nat} {e : env} {le : temp_env} {m : mem} (hI : LoopInv b ofs n pos ws m₀ k E0 e le m) :
+    Wp xi ge Source.dense.fn.nextelement (.Sloop loopBody .Sskip) Q e le m := by
+  refine wp_loop (I := LoopInv b ofs n pos ws m₀)
+    (J := fun k t e le m => ∃ k' < k, LoopInv b ofs n pos ws m₀ k' t e le m) ?_ ?_ hI
+  · intro k t e le m hI
+    obtain ⟨rfl, _⟩ := hI
+    have := wp_loopBody (xi := xi) (Q := Q) hn hw hlb hQ k E0 e le m (by exact ⟨rfl, ‹_›⟩)
+    simpa using this
+  · intro k t e le m ⟨k', hk', hI⟩
+    apply wp_skip
+    exact ⟨k', hk', by simpa using hI⟩
+
+/-- The body of `nextelement` returns what `NextSpec` describes. -/
+theorem wp_body {Q : Post} {le : temp_env} {m : mem} {b : block} {ofs : ptrofs} {n : Nat}
+    {pos : Int} {ws : Nat → Lib.Integers.int64}
+    (hset1 : PTree.get id.set1 le = some (.Vptr b ofs))
+    (hm : PTree.get id.m le = some (.Vint (ir n)))
+    (hpos : PTree.get id.pos le = some (.Vint (ir pos))) (hp1 : -1 ≤ pos) (hp2 : pos < 64 * n)
+    (hn1 : 1 ≤ n) (hn : 64 * n < 2147483648) (hw : WordsAt m b ofs ws n) (hlb : LeftbitTable m)
+    (hQ : ∀ r : Int, NextSpec (fun i => bv64 (ws i)) n pos r → Q.ret E0 (.Vint (ir r)) m) :
+    Wp xi ge Source.dense.fn.nextelement body Q empty_env le m := by
+  simp only [body, sif]
+  wp_step; wp_step; wp_step; wp_step
+  simp only [Exec.evalExpr, hm, typeof, cop,
+    ir_eq (a := n) (b := 1) ⟨by omega, by omega⟩ ⟨by decide, by decide⟩]
+  by_cases h1 : (n : Int) = 1
+  · rw [ite_eq_left (by simpa using h1)]
+    have hn' : n = 1 := by omega
+    subst hn'
+    exact wp_oneWord hset1 hpos hp1 (by omega) hw hlb (fun r hr => by simpa using hQ r hr)
+  · rw [ite_eq_right (by simpa using h1)]
+    apply wp_skip
+    simp only [seqPost, Post.after, E0_append]
+    wp_step
+    refine wp_initW hset1 hm hpos hp1 hp2 hn1 hn hw ?_
+    intro k le' hI
+    simp only [seqPost, Post.after, E0_append]
+    exact wp_scan hn hw hlb (fun r hr => by simpa using hQ r hr) hI
+
 end NautyVerified.Proofs.Nextelement
