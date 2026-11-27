@@ -130,30 +130,45 @@ else shared by name).
 
 ## Phase 2: program logic on CompCert4Lean's Clight
 
-Port CLean's CCLib (from `/tmp/survey-clean/export/CCLib`, LGPL/INRIA dual)
-onto CompCert4Lean definitions. Order and effort (from the survey):
+The logic is written directly against CompCert4Lean's Clight `step` (with
+`function_entry2`), following the design of CLean's `CCLib.Hoare` rather than
+porting CCLib wholesale: CCLib's separation-logic layer is built on its own
+copy of the semantics, and nauty's data (dynamically allocated arrays in
+distinct blocks, a few statics) does not need a frame rule.
 
-- First a **transfer layer**: `Word bits ≃ BitVec bits` and Rocq `Z ≃ Int`
-  with simp lemmas, so `omega`/`bv_decide` work through `intOfZ`/`zOfInt`;
-  Prop-valued `perm`/`valid_access` with deciders.
-- Mechanical: `SepLogic`, `FunPtr`, `Tactics`, most of `Funspec`, `Locals`.
-- Heavy: `MemdataLemmas`, `SepHoare` (Ptrofs arithmetic), `Aggregate`,
-  64-bit array support (replace CLean's `HoareArray`/`HoareLong` bridges).
-- Re-validate kernel `decide` on canonical `PTree` and Rocq `positive`
-  (`Temps`).
-- Determinism from `ExternalCalls`' `extcall_properties.ec_determ` instead of
-  CLean's axioms; external calls become the `xi` parameter.
-- Port `ClightExec` + `ClightExecSound` (an executable step proved sound),
-  with the volatile-read environment from `/tmp/nauty-verif/lean/NautyC/Run.lean`.
-- Fill the gaps the `nextelement` proof hit: `arrayU64`, pointer + `long`
-  offsets, signed comparison lemmas for negatives, `int ==`/`long != 0`/shift
-  helpers, a forward-stepping tactic for `set`/`if`/`assign` chains, better
-  `sep_cancel`, and **initial memory to owned fragments** (globals including
-  read-only `dropPerm` ones like `leftbit`, `bytecount`, `bit`).
+- **Executable evaluation** (`NautyVerified/Exec/Expr.lean`, done): `evalExpr`,
+  `evalLvalue`, `evalExprlist`, `derefLoc`, `assignLoc` (scalar stores and
+  structure copies), proved sound against `eval_expr`, `eval_lvalue`,
+  `eval_exprlist`, `deref_loc`, `assign_loc`. On a concrete expression `simp`
+  unfolds them to the memory operations performed.
+- **Interpreter** (`Exec/Interp.lean`, `nvInterp`, done): runs
+  `dense.locals` on every fixture and reproduces the native output (CFI-120:
+  28 million steps); run in CI by `scripts/run_interp.sh`.
+- **Triples** (`Logic/Triple.lean`, done): total, existential, trace-carrying:
+  from every state satisfying the precondition some execution finishes
+  normally, by `break`, by `continue` or by `return`, with the emitted trace
+  passed to the postcondition. Rules: consequence, skip, break, continue,
+  sequence, set, assign, if, return, loop (invariant indexed by a decreasing
+  variant and the trace so far).
+- **Calls** (`Logic/Call.lean`, done): `FunSpec`, `Satisfies`, call rule,
+  builtin rule, external functions, internal functions from a triple about
+  the body. Recursive functions by induction on a measure.
+- **Words** (`Word/BitVec.lean`): `toBV : Word bits → BitVec bits` with a
+  rewrite lemma per operation, and Rocq `Z` to `Int`, so `bv_decide` and
+  `omega` apply. Needs the public residue lemmas added to the fork's
+  `Lib/Integers.lean`.
+- **Memory**: array predicates over `Mem.load`/`Mem.store` (`int`, `setword`,
+  pointer arrays), unchanged-outside-footprint postconditions
+  (`Mem.unchanged_on`), initial memory of globals (including read-only tables
+  `leftbit`, `bytecount`, `bit`).
+- **Automation**: a stepping tactic that applies the rule for the next
+  statement and evaluates its expressions with `simp`.
+- **Determinism** (for Phase 6): Clight `step` is determinate given
+  `extcall_properties.ec_determ`, so the execution the logic produces is the
+  only one consistent with the inputs.
 
-Acceptance: re-prove `nextelement` on the new base; run the interpreter on
-the Petersen and CFI-120 harnesses and match native output (as in
-`/tmp/nauty-verif/gen/`).
+Acceptance: `nextelement` proved against Hex's `VSet.nextElem` specification
+on this base; interpreter agreement (done).
 
 ## Phase 3: Clight to Asm theorem
 

@@ -4,7 +4,7 @@ defaultTargets = ["NautyVerified"]
 [[require]]
 name = "compcert4lean"
 git = "https://github.com/kim-em/compcert4lean.git"
-rev = "2cb65ed92dc6228a5be3bbbfa5ee96e1b3602c7f"  # branch nauty-verified
+rev = "bd94e6adeabde9ad240b5898662560e59130fa5a"  # branch nauty-verified
 
 [[require]]
 name = "hex-graph-iso"
