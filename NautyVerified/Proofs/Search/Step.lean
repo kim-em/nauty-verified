@@ -285,4 +285,25 @@ theorem SearchAt.rebuildW {n : Nat} {m m' : mem} {S : SLoc} {ctx : Ctx n} {st st
       tables := h.tables.unch hu (not_W hv hW (by decide) (by decide) (by decide))
       inv := hinv }
 
+/-- With capacity 0 a pair says nothing about its block. -/
+theorem _root_.NautyVerified.Proofs.Alloc.DynAt.cap0 {m : mem} {bp bs : block} {c : Nat} {b : block} (h : DynAt m bp bs c 0 b)
+    (b' : block) : DynAt m bp bs c 0 b' :=
+  { h with ptr := fun h0 => absurd h0 (Nat.lt_irrefl 0), mal := fun h0 => absurd h0 (Nat.lt_irrefl 0),
+           bne := fun h0 => absurd h0 (Nat.lt_irrefl 0) }
+
+theorem SlotRel.next {m m' : mem} {bp bs : block} {k c' c : Nat} {b' b : block}
+    (d' : DynAt m' bp bs k c' b') (r : SlotRel m c' b' c b) : SlotNext m m' bp bs k c b := by
+  rcases r with ⟨rfl, hb⟩ | hf
+  · by_cases hc : 0 < c'
+    · exact ⟨c', b', d', .inl ⟨rfl, hb hc⟩⟩
+    · have : c' = 0 := by omega
+      subst this
+      exact ⟨0, b, d'.cap0 b, .inl ⟨rfl, rfl⟩⟩
+  · exact ⟨c', b', d', .inr hf⟩
+
+theorem ArrayAt.valid {m : mem} {chunk : Common.AST.memory_chunk} {b : block} {base : Int}
+    {vals : Nat → val} {k : Nat} (h : ArrayAt m chunk b base vals k) (hk : 0 < k) :
+    Mem.valid_block m b :=
+  Alloc.valid_of_access (h.writable 0 hk)
+
 end NautyVerified.Proofs.Search

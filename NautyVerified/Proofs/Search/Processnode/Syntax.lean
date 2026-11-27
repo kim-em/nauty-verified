@@ -18,6 +18,142 @@ open NautyVerified.Proofs.Refine (tv ix)
 open NautyVerified.Proofs.Alloc (gat)
 open NautyVerified.Proofs.Search (gats statsF)
 
+/-- `if (comp_canon == 0) { … testcanlab … }`. -/
+abbrev canonTest : statement :=
+  (sk
+    (.Sifthenelse
+      (.Ebinop .Oeq (.Evar dense.id.«nauty:comp_canon» tint) (ci 0 tint) tint)
+      (sk
+        (.Sifthenelse
+          (.Ebinop .Olt
+            (tv dense.id.«level»)
+            (.Evar dense.id.«nauty:canonlevel» tint)
+            tint)
+          (sk (.Sassign (.Evar dense.id.«nauty:comp_canon» tint) (ci 1 tint)))
+          (.Ssequence
+            (sk
+              (.Scall none
+                (.Ederef
+                  (.Efield
+                    (.Evar dense.id.«nauty:dispatch» (Tstruct dense.id.«_1027» noattr))
+                    dense.id.«updatecan»
+                    (tptr
+                      (tfun
+                        [(tptr tulong),
+                         (tptr tulong),
+                         (tptr tint),
+                         tint,
+                         tint,
+                         tint]
+                        .Tvoid)))
+                  (tfun
+                    [(tptr tulong),
+                     (tptr tulong),
+                     (tptr tint),
+                     tint,
+                     tint,
+                     tint]
+                    .Tvoid))
+                [(.Evar dense.id.«nauty:g» (tptr tulong)),
+                 (.Evar dense.id.«nauty:canong» (tptr tulong)),
+                 (.Evar dense.id.«nauty:canonlab» (tptr tint)),
+                 (.Evar dense.id.«nauty:samerows» tint),
+                 (.Evar dense.id.«nauty:m» tint),
+                 (.Evar dense.id.«nauty:n» tint)]))
+            (.Ssequence
+              (sk
+                (.Sassign
+                  (.Evar dense.id.«nauty:samerows» tint)
+                  (.Evar dense.id.«nauty:n» tint)))
+              (.Ssequence
+                (sk
+                  (.Scall
+                    (some (idOf 705))
+                    (.Ederef
+                      (.Efield
+                        (.Evar dense.id.«nauty:dispatch»
+                          (Tstruct dense.id.«_1027» noattr))
+                        dense.id.«testcanlab»
+                        (tptr
+                          (tfun
+                            [(tptr tulong),
+                             (tptr tulong),
+                             (tptr tint),
+                             (tptr tint),
+                             tint,
+                             tint]
+                            tint)))
+                      (tfun
+                        [(tptr tulong),
+                         (tptr tulong),
+                         (tptr tint),
+                         (tptr tint),
+                         tint,
+                         tint]
+                        tint))
+                    [(.Evar dense.id.«nauty:g» (tptr tulong)),
+                     (.Evar dense.id.«nauty:canong» (tptr tulong)),
+                     (.Etempvar dense.id.«lab» (tptr tint)),
+                     (.Eaddrof (.Evar dense.id.«sr» tint) (tptr tint)),
+                     (.Evar dense.id.«nauty:m» tint),
+                     (.Evar dense.id.«nauty:n» tint)]))
+                (.Sassign (.Evar dense.id.«nauty:comp_canon» tint) (tv (idOf 705))))))))
+      .Sskip))
+
+/-- `if (comp_canon == 0) { scatter; code = 2 } else …`. -/
+abbrev canonPick : statement :=
+  (sk
+    (.Sifthenelse
+      (.Ebinop .Oeq (.Evar dense.id.«nauty:comp_canon» tint) (ci 0 tint) tint)
+      (.Ssequence
+        (forLoopC dense.id.«i»
+          (.Ebinop .Olt (tv dense.id.«i») (.Evar dense.id.«nauty:n» tint) tint)
+          (sk
+            (.Sassign
+              (gat dense.id.«nauty:workperm» (gat dense.id.«nauty:canonlab» (tv dense.id.«i»)))
+              (ix dense.id.«lab» (tv dense.id.«i»)))))
+        (sk (.Sset dense.id.«code» (ci 2 tint))))
+      (sk
+        (.Sifthenelse
+          (.Ebinop .Ogt (.Evar dense.id.«nauty:comp_canon» tint) (ci 0 tint) tint)
+          (sk (.Sset dense.id.«code» (ci 3 tint)))
+          (sk (.Sset dense.id.«code» (ci 4 tint)))))))
+
+/-- The first-leaf comparison: scatter, then `cheapautom`/`isautom`. -/
+abbrev firstC : statement :=
+  (.Ssequence
+    (forLoopC dense.id.«i»
+      (.Ebinop .Olt (tv dense.id.«i») (.Evar dense.id.«nauty:n» tint) tint)
+      (sk
+        (.Sassign
+          (gat dense.id.«nauty:workperm» (gat dense.id.«nauty:firstlab» (tv dense.id.«i»)))
+          (ix dense.id.«lab» (tv dense.id.«i»)))))
+    (.Ssequence
+      (sk
+        (.Sifthenelse
+          (.Ebinop .Oge
+            (.Evar dense.id.«nauty:gca_first» tint)
+            (.Evar dense.id.«nauty:noncheaplevel» tint)
+            tint)
+          (.Sset (idOf 703) (ci 1 tint))
+          (.Ssequence
+            (sk
+              (.Scall
+                (some (idOf 704))
+                (.Ederef
+                  (.Efield
+                    (.Evar dense.id.«nauty:dispatch» (Tstruct dense.id.«_1027» noattr))
+                    dense.id.«isautom»
+                    (tptr (tfun [(tptr tulong), (tptr tint), tint, tint, tint] tint)))
+                  (tfun [(tptr tulong), (tptr tint), tint, tint, tint] tint))
+                [(.Evar dense.id.«nauty:g» (tptr tulong)),
+                 (.Evar dense.id.«nauty:workperm» (tptr tint)),
+                 (.Evar dense.id.«nauty:digraph» tint),
+                 (.Evar dense.id.«nauty:m» tint),
+                 (.Evar dense.id.«nauty:n» tint)]))
+            (.Sset (idOf 703) (.Ecast (tv (idOf 704)) tbool)))))
+      (.Sifthenelse (tv (idOf 703)) (sk (.Sset dense.id.«code» (ci 1 tint))) .Sskip)))
+
 abbrev classifyC : statement :=
   (.Ssequence
     (sk

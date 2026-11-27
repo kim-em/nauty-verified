@@ -1,6 +1,8 @@
 import NautyVerified.Spec.Orbjoin
 import NautyVerified.Spec.Fmptn
 import NautyVerified.Spec.Cycle
+import NautyVerified.Spec.Testcanlab
+import NautyVerified.Spec.Updatecan
 
 /-!
 # HexGraphIso's leaf classification, unrolled
@@ -118,19 +120,50 @@ theorem scatterW_inj {ref lab w : Array Nat} (hsz : w.size = n) (hr : ∀ i, i <
     scatterW_at hsz hr ri n (Nat.le_refl _) j hj] at he
   rw [li i j hi hj he]
 
+/-- `classify`'s comparison with the best leaf: the state after it and `sr`. -/
+def canonTestS (ctx : Ctx n) (level : Nat) (st : Search n) : Search n × Nat :=
+  if st.compCanon = 0 then
+    if level < st.canonlevel then ({ st with compCanon := 1 }, 0)
+    else
+      let st' := { st with canong := updatecan ctx st.canong st.canonlab st.samerows, samerows := n }
+      ({ st' with compCanon := (testcanlab ctx st'.canong st'.lab).1 },
+        (testcanlab ctx st'.canong st'.lab).2)
+  else (st, 0)
+
 /-- The best-leaf comparison of `classify`. -/
 def classifyCanon (ctx : Ctx n) (level : Nat) (st : Search n) : Leaf × Search n :=
-  let p : Search n × Nat :=
-    if st.compCanon = 0 then
-      if level < st.canonlevel then ({ st with compCanon := 1 }, 0)
-      else
-        let st' := { st with canong := updatecan ctx st.canong st.canonlab st.samerows, samerows := n }
-        ({ st' with compCanon := (testcanlab ctx st'.canong st'.lab).1 },
-          (testcanlab ctx st'.canong st'.lab).2)
-    else (st, 0)
+  let p := canonTestS ctx level st
   if p.1.compCanon = 0 then (.autoCanon, scatter p.1.canonlab p.1)
   else if p.1.compCanon > 0 then (.better p.2, p.1)
   else (.bad, p.1)
+
+theorem tclGo_range (ctx : Ctx n) (canong : Array (VSet n)) (lab : Array Nat) :
+    ∀ l : List Nat, (∀ i ∈ l, i < n) →
+      -1 ≤ (tclGo ctx canong lab l).1 ∧ (tclGo ctx canong lab l).1 ≤ 1 ∧
+        (tclGo ctx canong lab l).2 ≤ n
+  | [], _ => by simp [tclGo]
+  | i :: l, hl => by
+    have hi := hl i (.head _)
+    simp only [tclGo]
+    split
+    · simp only []; omega
+    · simp only []; omega
+    · exact tclGo_range ctx canong lab l fun j hj => hl j (.tail _ hj)
+
+theorem testcanlab_range (ctx : Ctx n) (canong : Array (VSet n)) (lab : Array Nat) :
+    -1 ≤ (testcanlab ctx canong lab).1 ∧ (testcanlab ctx canong lab).1 ≤ 1 ∧
+      (testcanlab ctx canong lab).2 ≤ n := by
+  rw [testcanlab_eq]
+  exact tclGo_range ctx canong lab _ fun i hi => List.mem_range.1 hi
+
+theorem foldl_canStep_size' (ctx : Ctx n) (lab : Array Nat) :
+    ∀ (l : List Nat) (c : Array (VSet n)), (l.foldl (canStep ctx lab) c).size = c.size
+  | [], _ => rfl
+  | _ :: l, c => by rw [List.foldl_cons, foldl_canStep_size' ctx lab l, canStep, Array.size_set!]
+
+theorem updatecan_size (ctx : Ctx n) (canong : Array (VSet n)) (lab : Array Nat) (sr : Nat) :
+    (updatecan ctx canong lab sr).size = canong.size := by
+  rw [updatecan_eq, foldl_canStep_size']
 
 theorem classify_eq (ctx : Ctx n) (level numcells : Nat) (st : Search n) :
     classify ctx level numcells st =
@@ -141,7 +174,7 @@ theorem classify_eq (ctx : Ctx n) (level numcells : Nat) (st : Search n) :
           (.autoFirst, scatter st.firstlab st)
         else classifyCanon ctx level (scatter st.firstlab st)
       else classifyCanon ctx level st := by
-  simp only [classify, classifyCanon, Id.run]
+  simp only [classify, classifyCanon, canonTestS, Id.run]
   have es : ∀ r : Array Nat, (scatter r st).compCanon = st.compCanon ∧
       (scatter r st).canonlevel = st.canonlevel ∧ (scatter r st).gcaFirst = st.gcaFirst ∧
       (scatter r st).noncheaplevel = st.noncheaplevel := fun r => by
