@@ -50,3 +50,4 @@ import NautyVerified.Proofs.Fmperm.Syntax
 import NautyVerified.Proofs.Alloc.Global
 import NautyVerified.Spec.Fmperm
 import NautyVerified.Spec.Cycle
+import NautyVerified.Proofs.Fmperm.Clear
