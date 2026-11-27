@@ -107,7 +107,7 @@ def dispatchGraphInit : List init_data :=
    .Init_addrof dense.id.targetcell Ptrofs.zero, .Init_addrof dense.id.naugraph_freedyn Ptrofs.zero,
    .Init_addrof dense.id.naugraph_check Ptrofs.zero, .Init_int64 (lr 0), .Init_int64 (lr 0)]
 
-kernel_rfl info_dispatchGraph :
+kernel_rfl info_dispatchGraphInit :
   info Harness.Block.dispatchGraph = some (dispatchGraphInit, false, false)
 
 /-- The values `dispatch_graph`'s fields hold, at `8 i`. -/
@@ -121,7 +121,7 @@ def dispatchVals : List val :=
 theorem dispatchGraph_load {m : mem} (hm : Genv.init_mem prog = some m) :
     ∀ (i : Nat) (hi : i < 11), Mem.load .Mint64 m Harness.Block.dispatchGraph (zOfInt (8 * (i : Int))) =
       some (dispatchVals[i]'(by simp [dispatchVals]; omega)) := by
-  obtain ⟨v, hv, hi, -, hvol⟩ := var_of_map info_dispatchGraph
+  obtain ⟨v, hv, hi, -, hvol⟩ := var_of_map info_dispatchGraphInit
   have h2 := (var_init hm hv hvol).2
   rw [hi] at h2
   rw [Init.ge_eq] at h2
