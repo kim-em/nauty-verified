@@ -126,4 +126,35 @@ theorem SearchAt.rebuild {n : Nat} {m m' : mem} {S : SLoc} {ctx : Ctx n} {st st'
       tables := h.tables.unch hu (not_wr_all hv hL (by decide) (by decide))
       inv := hinv }
 
+/-- nauty.c's static scalars. -/
+def scalG : List block :=
+  [Block.gcaFirst, Block.gcaCanon, Block.noncheaplevel, Block.allsamelevel, Block.eqlevFirst,
+   Block.eqlevCanon, Block.compCanon, Block.samerows, Block.canonlevel, Block.stabvertex,
+   Block.cosetindex, Block.needshortprune]
+
+theorem scalG_globs : ∀ y ∈ scalG, y ∈ globs := by decide
+
+theorem scalG_wr (S : SLoc) : ∀ y ∈ scalG, y ∈ S.wr := fun y hy =>
+  List.mem_append.2 (.inl (by revert y; decide))
+
+/-- After writes to scalars only: new `Scalars`, and the other parts for the new state. -/
+theorem SearchAt.setScalars {n : Nat} {m m' : mem} {S : SLoc} {ctx : Ctx n} {st st' : Search n}
+    {pre nsp pre' nsp' : Bool} (h : SearchAt m S ctx st pre nsp) {L : List block}
+    (hu : Unch m m' (· ∈ L)) (hL : ∀ z ∈ L, z ∈ scalG) (hsc : Scalars m' st' nsp')
+    (har : Arrays m S ctx st') (hst : Stats m S st' pre') (hinv : SInv st') :
+    SearchAt m' S ctx st' pre' nsp' := by
+  have hv := SLoc.vars_ne h.distinct
+  have nv : ∀ z ∈ S.vars, ¬ z ∈ L := fun z hz hzL =>
+    hv z hz z (scalG_globs z (hL z hzL)) rfl
+  have nf : ¬ Block.fmptr ∈ L := fun hzL => absurd (hL _ hzL) (by decide)
+  refine h.rebuild hu (fun z hz => scalG_wr S z (hL z hz)) (fun z hz => Keep.unch hu
+      (nv z (by simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
+                rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> simp [SLoc.vars])))
+    hsc (hst.unch hu (nv _ (by simp [SLoc.vars]))) (har.unch hu ?_) hinv
+  intro z hz
+  simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
+  rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
+    rfl | rfl
+  all_goals first | exact nf | exact nv _ (by simp [SLoc.vars])
+
 end NautyVerified.Proofs.Search
