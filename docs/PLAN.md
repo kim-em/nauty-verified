@@ -252,7 +252,9 @@ Rep definitions exist. Expected size: 25-40 Lean lines per C line on set
 code; total C-side 100k-200k lines (estimate from one function).
 
 Status: proved against HexGraphIso (`*_satisfies`, axiom-clean):
-`nextelement`, `orbjoin`, `breakout`, `fmptn`, `shortprune`, `longprune`.
+`nextelement`, `orbjoin`, `breakout`, `fmptn`, `shortprune`, `longprune`,
+`fmperm`; and the allocator layer: `malloc`, `free`, `nauty_zalloc`,
+`DYNALLOC1` (`wp_dynalloc1`).
 
 Conventions settled while doing these:
 
@@ -274,6 +276,18 @@ Conventions settled while doing these:
 - `longprune` is specified over an arbitrary contiguous run of pairs; how
   nauty's ring of `fmptr` pairs maps to `SearchState.autos` belongs to its
   callers.
+- `DYNALLSTAT` pairs are `DynAt m bp bs c cap b`: the capacity global holds
+  `cap` and, when `cap > 0`, the pointer global points to block `b` that
+  `malloc` made for `c * cap` bytes (`Malloced`: header at `-8`, `Freeable`
+  on `[-8, c*cap)`). `wp_dynalloc1` re-establishes it with capacity at least
+  the size asked for and reports exactly what changed: the two globals, the
+  old block (only when `cap > 0`), and a block not valid before. Writes into
+  the array go through `wp_gstore`, which also gives `Keep` (header and
+  permissions unchanged), so `DynAt` survives a function's own use of its
+  array. Specs taking a `DYNALLSTAT` array take `DynAt` in their pre and
+  return it in their post.
+- Facts about the `workperm` block are needed only when `n > 0`: with
+  capacity 0 the block is arbitrary and may coincide with a caller's array.
 
 ## Phase 6: dense end-to-end
 
