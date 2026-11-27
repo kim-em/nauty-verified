@@ -61,7 +61,7 @@ def refineSpec {n : Nat} (L : Loc) (ctx : Ctx n) (lab ptn : Array Nat) (active :
       (refine ctx L.level lab ptn active numcells) aw' ∧
     ArrayAt m' .Mint32 L.bk L.kb
       (fun _ => .Vint (ir (refine ctx L.level lab ptn active numcells).longcode)) 1 ∧
-    n ≤ capW ∧ L.M ≤ capS ∧ n + 2 ≤ capB ∧
+    n ≤ capW ∧ n + 2 ≤ capB ∧
     ((capW = L.capW ∧ bW = L.bW) ∨ ¬ Mem.valid_block m bW) ∧
     ((capS = L.capS ∧ bS = L.bS) ∨ ¬ Mem.valid_block m bS) ∧
     ((capB = L.capB ∧ bB = L.bB) ∨ ¬ Mem.valid_block m bB) ∧
@@ -88,7 +88,7 @@ theorem PreOk.withWork {n : Nat} {L : Loc} {m : mem} (hp : PreOk n L)
       [Block.naugraphWorkperm, Block.naugraphWorkpermSz, Block.naugraphWorkset,
        Block.naugraphWorksetSz, Block.naugraphBucket, Block.naugraphBucketSz,
        Block.naugraphBit, Block.naugraphBytecount, Block.leftbit], Mem.valid_block m z)
-    {capW capS capB : Nat} {bW bS bB : block} (hcW : n ≤ capW) (hcS : L.M ≤ capS)
+    {capW capS capB : Nat} {bW bS bB : block} (hcW : n ≤ capW) (hcS : 0 < capS)
     (hcB : n + 2 ≤ capB)
     (hbW : (capW = L.capW ∧ bW = L.bW) ∨ ¬ Mem.valid_block m bW)
     (hbS : (capS = L.capS ∧ bS = L.bS) ∨ ¬ Mem.valid_block m bS)
@@ -99,7 +99,7 @@ theorem PreOk.withWork {n : Nat} {L : Loc} {m : mem} (hp : PreOk n L)
   rw [Loc.blocks_eq, List.pairwise_append, List.pairwise_append] at d
   obtain ⟨⟨dA, -, dAN⟩, dG, dANG⟩ := d
   have hn0 := hp.n0
-  refine { hp with distinct := ?_, capW := hcW, capS := hcS, capB := hcB }
+  refine { hp with distinct := ?_, capW := hcW, capB := hcB }
   rw [Loc.blocks_eq, List.pairwise_append, List.pairwise_append]
   have hnew : ∀ z ∈ [L.bg, L.bl, L.bp, L.bn, L.bc, L.ba, L.bk] ++
       [Block.naugraphWorkperm, Block.naugraphWorkpermSz, Block.naugraphWorkset,
@@ -115,7 +115,7 @@ theorem PreOk.withWork {n : Nat} {L : Loc} {m : mem} (hp : PreOk n L)
           fun h => dANG _ (List.mem_append.2 (.inr (by simp))) z hz h.symm,
           fun h => dANG _ (List.mem_append.2 (.inr (by simp))) z hz h.symm⟩
     exact ⟨Alloc.ne_new hbW hzv (fun _ => hold.1) (by omega),
-      Alloc.ne_new hbS hzv (fun _ => hold.2.1) (by have := hp.M1; omega),
+      Alloc.ne_new hbS hzv (fun _ => hold.2.1) hcS,
       Alloc.ne_new hbB hzv (fun _ => hold.2.2) (by omega)⟩
   refine ⟨⟨dA, ?_, fun a ha b hb => ?_⟩, dG, fun a ha b hb => ?_⟩
   · simp [Loc.withWork, hWS, hWB, hSB]
@@ -206,6 +206,55 @@ theorem Mem.withWork {n : Nat} {m m' : mem} {L : Loc} {ctx : Ctx n} {st : Refine
       bytes := BytecountTable.unch hm.bytes hu (hp.notDyn (.inr (.inr (.inl rfl))) vbytes)
       left := LeftbitTable.unch hm.left hu (hp.notDyn (.inr (.inr (.inr rfl))) vleft) }
 
+/-- The caller blocks, globals and tables `Mem` mentions are valid. -/
+theorem Mem.valid_fixed {n : Nat} {m : mem} {L : Loc} {ctx : Ctx n} {st : RefineSt n}
+    {aw : Nat → Lib.Integers.int64} (hm : Mem m L ctx st aw)
+    (hv : ∀ z ∈ [L.bg, L.bl, L.bp, L.bn, L.bc, L.ba, L.bk], Mem.valid_block m z) :
+    ∀ z ∈ [L.bg, L.bl, L.bp, L.bn, L.bc, L.ba, L.bk] ++
+      [Block.naugraphWorkperm, Block.naugraphWorkpermSz, Block.naugraphWorkset,
+       Block.naugraphWorksetSz, Block.naugraphBucket, Block.naugraphBucketSz,
+       Block.naugraphBit, Block.naugraphBytecount, Block.leftbit], Mem.valid_block m z := by
+  intro z hz
+  rcases List.mem_append.1 hz with hz | hz
+  · exact hv z hz
+  · simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
+    rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
+    · exact Alloc.valid_of_access hm.dW.bpW
+    · exact Alloc.valid_of_access hm.dW.bsW
+    · exact Alloc.valid_of_access hm.dS.bpW
+    · exact Alloc.valid_of_access hm.dS.bsW
+    · exact Alloc.valid_of_access hm.dB.bpW
+    · exact Alloc.valid_of_access hm.dB.bsW
+    · exact Alloc.valid_of_access (Mem.load_valid_access _ _ _ _ _ (hm.bit 0 (by decide)))
+    · exact Alloc.valid_of_access (Mem.load_valid_access _ _ _ _ _ (hm.bytes 0 (by decide)))
+    · exact Alloc.valid_of_access (Mem.load_valid_access _ _ _ _ _ (hm.left 0 (by decide)))
+
+/-- `Mem` survives changes outside the caller blocks, the globals and the work blocks in use. -/
+theorem Mem.unch {n : Nat} {m m' : mem} {L : Loc} {ctx : Ctx n} {st : RefineSt n}
+    {aw : Nat → Lib.Integers.int64} (hm : Mem m L ctx st aw) {S : block → Prop}
+    (hu : Unch m m' S)
+    (hS : ∀ z ∈ [L.bg, L.bl, L.bp, L.bn, L.bc, L.ba, L.bk] ++
+      [Block.naugraphWorkperm, Block.naugraphWorkpermSz, Block.naugraphWorkset,
+       Block.naugraphWorksetSz, Block.naugraphBucket, Block.naugraphBucketSz,
+       Block.naugraphBit, Block.naugraphBytecount, Block.leftbit], ¬ S z)
+    (hW : 0 < L.capW → ¬ S L.bW) (hS' : 0 < L.capS → ¬ S L.bS) (hB : 0 < L.capB → ¬ S L.bB) :
+    Mem m' L ctx st aw := by
+  obtain ⟨cv, hcv⟩ := hm.cnt
+  exact
+    { graph := ⟨hm.graph.arr.unch hu (hS _ (by simp)), hm.graph.rep⟩
+      lab := hm.lab.unch hu (hS _ (by simp))
+      ptn := hm.ptn.unch hu (hS _ (by simp))
+      nc := hm.nc.unch hu (hS _ (by simp))
+      act := hm.act.unch hu (hS _ (by simp))
+      actRep := hm.actRep
+      cnt := ⟨cv, hcv.unch hu (hS _ (by simp))⟩
+      dW := hm.dW.keep hu (hS _ (by simp)) (hS _ (by simp)) fun hc => Keep.unch hu (hW hc)
+      dS := hm.dS.keep hu (hS _ (by simp)) (hS _ (by simp)) fun hc => Keep.unch hu (hS' hc)
+      dB := hm.dB.keep hu (hS _ (by simp)) (hS _ (by simp)) fun hc => Keep.unch hu (hB hc)
+      bit := hm.bit.unch hu (hS _ (by simp))
+      bytes := BytecountTable.unch hm.bytes hu (hS _ (by simp))
+      left := LeftbitTable.unch hm.left hu (hS _ (by simp)) }
+
 /-- Only the `code` cell changed: `Mem` holds. -/
 theorem Mem.unchCode {n : Nat} {m m' : mem} {L : Loc} {ctx : Ctx n} {st : RefineSt n}
     {aw : Nat → Lib.Integers.int64} (hok : Ok n L) (hm : Mem m L ctx st aw)
@@ -289,7 +338,7 @@ theorem refine_satisfies_of {xi : ExternalCalls} (hT : TrivialPass xi) (hN : Non
         · exact Alloc.valid_of_access (Mem.load_valid_access _ _ _ _ _ (hm.bytes 0 (by decide)))
         · exact Alloc.valid_of_access (Mem.load_valid_access _ _ _ _ _ (hm.left 0 (by decide)))
     have hok : Ok n (L.withWork capW bW capS bS capB bB) :=
-      hp.withWork hvG hcW hcS hcB hbW hbS hbB (hWS (by omega) (by have := hp.M1; omega))
+      hp.withWork hvG hcW (by have := hp.M1; omega) hcB hbW hbS hbB (hWS (by omega) (by have := hp.M1; omega))
         (hWB (by omega) (by omega)) (hSB (by have := hp.M1; omega) (by omega))
     have hm3 := hm.withWork hp hv hu3 hW hS hB
     have hT3 : ∀ k, k ≠ idOf 703 → k ≠ idOf 704 → k ≠ idOf 705 → k ≠ idOf 706 → k ≠ idOf 707 →
@@ -334,7 +383,7 @@ theorem refine_satisfies_of {xi : ExternalCalls} (hT : TrivialPass xi) (hN : Non
     have hi0 : StInv n (L.withWork capW bW capS bS capB bB) st₀ :=
       { ok := hok0, ptnSmall := hps, ncSmall := by simp [st₀, initSt]; omega
         hint := hn0, maxpos := hn0, code := by simp [st₀, initSt]; omega }
-    refine wp_mainLoop hT hN hok ⟨aw, hm3, ht4, hi0⟩ ?_
+    refine wp_mainLoop hT hN hok hcS ⟨aw, hm3, ht4, hi0⟩ ?_
     intro le5 m5 ⟨aw5, hm5, ht5, hi5⟩ hu5
     have hkn : ¬ dyn3Set m L.capW L.bW L.capS L.bS L.capB L.bB L.bk :=
       hp.notDyn (.inl (by simp)) (hv _ (by simp))
@@ -360,7 +409,7 @@ theorem refine_satisfies_of {xi : ExternalCalls} (hT : TrivialPass xi) (hN : Non
       · exact .inl ⟨hc, rfl⟩
       · exact .inr hnv
     refine ⟨m6, Nextelement.free_empty m6, by simp, capW, bW, capS, bS, capB, bB, aw5,
-      (hm5.unchCode hok hu6).congr rfl rfl rfl rfl, harr6, hcW, hcS, hcB, hbW, hbS, hbB, ?_⟩
+      (hm5.unchCode hok hu6).congr rfl rfl rfl rfl, harr6, hcW, hcB, hbW, hbS, hbB, ?_⟩
     refine ((hu3.mono fun z hz => .inr (.inr hz)).trans (hu5.mono fun z hz => ?_)).trans
       (hu6.mono fun z hz => .inr (.inl hz))
     unfold dyn3Set

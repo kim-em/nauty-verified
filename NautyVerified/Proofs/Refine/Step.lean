@@ -92,7 +92,7 @@ def TrivialPass (xi : ExternalCalls) : Prop :=
 def NontrivialPass (xi : ExternalCalls) : Prop :=
   ∀ {n : Nat} {Q : Post} {le : temp_env} {m : mem} {L : Loc} {ctx : Ctx n} {st : RefineSt n}
     {aw : Nat → Lib.Integers.int64} {split1 split2 : Nat},
-    Ok n L → Mem m L ctx st aw → Tmp le L st → StInv n L st → st.numcells < n →
+    Ok n L → L.M ≤ L.capS → Mem m L ctx st aw → Tmp le L st → StInv n L st → st.numcells < n →
     PTree.get dense.id.split1 le = some (.Vint (ir split1)) →
     PTree.get dense.id.split2 le = some (.Vint (ir split2)) →
     split1 < split2 → split2 = cellEnd st.ptn L.level split1 → split2 < n →
@@ -129,7 +129,8 @@ theorem Tmp.setCode {n : Nat} {le : temp_env} {L : Loc} {st : RefineSt n} (h : T
 /-- One iteration: HexGraphIso's `refineStep` for the chosen `split1`. -/
 theorem wp_iter (hT : TrivialPass xi) (hN : NontrivialPass xi) {n : Nat} {Q : Post}
     {le : temp_env} {m : mem} {L : Loc} {ctx : Ctx n} {st : RefineSt n}
-    {aw : Nat → Lib.Integers.int64} {s : Nat} (hok : Ok n L) (hm : Mem m L ctx st aw)
+    {aw : Nat → Lib.Integers.int64} {s : Nat} (hok : Ok n L) (hcS : L.M ≤ L.capS)
+    (hm : Mem m L ctx st aw)
     (ht : Tmp le L st) (hi : StInv n L st) (hnc : st.numcells < n)
     (hps : pickSplit st.active st.hint = some s)
     (hs1 : PTree.get dense.id.split1 le = some (.Vint (ir s)))
@@ -200,7 +201,7 @@ theorem wp_iter (hT : TrivialPass xi) (hN : NontrivialPass xi) {n : Nat} {Q : Po
       simp only [refineStep]; rw [ite_eq_left (by simp [en, ← hse])]
     rw [this]; exact hd
   · rw [ite_eq_right (by simp; omega)]
-    refine hN hok hm2 ht3 hi2 hnc hs1'' hs2'' (by omega) rfl hce2 fun le' m' hd hu => hQ' le' m' ?_ hu
+    refine hN hok hcS hm2 ht3 hi2 hnc hs1'' hs2'' (by omega) rfl hce2 fun le' m' hd hu => hQ' le' m' ?_ hu
     have : refineStep ctx L.level s st = refineNontrivial ctx L.level s en st2 := by
       simp only [refineStep]; rw [ite_eq_right (by simpa [en] using hse)]
     rw [this]; exact hd
@@ -215,7 +216,7 @@ def LoopAt {n : Nat} (L : Loc) (ctx : Ctx n) (st₀ : RefineSt n) (m₀ : mem) (
 /-- `refine`'s main loop is HexGraphIso's `refineLoop` with fuel `4n + 8`. -/
 theorem wp_mainLoop (hT : TrivialPass xi) (hN : NontrivialPass xi) {n : Nat} {Q : Post}
     {le : temp_env} {m : mem} {L : Loc} {ctx : Ctx n} {st₀ : RefineSt n} (hok : Ok n L)
-    (hd : Done le m L ctx st₀)
+    (hcS : L.M ≤ L.capS) (hd : Done le m L ctx st₀)
     (hQ : ∀ le' m', Done le' m' L ctx (refineLoop ctx L.level (4 * n + 8) st₀) →
       Unch m m' L.writes → Q.normal E0 empty_env le' m') :
     Wp xi ge dense.fn.refine mainLoop Q empty_env le m := by
@@ -235,7 +236,7 @@ theorem wp_mainLoop (hT : TrivialPass xi) (hN : NontrivialPass xi) {n : Nat} {Q 
     · intro le'' s hnc hps ht'' hs1
       simp only [E0_append]
       obtain ⟨G, rfl, hG, hloop'⟩ := refineLoop_next ctx L.level hF hnc hps
-      refine wp_iter hT hN hok hm ht'' hi hnc hps hs1 fun le3 m3 hd3 hu3 => ?_
+      refine wp_iter hT hN hok hcS hm ht'' hi hnc hps hs1 fun le3 m3 hd3 hu3 => ?_
       simp only [E0_append]
       exact ⟨True.intro, True.intro, G, by omega, _, hd3, hG, hloop.trans hloop', hu.trans hu3⟩
   · rintro F t e le' m' ⟨rfl, rfl, G, hG, hl⟩

@@ -113,7 +113,6 @@ structure Ok (n : Nat) (L : Loc) : Prop where
   Mlt : L.M < 33554432
   levlt : L.level < 2147483648
   capW : n ≤ L.capW
-  capS : L.M ≤ L.capS
   capB : n + 2 ≤ L.capB
   nlt : n < 1073741824
 
