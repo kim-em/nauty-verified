@@ -58,7 +58,7 @@ def dyn3Set (m : mem) (capP : Nat) (bP : block) (capS : Nat) (bS : block) (capB 
   z = WPS ∨ z = WP ∨ z = WSS ∨ z = WS ∨ z = BKS ∨ z = BK ∨ (0 < capP ∧ z = bP) ∨
     (0 < capS ∧ z = bS) ∨ (0 < capB ∧ z = bB) ∨ ¬ Mem.valid_block m z
 
-theorem wp_dyn3 {f : function} {Q : Post} {le : temp_env} {m : mem}
+theorem wp_dyn3 {f : function} {Q : Post} {le : temp_env} {m : mem} {rest : statement}
     {xn xm t1 t2 t3 t4 t5 t6 msg : ident} {msgLen : Int} {n M capP capS capB : Nat}
     {bP bS bB : block}
     (hDP : DynAt m WP WPS 4 capP bP) (hDS : DynAt m WS WSS 8 capS bS)
@@ -82,14 +82,14 @@ theorem wp_dyn3 {f : function} {Q : Post} {le : temp_env} {m : mem}
       Unch m m' (dyn3Set m capP bP capS bS capB bB) →
       (0 < capP' → 0 < capS' → bP' ≠ bS') → (0 < capP' → 0 < capB' → bP' ≠ bB') →
       (0 < capS' → 0 < capB' → bS' ≠ bB') →
-      Q.normal E0 empty_env le' m') :
+      Wp xi ge f rest Q empty_env le' m') :
     Wp xi ge f
       (.Ssequence (dynalloc1 dense.id.«naugraph:workperm_sz» dense.id.«naugraph:workperm» tint
           (.Etempvar xn tint) t1 t2 msg msgLen)
         (.Ssequence (dynalloc1 dense.id.«naugraph:workset_sz» dense.id.«naugraph:workset» tulong
             (.Etempvar xm tint) t3 t4 msg msgLen)
-          (dynalloc1 dense.id.«naugraph:bucket_sz» dense.id.«naugraph:bucket» tint
-            (.Ebinop .Oadd (.Etempvar xn tint) (ci 2 tint) tint) t5 t6 msg msgLen)))
+          (.Ssequence (dynalloc1 dense.id.«naugraph:bucket_sz» dense.id.«naugraph:bucket» tint
+            (.Ebinop .Oadd (.Etempvar xn tint) (ci 2 tint) tint) t5 t6 msg msgLen) rest)))
       Q empty_env le m := by
   have hvWP : Mem.valid_block m WP := valid_of_access hDP.bpW
   have hvWPS : Mem.valid_block m WPS := valid_of_access hDP.bsW
@@ -135,6 +135,7 @@ theorem wp_dyn3 {f : function} {Q : Post} {le : temp_env} {m : mem}
       fun hc => Keep.unch huS (not_dynSet (hgP _ (Malloced.valid (hDB.mal hc))) (hB hc).2.2.2
         (hB hc).2.2.1 fun hcs h => (hS hcs).2.2.2.2 hc h.symm)
   -- bucket
+  wp_step
   refine wp_dynalloc1' (c := 4) (n := n + 2)
     (le := le2) (elt := tint) (msg := msg) (msgLen := msgLen) (t1 := t5) (t2 := t6) (szE := .Ebinop .Oadd (.Etempvar xn tint) (ci 2 tint) tint) find_naugraphBucketSz find_naugraphBucket rfl hDB2
     (fun _ => by
@@ -170,6 +171,7 @@ theorem wp_dyn3 {f : function} {Q : Post} {le : temp_env} {m : mem}
       (not_dynSet (hgS _ (hgP _ hvWSS)) (by decide) (by decide) fun hc h => (hB hc).2.2.2 h.symm)
       fun hc => Keep.unch huB (nB hbS'm (fun hc => ⟨(hS hc).2.2.1, (hS hc).2.2.2.1,
         (hS hc).2.2.2.2⟩) hc (hS'v hc))
+  simp only [seqPost, Post.after, E0_append]
   refine hQ le3 m3 capP' bP' capS' bS' capB' bB' hDP3 hDS3 hDB3 hcP hcS hcB hbP' hbS'm hbB'm
     (fun z hz => hgB _ (hgS _ (hgP _ hz))) (fun k h1 h2 h3 h4 h5 h6 => by
       rw [ho3 k h5 h6, ho2 k h3 h4, ho1 k h1 h2]) ?_ ?_ ?_ ?_
