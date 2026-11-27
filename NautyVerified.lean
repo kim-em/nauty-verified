@@ -19,3 +19,4 @@ import NautyVerified.Statement.Dense
 import NautyVerified.Statement.Compiler
 import NautyVerified.Logic.Array
 import NautyVerified.Proofs.Orbjoin.Chase
+import NautyVerified.Proofs.Orbjoin.Join
