@@ -109,6 +109,7 @@ import NautyVerified.Proofs.Search.Node.FirstHex
 import NautyVerified.Proofs.Search.Node.OkFirst
 import NautyVerified.Proofs.Search.Node.Prune
 import NautyVerified.Proofs.Search.Node.Realloc
+import NautyVerified.Proofs.Search.Node.Target
 import NautyVerified.Proofs.Search.Node.InvSteps
 import NautyVerified.Proofs.Search.Frame
 import NautyVerified.Proofs.Harness.Spec
