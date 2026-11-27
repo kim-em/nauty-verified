@@ -225,4 +225,192 @@ theorem wp_cellLoopN {Q : Post} {le : temp_env} {m0 m : mem} {n : Nat} {L : Loc}
     · rw [temps_gss]; push_cast; rfl
     · exact { hP with tmp := hP.tmp.set _ (by decide) }
 
+/-- The splitter's set after its first `k` members. -/
+def wsPre {n : Nat} (lab : Array Nat) (split1 k : Nat) : VSet n :=
+  (List.range k).foldl (fun w o => w.insert lab[split1 + o]!) .empty
+
+theorem wsPre_succ {n : Nat} (lab : Array Nat) (split1 k : Nat) :
+    (wsPre lab split1 (k + 1) : VSet n) = (wsPre lab split1 k : VSet n).insert lab[split1 + k]! := by
+  simp [wsPre, List.range_succ]
+
+theorem wp_fillWS {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc} {lab : Array Nat}
+    {split1 split2 : Nat} {w0 : Nat → Lib.Integers.int64}
+    (hok : Ok n L) (hs1 : PTree.get dense.id.split1 le = some (.Vint (ir split1)))
+    (hs2 : PTree.get dense.id.split2 le = some (.Vint (ir split2)))
+    (hlabp : PTree.get dense.id.lab le = some (.Vptr L.bl L.lofs))
+    (hlarr : ArrayAt m .Mint32 L.bl L.lb (ints lab) n) (hlabs : ∀ i < n, lab[i]! < n)
+    (h12 : split1 ≤ split2) (h2n : split2 < n)
+    (hwsA : ArrayAt m .Mint64 L.bS 0 (longs w0) L.M)
+    (hwsR : SetRep (fun w => bv64 (w0 w)) L.M (VSet.empty : VSet n))
+    (hwsp : Mem.load .Mint64 m Block.naugraphWorkset (zOfInt 0) = some (.Vptr L.bS Ptrofs.zero))
+    (hbit : Set.BitTable m Block.naugraphBit)
+    (hQ : ∀ le' m' w', ArrayAt m' .Mint64 L.bS 0 (longs w') L.M →
+      SetRep (fun w => bv64 (w' w)) L.M (worksetOf n lab split1 split2) →
+      Unch m m' (· = L.bS) → Keep m m' L.bS →
+      (∀ z, z ≠ dense.id.i → PTree.get z le' = PTree.get z le) → Q.normal E0 empty_env le' m') :
+    Wp xi ge Source.dense.fn.refine fillWS Q empty_env le m := by
+  have hn := hok.nlt
+  have hnM := hok.nM
+  have hMl := hok.Mlt
+  have d := hok.wd
+  let len := split2 + 1 - split1
+  let I := fun (v : Nat) (t : trace) (e' : env) (le' : temp_env) (m' : mem) => t = E0 ∧
+    e' = empty_env ∧ ∃ k w, k ≤ len ∧ v = len - k ∧
+      PTree.get dense.id.i le' = some (.Vint (ir (split1 + k : Nat))) ∧
+      ArrayAt m' .Mint64 L.bS 0 (longs w) L.M ∧
+      SetRep (fun x => bv64 (w x)) L.M (wsPre lab split1 k : VSet n) ∧
+      Unch m m' (· = L.bS) ∧ Keep m m' L.bS ∧
+      (∀ z, z ≠ dense.id.i → PTree.get z le' = PTree.get z le)
+  let J := fun (v : Nat) (t : trace) (e' : env) (le' : temp_env) (m' : mem) => t = E0 ∧
+    e' = empty_env ∧ ∃ k w, k < len ∧ v = len - k ∧
+      PTree.get dense.id.i le' = some (.Vint (ir (split1 + k : Nat))) ∧
+      ArrayAt m' .Mint64 L.bS 0 (longs w) L.M ∧
+      SetRep (fun x => bv64 (w x)) L.M (wsPre lab split1 (k + 1) : VSet n) ∧
+      Unch m m' (· = L.bS) ∧ Keep m m' L.bS ∧
+      (∀ z, z ≠ dense.id.i → PTree.get z le' = PTree.get z le)
+  simp only [fillWS, Set.sk]
+  wp_step; wp_step; wp_step
+  apply wp_set_eval
+  simp only [Exec.evalExpr, hs1, E0_append]
+  refine wp_loop (I := I) (J := J) ?_ ?_ (n := len) ⟨rfl, rfl, 0, w0, Nat.zero_le _, rfl,
+    by simp, hwsA, by simpa [wsPre] using hwsR, Unch.refl _ _, Keep.refl _ _,
+    fun z hz => temps_gso _ _ hz⟩
+  · rintro v t e' le' m' ⟨rfl, rfl, k, w, hk, rfl, hik, hwk, hrk, hu, hkp, ho⟩
+    have hs2' : PTree.get dense.id.split2 le' = some (.Vint (ir split2)) := by
+      rw [ho _ (by decide)]; exact hs2
+    wp_step; wp_step; wp_step
+    apply wp_if_eval
+    simp only [Exec.evalExpr, hik, hs2', typeof, cop]
+    rw [ir_lt (a := (split2 : Int)) (b := ((split1 + k : Nat) : Int)) ⟨by omega, by omega⟩
+      ⟨by omega, by omega⟩]
+    by_cases hkl : k = len
+    · rw [ite_eq_right (by simp; omega)]
+      apply wp_break
+      subst hkl
+      refine hQ le' m' w hwk ?_ hu hkp ho
+      have : (wsPre lab split1 (split2 + 1 - split1) : VSet n) = worksetOf n lab split1 split2 := rfl
+      rw [← this]; exact hrk
+    · rw [ite_eq_left (by simp; omega)]
+      apply wp_skip
+      have hlarr' := hlarr.unch hu d.bl_bS
+      have hlabp' : PTree.get dense.id.lab le' = some (.Vptr L.bl L.lofs) := by
+        rw [ho _ (by decide)]; exact hlabp
+      have hle := eval_at (ge := ge) (e := empty_env) hlarr' (by omega) dense.id.lab hlabp'
+        (tv dense.id.i) (split1 + k) (by omega) hik rfl
+      have hlk := hlabs (split1 + k) (by omega)
+      have hwsp' : Mem.load .Mint64 m' Block.naugraphWorkset (zOfInt 0) =
+          some (.Vptr L.bS Ptrofs.zero) := by rw [hu.load _ _ _ (Ne.symm d.bS_g2)]; exact hwsp
+      refine Set.wp_addElementG rfl find_naugraphWorkset hwsp' (by exact hwk) (by omega) hle rfl
+        (by omega) (by omega) rfl find_naugraphBit (hbit.unch hu (Ne.symm d.bS_g6)) ?_
+      intro m1 hw1 hu1 _ hk1
+      refine ⟨by simp, rfl, k, Set.addW w lab[split1 + k]!, by omega, rfl, hik, hw1, ?_,
+        hu.trans hu1, hkp.trans hk1, ho⟩
+      rw [wsPre_succ]
+      exact Set.setRep_add hrk hlk
+  · rintro v t e' le' m' ⟨rfl, rfl, k, w, hk, rfl, hik, hwk, hrk, hu, hkp, ho⟩
+    wp_step; wp_step
+    apply wp_set_eval
+    simp only [Exec.evalExpr, hik, typeof, cop, ir_add]
+    refine ⟨len - (k + 1), by omega, by simp, rfl, k + 1, w, by omega, rfl, ?_, hwk, hrk, hu, hkp,
+      fun z hz => by rw [temps_gso _ _ hz, ho z hz]⟩
+    rw [temps_gss]; push_cast; rw [Int.add_assoc]
+
+/-- `refine`'s pass for a nontrivial splitting cell is HexGraphIso's `refineNontrivial`. -/
+theorem wp_nontrivial : NontrivialPass xi := by
+  intro n Q le m L ctx st aw split1 split2 hok hcS hm ht hi hnc hs1 hs2 h12 hse h2n hQ
+  have d := hok.wd
+  have hn := hok.nlt
+  have hnM := hok.nM
+  have hMl := hok.Mlt
+  have hM1 := hok.M1
+  have hso := hi.ok
+  have hlabs : ∀ i < n, st.lab[i]! < n := fun i hi' => hso.labOk i (by rw [hso.labSize]; exact hi')
+  -- EMPTYSET(workset, m)
+  obtain ⟨v0, hv0⟩ := malloced_array (hm.dS.mal (by omega)) .Mint64 8 rfl rfl L.M
+    (Nat.mul_le_mul_left 8 hcS)
+  have hwsp := hm.dS.ptr (by omega)
+  simp only [nontrivial]
+  wp_step
+  refine Set.wp_emptySetG (g := dense.id.«naugraph:workset») (mv := dense.id.m) (es := dense.id.es_)
+    (tmp := idOf 717) (by decide) rfl find_naugraphWorkset hwsp (Ne.symm d.bS_g2) hv0 hM1 (by omega)
+    ht.m ?_
+  intro le1 m1 hw1 hu1 _ hk1 g1
+  have hm1 : Mem m1 L ctx st aw := by
+    obtain ⟨cv, hcv⟩ := hm.cnt
+    have nS : ∀ {z}, L.bS ≠ z → ¬ (z = L.bS) := fun h1 h => h1 h.symm
+    exact hm.frame hok (hu1.mono fun z hz => .inr (.inr (.inr (.inr (.inr (.inr (.inl hz)))))))
+      (Keep.unch hu1 d.bW_bS) hk1 (Keep.unch hu1 (Ne.symm d.bS_bB)) (hm.lab.unch hu1 d.bl_bS)
+      (hm.ptn.unch hu1 d.bp_bS) (hm.nc.unch hu1 d.bn_bS) (hm.act.unch hu1 d.ba_bS) hm.actRep
+      ⟨cv, hcv.unch hu1 d.bc_bS⟩
+  have ht1 : Tmp le1 L st := ht.away [dense.id.es_, idOf 717] (by decide) fun z hz => by
+    simp only [List.mem_cons, List.not_mem_nil, or_false, not_or] at hz
+    exact g1 z hz.1 hz.2
+  have hwsp1 : Mem.load .Mint64 m1 Block.naugraphWorkset (zOfInt 0) =
+      some (.Vptr L.bS Ptrofs.zero) := by rw [hu1.load _ _ _ (Ne.symm d.bS_g2)]; exact hwsp
+  wp_step
+  refine wp_fillWS (lab := st.lab) hok (by rw [g1 _ (by decide) (by decide)]; exact hs1)
+    (by rw [g1 _ (by decide) (by decide)]; exact hs2) ht1.lab hm1.lab hlabs (by omega) h2n hw1
+    (Set.setRep_zero hnM) hwsp1 hm1.bit ?_
+  intro le2 m2 w2 hw2 hr2 hu2 hk2 g2
+  have hm2 : Mem m2 L ctx st aw := by
+    obtain ⟨cv, hcv⟩ := hm1.cnt
+    exact hm1.frame hok (hu2.mono fun z hz => .inr (.inr (.inr (.inr (.inr (.inr (.inl hz)))))))
+      (Keep.unch hu2 d.bW_bS) hk2 (Keep.unch hu2 (Ne.symm d.bS_bB)) (hm1.lab.unch hu2 d.bl_bS)
+      (hm1.ptn.unch hu2 d.bp_bS) (hm1.nc.unch hu2 d.bn_bS) (hm1.act.unch hu2 d.ba_bS) hm1.actRep
+      ⟨cv, hcv.unch hu2 d.bc_bS⟩
+  have ht2 : Tmp le2 L st := ht1.temps fun x hx => g2 x (by
+    rcases hx with hx | rfl | rfl | rfl
+    · intro h; subst h; revert hx; decide
+    all_goals decide)
+  have gs : ∀ z, z ≠ dense.id.i → z ≠ dense.id.es_ → z ≠ idOf 717 →
+      PTree.get z le2 = PTree.get z le := fun z h1 h2 h3 => by rw [g2 z h1, g1 z h2 h3]
+  -- MASH(longcode, split2 - split1 + 1)
+  wp_step; wp_step; wp_step
+  refine wp_mash ht2.longcode hi.code (i := split2 - split1 + 1) ?_ rfl (by omega) ?_
+  · simp only [Exec.evalExpr, typeof, cop]
+    rw [gs _ (by decide) (by decide) (by decide), gs _ (by decide) (by decide) (by decide), hs1, hs2]
+    simp only [cop, ir_sub, ir_add]
+    congr 3; omega
+  let st1 : RefineSt n := { st with longcode := Hex.GraphIso.Nauty.mash st.longcode (split2 - split1 + 1) }
+  have ht3 := ht2.setCode (Hex.GraphIso.Nauty.mash st.longcode (split2 - split1 + 1))
+  wp_step; wp_step; wp_step
+  apply wp_set_eval
+  simp only [Exec.evalExpr]
+  have hR : refineNontrivial ctx L.level split1 split2 st =
+      refineNontrivialFast.go ctx L.level (worksetOf n st.lab split1 split2) st1.ptn n 0 st1 := by
+    rw [refineNontrivial_eq_fast]; rfl
+  refine wp_cellLoopN (st0 := st1) (stc := st1) (R := refineNontrivial ctx L.level split1 split2 st)
+    hok hcS ⟨hso.labSize, hso.labOk, hso.ptnSize, hso.ptnEnd⟩
+    { mem := ⟨aw, hm2.congr rfl rfl rfl rfl⟩
+      unch := Unch.refl _ _
+      tmp := ht3.set _ (by decide)
+      wsA := hw2
+      wsR := hr2
+      pn := Nat.zero_le _
+      fuel := ⟨n, by omega, hR⟩
+      agree := fun _ _ _ => rfl
+      ok := ⟨hso.labSize, hso.labOk, hso.ptnSize, hso.ptnEnd⟩
+      small := hi.ptnSmall
+      nc := Nat.le_add_right _ _
+      hint := hi.hint
+      maxpos := hi.maxpos
+      code := by have := mash_lt st.longcode (split2 - split1 + 1); exact Nat.lt_trans this (by decide) }
+    (by rw [temps_gss]; rfl) ?_
+  intro le' m' hP
+  obtain ⟨aw', hm'⟩ := hP.mem
+  refine hQ le' m' ⟨aw', hm', hP.tmp,
+    { ok := hP.ok, ptnSmall := hP.small,
+      ncSmall := by have := hP.nc; have h2 : st1.numcells = st.numcells := rfl; omega,
+      hint := hP.hint, maxpos := hP.maxpos, code := hP.code }⟩ ?_
+  refine ((hu1.trans hu2).mono fun z hz => .inr (.inr (.inr (.inr (.inr (.inr (.inl hz))))))).trans
+    (hP.unch.mono fun z hz => ?_)
+  rcases hz with h | h | h | h | h | h | h
+  · exact .inl h
+  · exact .inr (.inl h)
+  · exact .inr (.inr (.inl h))
+  · exact .inr (.inr (.inr (.inl h)))
+  · exact .inr (.inr (.inr (.inr (.inl h))))
+  · exact .inr (.inr (.inr (.inr (.inr (.inl h)))))
+  · exact .inr (.inr (.inr (.inr (.inr (.inr (.inr h))))))
+
 end NautyVerified.Proofs.Refine
