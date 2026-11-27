@@ -6,7 +6,10 @@ HexGraphIso's correctness theorems (canonical form is a complete isomorphism
 invariant; the emitted generators generate the automorphism group; orbits are
 correct) hold of nauty itself and of the x86-64 program compiled from it.
 
-**Status: Phase 0 (setup).** No theorem about nauty is proved here yet. The
+**Status: Phase 1 done.** The C sources are Lean terms, linked into one
+program whose Clight form is pinned by kernel-checked equations against
+CompCert4Lean's own passes; the binary built from it reproduces every
+fixture. No theorem about nauty's behaviour is proved yet. The
 plan is [docs/PLAN.md](docs/PLAN.md); the experiments that motivated it are in
 [docs/feasibility-2026-11.md](docs/feasibility-2026-11.md).
 
@@ -23,7 +26,10 @@ plan is [docs/PLAN.md](docs/PLAN.md); the experiments that motivated it are in
 
 Trusted, outside the proofs: Lean's kernel; CompCert's C frontend
 (preprocessor, parser, elaboration); CompCert4Lean's x86-64 assembly semantics,
-assembly expansion and printer; the assembler and linker; `io_stdio.c`; and
+assembly expansion and printer; the assembler and linker; the identifier
+renaming and C linking that combine the translation units into one program
+(`NautyVerified/Source/Link.lean`), as a model of what the system linker does;
+`io_stdio.c`; and
 CompCert's memory model, in which allocation never fails and the stack is
 unbounded.
 
@@ -38,7 +44,9 @@ the zero-filling `c/harness/zalloc.c`; nauty's sources are not modified.
 | `c/nauty-2.9.3/` | pinned nauty sources |
 | `c/harness/` | `dense_main.c` (the verified program's `main`), `zalloc.c`, `nv_io.h`; `io_stdio.c` for native runs only |
 | `c/flags.sh` | the one build configuration |
-| `NautyVerified/` | the Lean development |
+| `c/csyntax/` | the CompCert frontend's output for each unit (generated, committed) |
+| `NautyVerified/Source/` | the units as Lean terms, their linking, and the pinned Clight |
+| `NautyVerified/Build/` | `nvCompile`, which compiles the linked program |
 | `tests/fixtures/` | graphs (`.json`) and recorded harness output (`.out`) |
 | `scripts/` | native test runner, fixture generators, trust check |
 
@@ -48,6 +56,14 @@ the zero-filling `c/harness/zalloc.c`; nauty's sources are not modified.
 lake build                    # Lean development
 scripts/run_native.sh         # native harness against tests/fixtures
 scripts/check_trust.sh        # no axiom, no native_decide, sorry only where listed
+```
+
+Regenerating `c/csyntax/` and building the verified binary need a prepared
+CompCert checkout and OCaml, as for CompCert4Lean's `scripts/compile_c.py`:
+
+```sh
+scripts/export_csyntax.sh COMPCERT4LEAN_CHECKOUT COMPCERT_CHECKOUT
+scripts/build_binary.sh COMPCERT4LEAN_CHECKOUT COMPCERT_CHECKOUT OUT_DIR --check
 ```
 
 ## Licence

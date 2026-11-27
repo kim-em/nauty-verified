@@ -34,16 +34,17 @@ In repo `kim-em/nauty-verified` (working name):
 
 ```
 theorem densenauty_binary_correct (G : HexGraphIso.Colored n k) (hn : n ≤ maxN) :
-  ∀ beh ∈ Asm.semantics xi (compiledDense),          -- CompCert4Lean output for the pinned C
-    Inputs.consistent G beh →                         -- volatile input reads supply encode G,
+  transf_c_program cfg … dense.program = .OK tp →       -- the binary of scripts/build_binary.sh
+  ∀ beh, program_behaves (Asm.semantics cfg xi tp) beh →
+    Inputs.consistent G beh →                         -- nv_read calls return encode G,
                                                       -- nauty_kill_request reads return 0
     beh = Terminates (Out.trace (HexGraphIso.Nauty.runColoredTraced G) ...) _
 ```
 
-where the harness reads the graph through volatile loads of a designated
-input global and writes results through volatile stores (CompCert records
-both as trace events, which is what its whole-program backward simulation
-preserves). Outputs: canonical labelling, canonical graph rows, emitted
+where `dense.program` is the linked program of Phase 1 and the harness reads
+the graph through calls to the external function `nv_read` and writes results
+through `nv_write` (CompCert records both as trace events, which is what its
+whole-program backward simulation preserves). Outputs: canonical labelling, canonical graph rows, emitted
 generators in order, orbits, the seven statistics. Corollaries restate
 `canon_invariant`, `iso_iff_canon_eq`, `Aut.complete`, orbit correctness for
 the binary (the Mathlib-facing ones via `hex-graph-iso-theory`). Group order
@@ -51,7 +52,8 @@ is out of scope (nauty's is a rounded double; Hex computes its own).
 
 Explicit assumptions in the trusted base: Lean kernel; CompCert's OCaml
 frontend (preprocessor, parser, elaboration to Csyntax); CompCert4Lean's
-x86-64 Asm semantics, Asmexpand, printer, assembler and linker; CompCert's
+x86-64 Asm semantics, Asmexpand, printer, assembler and linker; the
+renaming and C linking of Phase 1 as a model of the system linker; CompCert's
 infinite-memory model (allocation never fails, no stack overflow); the
 input/kill-flag environment assumption; `maxN` from `int` overflow bounds.
 
@@ -78,31 +80,53 @@ input/kill-flag environment assumption; `maxN` from `int` overflow bounds.
   run them on fixtures. Mirror hex's bans: no `axiom`, no `native_decide`,
   `sorry` only on a tracked list that must shrink.
 
-## Phase 1: C to CompCert4Lean terms
+## Phase 1: C to CompCert4Lean terms (done)
 
-1. **Csyntax exporter.** A `-lean` printer for CompCert's OCaml frontend
-   that emits a Lean term of `CompCert4Lean.Cfrontend.Csyntax.program` plus
-   its `SimplExpr.FreshIdentContext`. Templates: CLean's
-   `/tmp/survey-clean/export/ExportLean{Base,Ctypes,Clight}.ml`; vocabulary
-   from CompCert4Lean's generated codecs (`Prototype/Codecs.lean`,
-   `bridge/codecs.ml`, `scripts/generate_codecs.py`). Literals as Rocq
-   `Z`/`positive`/`RocqString`; `prog_comp_env_eq` by `decide`/`rfl`.
-   One module per translation unit; namespaced; header records input SHA-256s
-   and flags. Lives in the fork (upstreamable) or `tools/`.
-2. **Agreement with the existing ingestion.** Lean test: the printed term
-   equals `decodeSource` of the bridge's JSON for the same file (evaluated).
-3. **Clight by CompCert4Lean's own passes.** Define
-   `clight := SimplLocals (SimplExpr p)` per function; pin each function's
-   Clight body with a kernel-checked equality. Risk: kernel cost on nauty's
-   largest functions (`refine`, `othernode`). Measure first on `nautil.c`;
-   fallback is per-function lemmas with `decide := true` unfolding, or
-   printing the Clight from extracted OCaml and proving equality.
-4. **Link** the translation units (CompCert4Lean `Common/Linking.lean`,
-   `Ctypes.Linker_program`), resolving nauty's file-local statics
-   (`workperm` appears in several files).
+1. **Csyntax files.** `scripts/export_csyntax.sh` runs CompCert4Lean's
+   frontend bridge on each translation unit and writes
+   `c/csyntax/<unit>.json`, the interchange file the compiler driver itself
+   consumes, extended (in the `kim-em/compcert4lean` branch `nauty-verified`)
+   with the C name of every identifier. The files are committed; regeneration
+   is byte-identical.
+2. **Units as Lean definitions.** `c_unit u from "c/csyntax/u.json"`
+   (`NautyVerified/Source/Unit.lean`) decodes the file at elaboration time with
+   the driver's own decoder (`Prototype.decodeSource`) and adds the program as
+   closed constructor terms via derived `ToExpr` (`u.program`, one constant per
+   global definition, `u.id.<c_name>`). Because the decoder is the one the
+   driver runs, no separate printer or agreement test is needed.
+3. **Clight by CompCert4Lean's own passes.** `u.clight` and `u.locals` are the
+   outputs of `SimplExpr.transl_program` and `SimplLocals.transf_program`
+   (for every configuration with debug information off), pinned by
+   `u.clight_eq` and `u.locals_eq`, which are `Eq.refl` checked by the kernel
+   alone (elaborator `rfl` exhausts its recursion budget). Kernel cost is small:
+   1 to 2 seconds per equation even for `nauty.c`.
+4. **Linking.** CompCert4Lean proves only whole-program preservation, so the
+   binary is one whole-program compile of the linked program rather than
+   per-unit objects joined by the system linker. `c_link dense := dense_main
+   nauty nautil naugraph schreier naurng zalloc` (`Source/Link.lean`):
+   - gives every C name one shared identifier; a global with `static` storage
+     is keyed `unit:name` (file-local), every other name by itself;
+   - renames each unit by position (`Source/Rename.lean`): global symbol
+     positions (definitions, public names, `main`, address-of initialisers,
+     variables not bound by the enclosing function) take the global key,
+     other identifiers (members, tags, labels, parameters, locals) the plain
+     name, since the frontend uses one identifier per name whatever it denotes;
+   - links the renamed units left to right with CompCert's
+     `Ctypes.link_program`; `dense.link_eq : linkUnits [...] = some
+     dense.program` is kernel-checked (on the program's parts, the composite
+     environment following by `eq_of_parts`);
+   - pins `dense.clight` and `dense.locals` as for a unit.
+5. **Binary.** `scripts/build_binary.sh` compiles `dense.program` with
+   `transf_c_program` at the driver's O0 configuration (`nvCompile`,
+   `NautyVerified/Build/Compile.lean`), prints it with the bridge's
+   `print_named` operation (supplied names, printer defaults for sections and
+   alignment, every symbol global; static `name` of `unit` printed
+   `name.unit`), and links it with `io_stdio.c` and CompCert's runtime
+   library. It reproduces all 52 fixtures.
 
-Acceptance: `lake build` elaborates all units; CI regeneration is
-byte-identical; the term/JSON agreement test passes.
+Trust added by this phase: the renaming and `link_program` model what the
+system linker does with the units (file-local statics distinct, everything
+else shared by name).
 
 ## Phase 2: program logic on CompCert4Lean's Clight
 

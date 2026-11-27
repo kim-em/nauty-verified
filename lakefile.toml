@@ -4,7 +4,7 @@ defaultTargets = ["NautyVerified"]
 [[require]]
 name = "compcert4lean"
 git = "https://github.com/kim-em/compcert4lean.git"
-rev = "a4ce530aeebf4380b4385096027627b9e407786f"  # branch toolchain-v4.35.0-rc3
+rev = "2cb65ed92dc6228a5be3bbbfa5ee96e1b3602c7f"  # branch nauty-verified
 
 [[require]]
 name = "hex-graph-iso"
@@ -13,3 +13,7 @@ rev = "v0.10.0"
 
 [[lean_lib]]
 name = "NautyVerified"
+
+[[lean_exe]]
+name = "nvCompile"
+root = "NautyVerified.Build.Main"
