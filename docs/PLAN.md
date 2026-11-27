@@ -167,6 +167,14 @@ distinct blocks, a few statics) does not need a frame rule.
   `extcall_properties.ec_determ`, so the execution the logic produces is the
   only one consistent with the inputs.
 
+- **Fork changes for symbolic execution** (`kim-em/compcert4lean`, branch
+  `nauty-verified`): public residue and comparison lemmas in
+  `Lib/Integers.lean`; `ident`, `block`, `PTree.t`, `env` and `temp_env` made
+  abbreviations, because terms mixing them with `positive` or `PTree.tree`
+  are type-correct only after unfolding, and `simp` refuses to rewrite such
+  goals. Literal words are emitted at their exact type (`Int.repr`,
+  `Int64.repr`, `Ptrofs.repr`) for the same reason.
+
 Acceptance: `nextelement` proved against Hex's `VSet.nextElem` specification
 on this base; interpreter agreement (done).
 

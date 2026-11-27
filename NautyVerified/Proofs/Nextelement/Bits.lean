@@ -109,4 +109,21 @@ theorem tst_iff (x : BitVec 64) (C : _root_.Int) (k hi : Nat)
 
 macro "mask_tac" : tactic => `(tactic| exact mask_bits _ _ _ (by decide) (by decide) (by decide +kernel))
 
+/-! The seven masks as the code writes them (unsigned literals). -/
+
+theorem k32 : ∀ i, (BitVec.ofInt 64 18446744069414584320).toNat.testBit i =
+    decide (32 ≤ i ∧ i < 64) := by mask_tac
+theorem k48 : ∀ i, (BitVec.ofInt 64 18446462598732840960).toNat.testBit i =
+    decide (48 ≤ i ∧ i < 64) := by mask_tac
+theorem k56 : ∀ i, (BitVec.ofInt 64 18374686479671623680).toNat.testBit i =
+    decide (56 ≤ i ∧ i < 64) := by mask_tac
+theorem k40 : ∀ i, (BitVec.ofInt 64 280375465082880).toNat.testBit i =
+    decide (40 ≤ i ∧ i < 48) := by mask_tac
+theorem k16 : ∀ i, (BitVec.ofInt 64 4294901760).toNat.testBit i =
+    decide (16 ≤ i ∧ i < 32) := by mask_tac
+theorem k24 : ∀ i, (BitVec.ofInt 64 4278190080).toNat.testBit i =
+    decide (24 ≤ i ∧ i < 32) := by mask_tac
+theorem k8 : ∀ i, (BitVec.ofInt 64 65280).toNat.testBit i =
+    decide (8 ≤ i ∧ i < 16) := by mask_tac
+
 end NautyVerified.Proofs.Nextelement

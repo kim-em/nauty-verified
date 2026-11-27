@@ -91,4 +91,14 @@ theorem bvp_inj {x y : Lib.Integers.ptrofs} : bvp x = bvp y ↔ x = y := toBV_in
     intOfZ_Int64_unsigned]
   exact ofInt_toNat (bv64 y)
 
+theorem Int_add_repr (a b : Z) :
+    Lib.Integers.Int.add (Lib.Integers.Int.repr a) (Lib.Integers.Int.repr b) =
+      Lib.Integers.Int.repr (ZArith.BinInt.Z.add a b) :=
+  bv32_inj.1 (by simp [BitVec.ofInt_add])
+
+theorem Int64_add_repr (a b : Z) :
+    Lib.Integers.Int64.add (Lib.Integers.Int64.repr a) (Lib.Integers.Int64.repr b) =
+      Lib.Integers.Int64.repr (ZArith.BinInt.Z.add a b) :=
+  bv64_inj.1 (by simp [BitVec.ofInt_add])
+
 end NautyVerified.Word

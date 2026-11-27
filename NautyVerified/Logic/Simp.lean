@@ -1,4 +1,4 @@
-import CompCert4Lean.Lib.Maps
+import CompCert4Lean.Cfrontend.Clight
 
 /-!
 # Simplification lemmas for symbolic execution
@@ -22,5 +22,16 @@ open CompCert4Lean.Lib.Maps
 
 @[simp] theorem ptree_gempty {A : Type} (i : positive) : PTree.get i (PTree.empty A) = none :=
   PTree.gempty A i
+
+/-! The same for Clight's temporaries and local environments, whose types are
+definitions of `PTree.t` (so the generic lemmas do not match them syntactically). -/
+
+open CompCert4Lean.Cfrontend.Clight CompCert4Lean.Common.Values in
+@[simp] theorem temps_gss (i : positive) (v : val) (le : temp_env) :
+    PTree.get i (PTree.set i v le) = some v := PTree.gss i v le
+
+open CompCert4Lean.Cfrontend.Clight CompCert4Lean.Common.Values in
+@[simp] theorem temps_gso {i j : positive} (v : val) (le : temp_env) (h : i ≠ j := by decide) :
+    PTree.get i (PTree.set j v le) = PTree.get i le := PTree.gso v le h
 
 end NautyVerified.Logic
