@@ -91,6 +91,8 @@ import NautyVerified.Proofs.Search.Node.Spec
 import NautyVerified.Proofs.Search.Node.OtherHex
 import NautyVerified.Proofs.Search.Node.Rebuild
 import NautyVerified.Proofs.Search.Node.OkOff
+import NautyVerified.Proofs.Search.Node.FirstHex
+import NautyVerified.Proofs.Search.Node.OkFirst
 import NautyVerified.Proofs.Search.Frame
 import NautyVerified.Proofs.Harness.Spec
 import NautyVerified.Proofs.Search.Node.Firstpathnode
