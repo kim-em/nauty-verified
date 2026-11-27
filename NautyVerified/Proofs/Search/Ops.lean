@@ -74,6 +74,65 @@ theorem wp_gstoreV {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
     simp only [elemOfs, intOfZ_zOfInt, show csize .Mint32 = 4 from rfl]; omega))
     (fun z hz => Mem.store_valid_block_1 _ _ _ _ _ _ hst _ hz)
 
+/-- `p[a] = rhs` for an `int *` temporary, with validity preserved. -/
+theorem wp_storeV {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {bo : block}
+    {ofs : ptrofs} {o : Array Nat} {n : Nat}
+    (harr : ArrayAt m .Mint32 bo (intOfZ (Ptrofs.unsigned ofs)) (ints o) n)
+    (hn : n < 2147483648) (p : Common.AST.ident) (hp : PTree.get p le = some (.Vptr bo ofs))
+    (a : expr) (c : Nat) (hc : c < n)
+    (ha : Exec.evalExpr ge e le m a = some (.Vint (ir c))) (hty : typeof a = tint)
+    (rhs : expr) (x : Int) (hrhs : Exec.evalExpr ge e le m rhs = some (.Vint (ir x)))
+    (hrty : typeof rhs = tint)
+    (hQ : ∀ m', ArrayAt m' .Mint32 bo (intOfZ (Ptrofs.unsigned ofs)) (upd (ints o) c (.Vint (ir x))) n →
+      Unch m m' (· = bo) → (∀ z, Mem.valid_block m z → Mem.valid_block m' z) → Q.normal E0 e le m') :
+    Wp xi ge f (.Sassign (.Ederef (.Ebinop .Oadd (.Etempvar p (tptr tint)) a (tptr tint)) tint) rhs)
+      Q e le m := by
+  have haddr : Ptrofs.unsigned (Ptrofs.add ofs (Ptrofs.mul (Ptrofs.repr
+      (Cfrontend.Ctypes.sizeof ge.genv_cenv tint)) (Ptrofs.of_ints (ir c)))) =
+      elemOfs .Mint32 (intOfZ (Ptrofs.unsigned ofs)) c := by
+    apply addr_elem ofs _ .Mint32 rfl rfl (by omega)
+    have hf := harr.fits
+    have h4 : csize .Mint32 = 4 := rfl
+    rw [h4] at hf ⊢
+    omega
+  obtain ⟨m', hst, harr', -⟩ := store_array harr hc (.Vint (ir x)) rfl
+  apply wp_assign_eval
+  simp only [Exec.evalLvalue, Exec.evalExpr, hp, ha, hty, hrhs, hrty]
+  simp only [typeof, cop, Exec.assignLoc, Cfrontend.Ctypes.access_mode]
+  show match Mem.store .Mint32 m bo (Ptrofs.unsigned _) _ with
+    | some m' => Q.normal E0 e le m' | none => False
+  rw [haddr, hst]
+  exact hQ m' harr' (Unch.store hst rfl) (fun z hz => Mem.store_valid_block_1 _ _ _ _ _ _ hst _ hz)
+
+/-- `if (c) g = rhs;` for a static `int` `g` holding `v`: afterwards it holds
+`if c then x else v`. -/
+theorem wp_clamp {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {g : ident}
+    {b : block} {v : Int} (hge : PTree.get g e = none)
+    (hg : Genv.find_symbol ge.genv_genv g = some b) (hI : IntAt m b v) {cond rhs : expr}
+    {c : Bool} (hc : Exec.evalExpr ge e le m cond = some (Val.of_bool c)) (hct : typeof cond = tint)
+    {x : Int} (hr : Exec.evalExpr ge e le m rhs = some (.Vint (ir x))) (hrt : typeof rhs = tint)
+    (hQ : ∀ m', IntAt m' b (if c then x else v) → Unch m m' (· = b) →
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) → Q.normal E0 e le m') :
+    Wp xi ge f (.Ssequence .Sskip (.Sifthenelse cond (.Ssequence .Sskip (.Sassign (.Evar g tint) rhs))
+      .Sskip)) Q e le m := by
+  wp_step; wp_step
+  apply wp_if_eval
+  rw [hc, hct]
+  simp only [cop]
+  cases c
+  · simp only [Bool.false_eq_true, ite_false]
+    exact wp_skip (hQ m (by simpa using hI) (Unch.refl _ _) fun _ h => h)
+  · simp only [ite_true]
+    wp_step; wp_step
+    exact wp_gint hge hg hI.writable hr hrt fun m' hI' hu hv => hQ m' (by simpa using hI') hu hv
+
+theorem IntAt.ite_nat {m : mem} {b : block} {p : Prop} [Decidable p] {x y : Nat}
+    (h : IntAt m b (if decide p = true then (x : Int) else (y : Int))) :
+    IntAt m b ((if p then x else y : Nat) : Int) := by
+  by_cases hp : p
+  · simp only [hp, decide_true, ite_true] at h ⊢; exact h
+  · simp only [hp, decide_false, Bool.false_eq_true, ite_false] at h ⊢; exact h
+
 /-! ## `short` values -/
 
 theorem ir_shl16 {a : _root_.Int} (h0 : 0 ≤ a) (ha : a < 32768) :

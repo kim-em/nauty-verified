@@ -84,6 +84,10 @@ theorem _root_.NautyVerified.Logic.Unch.snoc {m m₁ m₂ : mem} {w : List block
   (h.mono fun _ hz => List.mem_cons_of_mem _ hz).trans
     (hu.mono fun _ hz => by rw [hz]; exact List.mem_cons_self)
 
+theorem _root_.NautyVerified.Logic.Unch.sub {m m' : mem} {l l' : List block}
+    (h : Unch m m' (· ∈ l)) (hs : ∀ z ∈ l, z ∈ l') : Unch m m' (· ∈ l') :=
+  h.mono fun z hz => hs z hz
+
 /-- Carry facts `h₁ …` across `hu : Unch m m' (· = b)`, each about a block other than `b`
 (distinctness from `hd`). -/
 macro "fwd " hd:ident ppSpace hu:ident " [" hs:ident* "]" : tactic => do

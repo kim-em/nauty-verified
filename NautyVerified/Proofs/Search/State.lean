@@ -315,6 +315,12 @@ structure SInv {n : Nat} (st : Search n) : Prop where
   canoncodeSize : st.canoncode.size = n + 2
   firsttcSize : st.firsttc.size = n + 2
   canongSize : st.canong.size = n
+  /-- The level-valued statics fit nauty.c's `int`s. -/
+  scalars : st.gcaFirst < 2147483648 ∧ st.gcaCanon < 2147483648 ∧
+    st.noncheaplevel < 2147483648 ∧ st.allsamelevel < 2147483648 ∧
+    st.eqlevFirst < 2147483648 ∧ -1 ≤ st.eqlevCanon ∧ st.eqlevCanon < 2147483648 ∧
+    -1 ≤ st.compCanon ∧ st.compCanon ≤ 1 ∧ st.canonlevel < 2147483648 ∧
+    st.stabvertex < 2147483648 ∧ st.cosetindex < 2147483648
 
 /-- Memory holds HexGraphIso's search state `st` for the graph `ctx`. -/
 structure SearchAt {n : Nat} (m : mem) (S : SLoc) (ctx : Ctx n) (st : Search n) (pre nsp : Bool) :

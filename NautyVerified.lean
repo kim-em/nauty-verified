@@ -98,6 +98,7 @@ import NautyVerified.Proofs.Search.Node.Tc
 import NautyVerified.Proofs.Search.Node.TcOps
 import NautyVerified.Proofs.Search.Node.Prologue
 import NautyVerified.Proofs.Search.Firstterminal.Satisfies
+import NautyVerified.Proofs.Search.Recover.Satisfies
 import NautyVerified.Proofs.Refine.Frame
 import NautyVerified.Proofs.Refine.Trivial
 import NautyVerified.Proofs.Refine.Pop
