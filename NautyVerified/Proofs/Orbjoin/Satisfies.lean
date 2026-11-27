@@ -28,7 +28,8 @@ def orbjoinSpec (bo : block) (ofs : ptrofs) (bm : block) (mofs : ptrofs) (o mp :
     bo ≠ bm ∧ n < 2147483648 ∧ (∀ i < n, mp[i]! < n) ∧ Descending o n
   post _ m t v m' := t = E0 ∧ v = .Vint (ir (Hex.GraphIso.Nauty.orbjoin o mp n).2) ∧
     ArrayAt m' .Mint32 bo (intOfZ (Ptrofs.unsigned ofs))
-      (ints (Hex.GraphIso.Nauty.orbjoin o mp n).1) n ∧ Unch m m' (· = bo)
+      (ints (Hex.GraphIso.Nauty.orbjoin o mp n).1) n ∧ Unch m m' (· = bo) ∧
+      Alloc.KeepA m m'
 
 def entryTemps (bo : block) (ofs : ptrofs) (bm : block) (mofs : ptrofs) (n : Nat) : temp_env :=
   PTree.set id.n (.Vint (ir n)) (PTree.set id.map (.Vptr bm mofs)
@@ -56,7 +57,7 @@ theorem orbjoin_satisfies {xi : ExternalCalls} (bo : block) (ofs : ptrofs) (bm :
     simp only [body]
     wp_step
     refine wp_joinLoop hf ?_
-    intro le1 m1 hf1 hu1
+    intro le1 m1 hf1 hu1 hk1
     simp only [E0_append]
     wp_step; wp_step; wp_step
     apply wp_set_eval
@@ -64,13 +65,13 @@ theorem orbjoin_satisfies {xi : ExternalCalls} (bo : block) (ofs : ptrofs) (bm :
     wp_step
     refine wp_compressLoop (hf1.temps fun k hk => ?_) (temps_gss _ _ _) ?_
     · rw [temps_gso _ _ (by rcases hk with rfl | rfl | rfl <;> decide)]
-    intro le2 m2 hf2 hj hu2
+    intro le2 m2 hf2 hj hu2 hk2
     simp only [E0_append]
     wp_step; wp_step
     apply wp_return_some_eval
     simp only [Exec.evalExpr, hj, typeof, cop, Source.dense.fn.orbjoin.fn_return_eq,
       Nextelement.free_empty]
     simp only [orbjoinSpec, orbjoin_eq]
-    exact ⟨trivial, trivial, hf2.arr, hu1.trans hu2⟩
+    exact ⟨trivial, trivial, hf2.arr, hu1.trans hu2, hk1.trans hk2⟩
 
 end NautyVerified.Proofs.Orbjoin

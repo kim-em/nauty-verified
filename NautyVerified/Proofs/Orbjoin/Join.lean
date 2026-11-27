@@ -1,3 +1,4 @@
+import NautyVerified.Proofs.Refine.Arr
 import NautyVerified.Proofs.Orbjoin.Chase
 
 /-!
@@ -49,7 +50,7 @@ theorem wp_joinStep {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem
     (h : Frame m le bo ofs bm mofs o mp n) {i : Nat} (hi : i < n)
     (hiv : PTree.get id.i le = some (.Vint (ir i)))
     (hQ : ∀ le' m', Frame m' le' bo ofs bm mofs (join mp n o i) mp n → Unch m m' (· = bo) →
-      PTree.get id.i le' = some (.Vint (ir i)) → Q.normal E0 e le' m') :
+      Alloc.KeepA m m' → PTree.get id.i le' = some (.Vint (ir i)) → Q.normal E0 e le' m') :
     Wp xi ge f joinStep Q e le m := by
   have hii : Exec.evalExpr ge e le m (tv id.i) = some (.Vint (ir i)) := hiv
   have hmi := eval_at h.marr h.nlt id.map h.hmap (tv id.i) i hi hii rfl
@@ -65,7 +66,7 @@ theorem wp_joinStep {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem
   · rw [ite_eq_right (by simp [hfix])]
     apply wp_skip
     have : join mp n o i = o := by simp [join, hfix]
-    exact hQ le m (by rw [this]; exact h) (Unch.refl _ _) hiv
+    exact hQ le m (by rw [this]; exact h) (Unch.refl _ _) (Alloc.KeepA.refl _) hiv
   · rw [ite_eq_left (by simp; omega)]
     have hoi := ints_lt h.desc hi
     wp_step; wp_step; wp_step
@@ -124,9 +125,9 @@ theorem wp_joinStep {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem
     by_cases hab : a < b
     · rw [ite_eq_left (by simpa using hab)]
       wp_step; wp_step
-      refine wp_store h2.arr h2.nlt id.orbits h2.horb (tv id.j2) b hblt hjb rfl (tv id.j1) a hja rfl ?_
-      intro m' harr' hu
-      apply hQ le2 m' _ hu hiv2
+      refine Refine.wp_storeV h2.arr h2.nlt id.orbits h2.horb (tv id.j2) b hblt hjb rfl (tv id.j1) a hja rfl ?_
+      intro m' harr' hu hk
+      apply hQ le2 m' _ hu hk hiv2
       rw [hjoin, if_pos hab]
       exact { h2 with
         arr := by rw [ints_set (by omega)]; exact harr'
@@ -141,9 +142,9 @@ theorem wp_joinStep {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem
       by_cases hba : b < a
       · rw [ite_eq_left (by simpa using hba)]
         wp_step; wp_step
-        refine wp_store h2.arr h2.nlt id.orbits h2.horb (tv id.j1) a halt hja rfl (tv id.j2) b hjb rfl ?_
-        intro m' harr' hu
-        apply hQ le2 m' _ hu hiv2
+        refine Refine.wp_storeV h2.arr h2.nlt id.orbits h2.horb (tv id.j1) a halt hja rfl (tv id.j2) b hjb rfl ?_
+        intro m' harr' hu hk
+        apply hQ le2 m' _ hu hk hiv2
         rw [hjoin, if_neg hab, if_pos hba]
         exact { h2 with
           arr := by rw [ints_set (by omega)]; exact harr'
@@ -151,7 +152,7 @@ theorem wp_joinStep {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem
           desc := h.desc.set halt (by omega) }
       · rw [ite_eq_right (by simpa using hba)]
         apply wp_skip
-        apply hQ le2 m _ (Unch.refl _ _) hiv2
+        apply hQ le2 m _ (Unch.refl _ _) (Alloc.KeepA.refl _) hiv2
         rw [hjoin, if_neg hab, if_neg hba]
         exact h2
 

@@ -27,26 +27,27 @@ theorem wp_joinLoop {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem
     {bo : block} {ofs : ptrofs} {bm : block} {mofs : ptrofs} {o mp : Array Nat} {n : Nat}
     (h : Frame m le bo ofs bm mofs o mp n)
     (hQ : ∀ le' m', Frame m' le' bo ofs bm mofs ((List.range n).foldl (join mp n) o) mp n →
-      Unch m m' (· = bo) → Q.normal E0 e le' m') :
+      Unch m m' (· = bo) → Alloc.KeepA m m' → Q.normal E0 e le' m') :
     Wp xi ge f (forI joinStep) Q e le m := by
   refine wp_forLoop (xi := xi) id.i id.n joinStep n h.nlt
     (fun k le m' => Frame m' le bo ofs bm mofs ((List.range k).foldl (join mp n) o) mp n ∧
-      Unch m m' (· = bo) ∧ k ≤ n ∧ PTree.get id.i le = some (.Vint (ir k)))
+      Unch m m' (· = bo) ∧ Alloc.KeepA m m' ∧ k ≤ n ∧ PTree.get id.i le = some (.Vint (ir k)))
     (fun k le m' => Frame m' le bo ofs bm mofs ((List.range (k + 1)).foldl (join mp n) o) mp n ∧
-      Unch m m' (· = bo) ∧ k < n ∧ PTree.get id.i le = some (.Vint (ir k))) ?_ ?_ ?_ ?_ ?_
-  · rintro k le m ⟨hf, -, hk, hi⟩
+      Unch m m' (· = bo) ∧ Alloc.KeepA m m' ∧ k < n ∧ PTree.get id.i le = some (.Vint (ir k)))
+      ?_ ?_ ?_ ?_ ?_
+  · rintro k le m ⟨hf, -, -, hk, hi⟩
     exact ⟨hk, hi, hf.hn⟩
-  · refine ⟨h.temps fun k hk => ?_, Unch.refl _ _, Nat.zero_le _, temps_gss _ _ _⟩
+  · refine ⟨h.temps fun k hk => ?_, Unch.refl _ _, Alloc.KeepA.refl _, Nat.zero_le _, temps_gss _ _ _⟩
     rw [temps_gso _ _ (by rcases hk with rfl | rfl | rfl <;> decide)]
-  · rintro k le m' hk ⟨hf, hu, -, hi⟩
+  · rintro k le m' hk ⟨hf, hu, hkp, -, hi⟩
     refine wp_joinStep hf hk hi ?_
-    intro le' m'' hf' hu' hi'
-    exact ⟨rfl, by rw [foldl_range_succ]; exact hf', hu.trans hu', hk, hi'⟩
-  · rintro k le m ⟨hf, hu, hk, hi⟩
-    refine ⟨hi, hf.temps fun k' hk' => ?_, hu, hk, temps_gss _ _ _⟩
+    intro le' m'' hf' hu' hk' hi'
+    exact ⟨rfl, by rw [foldl_range_succ]; exact hf', hu.trans hu', hkp.trans hk', hk, hi'⟩
+  · rintro k le m ⟨hf, hu, hkp, hk, hi⟩
+    refine ⟨hi, hf.temps fun k' hk' => ?_, hu, hkp, hk, temps_gss _ _ _⟩
     rw [temps_gso _ _ (by rcases hk' with rfl | rfl | rfl <;> decide)]
-  · rintro le m ⟨hf, hu, -, -⟩
-    exact hQ le m hf hu
+  · rintro le m ⟨hf, hu, hkp, -, -⟩
+    exact hQ le m hf hu hkp
 
 /-- One iteration of the second loop: `HexGraphIso`'s `compress`. -/
 theorem wp_compressStep {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
@@ -55,7 +56,7 @@ theorem wp_compressStep {f : function} {Q : Post} {e : env} {le : temp_env} {m :
     (hiv : PTree.get id.i le = some (.Vint (ir k)))
     (hjv : PTree.get id.j1 le = some (.Vint (ir c)))
     (hQ : ∀ le' m', Frame m' le' bo ofs bm mofs (compress (o, c) k).1 mp n → Unch m m' (· = bo) →
-      PTree.get id.i le' = some (.Vint (ir k)) →
+      Alloc.KeepA m m' → PTree.get id.i le' = some (.Vint (ir k)) →
       PTree.get id.j1 le' = some (.Vint (ir (compress (o, c) k).2)) → Q.normal E0 e le' m') :
     Wp xi ge f compressStep Q e le m := by
   have hnl := h.nlt
@@ -74,10 +75,10 @@ theorem wp_compressStep {f : function} {Q : Post} {e : env} {le : temp_env} {m :
       PTree.get k' le := fun k' hk' => temps_gso _ _ hk'
   have h1 : Frame m (PTree.set id.t (.Vint (ir (o[o[k]!]! : Int))) le) bo ofs bm mofs o mp n :=
     h.temps fun k' hk' => hle1 k' (by rcases hk' with rfl | rfl | rfl <;> decide)
-  refine wp_store h1.arr h1.nlt id.orbits h1.horb (tv id.i) k hk
+  refine Refine.wp_storeV h1.arr h1.nlt id.orbits h1.horb (tv id.i) k hk
     (by show PTree.get _ _ = _; rw [hle1 _ (by decide)]; exact hiv) rfl
     (tv id.t) (o[o[k]!]!) (temps_gss _ _ _) rfl ?_
-  intro m' harr' hu
+  intro m' harr' hu hkk
   have hset : ints (o.set! k o[o[k]!]!) = upd (ints o) k (.Vint (ir (o[o[k]!]! : Int))) :=
     ints_set (by omega) _
   have h2 : Frame m' (PTree.set id.t (.Vint (ir (o[o[k]!]! : Int))) le) bo ofs bm mofs
@@ -96,13 +97,13 @@ theorem wp_compressStep {f : function} {Q : Post} {e : env} {le : temp_env} {m :
     wp_step; wp_step
     apply wp_set_eval
     simp (config := {decide := true}) only [Exec.evalExpr, temps_gso, hjv, typeof, cop, ir_add]
-    refine hQ _ m' (h2.temps fun k' hk' => ?_) hu ?_ ?_
+    refine hQ _ m' (h2.temps fun k' hk' => ?_) hu hkk ?_ ?_
     · rw [temps_gso _ _ (by rcases hk' with rfl | rfl | rfl <;> decide)]
     · rw [temps_gso _ _ (by decide), temps_gso _ _ (by decide)]; exact hiv
     · rw [temps_gss, hci, ite_eq_left hr]; push_cast; rfl
   · rw [ite_eq_right (by simp; omega)]
     apply wp_skip
-    refine hQ _ m' h2 hu ?_ ?_
+    refine hQ _ m' h2 hu hkk ?_ ?_
     · rw [temps_gso _ _ (by decide)]; exact hiv
     · rw [temps_gso _ _ (by decide), hci, ite_eq_right hr]; exact hjv
 
@@ -113,32 +114,33 @@ theorem wp_compressLoop {f : function} {Q : Post} {e : env} {le : temp_env} {m :
     (hjv : PTree.get id.j1 le = some (.Vint (ir 0)))
     (hQ : ∀ le' m', Frame m' le' bo ofs bm mofs ((List.range n).foldl compress (o, 0)).1 mp n →
       PTree.get id.j1 le' = some (.Vint (ir ((List.range n).foldl compress (o, 0)).2)) →
-      Unch m m' (· = bo) → Q.normal E0 e le' m') :
+      Unch m m' (· = bo) → Alloc.KeepA m m' → Q.normal E0 e le' m') :
     Wp xi ge f (forI compressStep) Q e le m := by
   refine wp_forLoop (xi := xi) id.i id.n compressStep n h.nlt
     (fun k le m' => Frame m' le bo ofs bm mofs ((List.range k).foldl compress (o, 0)).1 mp n ∧
-      Unch m m' (· = bo) ∧ k ≤ n ∧ PTree.get id.i le = some (.Vint (ir k)) ∧
+      Unch m m' (· = bo) ∧ Alloc.KeepA m m' ∧ k ≤ n ∧ PTree.get id.i le = some (.Vint (ir k)) ∧
       PTree.get id.j1 le = some (.Vint (ir ((List.range k).foldl compress (o, 0)).2)))
     (fun k le m' => Frame m' le bo ofs bm mofs ((List.range (k + 1)).foldl compress (o, 0)).1 mp n ∧
-      Unch m m' (· = bo) ∧ k < n ∧ PTree.get id.i le = some (.Vint (ir k)) ∧
+      Unch m m' (· = bo) ∧ Alloc.KeepA m m' ∧ k < n ∧ PTree.get id.i le = some (.Vint (ir k)) ∧
       PTree.get id.j1 le = some (.Vint (ir ((List.range (k + 1)).foldl compress (o, 0)).2)))
     ?_ ?_ ?_ ?_ ?_
-  · rintro k le m ⟨hf, -, hk, hi, -⟩
+  · rintro k le m ⟨hf, -, -, hk, hi, -⟩
     exact ⟨hk, hi, hf.hn⟩
-  · refine ⟨h.temps fun k hk => ?_, Unch.refl _ _, Nat.zero_le _, temps_gss _ _ _, ?_⟩
+  · refine ⟨h.temps fun k hk => ?_, Unch.refl _ _, Alloc.KeepA.refl _, Nat.zero_le _, temps_gss _ _ _,
+      ?_⟩
     · rw [temps_gso _ _ (by rcases hk with rfl | rfl | rfl <;> decide)]
     · rw [temps_gso _ _ (by decide)]; exact hjv
-  · rintro k le m' hk ⟨hf, hu, -, hi, hj⟩
+  · rintro k le m' hk ⟨hf, hu, hkp, -, hi, hj⟩
     refine wp_compressStep (c := ((List.range k).foldl compress (o, 0)).2)
       (o := ((List.range k).foldl compress (o, 0)).1) hf hk hi hj ?_
-    intro le' m'' hf' hu' hi' hj'
-    refine ⟨rfl, by rw [foldl_range_succ]; exact hf', hu.trans hu', hk, hi',
+    intro le' m'' hf' hu' hk' hi' hj'
+    refine ⟨rfl, by rw [foldl_range_succ]; exact hf', hu.trans hu', hkp.trans hk', hk, hi',
       by rw [foldl_range_succ]; exact hj'⟩
-  · rintro k le m ⟨hf, hu, hk, hi, hj⟩
-    refine ⟨hi, hf.temps fun k' hk' => ?_, hu, hk, temps_gss _ _ _, ?_⟩
+  · rintro k le m ⟨hf, hu, hkp, hk, hi, hj⟩
+    refine ⟨hi, hf.temps fun k' hk' => ?_, hu, hkp, hk, temps_gss _ _ _, ?_⟩
     · rw [temps_gso _ _ (by rcases hk' with rfl | rfl | rfl <;> decide)]
     · rw [temps_gso _ _ (by decide)]; exact hj
-  · rintro le m ⟨hf, hu, -, -, hj⟩
-    exact hQ le m hf hj hu
+  · rintro le m ⟨hf, hu, hkp, -, -, hj⟩
+    exact hQ le m hf hj hu hkp
 
 end NautyVerified.Proofs.Orbjoin
