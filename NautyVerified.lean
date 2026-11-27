@@ -155,3 +155,4 @@ import NautyVerified.Proofs.Harness.Graph
 import NautyVerified.Proofs.Harness.Part
 import NautyVerified.Proofs.Harness.PartC
 import NautyVerified.Proofs.Harness.Output
+import NautyVerified.Proofs.Harness.Words
