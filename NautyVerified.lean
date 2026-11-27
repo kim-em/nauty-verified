@@ -17,6 +17,7 @@ import NautyVerified.Proofs.Nextelement.Body
 import NautyVerified.Proofs.Nextelement.Satisfies
 import NautyVerified.Statement.Dense
 import NautyVerified.Statement.Compiler
+import NautyVerified.Statement.Compose
 import NautyVerified.Logic.Array
 import NautyVerified.Logic.Ints
 import NautyVerified.Proofs.Orbjoin.Chase
