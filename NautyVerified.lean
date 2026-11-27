@@ -49,6 +49,8 @@ import NautyVerified.Proofs.Alloc.Zero
 import NautyVerified.Proofs.Alloc.Free
 import NautyVerified.Proofs.Alloc.Dyn
 import NautyVerified.Proofs.Alloc.Dyn3
+import NautyVerified.Proofs.Alloc.DynG
+import NautyVerified.Proofs.Alloc.DynSeq
 import NautyVerified.Proofs.Alloc.Dyn2
 import NautyVerified.Proofs.Fmperm.Syntax
 import NautyVerified.Proofs.Alloc.Global
