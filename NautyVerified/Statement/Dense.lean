@@ -46,20 +46,28 @@ The parts of `expected G`, and HexGraphIso's theorems about them. -/
 def canonWords {n k : Nat} (G : Colored n k) : List Int :=
   (Nauty.runColoredTraced G).result.canong.toList.flatMap (rowWords (setwordsNeeded n))
 
-/-- The canonical graph is a complete invariant: two graphs on the same
-vertices and colours get the same canonical graph exactly when they are
-isomorphic. -/
+/-- The number of vertices of each colour. -/
+def colorCounts {n k : Nat} (G : Colored n k) : List Nat :=
+  (List.range k).map fun c => (Nauty.colorClass G c).length
+
+/-- The canonical graph, together with the colour-class sizes, is a complete
+invariant: two coloured graphs get the same canonical graph and have the same
+number of vertices of each colour exactly when they are isomorphic. (The
+canonical graph alone does not see the colouring: three isolated vertices
+coloured `0, 0, 1` and `0, 1, 1` have the same canonical graph.) -/
 theorem canonWords_eq_iff {n k : Nat} (G H : Colored n k) :
-    canonWords G = canonWords H ↔ Isomorphic G H := by
+    (canonWords G = canonWords H ∧ colorCounts G = colorCounts H) ↔ Isomorphic G H := by
   sorry
 
 /-- The generators the binary writes (block 1) are automorphisms of `G`, and
 every automorphism of `G` is a product of them. -/
 theorem generators_correct {n k : Nat} (G : Colored n k) :
-    (∀ p ∈ (Nauty.runColoredTraced G).autos.toList, ∃ q, (∀ i : Fin n, (q i).val = p[i.val]!) ∧
+    (∀ p ∈ (Nauty.runColoredTraced G).autos.toList, ∃ q, (∀ i : Fin n, (q.get i).val = p[i.val]!) ∧
       IsIso G G q) ∧
     ∀ q, IsIso G G q → Perm.Generated (Aut.gens G) q := by
-  sorry
+  refine ⟨fun p hp => ?_, fun q hq => Aut.complete G hq⟩
+  obtain ⟨q, hq⟩ := Aut.trace_admitted G p hp
+  exact ⟨q, autom?_val_get hq, autom?_isIso hq⟩
 
 /-- The orbits the binary writes (block 3): two vertices get the same
 representative exactly when an automorphism maps one to the other. -/
