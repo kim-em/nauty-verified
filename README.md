@@ -6,10 +6,12 @@ HexGraphIso's correctness theorems (canonical form is a complete isomorphism
 invariant; the emitted generators generate the automorphism group; orbits are
 correct) hold of nauty itself and of the x86-64 program compiled from it.
 
-**Status: Phase 1 done.** The C sources are Lean terms, linked into one
-program whose Clight form is pinned by kernel-checked equations against
+**Status: Phases 1 and 2 done.** The C sources are Lean terms, linked into
+one program whose Clight form is pinned by kernel-checked equations against
 CompCert4Lean's own passes; the binary built from it reproduces every
-fixture. No theorem about nauty's behaviour is proved yet. The
+fixture. A program logic over CompCert4Lean's Clight semantics is in place,
+and the first nauty function, `nextelement`, is proved against HexGraphIso's
+`VSet.nextElem`. The
 plan is [docs/PLAN.md](docs/PLAN.md); the experiments that motivated it are in
 [docs/feasibility-2026-11.md](docs/feasibility-2026-11.md).
 

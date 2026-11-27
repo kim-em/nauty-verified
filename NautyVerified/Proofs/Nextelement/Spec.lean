@@ -30,6 +30,9 @@ theorem bitmask_getMsbD (x : BitVec 64) (b i : Nat) (hb : b < 64) (hi : i < 64) 
 def InSet (ws : Nat → BitVec 64) (n v : Nat) : Prop :=
   v < 64 * n ∧ (ws (v / 64)).getMsbD (v % 64) = true
 
+instance (ws : Nat → BitVec 64) (n v : Nat) : Decidable (InSet ws n v) := by
+  unfold InSet; infer_instance
+
 /-- `r` is what `nextelement(set1, n, pos)` must return: the least element
     `> pos`, or `-1` if there is none. -/
 def NextSpec (ws : Nat → BitVec 64) (n : Nat) (pos : _root_.Int) (r : _root_.Int) : Prop :=

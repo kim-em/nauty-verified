@@ -175,8 +175,14 @@ distinct blocks, a few statics) does not need a frame rule.
   goals. Literal words are emitted at their exact type (`Int.repr`,
   `Int64.repr`, `Ptrofs.repr`) for the same reason.
 
-Acceptance: `nextelement` proved against Hex's `VSet.nextElem` specification
-on this base; interpreter agreement (done).
+Acceptance (done): `nextelement_satisfies` (`Proofs/Nextelement/`) proves
+nauty's `nextelement`, from its pinned Clight, against `NextSpec`, and
+`nextElem_of_nextSpec` derives HexGraphIso's `VSet.nextElem` from it;
+interpreter agreement. The proof pattern for every function: factor the body
+(`Tools/PrintClight`, pinned by `kernel_rfl`), state lookups of the
+temporaries as hypotheses, run `wp_step` and evaluate with the `cop` simp set
+and the `ir`/`bv64` lemmas, split on tests, and close leaves with the pure
+specification lemmas. `bv_decide` is not used (it adds `Lean.ofReduceBool`).
 
 ## Phase 3: Clight to Asm theorem
 
