@@ -73,4 +73,30 @@ theorem copy_load {m m' : mem} {bs bd : block} {N : Nat} {bytes : List memval}
   rw [← hsz] at he1
   exact Mem.loadbytes_load _ _ _ _ _ he1 hal
 
+/-- `k` readable 8-byte words from offset 0 give `loadbytes` of `8 k` bytes. -/
+theorem lb_of_loads {m : mem} {b : block} :
+    ∀ k : Nat, (∀ i < k, ∃ v, Mem.load .Mint64 m b (zOfInt (8 * (i : Int))) = some v) →
+      ∃ bytes, Mem.loadbytes m b (zOfInt 0) (zOfInt (8 * (k : Int))) = some bytes
+  | 0, _ => ⟨[], Mem.loadbytes_empty _ _ _ _ (by decide)⟩
+  | k + 1, h => by
+    obtain ⟨b1, h1⟩ := lb_of_loads k fun i hi => h i (by omega)
+    obtain ⟨v, hv⟩ := h k (by omega)
+    obtain ⟨b2, h2, -⟩ := Mem.load_loadbytes _ _ _ _ _ hv
+    have e : ZArith.BinInt.Z.add (zOfInt 0) (zOfInt (8 * (k : Int))) = zOfInt (8 * (k : Int)) :=
+      intOfZ_injective (by rw [intOfZ_add]; simp [intOfZ_zOfInt])
+    have h2' : Mem.loadbytes m b (ZArith.BinInt.Z.add (zOfInt 0) (zOfInt (8 * (k : Int))))
+        (Common.Memdata.size_chunk .Mint64) = some b2 := by rw [e]; exact h2
+    have h3 := Mem.loadbytes_concat _ _ _ _ (Common.Memdata.size_chunk .Mint64) _ _ h1 h2'
+      (by change intOfZ _ ≤ intOfZ _; simp [intOfZ_zOfInt]; omega) (by decide)
+    have e2 : ZArith.BinInt.Z.add (zOfInt (8 * (k : Int))) (Common.Memdata.size_chunk .Mint64) =
+        zOfInt (8 * ((k + 1 : Nat) : Int)) :=
+      intOfZ_injective (by rw [intOfZ_add]; simp [intOfZ_zOfInt]; rfl)
+    exact ⟨b1 ++ b2, by rw [← e2]; exact h3⟩
+
+/-- `storebytes` changes only its block. -/
+theorem Unch.storebytes {m m' : mem} {b : block} {ofs : Z} {bytes : List memval}
+    (h : Mem.storebytes m b ofs bytes = some m') : NautyVerified.Logic.Unch m m' (· = b) :=
+  ⟨fun _ b' _ hb => Mem.load_storebytes_other _ _ _ _ _ h _ _ _ (.inl hb),
+   fun _ _ _ _ _ hv => ⟨fun o ho => Mem.perm_storebytes_1 _ _ _ _ _ h _ _ _ _ (hv.1 o ho), hv.2⟩⟩
+
 end NautyVerified.Proofs.Top
