@@ -47,7 +47,7 @@ def updatecanSpec {n : Nat} (bg : block) (gofs : ptrofs) (gw : Nat → Lib.Integ
     GraphAt m' bc cofs cw' (Hex.GraphIso.Nauty.updatecan ⟨grows⟩ canong lab samerows) M ∧
     DynAt m' WP WPS 4 cap' b' ∧ n ≤ cap' ∧ ((cap' = cap ∧ b' = b0) ∨ ¬ Mem.valid_block m b') ∧
     Unch m m' (fun z => z = bc ∨ z = WPS ∨ z = WP ∨ (0 < cap ∧ z = b0) ∨
-      (¬ Mem.valid_block m b' ∧ z = b'))
+      (¬ Mem.valid_block m b' ∧ z = b')) ∧ Keep m m' bc
 
 def entryTemps (bg : block) (gofs : ptrofs) (bc : block) (cofs : ptrofs) (bl : block)
     (lofs : ptrofs) (samerows M n : Nat) : temp_env :=
@@ -178,8 +178,9 @@ theorem updatecan_satisfies {xi : ExternalCalls} {n : Nat} (bg : block) (gofs : 
       rw [hT2 _ (by decide) (by decide) (by decide)]
       simp (config := {decide := true}) only [entryTemps, temps_gso, temps_gss]
     refine wp_rows hf hcg2 hcsz hsr hsrv ?_
-    intro le3 m3 cw' hcg3 hu3 ho3
-    refine ⟨m3, Nextelement.free_empty m3, rfl, cw', cap', b', hcg3, ?_, hcap, hb', ?_⟩
+    intro le3 m3 cw' hcg3 hu3 hk3 ho3
+    refine ⟨m3, Nextelement.free_empty m3, rfl, cw', cap', b', hcg3, ?_, hcap, hb', ?_,
+      ((Keep.unch hu1 oc).trans (Keep.unch hu2 (nb _ fun h => (hbD h).1))).trans (hk3 bc)⟩
     · refine (hD'.keep hu2 (nb _ fun h => (hD'.bne h).2) (nb _ fun h => (hD'.bne h).1)
         fun _ => hk2).keep hu3 gWP.1 gWPS.1 fun hc0 => Keep.unch hu3 (hbD hc0).1
     · have hbS : ∀ z, 0 < n ∧ z = b' → (z = bc ∨ z = WPS ∨ z = WP ∨ (0 < cap ∧ z = b0) ∨

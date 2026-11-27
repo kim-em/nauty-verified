@@ -105,7 +105,7 @@ theorem wp_updatecan {f : function} {Q : Post} {le : temp_env} (c : PCtx m₀ m�
       have hb := wnb hc
       refine ⟨fun e => hb (e ▸ ?_), fun e => hb (e ▸ ?_), fun e => hb (e ▸ ?_), fun e => hb (e ▸ ?_),
         fun e => hb (e ▸ ?_)⟩ <;> simp [SLoc.blocks]
-  · rintro t r m' ⟨⟨rfl, cw', cap', b', hg', hD', hcap, hrel, hu⟩, hv⟩
+  · rintro t r m' ⟨⟨rfl, cw', cap', b', hg', hD', hcap, hrel, hu, -⟩, hv⟩
     let W := fun z => z = S.bc ∨ z = Block.naugraphWorkpermSz ∨ z = Block.naugraphWorkperm ∨
       (0 < cW ∧ z = bW) ∨ (¬ Mem.valid_block m b' ∧ z = b')
     have notW : ∀ z ∈ S.blocks, z ≠ S.bc → z ≠ Block.naugraphWorkpermSz →

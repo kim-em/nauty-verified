@@ -1,3 +1,4 @@
+import NautyVerified.Proofs.Alloc.KeepV
 import NautyVerified.Proofs.Updatecan.Inv
 import NautyVerified.Proofs.Permset.Satisfies
 import NautyVerified.Proofs.Graph.Rows
@@ -102,7 +103,8 @@ theorem wp_rows {Q : Post} {le : temp_env} {m : mem} {n : Nat} {bg : block} {gof
     (hsrv : PTree.get id.samerows le = some (.Vint (ir samerows)))
     (hQ : ∀ le' m' cw', GraphAt m' bc cofs cw'
         (Hex.GraphIso.Nauty.updatecan ⟨grows⟩ canong lab samerows) M →
-      Unch m m' (· = bc) → (∀ x, x ≠ id.i → x ≠ id.ph → PTree.get x le' = PTree.get x le) →
+      Unch m m' (· = bc) → Alloc.KeepA m m' →
+      (∀ x, x ≠ id.i → x ≠ id.ph → PTree.get x le' = PTree.get x le) →
       Q.normal E0 empty_env le' m') :
     Wp xi ge Source.dense.fn.updatecan rows Q empty_env le m := by
   have hM1 := h.M1
@@ -115,13 +117,13 @@ theorem wp_rows {Q : Post} {le : temp_env} {m : mem} {n : Nat} {bg : block} {gof
     e' = empty_env ∧ ∃ c cw', samerows ≤ c ∧ c ≤ n ∧ v = n - c ∧
       PTree.get id.i le' = some (.Vint (ir c)) ∧
       PTree.get id.ph le' = some (.Vptr bc (ptrTo basec 8 (M * c))) ∧
-      Graph.RowsAt m' bc cofs cw' (C c) c M ∧ Unch m m' (· = bc) ∧
+      Graph.RowsAt m' bc cofs cw' (C c) c M ∧ Unch m m' (· = bc) ∧ Alloc.KeepA m m' ∧
       ∀ x, x ≠ id.i → x ≠ id.ph → PTree.get x le' = PTree.get x le
   let J := fun (v : Nat) (t : trace) (e' : env) (le' : temp_env) (m' : mem) => t = E0 ∧
     e' = empty_env ∧ ∃ c cw', samerows ≤ c ∧ c < n ∧ v = n - c ∧
       PTree.get id.i le' = some (.Vint (ir c)) ∧
       PTree.get id.ph le' = some (.Vptr bc (ptrTo basec 8 (M * c))) ∧
-      Graph.RowsAt m' bc cofs cw' (C (c + 1)) (c + 1) M ∧ Unch m m' (· = bc) ∧
+      Graph.RowsAt m' bc cofs cw' (C (c + 1)) (c + 1) M ∧ Unch m m' (· = bc) ∧ Alloc.KeepA m m' ∧
       ∀ x, x ≠ id.i → x ≠ id.ph → PTree.get x le' = PTree.get x le
   wp_step; wp_step; wp_step; wp_step
   apply wp_set_eval
@@ -140,9 +142,9 @@ theorem wp_rows {Q : Post} {le : temp_env} {m : mem} {n : Nat} {bg : block} {gof
   simp only [E0_append]
   refine wp_loop (I := I) (J := J) ?_ ?_ (n := n - samerows)
     ⟨rfl, rfl, samerows, cw, Nat.le_refl _, hsr, rfl, by rw [temps_gso _ _ (by decide), temps_gss],
-      temps_gss _ _ _, by simpa [C] using hcg, Unch.refl _ _, fun x h1 h2 => by
+      temps_gss _ _ _, by simpa [C] using hcg, Unch.refl _ _, Alloc.KeepA.refl _, fun x h1 h2 => by
         rw [temps_gso _ _ h2, temps_gso _ _ h1]⟩
-  · rintro v t e' le' m' ⟨rfl, rfl, c, cw', hsc, hcn, rfl, hi, hph, hcg', hu, ho⟩
+  · rintro v t e' le' m' ⟨rfl, rfl, c, cw', hsc, hcn, rfl, hi, hph, hcg', hu, hkp, ho⟩
     have hf := (h.temps ho).unch hu
     wp_step; wp_step; wp_step
     apply wp_if_eval
@@ -189,7 +191,8 @@ theorem wp_rows {Q : Post} {le : temp_env} {m : mem} {n : Nat} {bg : block} {gof
         ⟨rfl, hf.graph.row hlc, hf.graph.rep _ hlc, hcg'.row hc, hf.warr, hf.wsmall,
           hf.lb, hf.bit, hf.cg, hf.cW (by omega), hf.cbit, hf.clb, hM1, hMlt⟩ ?_
       rintro t r m2 ⟨rfl, w2', harr2, hrep2, hu2, hout2⟩
-      refine ⟨by simp, rfl, c, Graph.rowSet cw' M c w2', hsc, hc, rfl, hi, hph, ?_, hu.trans hu2, ho⟩
+      refine ⟨by simp, rfl, c, Graph.rowSet cw' M c w2', hsc, hc, rfl, hi, hph, ?_, hu.trans hu2,
+        hkp.trans (Alloc.KeepA.of_outside hu2 hout2 harr2.base_nonneg), ho⟩
       have := Graph.RowsAt.setRow hcg' hc hcsz' harr2 hrep2 hout2
       have hC : C (c + 1) = (C c).set! c (grows[lab[c]!]!.permset (invPerm lab)) := by
         simp only [C]
@@ -204,8 +207,8 @@ theorem wp_rows {Q : Post} {le : temp_env} {m : mem} {n : Nat} {bg : block} {gof
       have hC : C c = Hex.GraphIso.Nauty.updatecan ⟨grows⟩ canong lab samerows := by
         simp only [C]; rw [updatecan_eq]
       rw [hC] at hcg'
-      simpa using hQ le' m' cw' hcg'.graphAt hu ho
-  · rintro v t e' le' m' ⟨rfl, rfl, c, cw', hsc, hcn, rfl, hi, hph, hcg', hu, ho⟩
+      simpa using hQ le' m' cw' hcg'.graphAt hu hkp ho
+  · rintro v t e' le' m' ⟨rfl, rfl, c, cw', hsc, hcn, rfl, hi, hph, hcg', hu, hkp, ho⟩
     have hf := (h.temps ho).unch hu
     wp_step; wp_step; wp_step
     apply wp_set_eval
@@ -217,7 +220,7 @@ theorem wp_rows {Q : Post} {le : temp_env} {m : mem} {n : Nat} {bg : block} {gof
     simp only [typeof, cop]
     rw [Prune.Long.add_ptrTo8 _ _ _ _ (by omega)]
     refine ⟨n - (c + 1), by omega, by simp, rfl, c + 1, cw', by omega, by omega, rfl,
-      by rw [temps_gso _ _ (by decide), temps_gss]; rfl, by rw [temps_gss, Nat.mul_succ], hcg', hu,
+      by rw [temps_gso _ _ (by decide), temps_gss]; rfl, by rw [temps_gss, Nat.mul_succ], hcg', hu, hkp,
       fun x h1 h2 => by rw [temps_gso _ _ h2, temps_gso _ _ h1, ho x h1 h2]⟩
 
 end NautyVerified.Proofs.Updatecan
