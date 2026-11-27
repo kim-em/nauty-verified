@@ -5,6 +5,8 @@ import NautyVerified.Proofs.Set.Bit
 import NautyVerified.Proofs.Set.Add
 import NautyVerified.Spec.Fmptn
 import NautyVerified.Proofs.Refine.Step
+import NautyVerified.Proofs.Refine.Dialect
+import NautyVerified.Proofs.Refine1.Syntax
 
 /-!
 # `refine`'s pass for a trivial splitting cell
@@ -35,6 +37,151 @@ open Hex.GraphIso.Nauty (VSet Ctx RefineSt splitCellLoop trivialSplit trivialCel
 
 variable {xi : ExternalCalls}
 
+/-! ## The pass, for either dialect
+
+`trivialG D tA tB` is the trivial-splitter pass in dialect `D`, with
+SimplExpr's two condition temporaries `tA`, `tB`; `refine`'s and `refine1`'s
+`trivial` are its instances. -/
+
+section Generic
+open NautyVerified.Proofs.Set (sk pv)
+
+abbrev swapLoopG (D : Dialect) : statement :=
+  (.Sloop
+    (.Ssequence
+      (sk (.Sifthenelse (.Ebinop .Ole (tv dense.id.«c1») (tv dense.id.«c2») tint) .Sskip .Sbreak))
+      (.Ssequence
+        (sk (.Sset dense.id.«labc1» (ix dense.id.«lab» (tv dense.id.«c1»))))
+        (sk
+          (.Sifthenelse
+            (D.isE dense.id.«gptr» (tv dense.id.«labc1»))
+            (sk (.Sset dense.id.«c1» (.Ebinop .Oadd (tv dense.id.«c1») (ci 1 tint) tint)))
+            (.Ssequence
+              (sk (.Sassign (ix dense.id.«lab» (tv dense.id.«c1»)) (ix dense.id.«lab» (tv dense.id.«c2»))))
+              (.Ssequence
+                (sk (.Sassign (ix dense.id.«lab» (tv dense.id.«c2»)) (tv dense.id.«labc1»)))
+                (sk (.Sset dense.id.«c2» (.Ebinop .Osub (tv dense.id.«c2») (ci 1 tint) tint)))))))))
+    .Sskip)
+
+abbrev trivSplitG (D : Dialect) (tA tB : Common.AST.ident) : statement :=
+  (.Ssequence
+    (sk
+      (.Sifthenelse
+        (.Ebinop .Oge (tv dense.id.«c2») (tv dense.id.«cell1») tint)
+        (sk (.Sset tA (.Ecast (.Ebinop .Ole (tv dense.id.«c1») (tv dense.id.«cell2») tint) tbool)))
+        (.Sset tA (ci 0 tint))))
+    (.Sifthenelse
+      (tv tA)
+      (.Ssequence
+        (sk (.Sassign (ix dense.id.«ptn» (tv dense.id.«c2»)) (tv dense.id.«level»)))
+        (.Ssequence
+          (sk (mash (tv dense.id.«c2»)))
+          (.Ssequence
+            (sk
+              (.Sassign
+                (.Ederef (pi dense.id.«numcells») tint)
+                (.Ebinop .Oadd (.Ederef (pi dense.id.«numcells») tint) (ci 1 tint) tint)))
+            (.Ssequence
+              (sk
+                (.Sifthenelse
+                  (D.isE dense.id.«active» (tv dense.id.«cell1»))
+                  (.Sset tB (ci 1 tint))
+                  (sk
+                    (.Sset
+                      tB
+                      (.Ecast
+                        (.Ebinop .Oge
+                          (.Ebinop .Osub (tv dense.id.«c2») (tv dense.id.«cell1») tint)
+                          (.Ebinop .Osub (tv dense.id.«cell2») (tv dense.id.«c1») tint)
+                          tint)
+                        tbool)))))
+              (.Sifthenelse
+                (tv tB)
+                (.Ssequence
+                  (D.addE dense.id.«active» (tv dense.id.«c1»))
+                  (sk
+                    (.Sifthenelse
+                      (.Ebinop .Oeq (tv dense.id.«c1») (tv dense.id.«cell2») tint)
+                      (sk (.Sset dense.id.«hint» (tv dense.id.«c1»)))
+                      .Sskip)))
+                (.Ssequence
+                  (D.addE dense.id.«active» (tv dense.id.«cell1»))
+                  (sk
+                    (.Sifthenelse
+                      (.Ebinop .Oeq (tv dense.id.«c2») (tv dense.id.«cell1») tint)
+                      (sk (.Sset dense.id.«hint» (tv dense.id.«cell1»)))
+                      .Sskip))))))))
+      .Sskip))
+
+abbrev cellLoopTG (D : Dialect) (tA tB : Common.AST.ident) : statement :=
+  (.Sloop
+    (.Ssequence
+      (sk (.Sifthenelse (.Ebinop .Olt (tv dense.id.«cell1») (tv dense.id.«n») tint) .Sskip .Sbreak))
+      (.Ssequence
+        (scanEnd dense.id.«cell2» dense.id.«cell1»)
+        (.Ssequence
+          (sk (.Sifthenelse (.Ebinop .Oeq (tv dense.id.«cell1») (tv dense.id.«cell2») tint) .Scontinue .Sskip))
+          (.Ssequence
+            (sk (.Sset dense.id.«c1» (tv dense.id.«cell1»)))
+            (.Ssequence (sk (.Sset dense.id.«c2» (tv dense.id.«cell2»))) (.Ssequence (swapLoopG D) (trivSplitG D tA tB)))))))
+    (sk (.Sset dense.id.«cell1» (.Ebinop .Oadd (tv dense.id.«cell2») (ci 1 tint) tint))))
+
+abbrev trivialG (D : Dialect) (tA tB : Common.AST.ident) : statement :=
+  (.Ssequence
+    (sk
+      (.Sset dense.id.«gptr»
+        (.Ebinop .Oadd
+          (.Ecast (pv dense.id.«g») (tptr tulong))
+          (.Ebinop .Omul D.mE (.Ecast (ix dense.id.«lab» (tv dense.id.«split1»)) tulong) tulong)
+          (tptr tulong))))
+    (.Ssequence (sk (.Sset dense.id.«cell1» (ci 0 tint))) (cellLoopTG D tA tB)))
+
+end Generic
+
+theorem trivial_D0 : trivial = trivialG D0 (idOf 716) (idOf 715) := rfl
+
+theorem trivial_D1 : Refine1.trivial = trivialG D1 (idOf 714) (idOf 713) := rfl
+
+/-- A temporary the trivial pass may clobber: none of those it reads. -/
+structure Scratch (x : Common.AST.ident) : Prop where
+  notArg : x ∉ Refine.args
+  longcode : x ≠ dense.id.longcode
+  hint : x ≠ dense.id.hint
+  maxpos : x ≠ dense.id.maxpos
+  cell1 : x ≠ dense.id.cell1
+  cell2 : x ≠ dense.id.cell2
+  c1 : x ≠ dense.id.c1
+  c2 : x ≠ dense.id.c2
+  gptr : x ≠ dense.id.gptr
+  labc1 : x ≠ dense.id.labc1
+  split1 : x ≠ dense.id.split1
+
+theorem Scratch.ne_arg {x y : Common.AST.ident} (h : Scratch x) (hy : y ∈ args) : x ≠ y :=
+  fun e => h.notArg (e ▸ hy)
+
+set_option hygiene false in
+/-- An inequality of identifiers: by `decide`, from one in the context, or from `hsA`/`hsB`
+(`Scratch` facts) for an argument temporary. -/
+macro "scr" : tactic => `(tactic| first
+  | decide
+  | assumption
+  | exact Ne.symm (by assumption)
+  | exact Scratch.ne_arg hsA (by decide)
+  | exact Ne.symm (Scratch.ne_arg hsA (by decide))
+  | exact Scratch.ne_arg hsB (by decide)
+  | exact Ne.symm (Scratch.ne_arg hsB (by decide)))
+
+theorem Scratch.tmp {x : Common.AST.ident} (h : Scratch x) :
+    x ∉ args ∧ x ≠ dense.id.longcode ∧ x ≠ dense.id.hint ∧ x ≠ dense.id.maxpos :=
+  ⟨h.notArg, h.longcode, h.hint, h.maxpos⟩
+
+theorem scratch_of (x : Common.AST.ident) (h : x ∉ args ∧ x ≠ dense.id.longcode ∧ x ≠ dense.id.hint ∧
+    x ≠ dense.id.maxpos ∧ x ≠ dense.id.cell1 ∧ x ≠ dense.id.cell2 ∧ x ≠ dense.id.c1 ∧
+    x ≠ dense.id.c2 ∧ x ≠ dense.id.gptr ∧ x ≠ dense.id.labc1 ∧ x ≠ dense.id.split1) : Scratch x :=
+  ⟨h.1, h.2.1, h.2.2.1, h.2.2.2.1, h.2.2.2.2.1, h.2.2.2.2.2.1, h.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.1,
+    h.2.2.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.2.2.2⟩
+
+
 /-! ## The two-pointer loop -/
 
 theorem splitCellLoop_stop {n : Nat} (gRow : VSet n) (F : Nat) (lab : Array Nat) {c1 c2 : Int}
@@ -50,19 +197,17 @@ theorem splitCellLoop_step {n : Nat} (gRow : VSet n) (F : Nat) (lab : Array Nat)
   rw [splitCellLoop, ite_eq_left h]
 
 /-- `ISELEMENT(gptr, a)` for `gptr` at row `v` of the graph. -/
-theorem eval_inRow {e : env} {le : temp_env} {m : mem} {n : Nat} {bg : block} {gofs : ptrofs}
-    {gw : Nat → Lib.Integers.int64} {rows : Array (VSet n)} {M v c : Nat}
-    (hg : GraphAt m bg gofs gw rows M) (hv : v < n) (hM : M < 33554432) (hnM : n ≤ 64 * M)
+theorem eval_inRow {D : Dialect} (hD : D.Sem) {e : env} {le : temp_env} {m : mem} {n : Nat}
+    {bg : block} {gofs : ptrofs} {gw : Nat → Lib.Integers.int64} {rows : Array (VSet n)} {M v c : Nat}
+    (hMok : D.okM M) (hg : GraphAt m bg gofs gw rows M) (hv : v < n) (hM : M < 33554432)
+    (hnM : n ≤ 64 * M)
     (hp : PTree.get dense.id.gptr le = some
       (.Vptr bg (ptrTo (intOfZ (Ptrofs.unsigned gofs)) 8 (M * v))))
     {a : expr} (ha : Exec.evalExpr ge e le m a = some (.Vint (ir c))) (hty : typeof a = tint)
     (hc : c < n) (hbit : BitTable m Block.naugraphBit)
     (he : PTree.get dense.id.«naugraph:bit» e = none) :
-    Exec.evalExpr ge e le m (Set.isElement dense.id.gptr dense.id.«naugraph:bit» a) =
-      some (Val.of_bool (rows[v]!.mem c)) := by
-  rw [Set.eval_isElement (hg.row hv) (by omega) hp ha hty (by omega) (by omega) hbit he
-    find_naugraphBit, (hg.rep v hv).2 c (by omega)]
-
+    Exec.evalExpr ge e le m (D.isE dense.id.gptr a) = some (Val.of_bool (rows[v]!.mem c)) := by
+  rw [hD.isE hMok hM (hg.row hv) hp ha hty (by omega) hbit he, (hg.rep v hv).2 c (by omega)]
 
 /-- What `swapLoop` leaves, for the loop started from `lab` on `[cell1, cell2]`. -/
 structure SwapOut {n : Nat} (lab lab' : Array Nat) (cell1 cell2 : Nat) (c1 : Nat) (c2 : Int) :
@@ -74,11 +219,11 @@ structure SwapOut {n : Nat} (lab lab' : Array Nat) (cell1 cell2 : Nat) (c1 : Nat
   le : (c1 : Int) ≤ c2 + 1
   hi : c2 ≤ cell2
 
-theorem wp_swap {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {n : Nat}
-    {bg : block} {gofs : ptrofs} {gw : Nat → Lib.Integers.int64} {rows : Array (VSet n)}
+theorem wp_swap {D : Dialect} (hD : D.Sem) {f : function} {Q : Post} {e : env} {le : temp_env}
+    {m : mem} {n : Nat} {bg : block} {gofs : ptrofs} {gw : Nat → Lib.Integers.int64} {rows : Array (VSet n)}
     {M v : Nat} {bl : block} {lofs : ptrofs} {lab : Array Nat} {cell1 cell2 : Nat}
-    (hg : GraphAt m bg gofs gw rows M) (hv : v < n) (hM : M < 33554432) (hnM : n ≤ 64 * M)
-    (hbit : BitTable m Block.naugraphBit) (hgl : bg ≠ bl) (hbitl : Block.naugraphBit ≠ bl)
+    (hMok : D.okM M) (hg : GraphAt m bg gofs gw rows M) (hv : v < n) (hM : M < 33554432)
+    (hnM : n ≤ 64 * M) (hbit : BitTable m Block.naugraphBit) (hgl : bg ≠ bl) (hbitl : Block.naugraphBit ≠ bl)
     (he : PTree.get dense.id.«naugraph:bit» e = none)
     (harr : ArrayAt m .Mint32 bl (intOfZ (Ptrofs.unsigned lofs)) (ints lab) n)
     (hsz : lab.size = n) (hsmall : ∀ j < n, lab[j]! < n) (hc12 : cell1 ≤ cell2) (hc2n : cell2 < n)
@@ -95,7 +240,7 @@ theorem wp_swap {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {n
       PTree.get dense.id.c2 le' = some (.Vint (ir c2)) →
       (∀ x, x ≠ dense.id.c1 → x ≠ dense.id.c2 → x ≠ dense.id.labc1 →
         PTree.get x le' = PTree.get x le) → Q.normal E0 e le' m') :
-    Wp xi ge f swapLoop Q e le m := by
+    Wp xi ge f (swapLoopG D) Q e le m := by
   let R := splitCellLoop rows[v]! (cell2 - cell1 + 2) lab cell1 cell2
   have hn : n < 2147483648 := by omega
   let I := fun (k : Nat) (t : trace) (e' : env) (le' : temp_env) (m' : mem) => t = E0 ∧ e' = e ∧
@@ -150,8 +295,9 @@ theorem wp_swap {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {n
         rw [ho2 _ (by decide), ho _ (by decide) (by decide) (by decide)]; exact hp
       wp_step; wp_step
       apply wp_if_eval
-      rw [eval_inRow hgm hv hM hnM hp2 (a := tv dense.id.labc1) hl1v rfl (hs.small c1 hc1n) hbm he]
-      simp only [typeof, cop]
+      rw [eval_inRow hD hMok hgm hv hM hnM hp2 (a := tv dense.id.labc1) hl1v rfl (hs.small c1 hc1n) hbm he,
+        hD.isTy]
+      simp only [cop]
       by_cases hmem : rows[v]!.mem lab'[c1]! = true
       · rw [ite_eq_left (by simp [hmem])]
         wp_step; wp_step
@@ -317,9 +463,10 @@ theorem trivialSplit_stop {n : Nat} (level cell1 cell2 c1 : Nat) (c2 : Int) (st 
   rw [ite_eq_right (by intro h'; exact h ⟨h'.1, by omega⟩)]
 
 
-theorem wp_trivSplit {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc}
-    {ctx : Ctx n} {st : RefineSt n} {aw : Nat → Lib.Integers.int64} {cell1 cell2 c1 : Nat}
-    {c2 : Int} (hok : Ok n L) (hm : Mem m L ctx st aw) (ht : Tmp le L st)
+theorem wp_trivSplit {D : Dialect} (hD : D.Sem) {tA tB : Common.AST.ident} (hsA : Scratch tA)
+    (hsB : Scratch tB) (hAB : tA ≠ tB) {f : function} {Q : Post} {le : temp_env} {m : mem}
+    {n : Nat} {L : Loc} {ctx : Ctx n} {st : RefineSt n} {aw : Nat → Lib.Integers.int64}
+    {cell1 cell2 c1 : Nat} {c2 : Int} (hMok : D.okM L.M) (hok : Ok n L) (hm : Mem m L ctx st aw) (ht : Tmp le L st)
     (hcode : st.longcode < 2 ^ 62) (hpsz : st.ptn.size = n)
     (hc1c : cell1 ≤ c1) (hcc : (c1 : Int) = c2 + 1) (hc2c : c2 ≤ cell2) (hcn : cell2 < n)
     (hcell1 : PTree.get dense.id.cell1 le = some (.Vint (ir cell1)))
@@ -329,16 +476,20 @@ theorem wp_trivSplit {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Na
     (hQ : ∀ le' m' aw', Mem m' L ctx (trivialSplit L.level cell1 cell2 c1 c2 st) aw' →
       Tmp le' L (trivialSplit L.level cell1 cell2 c1 c2 st) →
       Unch m m' (fun z => z = L.bp ∨ z = L.bn ∨ z = L.ba) →
-      (∀ x, x ≠ idOf 715 → x ≠ idOf 716 → x ≠ dense.id.longcode → x ≠ dense.id.hint →
+      (∀ x, x ≠ tB → x ≠ tA → x ≠ dense.id.longcode → x ≠ dense.id.hint →
         PTree.get x le' = PTree.get x le) → Q.normal E0 empty_env le' m') :
-    Wp xi ge f trivSplit Q empty_env le m := by
+    Wp xi ge f (trivSplitG D tA tB) Q empty_env le m := by
+  have a0 := hsA.notArg; have a1 := hsA.longcode; have a2 := hsA.hint; have a3 := hsA.maxpos
+  have a4 := hsA.cell1; have a5 := hsA.cell2; have a6 := hsA.c1; have a7 := hsA.c2
+  have b0 := hsB.notArg; have b1 := hsB.longcode; have b2 := hsB.hint; have b3 := hsB.maxpos
+  have b4 := hsB.cell1; have b5 := hsB.cell2; have b6 := hsB.c1; have b7 := hsB.c2
   have hn := hok.nlt
   have hc2n : c2 < n := by omega
   -- the cases where nothing is split
   have stop : ∀ v, ¬ ((cell1 : Int) ≤ c2 ∧ c1 ≤ cell2) →
-      Q.normal E0 empty_env (PTree.set (idOf 716) v le) m := fun v h => by
+      Q.normal E0 empty_env (PTree.set tA v le) m := fun v h => by
     rw [trivialSplit_stop L.level cell1 cell2 c1 c2 st h] at hQ
-    exact hQ _ m aw hm (ht.set (x := idOf 716) v (by decide)) (Unch.refl _ _)
+    exact hQ _ m aw hm (ht.set (x := tA) v hsA.tmp) (Unch.refl _ _)
       fun x _ h2 _ _ => temps_gso _ _ h2
   wp_step; wp_step; wp_step
   apply wp_if_eval
@@ -354,16 +505,16 @@ theorem wp_trivSplit {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Na
     · rw [show (!decide ((cell2 : Int) < c1)) = true by simp; omega]
       apply wp_if_eval
       simp only [Exec.evalExpr, temps_gss, typeof, cop]
-      rw [ite_eq_left (by decide)]
-      generalize hv716 : PTree.set (idOf 716) _ le = le2
-      have ho2 : ∀ x, x ≠ idOf 716 → PTree.get x le2 = PTree.get x le := fun x hx => by
+      rw [ite_eq_left (by scr)]
+      generalize hv716 : PTree.set tA _ le = le2
+      have ho2 : ∀ x, x ≠ tA → PTree.get x le2 = PTree.get x le := fun x hx => by
         rw [← hv716]; exact temps_gso _ _ hx
-      have ht2 : Tmp le2 L st := by rw [← hv716]; exact ht.set _ (by decide)
+      have ht2 : Tmp le2 L st := by rw [← hv716]; exact ht.set _ hsA.tmp
       obtain ⟨k, hk⟩ : ∃ k : Nat, c2 = k := ⟨c2.toNat, by omega⟩
       subst hk
       have hkn : k < n := by omega
       have hc2e : ∀ mm, Exec.evalExpr ge empty_env le2 mm (tv dense.id.c2) = some (.Vint (ir k)) :=
-        fun _ => by show PTree.get _ _ = _; rw [ho2 _ (by decide)]; exact hc2
+        fun _ => by show PTree.get _ _ = _; rw [ho2 _ (by scr)]; exact hc2
       -- ptn[c2] = level
       wp_step; wp_step; wp_step
       refine wp_store hm.ptn (by omega) dense.id.ptn ht2.ptn (tv dense.id.c2) k hkn (hc2e _) rfl
@@ -380,7 +531,7 @@ theorem wp_trivSplit {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Na
           some (.Vlong (lr (Hex.GraphIso.Nauty.mash st.longcode k : Nat))) := by
         rw [← hv3]; exact temps_gss _ _ _
       have hnum3 : PTree.get dense.id.numcells le3 = some (.Vptr L.bn L.nofs) := by
-        rw [ho3 _ (by decide)]; exact ht2.numcells
+        rw [ho3 _ (by scr)]; exact ht2.numcells
       -- *numcells = *numcells + 1
       have hpn := hok.ne 2 3 (by omega)
       have hpa := hok.ne 2 5 (by omega)
@@ -405,12 +556,12 @@ theorem wp_trivSplit {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Na
           · exact (hok.ne 3 16 (by omega)) h.symm
           · exact (hok.ne 5 16 (by omega)) h.symm)
       have hact3 : PTree.get dense.id.active le3 = some (.Vptr L.ba L.aofs) := by
-        rw [ho3 _ (by decide)]; exact ht2.active
+        rw [ho3 _ (by scr)]; exact ht2.active
       have hcl3 : PTree.get dense.id.cell1 le3 = some (.Vint (ir cell1)) := by
-        rw [ho3 _ (by decide), ho2 _ (by decide)]; exact hcell1
-      have hmem := Set.eval_isElement (e := empty_env) (le := le3) (m := m2) (s := dense.id.active)
-        (bitId := dense.id.«naugraph:bit») (a := tv dense.id.cell1) hact2 (by have := hok.Mlt; omega) hact3 hcl3 rfl
-        (by have := hok.nM; omega) (by have := hok.nlt; omega) hbit2 rfl find_naugraphBit
+        rw [ho3 _ (by scr), ho2 _ (by scr)]; exact hcell1
+      have hmem := hD.isE (e := empty_env) (le := le3) (m := m2) (s := dense.id.active)
+        (a := tv dense.id.cell1) hMok hok.Mlt hact2 hact3 hcl3 rfl
+        (by have := hok.nM; omega) hbit2 rfl
       rw [hm.actRep.2 cell1 (by have := hok.nM; omega)] at hmem
       wp_step; wp_step; wp_step
       -- the end: `active` gets `x`, `hint` becomes `h'`
@@ -419,7 +570,7 @@ theorem wp_trivSplit {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Na
             { splitMid L.level k st with active := st.active.insert x, hint := h' } →
           ArrayAt m' .Mint64 L.ba L.ab (longs (Set.addW aw x)) L.M → Unch m2 m' (· = L.ba) →
           PTree.get dense.id.hint le' = some (.Vint (ir h')) →
-          (∀ y, y ≠ dense.id.hint → y ≠ idOf 715 → PTree.get y le' = PTree.get y le3) →
+          (∀ y, y ≠ dense.id.hint → y ≠ tB → PTree.get y le' = PTree.get y le3) →
           Q.normal E0 empty_env le' m' := by
         intro x h' le' m' hx heq harr' hu' hh ho'
         have hu : Unch m m' (fun z => z = L.bp ∨ z = L.bn ∨ z = L.ba) :=
@@ -466,42 +617,42 @@ theorem wp_trivSplit {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Na
         refine hQ le' m' (Set.addW aw x) hmem' ?_ hu ?_
         · rw [heq]
           refine ht.update (fun y hy => ?_) ?_ hh ?_
-          · rw [ho' y (by rintro rfl; revert hy; decide) (by rintro rfl; revert hy; decide),
-              ho3 _ (by rintro rfl; revert hy; decide), ho2 _ (by rintro rfl; revert hy; decide)]
-          · rw [ho' _ (by decide) (by decide)]; exact hl3
-          · rw [ho' _ (by decide) (by decide), ho3 _ (by decide), ho2 _ (by decide)]; exact ht.maxpos
+          · rw [ho' y (by rintro rfl; first | (revert hy; decide) | exact a0 hy | exact b0 hy) (by rintro rfl; first | (revert hy; decide) | exact a0 hy | exact b0 hy),
+              ho3 _ (by rintro rfl; first | (revert hy; decide) | exact a0 hy | exact b0 hy), ho2 _ (by rintro rfl; first | (revert hy; decide) | exact a0 hy | exact b0 hy)]
+          · rw [ho' _ (by scr) (by scr)]; exact hl3
+          · rw [ho' _ (by scr) (by scr), ho3 _ (by scr), ho2 _ (by scr)]; exact ht.maxpos
         · intro y h1 h2 h3 h4
           rw [ho' y h4 h1, ho3 y h3, ho2 y h2]
       apply wp_if_eval
-      rw [hmem]
-      simp only [typeof, cop]
+      rw [hmem, hD.isTy]
+      simp only [cop]
       by_cases hM : st.active.mem cell1 = true
       · rw [ite_eq_left (by simp [hM])]
         apply wp_set_eval
         simp only [Exec.evalExpr]
         apply wp_if_eval
         simp only [Exec.evalExpr, temps_gss, typeof, cop]
-        rw [ite_eq_left (by decide)]
-        generalize hv4 : PTree.set (idOf 715) _ le3 = le4
+        rw [ite_eq_left (by scr)]
+        generalize hv4 : PTree.set tB _ le3 = le4
         -- ADDELEMENT(active, c1); if (c1 == cell2) hint = c1;
-        have hD : st.active.mem cell1 = true ∨ cell2 - c1 ≤ k - cell1 := .inl hM
-        have ho4 : ∀ y, y ≠ idOf 715 → PTree.get y le4 = PTree.get y le3 := fun y hy => by rw [← hv4]; exact temps_gso _ _ hy
+        have hDc : st.active.mem cell1 = true ∨ cell2 - c1 ≤ k - cell1 := .inl hM
+        have ho4 : ∀ y, y ≠ tB → PTree.get y le4 = PTree.get y le3 := fun y hy => by rw [← hv4]; exact temps_gso _ _ hy
         have hc1_4 : Exec.evalExpr ge empty_env le4 m2 (tv dense.id.c1) = some (.Vint (ir c1)) := by
           show PTree.get _ _ = _
-          rw [ho4 _ (by decide), ho3 _ (by decide), ho2 _ (by decide)]; exact hc1
+          rw [ho4 _ (by scr), ho3 _ (by scr), ho2 _ (by scr)]; exact hc1
         wp_step
-        refine Set.wp_addElementB hact2 (by have := hok.Mlt; omega)
-          (by rw [ho4 _ (by decide)]; exact hact3) hc1_4 rfl
-          (by have := hok.nM; omega) (by omega) find_naugraphBit hbit2 rfl ?_
-        intro m4 harr4 hu4 _
+        refine hD.addE hMok hok.Mlt hact2
+          (by rw [ho4 _ (by scr)]; exact hact3) hc1_4 rfl
+          (by have := hok.nM; omega) hbit2 rfl ?_
+        intro m4 harr4 hu4
         wp_step; wp_step; wp_step
         simp only [show PTree.get dense.id.c1 le4 = _ from hc1_4,
           show PTree.get dense.id.cell2 le4 = some (.Vint (ir cell2)) by
-            rw [ho4 _ (by decide), ho3 _ (by decide), ho2 _ (by decide)]; exact hcell2,
+            rw [ho4 _ (by scr), ho3 _ (by scr), ho2 _ (by scr)]; exact hcell2,
           typeof, cop]
         rw [ir_eq (a := (c1 : Int)) (b := (cell2 : Int)) ⟨by omega, by omega⟩ ⟨by omega, by omega⟩]
         have heq0 := trivialSplit_eq L.level cell1 cell2 c1 (k : Int) st hA hB
-        rw [ite_eq_left (by simpa using hD)] at heq0
+        rw [ite_eq_left (by simpa using hDc)] at heq0
         by_cases he : c1 = cell2
         · rw [ite_eq_left (by simp; omega)]
           wp_step; wp_step
@@ -514,44 +665,44 @@ theorem wp_trivSplit {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Na
           apply wp_skip
           refine fin c1 st.hint _ m4 (by omega) ?_ harr4 hu4 ?_ fun y _ h2 => ho4 _ h2
           · rw [heq0, ite_eq_right he]; rfl
-          · rw [ho4 _ (by decide), ho3 _ (by decide), ho2 _ (by decide)]; exact ht.hint
+          · rw [ho4 _ (by scr), ho3 _ (by scr), ho2 _ (by scr)]; exact ht.hint
       · rw [ite_eq_right (by simp [hM])]
         wp_step; wp_step
         apply wp_set_eval
         simp only [Exec.evalExpr, show PTree.get dense.id.c2 le3 = some (.Vint (ir k)) by
-            rw [ho3 _ (by decide), ho2 _ (by decide)]; exact hc2, hcl3,
+            rw [ho3 _ (by scr), ho2 _ (by scr)]; exact hc2, hcl3,
           show PTree.get dense.id.cell2 le3 = some (.Vint (ir cell2)) by
-            rw [ho3 _ (by decide), ho2 _ (by decide)]; exact hcell2,
+            rw [ho3 _ (by scr), ho2 _ (by scr)]; exact hcell2,
           show PTree.get dense.id.c1 le3 = some (.Vint (ir c1)) by
-            rw [ho3 _ (by decide), ho2 _ (by decide)]; exact hc1, typeof, cop, ir_sub]
+            rw [ho3 _ (by scr), ho2 _ (by scr)]; exact hc1, typeof, cop, ir_sub]
         rw [ir_lt (a := (k : Int) - cell1) (b := (cell2 : Int) - c1) ⟨by omega, by omega⟩
           ⟨by omega, by omega⟩]
         by_cases hd : cell2 - c1 ≤ k - cell1
         · rw [show (!decide ((k : Int) - cell1 < cell2 - c1)) = true by simp; omega]
           apply wp_if_eval
           simp only [Exec.evalExpr, temps_gss, typeof, cop]
-          rw [ite_eq_left (by decide)]
-          generalize hv4 : PTree.set (idOf 715) _ le3 = le4
+          rw [ite_eq_left (by scr)]
+          generalize hv4 : PTree.set tB _ le3 = le4
           
           -- ADDELEMENT(active, c1); if (c1 == cell2) hint = c1;
-          have hD : st.active.mem cell1 = true ∨ cell2 - c1 ≤ k - cell1 := .inr hd
-          have ho4 : ∀ y, y ≠ idOf 715 → PTree.get y le4 = PTree.get y le3 := fun y hy => by rw [← hv4]; exact temps_gso _ _ hy
+          have hDc : st.active.mem cell1 = true ∨ cell2 - c1 ≤ k - cell1 := .inr hd
+          have ho4 : ∀ y, y ≠ tB → PTree.get y le4 = PTree.get y le3 := fun y hy => by rw [← hv4]; exact temps_gso _ _ hy
           have hc1_4 : Exec.evalExpr ge empty_env le4 m2 (tv dense.id.c1) = some (.Vint (ir c1)) := by
             show PTree.get _ _ = _
-            rw [ho4 _ (by decide), ho3 _ (by decide), ho2 _ (by decide)]; exact hc1
+            rw [ho4 _ (by scr), ho3 _ (by scr), ho2 _ (by scr)]; exact hc1
           wp_step
-          refine Set.wp_addElementB hact2 (by have := hok.Mlt; omega)
-            (by rw [ho4 _ (by decide)]; exact hact3) hc1_4 rfl
-            (by have := hok.nM; omega) (by omega) find_naugraphBit hbit2 rfl ?_
-          intro m4 harr4 hu4 _
+          refine hD.addE hMok hok.Mlt hact2
+            (by rw [ho4 _ (by scr)]; exact hact3) hc1_4 rfl
+            (by have := hok.nM; omega) hbit2 rfl ?_
+          intro m4 harr4 hu4
           wp_step; wp_step; wp_step
           simp only [show PTree.get dense.id.c1 le4 = _ from hc1_4,
             show PTree.get dense.id.cell2 le4 = some (.Vint (ir cell2)) by
-              rw [ho4 _ (by decide), ho3 _ (by decide), ho2 _ (by decide)]; exact hcell2,
+              rw [ho4 _ (by scr), ho3 _ (by scr), ho2 _ (by scr)]; exact hcell2,
             typeof, cop]
           rw [ir_eq (a := (c1 : Int)) (b := (cell2 : Int)) ⟨by omega, by omega⟩ ⟨by omega, by omega⟩]
           have heq0 := trivialSplit_eq L.level cell1 cell2 c1 (k : Int) st hA hB
-          rw [ite_eq_left (by simpa using hD)] at heq0
+          rw [ite_eq_left (by simpa using hDc)] at heq0
           by_cases he : c1 = cell2
           · rw [ite_eq_left (by simp; omega)]
             wp_step; wp_step
@@ -564,32 +715,32 @@ theorem wp_trivSplit {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Na
             apply wp_skip
             refine fin c1 st.hint _ m4 (by omega) ?_ harr4 hu4 ?_ fun y _ h2 => ho4 _ h2
             · rw [heq0, ite_eq_right he]; rfl
-            · rw [ho4 _ (by decide), ho3 _ (by decide), ho2 _ (by decide)]; exact ht.hint
+            · rw [ho4 _ (by scr), ho3 _ (by scr), ho2 _ (by scr)]; exact ht.hint
         · rw [show (!decide ((k : Int) - cell1 < cell2 - c1)) = false by simp; omega]
           apply wp_if_eval
           simp only [Exec.evalExpr, temps_gss, typeof, cop]
-          rw [ite_eq_right (by decide)]
-          generalize hv4 : PTree.set (idOf 715) _ le3 = le4
+          rw [ite_eq_right (by scr)]
+          generalize hv4 : PTree.set tB _ le3 = le4
           
           -- ADDELEMENT(active, cell1); if (c2 == cell1) hint = cell1;
-          have hD : ¬ (st.active.mem cell1 = true ∨ cell2 - c1 ≤ k - cell1) := by rintro (h | h) <;> contradiction
-          have ho4 : ∀ y, y ≠ idOf 715 → PTree.get y le4 = PTree.get y le3 := fun y hy => by rw [← hv4]; exact temps_gso _ _ hy
+          have hDc : ¬ (st.active.mem cell1 = true ∨ cell2 - c1 ≤ k - cell1) := by rintro (h | h) <;> contradiction
+          have ho4 : ∀ y, y ≠ tB → PTree.get y le4 = PTree.get y le3 := fun y hy => by rw [← hv4]; exact temps_gso _ _ hy
           have hcl_4 : Exec.evalExpr ge empty_env le4 m2 (tv dense.id.cell1) = some (.Vint (ir cell1)) := by
             show PTree.get _ _ = _
-            rw [ho4 _ (by decide)]; exact hcl3
+            rw [ho4 _ (by scr)]; exact hcl3
           wp_step
-          refine Set.wp_addElementB hact2 (by have := hok.Mlt; omega)
-            (by rw [ho4 _ (by decide)]; exact hact3) hcl_4 rfl
-            (by have := hok.nM; omega) (by omega) find_naugraphBit hbit2 rfl ?_
-          intro m4 harr4 hu4 _
+          refine hD.addE hMok hok.Mlt hact2
+            (by rw [ho4 _ (by scr)]; exact hact3) hcl_4 rfl
+            (by have := hok.nM; omega) hbit2 rfl ?_
+          intro m4 harr4 hu4
           wp_step; wp_step; wp_step
           simp only [show PTree.get dense.id.cell1 le4 = _ from hcl_4,
             show PTree.get dense.id.c2 le4 = some (.Vint (ir k)) by
-              rw [ho4 _ (by decide), ho3 _ (by decide), ho2 _ (by decide)]; exact hc2,
+              rw [ho4 _ (by scr), ho3 _ (by scr), ho2 _ (by scr)]; exact hc2,
             typeof, cop]
           rw [ir_eq (a := (k : Int)) (b := (cell1 : Int)) ⟨by omega, by omega⟩ ⟨by omega, by omega⟩]
           have heq0 := trivialSplit_eq L.level cell1 cell2 c1 (k : Int) st hA hB
-          rw [ite_eq_right (by simpa using hD)] at heq0
+          rw [ite_eq_right (by simpa using hDc)] at heq0
           by_cases he : k = cell1
           · rw [ite_eq_left (by simp; omega)]
             wp_step; wp_step
@@ -602,7 +753,7 @@ theorem wp_trivSplit {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Na
             apply wp_skip
             refine fin cell1 st.hint _ m4 (by omega) ?_ harr4 hu4 ?_ fun y _ h2 => ho4 _ h2
             · rw [heq0, ite_eq_right (show ¬ (k : Int).toNat = cell1 from he)]; rfl
-            · rw [ho4 _ (by decide), ho3 _ (by decide), ho2 _ (by decide)]; exact ht.hint
+            · rw [ho4 _ (by scr), ho3 _ (by scr), ho2 _ (by scr)]; exact ht.hint
     · rw [show (!decide ((cell2 : Int) < c1)) = false by simp; omega]
       apply wp_if_eval
       simp only [Exec.evalExpr, temps_gss, typeof, cop]
@@ -692,13 +843,20 @@ structure PassInv {n : Nat} (le : temp_env) (m0 m : mem) (L : Loc) (ctx : Ctx n)
   code : stc.longcode < 2 ^ 62
 
 
-theorem wp_cellLoopT {f : function} {Q : Post} {le : temp_env} {m0 m : mem} {n : Nat} {L : Loc}
-    {ctx : Ctx n} {st0 : RefineSt n} {v0 : Nat} {R stc : RefineSt n}
-    (hok : Ok n L) (hv0 : v0 < n) (hok0 : Hex.GraphIso.Nauty.StOk n L.level st0)
+theorem wp_cellLoopT {D : Dialect} (hD : D.Sem) {tA tB : Common.AST.ident} (hsA : Scratch tA)
+    (hsB : Scratch tB) (hAB : tA ≠ tB) {f : function} {Q : Post} {le : temp_env} {m0 m : mem}
+    {n : Nat} {L : Loc} {ctx : Ctx n} {st0 : RefineSt n} {v0 : Nat} {R stc : RefineSt n}
+    (hMok : D.okM L.M) (hok : Ok n L) (hv0 : v0 < n) (hok0 : Hex.GraphIso.Nauty.StOk n L.level st0)
     (hI : PassInv le m0 m L ctx st0 v0 R 0 stc)
     (hc : PTree.get dense.id.cell1 le = some (.Vint (ir (0 : Nat))))
     (hQ : ∀ le' m', PassInv le' m0 m' L ctx st0 v0 R n R → Q.normal E0 empty_env le' m') :
-    Wp xi ge f cellLoopT Q empty_env le m := by
+    Wp xi ge f (cellLoopTG D tA tB) Q empty_env le m := by
+  have a0 := hsA.notArg; have a1 := hsA.longcode; have a2 := hsA.hint; have a3 := hsA.maxpos
+  have a4 := hsA.cell1; have a5 := hsA.cell2; have a6 := hsA.c1; have a7 := hsA.c2
+  have a8 := hsA.gptr; have a9 := hsA.labc1
+  have b0 := hsB.notArg; have b1 := hsB.longcode; have b2 := hsB.hint; have b3 := hsB.maxpos
+  have b4 := hsB.cell1; have b5 := hsB.cell2; have b6 := hsB.c1; have b7 := hsB.c2
+  have b8 := hsB.gptr; have b9 := hsB.labc1
   have hn := hok.nlt
   have hsz0 : st0.ptn.size = n := hok0.ptnSize
   have hend0 : st0.ptn[n - 1]! ≤ L.level := by have := hok0.ptnEnd; rwa [hsz0] at this
@@ -728,13 +886,13 @@ theorem wp_cellLoopT {f : function} {Q : Post} {le : temp_env} {m0 m : mem} {n :
       generalize hen : cellEnd st0.ptn L.level c = en at hspec hR
       obtain ⟨hce, hen', hstop, hgo⟩ := hspec
       wp_step
-      refine wp_scanEnd (x := dense.id.cell2) (y := dense.id.cell1) (by decide) (by decide) hm.ptn
+      refine wp_scanEnd (x := dense.id.cell2) (y := dense.id.cell1) (by scr) (by scr) hm.ptn
         (by omega) ht.ptn ht.level hok.levlt hP.small hc hce hen'
         (by rw [hP.agree en hce hen']; exact hstop)
         (fun i h1 h2 => by rw [hP.agree i h1 (by omega)]; exact hgo i h1 h2) ?_
       intro le1 hcell2 ho1
       have hc1 : PTree.get dense.id.cell1 le1 = some (.Vint (ir c)) := by
-        rw [ho1 _ (by decide)]; exact hc
+        rw [ho1 _ (by scr)]; exact hc
       wp_step; wp_step; wp_step
       apply wp_if_eval
       simp only [Exec.evalExpr, hc1, hcell2, typeof, cop]
@@ -751,7 +909,7 @@ theorem wp_cellLoopT {f : function} {Q : Post} {le : temp_env} {m0 m : mem} {n :
               rcases hx with hx | rfl | rfl | rfl
               · intro h; subst h; revert hx; decide
               all_goals decide)
-            gptr := by rw [ho1 _ (by decide)]; exact hP.gptr
+            gptr := by rw [ho1 _ (by scr)]; exact hP.gptr
             pn := hen'
             fuel := ⟨F', by omega, hR⟩
             agree := fun j h1 h2 => hP.agree j (by omega) h2
@@ -771,12 +929,12 @@ theorem wp_cellLoopT {f : function} {Q : Post} {le : temp_env} {m0 m : mem} {n :
         have hok' := hP.ok
         have hlsz : stc.lab.size = n := hok'.labSize
         wp_step
-        refine wp_swap (v := v0) hm.graph hv0 hok.Mlt hok.nM hm.bit (hok.ne 0 1 (by omega))
+        refine wp_swap hD (v := v0) hMok hm.graph hv0 hok.Mlt hok.nM hm.bit (hok.ne 0 1 (by omega))
           (hok.ne 1 16 (by omega)).symm rfl hm.lab hlsz (fun j hj => hok'.labOk j (by omega))
           (Nat.le_of_lt hlt) hen'
-          (by rw [ho2 _ (by decide) (by decide), ho1 _ (by decide)]; exact hP.gptr)
-          (by rw [ho2 _ (by decide) (by decide), ho1 _ (by decide)]; exact ht.lab)
-          (by rw [← hle2, temps_gso _ _ (by decide), temps_gss])
+          (by rw [ho2 _ (by scr) (by scr), ho1 _ (by scr)]; exact hP.gptr)
+          (by rw [ho2 _ (by scr) (by scr), ho1 _ (by scr)]; exact ht.lab)
+          (by rw [← hle2, temps_gso _ _ (by scr), temps_gss])
           (by rw [← hle2, temps_gss]) ?_
         intro le3 m3 lab' c1 c2 hRs harr3 hu3 hs hcc hc13 hc23 ho3
         have ho13 : ∀ x, x ≠ dense.id.c1 → x ≠ dense.id.c2 → x ≠ dense.id.labc1 → x ≠ dense.id.cell2 →
@@ -801,9 +959,9 @@ theorem wp_cellLoopT {f : function} {Q : Post} {le : temp_env} {m0 m : mem} {n :
           (by rintro rfl; rcases hx with hx | h | h | h <;> first | (revert hx; decide) | (revert h; decide))
           (by rintro rfl; rcases hx with hx | h | h | h <;> first | (revert hx; decide) | (revert h; decide))).congr
             rfl rfl rfl
-        refine wp_trivSplit hok hmL htL hP.code hok'.ptnSize hs.lo hcc hs.hi hen'
-          (by rw [ho13 _ (by decide) (by decide) (by decide) (by decide)]; exact hc)
-          (by rw [ho3 _ (by decide) (by decide) (by decide), ho2 _ (by decide) (by decide)]; exact hcell2)
+        refine wp_trivSplit hD hsA hsB hAB hMok hok hmL htL hP.code hok'.ptnSize hs.lo hcc hs.hi hen'
+          (by rw [ho13 _ (by scr) (by scr) (by scr) (by scr)]; exact hc)
+          (by rw [ho3 _ (by scr) (by scr) (by scr), ho2 _ (by scr) (by scr)]; exact hcell2)
           hc13 hc23 ?_
         intro le4 m4 aw4 hm4 ht4 hu4 ho4
         have hTC : trivialCell L.level ctx.g[v0]! c en stc =
@@ -843,8 +1001,8 @@ theorem wp_cellLoopT {f : function} {Q : Post} {le : temp_env} {m0 m : mem} {n :
               · exact .inr (.inr (.inr (.inr (.inl h))))))
             tmp := ht4
             gptr := by
-              rw [ho4 _ (by decide) (by decide) (by decide) (by decide),
-                ho13 _ (by decide) (by decide) (by decide) (by decide)]
+              rw [ho4 _ (by scr) (by scr) (by scr) (by scr),
+                ho13 _ (by scr) (by scr) (by scr) (by scr)]
               exact hP.gptr
             pn := hen'
             fuel := ⟨F', by omega, hR⟩
@@ -855,8 +1013,8 @@ theorem wp_cellLoopT {f : function} {Q : Post} {le : temp_env} {m0 m : mem} {n :
             hint := hhint
             maxpos := by rw [hmax]; exact hP.maxpos
             code := hcd }⟩
-        rw [ho4 _ (by decide) (by decide) (by decide) (by decide),
-          ho3 _ (by decide) (by decide) (by decide), ho2 _ (by decide) (by decide)]
+        rw [ho4 _ (by scr) (by scr) (by scr) (by scr),
+          ho3 _ (by scr) (by scr) (by scr), ho2 _ (by scr) (by scr)]
         exact hcell2
     · rw [ite_eq_right (by simpa using hcn)]
       apply wp_break
@@ -873,13 +1031,25 @@ theorem wp_cellLoopT {f : function} {Q : Post} {le : temp_env} {m0 m : mem} {n :
     refine ⟨n - (en + 1), by omega, by simp, rfl, en + 1, stc, rfl, ?_, ?_⟩
     · rw [temps_gss]; push_cast; rfl
     · exact { hP with
-        tmp := hP.tmp.set _ (by decide)
-        gptr := by rw [temps_gso _ _ (by decide)]; exact hP.gptr }
+        tmp := hP.tmp.set _ (by scr)
+        gptr := by rw [temps_gso _ _ (by scr)]; exact hP.gptr }
 
 
-/-- `refine`'s pass for a trivial splitting cell is HexGraphIso's `refineTrivial`. -/
-theorem wp_trivial : TrivialPass xi := by
-  intro n Q le m L ctx st aw split1 hok hm ht hi hnc hs1 hsp hQ
+/-- The trivial-splitter pass in dialect `D`, as `TrivialPass` states it for `refine`. -/
+def TrivialPassG (xi : ExternalCalls) (D : Dialect) (tA tB : Common.AST.ident) (f : function) :
+    Prop :=
+  ∀ {n : Nat} {Q : Post} {le : temp_env} {m : mem} {L : Loc} {ctx : Ctx n} {st : RefineSt n}
+    {aw : Nat → Lib.Integers.int64} {split1 : Nat},
+    D.okM L.M → Ok n L → Mem m L ctx st aw → Tmp le L st → StInv n L st → st.numcells < n →
+    PTree.get dense.id.split1 le = some (.Vint (ir split1)) → split1 < n →
+    (∀ le' m', Done le' m' L ctx (Hex.GraphIso.Nauty.refineTrivial ctx L.level split1 st) →
+      Unch m m' L.writes → Q.normal E0 empty_env le' m') →
+    Wp xi ge f (trivialG D tA tB) Q empty_env le m
+
+/-- The trivial-splitter pass is HexGraphIso's `refineTrivial`, in either dialect. -/
+theorem wp_trivialG {D : Dialect} (hD : D.Sem) {tA tB : Common.AST.ident} (hsA : Scratch tA)
+    (hsB : Scratch tB) (hAB : tA ≠ tB) (f : function) : TrivialPassG xi D tA tB f := by
+  intro n Q le m L ctx st aw split1 hMok hok hm ht hi hnc hs1 hsp hQ
   have hn := hok.nlt
   have hok0 := hi.ok
   have hlsz : st.lab.size = n := hok0.labSize
@@ -894,9 +1064,10 @@ theorem wp_trivial : TrivialPass xi := by
       some (.Vlong (lr (st.lab[split1]! : Int))) := by
     rw [Exec.evalExpr, hle]
     simp only [ints, typeof, cop, cast_int_long_ir (a := (st.lab[split1]! : Int)) ⟨by omega, by omega⟩]
-  rw [Exec.evalExpr, e1, Exec.evalExpr, show Exec.evalExpr ge empty_env le m (tv dense.id.m) = _ from ht.m,
-    e3]
+  obtain ⟨hmE, hmT⟩ := hD.mE (e := empty_env) (le := le) (m := m) hMok ht.m
+  rw [Exec.evalExpr, e1, Exec.evalExpr, hmE, e3]
   have hMlt := hok.Mlt
+  simp only [hmT]
   simp only [typeof, cop, Graph.mul_lr (show L.M < 2147483648 by omega)]
   rw [show ((L.M : Int) * (st.lab[split1]! : Int)) = ((L.M * st.lab[split1]! : Nat) : Int) by
     push_cast; rfl, Graph.add_ptrTo_long]
@@ -906,7 +1077,7 @@ theorem wp_trivial : TrivialPass xi := by
   have hR : Hex.GraphIso.Nauty.refineTrivial ctx L.level split1 st =
       Hex.GraphIso.Nauty.refineTrivialFast.go L.level ctx.g[st.lab[split1]!]! st.ptn n 0 st := by
     rw [Hex.GraphIso.Nauty.refineTrivial_eq_fast]; rfl
-  refine wp_cellLoopT (st0 := st) (v0 := st.lab[split1]!) hok hv0 hok0
+  refine wp_cellLoopT hD hsA hsB hAB (st0 := st) (v0 := st.lab[split1]!) hMok hok hv0 hok0
     { mem := ⟨aw, hm⟩
       unch := Unch.refl _ _
       tmp := (ht.set _ (by decide)).set _ (by decide)
@@ -925,5 +1096,14 @@ theorem wp_trivial : TrivialPass xi := by
   exact hQ le' m' ⟨aw', hm', hP.tmp,
     { ok := hP.ok, ptnSmall := hP.small, ncSmall := by have := hP.nc; omega, hint := hP.hint,
       maxpos := hP.maxpos, code := hP.code }⟩ hP.unch
+
+
+/-- `refine`'s pass for a trivial splitting cell is HexGraphIso's `refineTrivial`. -/
+theorem wp_trivial : TrivialPass xi := fun hok =>
+  wp_trivialG D0_sem (scratch_of _ (by decide)) (scratch_of _ (by decide)) (by decide) _ True.intro hok
+
+/-- `refine1`'s pass for a trivial splitting cell is HexGraphIso's `refineTrivial`. -/
+theorem wp_trivial1 : TrivialPassG xi D1 (idOf 714) (idOf 713) dense.fn.refine1 :=
+  wp_trivialG D1_sem (scratch_of _ (by decide)) (scratch_of _ (by decide)) (by decide) _
 
 end NautyVerified.Proofs.Refine

@@ -63,8 +63,11 @@ import NautyVerified.Proofs.Cheapautom.Satisfies
 import NautyVerified.Proofs.Graph.Rows
 import NautyVerified.Proofs.Set.Elem
 import NautyVerified.Proofs.Set.Bit
+import NautyVerified.Proofs.Set.One
 import NautyVerified.Proofs.Refine.Syntax
 import NautyVerified.Proofs.Refine.State
+import NautyVerified.Proofs.Refine.Dialect
+import NautyVerified.Proofs.Refine1.Syntax
 import NautyVerified.Proofs.Refine.Mash
 import NautyVerified.Proofs.Refine.Scan
 import NautyVerified.Proofs.Refine.Guard
