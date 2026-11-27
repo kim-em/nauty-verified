@@ -79,6 +79,7 @@ import NautyVerified.Proofs.Refine.Fn
 import NautyVerified.Proofs.Refine1.Satisfies
 import NautyVerified.Proofs.Doref.Syntax
 import NautyVerified.Proofs.Doref.Satisfies
+import NautyVerified.Proofs.Search.Blocks
 import NautyVerified.Proofs.Refine.Frame
 import NautyVerified.Proofs.Refine.Trivial
 import NautyVerified.Proofs.Refine.Pop
