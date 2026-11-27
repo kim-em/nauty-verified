@@ -45,3 +45,5 @@ import NautyVerified.Proofs.Alloc.Malloc
 import NautyVerified.Proofs.Alloc.Zalloc
 import NautyVerified.Proofs.Alloc.Zero
 import NautyVerified.Proofs.Alloc.Free
+import NautyVerified.Proofs.Alloc.Dyn
+import NautyVerified.Proofs.Fmperm.Syntax

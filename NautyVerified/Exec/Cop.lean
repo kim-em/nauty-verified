@@ -186,7 +186,17 @@ variable (x y : Lib.Integers.int64) (n : Lib.Integers.int)
   rfl
 @[simp, cop] theorem cast_i_uc : sem_cast (.Vint n) (Tint .I32 .Signed a) (Tint .I8 .Unsigned b) m =
     some (.Vint (Lib.Integers.Int.zero_ext (zOfInt 8) n)) := rfl
+@[simp, cop] theorem gt_ll : sem_binary_operation ce .Ogt (.Vlong x) (Tlong .Unsigned a)
+    (.Vlong y) (Tlong .Unsigned b) m = some (Val.of_bool (Lib.Integers.Int64.ltu y x)) := rfl
+@[simp, cop] theorem mul_ll : sem_binary_operation ce .Omul (.Vlong x) (Tlong .Unsigned a)
+    (.Vlong y) (Tlong .Unsigned b) m = some (.Vlong (Lib.Integers.Int64.mul x y)) := rfl
+@[simp, cop] theorem cast_ip (t : type) : sem_cast (.Vint n) (Tint .I32 .Signed a) (Tpointer t b) m =
+    some (.Vlong (Lib.Integers.Int64.repr (Lib.Integers.Int.signed n))) := rfl
 end LongMixed
+
+@[simp, cop] theorem eq_pl (blk : block) (ofs : ptrofs) (t1 t2 : type) (y : Lib.Integers.int64) :
+    sem_binary_operation ce .Oeq (.Vptr blk ofs) (Tpointer t1 a) (.Vlong y) (Tpointer t2 b) m =
+      (Val.cmplu_bool (Mem.valid_pointer m) .Ceq (.Vptr blk ofs) (.Vlong y)).map Val.of_bool := rfl
 
 @[simp, cop] theorem bool_ptr (blk : block) (ofs : ptrofs) (t : type) :
     bool_val (.Vptr blk ofs) (Tpointer t a) m =

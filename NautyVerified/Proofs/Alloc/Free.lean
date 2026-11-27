@@ -30,7 +30,7 @@ structure Malloced (m : mem) (b : block) (n : Nat) : Prop where
 
 def freeSpec (b : block) (n : Nat) : FunSpec where
   pre args m := args = [.Vptr b Ptrofs.zero] ∧ Malloced m b n
-  post _ m t v m' := t = E0 ∧ v = .Vundef ∧ Unch m m' (· = b)
+  post _ m t v m' := t = E0 ∧ v = .Vundef ∧ Unch m m' (· = b) ∧ Mem.nextblock m' = Mem.nextblock m
 
 theorem free_satisfies {xi : ExternalCalls} (b : block) (n : Nat) :
     Satisfies xi ge (.External .EF_free [tptr .Tvoid] .Tvoid Common.AST.cc_default)
@@ -50,7 +50,7 @@ theorem free_satisfies {xi : ExternalCalls} (b : block) (n : Nat) :
     have := hm.perm (intOfZ o) h1 h2
     rwa [zOfInt_intOfZ] at this
   obtain ⟨m', hfree⟩ := Mem.range_perm_free _ _ _ _ hrange
-  refine ⟨E0, .Vundef, m', ?_, rfl, rfl, Unch.free hfree⟩
+  refine ⟨E0, .Vundef, m', ?_, rfl, rfl, Unch.free hfree, Mem.nextblock_free _ _ _ _ _ hfree⟩
   refine .extcall_free_sem_ptr _ _ (Ptrofs.repr (zOfInt n)) _ _ ?_ ?_
   · show Mem.load Mptr m b (zOfInt (-8)) = some (Vptrofs (Ptrofs.repr (zOfInt n)))
     rw [vptrofs_lr]; exact hm.hdr
