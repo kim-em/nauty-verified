@@ -268,6 +268,10 @@ the argmax against `argmaxLoop`. Its spec (`bestcellSpec`, `Pre`, `Post`) is
 shared with `targetcell`: the three `DYNALLSTAT` pairs may be replaced, and
 only `dyn3Set` changes. Sets reached through a pointer global use
 `Proofs/Set/Global.lean`; loops from a nonzero start use `wp_forLoopFrom`.
+`targetcell` (`Proofs/Targetcell/`) is proved against HexGraphIso's
+`targetcell` for any `digraph` argument and a hint below `n`, calling
+`bestcell` through `bestcell_satisfies`; `targetcell_mem` (Hex level) gives the
+start of a nontrivial cell when one exists.
 
 Conventions settled while doing these:
 

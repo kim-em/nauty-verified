@@ -106,4 +106,5 @@ import NautyVerified.Proofs.Testcanlab.Satisfies
 import NautyVerified.Logic.ForFrom
 import NautyVerified.Spec.Bestcell
 import NautyVerified.Proofs.Bestcell.Satisfies
+import NautyVerified.Proofs.Targetcell.Satisfies
 import NautyVerified.Proofs.Init.Tables
