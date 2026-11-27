@@ -1,6 +1,8 @@
 import NautyVerified.Proofs.Refine.CountN
 import NautyVerified.Proofs.Refine.WindowN
 import NautyVerified.Spec.CountWin
+import NautyVerified.Proofs.Refine.Temps
+import NautyVerified.Proofs.Refine1.Count
 
 /-!
 # Counting one cell
@@ -92,17 +94,39 @@ theorem cnt_inc (cs : List Nat) (cell1 k : Nat) (cv0 : Nat → val) (p : Nat) :
     · rw [ite_eq_left h, ite_eq_left (by omega)]
     · rw [ite_eq_right h, ite_eq_right (by omega)]
 
+/-- `while (++i <= cell2) { <count lab[i]>; widen the window; ++bucket[cnt]; count[i] = cnt; }`
+with the per-member count `hd` and SimplExpr's temporaries `t1 t2 t3`. -/
+abbrev countRestG (hd : statement → statement) (t1 t2 t3 : Common.AST.ident) : statement :=
+  .Sloop
+    (.Ssequence
+      (.Ssequence
+        (.Ssequence
+          (Set.sk (.Sset t1 (.Ecast (.Ebinop .Oadd (tv dense.id.i) (ci 1 tint) tint) tint)))
+          (.Sset dense.id.i (tv t1)))
+        (.Sifthenelse (.Ebinop .Ole (tv t1) (tv dense.id.cell2) tint) .Sskip .Sbreak))
+      (hd (.Ssequence (widenLo t2) (.Ssequence (widenHi t3)
+        (.Ssequence
+          (Set.sk (.Sassign (gix dense.id.«naugraph:bucket» (tv dense.id.cnt))
+            (.Ebinop .Oadd (gix dense.id.«naugraph:bucket» (tv dense.id.cnt)) (ci 1 tint) tint)))
+          (Set.sk (.Sassign (ix dense.id.count (tv dense.id.i)) (tv dense.id.cnt))))))))
+    .Sskip
+
+theorem countRest_D0 : countRest =
+    countRestG (cntHead (idOf 725) (idOf 726) (idOf 727) (idOf 728)) (idOf 724) (idOf 729)
+      (idOf 730) := rfl
+
+theorem countRest_D1 : Refine1.countRest =
+    countRestG (fun rest => .Ssequence (Refine1.cnt1 (idOf 719)) rest) (idOf 718) (idOf 720)
+      (idOf 721) := rfl
+
 /-- What the nontrivial pass reads while it counts and splits one cell: the
-graph, `lab`, the splitter's words, the pointer globals and the tables. -/
-structure CFrame {n : Nat} (m : mem) (L : Loc) (ctx : Ctx n) (lab : Array Nat) (ws : VSet n)
-    (wsw : Nat → Lib.Integers.int64) : Prop where
+graph, `lab`, the pointer globals and the tables. What it reads about the
+splitter set depends on the function (`CountHead`). -/
+structure CFrame {n : Nat} (m : mem) (L : Loc) (ctx : Ctx n) (lab : Array Nat) : Prop where
   ok : Ok n L
   graph : GraphAt m L.bg L.gofs L.gw ctx.g L.M
   larr : ArrayAt m .Mint32 L.bl L.lb (ints lab) n
   labs : ∀ i < n, lab[i]! < n
-  wsA : ArrayAt m .Mint64 L.bS 0 (longs wsw) L.M
-  wsR : SetRep (fun w => bv64 (wsw w)) L.M ws
-  wsp : Mem.load .Mint64 m Block.naugraphWorkset (zOfInt 0) = some (.Vptr L.bS Ptrofs.zero)
   bkp : Mem.load .Mint64 m Block.naugraphBucket (zOfInt 0) = some (.Vptr L.bB Ptrofs.zero)
   wpp : Mem.load .Mint64 m Block.naugraphWorkperm (zOfInt 0) = some (.Vptr L.bW Ptrofs.zero)
   bytes : BytecountTable m
@@ -112,10 +136,10 @@ structure CFrame {n : Nat} (m : mem) (L : Loc) (ctx : Ctx n) (lab : Array Nat) (
 
 /-- `CFrame` survives writes to `count`, `bucket`, `workperm`, `ptn`, `active`
 and `*numcells`. -/
-theorem CFrame.unch {n : Nat} {m m' : mem} {L : Loc} {ctx : Ctx n} {lab : Array Nat} {ws : VSet n}
-    {wsw : Nat → Lib.Integers.int64} (h : CFrame m L ctx lab ws wsw)
+theorem CFrame.unch {n : Nat} {m m' : mem} {L : Loc} {ctx : Ctx n} {lab : Array Nat}
+    (h : CFrame m L ctx lab)
     (hu : Unch m m' (fun z => z = L.bc ∨ z = L.bB ∨ z = L.bW ∨ z = L.bp ∨ z = L.ba ∨ z = L.bn)) :
-    CFrame m' L ctx lab ws wsw :=
+    CFrame m' L ctx lab :=
   have d := h.ok.wd
   have nW : ∀ {g : block}, L.bc ≠ g → L.bB ≠ g → L.bW ≠ g → L.bp ≠ g → L.ba ≠ g → L.bn ≠ g →
       ¬ (g = L.bc ∨ g = L.bB ∨ g = L.bW ∨ g = L.bp ∨ g = L.ba ∨ g = L.bn) :=
@@ -132,8 +156,6 @@ theorem CFrame.unch {n : Nat} {m m' : mem} {L : Loc} {ctx : Ctx n} {lab : Array 
       (Ne.symm d.bg_bp) (Ne.symm d.bg_ba) (Ne.symm d.bg_bn)), h.graph.rep⟩
     larr := h.larr.unch hu (nW (Ne.symm d.bl_bc) (Ne.symm d.bl_bB) (Ne.symm d.bl_bW)
       (Ne.symm d.bl_bp) (Ne.symm d.bl_ba) (Ne.symm d.bl_bn))
-    wsA := h.wsA.unch hu (nW d.bc_bS (Ne.symm d.bS_bB) (d.bW_bS) (d.bp_bS) (d.ba_bS) (d.bn_bS))
-    wsp := by rw [hu.load _ _ _ (nW d.bc_g2 d.bB_g2 d.bW_g2 d.bp_g2 d.ba_g2 d.bn_g2)]; exact h.wsp
     bkp := by rw [hu.load _ _ _ (nW d.bc_g4 d.bB_g4 d.bW_g4 d.bp_g4 d.ba_g4 d.bn_g4)]; exact h.bkp
     wpp := by rw [hu.load _ _ _ (nW d.bc_g0 d.bB_g0 d.bW_g0 d.bp_g0 d.ba_g0 d.bn_g0)]; exact h.wpp
     bytes := BytecountTable.unch h.bytes hu (nW d.bc_g7 d.bB_g7 d.bW_g7 d.bp_g7 d.ba_g7 d.bn_g7)
@@ -148,10 +170,67 @@ theorem countsOf_le {n : Nat} (ctx : Ctx n) (lab : Array Nat) (ws : VSet n) (cel
   · rw [countsOf_get ctx lab ws ho]; exact cardInter_le _ _
   · rw [getElem!_neg _ _ (by rw [countsOf_length]; omega)]; exact Nat.zero_le _
 
-/-- The temporaries the counting loop assigns. -/
-def cntTemps : List Common.AST.ident :=
-  [dense.id.i, idOf 724, dense.id.set1, dense.id.set2, dense.id.cnt, dense.id.c1, idOf 725,
-   idOf 726, idOf 727, idOf 728, dense.id.x, dense.id.bmin, dense.id.bmax, idOf 729, idOf 730]
+/-- `hd rest` sets `cnt` to the neighbour count of `lab[i]` in the splitter set `ws`,
+assigning only `hdTemps ht`, then runs `rest`; `Sp` is what it reads about the splitter. -/
+def CountHead (xi : ExternalCalls) (f : function) (hd : statement → statement)
+    (ht : List Common.AST.ident) {n : Nat} (L : Loc) (ctx : Ctx n) (ws : VSet n)
+    (Sp : temp_env → mem → Prop) : Prop :=
+  ∀ {Q : Post} {le : temp_env} {m : mem} {rest : statement} {st : RefineSt n} {i : Nat},
+    Sp le m → CFrame m L ctx st.lab → Tmp le L st →
+    PTree.get dense.id.i le = some (.Vint (ir i)) → i < n →
+    (∀ le', PTree.get dense.id.cnt le' = some (.Vint (ir (ws.cardInter ctx.g[st.lab[i]!]! : Nat))) →
+      (∀ z, z ∉ hdTemps ht → PTree.get z le' = PTree.get z le) → Wp xi ge f rest Q empty_env le' m) →
+    Wp xi ge f (hd rest) Q empty_env le m
+
+/-- `Sp` survives the nontrivial pass's writes to memory, and changes of the
+temporaries outside `T`. -/
+structure SpOk (Sp : temp_env → mem → Prop) (L : Loc) (T : List Common.AST.ident) : Prop where
+  unch : ∀ {le m m'} {S : block → Prop}, Sp le m → Unch m m' S →
+    (∀ z, S z → z = L.bl ∨ z = L.bp ∨ z = L.bn ∨ z = L.bc ∨ z = L.ba ∨ z = L.bW ∨ z = L.bB) →
+    Sp le m'
+  temps : ∀ {le le' m}, Sp le m → (∀ z, z ∉ T → PTree.get z le' = PTree.get z le) → Sp le' m
+
+theorem SpOk.mono {Sp : temp_env → mem → Prop} {L : Loc} {T T' : List Common.AST.ident}
+    (h : SpOk Sp L T') (hT : ∀ z ∈ T, z ∈ T') : SpOk Sp L T :=
+  ⟨h.unch, fun hs ho => h.temps hs fun z hz => ho z fun h' => hz (hT z h')⟩
+
+/-- `refine`'s. -/
+abbrev cntTemps : List Common.AST.ident :=
+  cntTempsG (idOf 724) (idOf 729) (idOf 730) [idOf 725, idOf 726, idOf 727, idOf 728]
+
+theorem cntTemps_away {t1 t2 t3 : Common.AST.ident} {hts : List Common.AST.ident}
+    (hT : NTemps ([t1, t2, t3] ++ hts)) :
+    ∀ x ∈ args ++ [dense.id.longcode, dense.id.hint, dense.id.maxpos], x ∉ cntTempsG t1 t2 t3 hts := by
+  intro x hx hm
+  have hc : ∀ y ∈ args ++ [dense.id.longcode, dense.id.hint, dense.id.maxpos],
+      y ∉ [dense.id.i, dense.id.set1, dense.id.set2, dense.id.cnt, dense.id.c1, dense.id.x,
+        dense.id.bmin, dense.id.bmax] := by decide
+  have hA := hT.notMem (l := [t1, t2, t3] ++ hts) (fun y hy => hy) (args_names x hx)
+  have hB := hc x hx
+  simp only [cntTempsG, hdTemps, List.mem_append, List.mem_cons, List.mem_nil_iff, or_false,
+    not_or] at hm hA hB
+  simp_all
+
+/-- `refine`'s splitter set: `M` words in the `workset` block. -/
+def SpWords {n : Nat} (L : Loc) (ws : VSet n) (wsw : Nat → Lib.Integers.int64) (_le : temp_env)
+    (m : mem) : Prop :=
+  ArrayAt m .Mint64 L.bS 0 (longs wsw) L.M ∧ SetRep (fun w => bv64 (wsw w)) L.M ws ∧
+    Mem.load .Mint64 m Block.naugraphWorkset (zOfInt 0) = some (.Vptr L.bS Ptrofs.zero)
+
+theorem SpWords.ok {n : Nat} {L : Loc} {ws : VSet n} {wsw : Nat → Lib.Integers.int64}
+    (d : WDist L) (T : List Common.AST.ident) : SpOk (SpWords L ws wsw) L T where
+  unch := fun ⟨hA, hR, hp⟩ hu hS => by
+    have nS : ∀ g, g ≠ L.bl → g ≠ L.bp → g ≠ L.bn → g ≠ L.bc → g ≠ L.ba → g ≠ L.bW → g ≠ L.bB →
+        ∀ S : block → Prop, (∀ z, S z → z = L.bl ∨ z = L.bp ∨ z = L.bn ∨ z = L.bc ∨ z = L.ba ∨
+          z = L.bW ∨ z = L.bB) → ¬ S g := by
+      intro g h1 h2 h3 h4 h5 h6 h7 S hS hg
+      rcases hS g hg with h | h | h | h | h | h | h <;> contradiction
+    refine ⟨hA.unch hu (nS _ (Ne.symm d.bl_bS) (Ne.symm d.bp_bS) (Ne.symm d.bn_bS) (Ne.symm d.bc_bS)
+      (Ne.symm d.ba_bS) (Ne.symm d.bW_bS) d.bS_bB _ hS), hR, ?_⟩
+    rw [hu.load _ _ _ (nS _ (Ne.symm d.bl_g2) (Ne.symm d.bp_g2) (Ne.symm d.bn_g2) (Ne.symm d.bc_g2)
+      (Ne.symm d.ba_g2) (Ne.symm d.bW_g2) (Ne.symm d.bB_g2) _ hS)]
+    exact hp
+  temps := fun hs _ => hs
 
 /-- `Tmp` survives assignments to temporaries outside `args` and the three scalars. -/
 theorem Tmp.away {n : Nat} {le le' : temp_env} {L : Loc} {st : RefineSt n} (h : Tmp le L st)
@@ -165,10 +244,27 @@ theorem Tmp.away {n : Nat} {le le' : temp_env} {L : Loc} {st : RefineSt n} (h : 
     · subst hx; simp
     · subst hx; simp))
 
-theorem wp_countRest {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc} {ctx : Ctx n}
-    {st : RefineSt n} {ws : VSet n} {wsw : Nat → Lib.Integers.int64} {cell1 cell2 : Nat}
-    {cv0 bv0 : Nat → val}
-    (hf : CFrame m L ctx st.lab ws wsw) (ht : Tmp le L st)
+/-- `refine`'s per-member count: the word loop over the `workset` block. -/
+theorem cntHead_ok {f : function} {a b c d : Common.AST.ident}
+    (hd : [dense.id.c1, a, b, c, d, dense.id.x, dense.id.set1, dense.id.set2, dense.id.cnt,
+      dense.id.m].Pairwise (· ≠ ·)) {n : Nat} {L : Loc} {ctx : Ctx n} {ws : VSet n}
+    {wsw : Nat → Lib.Integers.int64} :
+    CountHead xi f (cntHead a b c d) [a, b, c, d] L ctx ws (SpWords L ws wsw) := by
+  intro Q le m rest st i ⟨hA, hR, hp⟩ hf ht hi hin hQ
+  refine wp_cntHead hd hf.ok ht hf.graph hf.larr hA hR hp hi hin (hf.labs i hin) hf.bytes ?_
+  intro le' hc ho
+  refine hQ le' hc fun z hz => ?_
+  have e : ∀ y ∈ hdTemps [a, b, c, d], z ≠ y := fun y hy h => hz (h ▸ hy)
+  exact ho z (e _ (by simp)) (e _ (by simp)) (e _ (by simp)) (e _ (by simp)) (e _ (by simp))
+    (e _ (by simp)) (e _ (by simp)) (e _ (by simp)) (e _ (by simp))
+
+theorem wp_countRest {hd : statement → statement} {t1 t2 t3 : Common.AST.ident}
+    {hts : List Common.AST.ident} (hT : NTemps ([t1, t2, t3] ++ hts))
+    {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc} {ctx : Ctx n}
+    {st : RefineSt n} {ws : VSet n} {Sp : temp_env → mem → Prop} {cell1 cell2 : Nat}
+    {cv0 bv0 : Nat → val} (hH : CountHead xi f hd hts L ctx ws Sp)
+    (hSp : Sp le m) (hSo : SpOk Sp L (cntTempsG t1 t2 t3 hts))
+    (hf : CFrame m L ctx st.lab) (ht : Tmp le L st)
     (h12 : cell1 < cell2) (h2n : cell2 < n)
     (hi : PTree.get dense.id.i le = some (.Vint (ir cell1)))
     (hc2 : PTree.get dense.id.cell2 le = some (.Vint (ir cell2)))
@@ -188,9 +284,9 @@ theorem wp_countRest {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Na
       ArrayAt m' .Mint32 L.bB 0
         (bktVals (countsOf ctx st.lab ws cell1 cell2) (cell2 - cell1) bv0) L.capB →
       Unch m m' (fun z => z = L.bc ∨ z = L.bB) → Keep m m' L.bB →
-      (∀ z, z ∉ cntTemps → PTree.get z le' = PTree.get z le) →
+      (∀ z, z ∉ cntTempsG t1 t2 t3 hts → PTree.get z le' = PTree.get z le) →
       Q.normal E0 empty_env le' m') :
-    Wp xi ge f countRest Q empty_env le m := by
+    Wp xi ge f (countRestG hd t1 t2 t3) Q empty_env le m := by
   have hok := hf.ok
   have d := hok.wd
   have hcap := hok.capB
@@ -207,22 +303,22 @@ theorem wp_countRest {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Na
       ArrayAt m' .Mint32 L.bc L.cb (cntVals cs cell1 k cv0) n ∧
       ArrayAt m' .Mint32 L.bB 0 (bktVals cs k bv0) L.capB ∧
       Unch m m' (fun z => z = L.bc ∨ z = L.bB) ∧ Keep m m' L.bB ∧
-      (∀ z, z ∉ cntTemps → PTree.get z le' = PTree.get z le)
+      (∀ z, z ∉ cntTempsG t1 t2 t3 hts → PTree.get z le' = PTree.get z le)
   refine wp_loop (I := I) (J := fun v tr e' le' m' => ∃ v', v' < v ∧ I v' tr e' le' m') ?_ ?_
     (n := F) ⟨rfl, rfl, 0, Nat.zero_le _, rfl, by simpa using hi, hbmin, hbmax, hcnt, hbkt,
       Unch.refl _ _, Keep.refl _ _, fun _ _ => rfl⟩
   · rintro v tr e' le' m' ⟨rfl, rfl, k, hk, rfl, hik, hmin, hmax, hca, hba, hu, hkp, ho⟩
     have hc2' : PTree.get dense.id.cell2 le' = some (.Vint (ir cell2)) := by
-      rw [ho _ (by decide)]; exact hc2
+      rw [ho _ (by nscr)]; exact hc2
     wp_step; wp_step; wp_step; wp_step; wp_step
     apply wp_set_eval
     simp only [Exec.evalExpr, hik, typeof, cop, ir_add]
     apply wp_set_eval
     simp only [Exec.evalExpr, temps_gss]
     apply wp_if_eval
-    simp only [Exec.evalExpr, temps_gss, temps_gso _ _ (show (idOf 724) ≠ dense.id.i by decide),
+    simp only [Exec.evalExpr, temps_gss, temps_gso _ _ (show t1 ≠ dense.id.i by nscr),
       typeof, cop]
-    rw [temps_gso _ _ (by decide), temps_gso _ _ (by decide), hc2']
+    rw [temps_gso _ _ (by nscr), temps_gso _ _ (by nscr), hc2']
     simp only [cop]
     rw [ir_lt (a := (cell2 : Int)) (b := ((cell1 + k : Nat) : Int) + 1) ⟨by omega, by omega⟩
       ⟨by omega, by omega⟩]
@@ -232,11 +328,11 @@ theorem wp_countRest {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Na
       subst hkF
       simp only [E0_append]
       refine hQ _ _ ?_ ?_ hca hba hu hkp ?_
-      · rw [temps_gso _ _ (by decide), temps_gso _ _ (by decide)]; exact hmin
-      · rw [temps_gso _ _ (by decide), temps_gso _ _ (by decide)]; exact hmax
+      · rw [temps_gso _ _ (by nscr), temps_gso _ _ (by nscr)]; exact hmin
+      · rw [temps_gso _ _ (by nscr), temps_gso _ _ (by nscr)]; exact hmax
       · intro z hz
-        have h1 : z ≠ dense.id.i := fun h => hz (h ▸ by simp [cntTemps])
-        have h2 : z ≠ idOf 724 := fun h => hz (h ▸ by simp [cntTemps])
+        have h1 : z ≠ dense.id.i := fun h => hz (h ▸ by simp [cntTempsG])
+        have h2 : z ≠ t1 := fun h => hz (h ▸ by simp [cntTempsG])
         rw [temps_gso _ _ h1, temps_gso _ _ h2, ho z hz]
     · rw [ite_eq_left (by simp; omega)]
       apply wp_skip
@@ -244,32 +340,30 @@ theorem wp_countRest {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Na
       have hk1 : k + 1 < cs.length := by omega
       have hcu := hf.unch (hu.mono fun z hz => by rcases hz with h | h <;> simp [h])
       let le2 := PTree.set dense.id.i (.Vint (ir (((cell1 + k : Nat) : Int) + 1)))
-        (PTree.set (idOf 724) (.Vint (ir (((cell1 + k : Nat) : Int) + 1))) le')
-      have ho2 : ∀ z, z ∉ cntTemps → PTree.get z le2 = PTree.get z le := fun z hz => by
-        have h1 : z ≠ dense.id.i := fun h => hz (h ▸ by simp [cntTemps])
-        have h2 : z ≠ idOf 724 := fun h => hz (h ▸ by simp [cntTemps])
+        (PTree.set t1 (.Vint (ir (((cell1 + k : Nat) : Int) + 1))) le')
+      have ho2 : ∀ z, z ∉ cntTempsG t1 t2 t3 hts → PTree.get z le2 = PTree.get z le := fun z hz => by
+        have h1 : z ≠ dense.id.i := fun h => hz (h ▸ by simp [cntTempsG])
+        have h2 : z ≠ t1 := fun h => hz (h ▸ by simp [cntTempsG])
         simp only [le2]; rw [temps_gso _ _ h1, temps_gso _ _ h2, ho z hz]
-      have ht2 : Tmp le2 L st := ht.away cntTemps (by decide) ho2
+      have ht2 : Tmp le2 L st := ht.away (cntTempsG t1 t2 t3 hts) (cntTemps_away hT) ho2
       have hi2 : PTree.get dense.id.i le2 = some (.Vint (ir (cell1 + (k + 1) : Nat))) := by
         simp only [le2, temps_gss]; push_cast; rw [Int.add_assoc]
       have hlk := hf.labs (cell1 + (k + 1)) (by omega)
-      refine wp_cntHead (by decide) hok ht2 hcu.graph hcu.larr hcu.wsA hcu.wsR hcu.wsp hi2
-        (by omega) hlk hcu.bytes ?_
+      have hSp2 : Sp le2 m' := hSo.temps (hSo.unch hSp hu fun z hz => by
+        rcases hz with h | h
+        · exact .inr (.inr (.inr (.inl h)))
+        · exact .inr (.inr (.inr (.inr (.inr (.inr h)))))) ho2
+      refine hH hSp2 hcu ht2 hi2 (by omega) ?_
       intro le3 hcnt3 ho3
       have hcs1 : ws.cardInter ctx.g[st.lab[cell1 + (k + 1)]!]! = cs[k + 1]! := by
         rw [← hcs, countsOf_get ctx st.lab ws (by omega)]
       rw [hcs1] at hcnt3
-      have hg3 : ∀ z, z ≠ dense.id.c1 → z ≠ idOf 725 → z ≠ idOf 726 → z ≠ idOf 727 → z ≠ idOf 728 →
-          z ≠ dense.id.x → z ≠ dense.id.set1 → z ≠ dense.id.set2 → z ≠ dense.id.cnt →
-          z ≠ dense.id.i → z ≠ idOf 724 → PTree.get z le3 = PTree.get z le' :=
-        fun z h0 h1 h2 h3 h4 h5 h6 h7 h8 h9 h10 => by
-          rw [ho3 z h0 h1 h2 h3 h4 h5 h6 h7 h8, temps_gso _ _ h9, temps_gso _ _ h10]
+      have hg3 : ∀ z, z ∉ hdTemps hts → z ≠ dense.id.i → z ≠ t1 → PTree.get z le3 = PTree.get z le' :=
+        fun z h0 h9 h10 => by rw [ho3 z h0, temps_gso _ _ h9, temps_gso _ _ h10]
       have hmin3 : PTree.get dense.id.bmin le3 = some (.Vint (ir (pmin cs k : Nat))) := by
-        rw [hg3 _ (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
-          (by decide) (by decide) (by decide) (by decide)]; exact hmin
+        rw [hg3 _ (by nscr) (by nscr) (by nscr)]; exact hmin
       have hmax3 : PTree.get dense.id.bmax le3 = some (.Vint (ir (pmax cs k : Nat))) := by
-        rw [hg3 _ (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
-          (by decide) (by decide) (by decide) (by decide)]; exact hmax
+        rw [hg3 _ (by nscr) (by nscr) (by nscr)]; exact hmax
       have hpk := pmin_le (cs := cs) (k := k) (o := 0) (by omega) (Nat.zero_le _)
       have hxk := le_pmax (cs := cs) (k := k) (o := 0) (by omega) (Nat.zero_le _)
       have hc0 := hcle 0
@@ -279,21 +373,21 @@ theorem wp_countRest {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Na
       have hmaxle : pmax cs k ≤ n := pmax_le hcle (by omega)
       have hcapB := hf.capB
       wp_step
-      refine wp_widenLo (by decide) (by decide) hmin3 hcnt3 hba (hcu.bkp) (Ne.symm d.bB_g4)
+      refine wp_widenLo (by nscr) (by nscr) hmin3 hcnt3 hba (hcu.bkp) (Ne.symm d.bB_g4)
         (by omega) (by omega) (by omega) ?_
       intro le4 m4 hmin4 hba4 hu4 hk4 ho4
       have hcnt4 : PTree.get dense.id.cnt le4 = some (.Vint (ir (cs[k + 1]! : Nat))) := by
-        rw [ho4 _ (by decide) (by decide)]; exact hcnt3
+        rw [ho4 _ (by nscr) (by nscr)]; exact hcnt3
       have hmax4 : PTree.get dense.id.bmax le4 = some (.Vint (ir (pmax cs k : Nat))) := by
-        rw [ho4 _ (by decide) (by decide)]; exact hmax3
+        rw [ho4 _ (by nscr) (by nscr)]; exact hmax3
       have hbkp4 : Mem.load .Mint64 m4 Block.naugraphBucket (zOfInt 0) =
           some (.Vptr L.bB Ptrofs.zero) := by rw [hu4.load _ _ _ (Ne.symm d.bB_g4)]; exact hcu.bkp
       wp_step
-      refine wp_widenHi (by decide) (by decide) hmax4 hcnt4 hba4 hbkp4 (Ne.symm d.bB_g4)
+      refine wp_widenHi (by nscr) (by nscr) hmax4 hcnt4 hba4 hbkp4 (Ne.symm d.bB_g4)
         (by omega) (by omega) (by omega) ?_
       intro le5 m5 hmax5 hba5 hu5 hk5 ho5
       have hcnt5 : PTree.get dense.id.cnt le5 = some (.Vint (ir (cs[k + 1]! : Nat))) := by
-        rw [ho5 _ (by decide) (by decide)]; exact hcnt4
+        rw [ho5 _ (by nscr) (by nscr)]; exact hcnt4
       have hbkp5 : Mem.load .Mint64 m5 Block.naugraphBucket (zOfInt 0) =
           some (.Vptr L.bB Ptrofs.zero) := by rw [hu5.load _ _ _ (Ne.symm d.bB_g4)]; exact hbkp4
       have hW : ∀ v, (if pmax cs k < v ∧ v ≤ max (pmax cs k) cs[k + 1]! then Vint (ir 0) else
@@ -317,17 +411,14 @@ theorem wp_countRest {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Na
       have hu46 : Unch m' m6 (· = L.bB) := (hu4.trans hu5).trans hu6
       have hca6 := hca.unch hu46 d.bc_bB
       have hi5 : PTree.get dense.id.i le5 = some (.Vint (ir (cell1 + (k + 1) : Nat))) := by
-        rw [ho5 _ (by decide) (by decide), ho4 _ (by decide) (by decide),
-          ho3 _ (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
-            (by decide) (by decide)]
+        rw [ho5 _ (by nscr) (by nscr), ho4 _ (by nscr) (by nscr),
+          ho3 _ (by nscr)]
         exact hi2
       have ht5 : Tmp le5 L st := by
-        refine ht2.away [dense.id.c1, idOf 725, idOf 726, idOf 727, idOf 728, dense.id.x,
-          dense.id.set1, dense.id.set2, dense.id.cnt, dense.id.bmin, idOf 729, dense.id.bmax,
-          idOf 730] (by decide) fun z hz => ?_
-        simp only [List.mem_cons, List.not_mem_nil, or_false, not_or] at hz
-        obtain ⟨h0, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11, h12⟩ := hz
-        rw [ho5 z h11 h12, ho4 z h9 h10, ho3 z h0 h1 h2 h3 h4 h5 h6 h7 h8]
+        refine ht2.away (cntTempsG t1 t2 t3 hts) (cntTemps_away hT) fun z hz => ?_
+        have hs : ∀ y ∈ cntTempsG t1 t2 t3 hts, z ≠ y := fun y hy h => hz (h ▸ hy)
+        rw [ho5 z (hs _ (by simp)) (hs _ (by simp)), ho4 z (hs _ (by simp)) (hs _ (by simp)),
+          ho3 z fun h => hz (List.mem_append_left _ (List.mem_append_right _ h))]
       wp_step; wp_step
       refine wp_storeV hca6 (by omega) dense.id.count ht5.count (tv dense.id.i) (cell1 + (k + 1))
         (by omega) hi5 rfl (tv dense.id.cnt) (cs[k + 1]! : Nat) hcnt5 rfl ?_
@@ -336,16 +427,14 @@ theorem wp_countRest {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Na
       refine ⟨F - (k + 1), by omega, by simp, rfl, k + 1, by omega, rfl, hi5, ?_, ?_,
         hca7.congr fun p _ => cnt_inc cs cell1 k cv0 p, hba7.congr fun v _ => bkt_inc cs k hk1 bv0 v,
         ?_, ?_, ?_⟩
-      · rw [ho5 _ (by decide) (by decide), pmin_succ hk1]; exact hmin4
+      · rw [ho5 _ (by nscr) (by nscr), pmin_succ hk1]; exact hmin4
       · rw [pmax_succ hk1]; exact hmax5
       · refine ((hu.trans (hu46.mono fun z hz => .inr hz)).trans (hu7.mono fun z hz => .inl hz))
       · exact ((hkp.trans ((hk4.trans hk5).trans hk6))).trans (Keep.unch hu7 (Ne.symm d.bc_bB))
       · intro z hz
-        have hs : ∀ y ∈ cntTemps, z ≠ y := fun y hy h => hz (h ▸ hy)
-        simp only [cntTemps, List.mem_cons, List.not_mem_nil, or_false, forall_eq_or_imp,
-          forall_eq] at hs
-        obtain ⟨h0, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11, h12, h13, h14⟩ := hs
-        rw [ho5 z h12 h14, ho4 z h11 h13, ho3 z h5 h6 h7 h8 h9 h10 h2 h3 h4]
+        have hs : ∀ y ∈ cntTempsG t1 t2 t3 hts, z ≠ y := fun y hy h => hz (h ▸ hy)
+        rw [ho5 z (hs _ (by simp)) (hs _ (by simp)), ho4 z (hs _ (by simp)) (hs _ (by simp)),
+          ho3 z fun h => hz (List.mem_append_left _ (List.mem_append_right _ h))]
         exact ho2 z hz
   · rintro v tr e' le' m' hJ
     apply wp_skip

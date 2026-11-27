@@ -22,19 +22,14 @@ open Hex.GraphIso.Nauty
 
 variable {xi : ExternalCalls}
 
-/-- `CFrame` from `Mem`, `StOk` and the splitter's words. -/
+/-- `CFrame` from `Mem` and `StOk`. -/
 theorem CFrame.of {n : Nat} {m : mem} {L : Loc} {ctx : Ctx n} {st : RefineSt n}
-    {aw : Nat → Lib.Integers.int64} {ws : VSet n} {wsw : Nat → Lib.Integers.int64}
-    (hok : Ok n L) (hcS : L.M ≤ L.capS) (hm : Mem m L ctx st aw) (hso : StOk n L.level st)
-    (hwsA : ArrayAt m .Mint64 L.bS 0 (longs wsw) L.M)
-    (hwsR : SetRep (fun w => bv64 (wsw w)) L.M ws) : CFrame m L ctx st.lab ws wsw where
+    {aw : Nat → Lib.Integers.int64}
+    (hok : Ok n L) (hm : Mem m L ctx st aw) (hso : StOk n L.level st) : CFrame m L ctx st.lab where
   ok := hok
   graph := hm.graph
   larr := hm.lab
   labs := fun i hi => hso.labOk i (by rw [hso.labSize]; exact hi)
-  wsA := hwsA
-  wsR := hwsR
-  wsp := hm.dS.ptr (by have := hok.M1; omega)
   bkp := hm.dB.ptr (by have := hok.capB; omega)
   wpp := hm.dW.ptr (by have := hok.capW; have := hok.n0; omega)
   bytes := hm.bytes
@@ -85,13 +80,12 @@ theorem nontrivialCell_ptn_out {n : Nat} (ctx : Ctx n) (level : Nat) (ws : VSet 
     exact windowScan_ptn_out level c e _ hj _ _ _ _
 
 structure PassInvN {n : Nat} (le : temp_env) (m0 m : mem) (L : Loc) (ctx : Ctx n)
-    (st0 : RefineSt n) (ws : VSet n) (wsw : Nat → Lib.Integers.int64) (R : RefineSt n) (p : Nat)
+    (st0 : RefineSt n) (ws : VSet n) (Sp : temp_env → mem → Prop) (R : RefineSt n) (p : Nat)
     (stc : RefineSt n) : Prop where
   mem : ∃ aw, Mem m L ctx stc aw
   unch : Unch m0 m (cellW L)
   tmp : Tmp le L stc
-  wsA : ArrayAt m .Mint64 L.bS 0 (longs wsw) L.M
-  wsR : SetRep (fun w => bv64 (wsw w)) L.M ws
+  sp : Sp le m
   pn : p ≤ n
   fuel : ∃ F, n - p ≤ F ∧ R = refineNontrivialFast.go ctx L.level ws st0.ptn F p stc
   agree : ∀ j, p ≤ j → j < n → stc.ptn[j]! = st0.ptn[j]!
@@ -112,24 +106,63 @@ theorem notCellW_bS {L : Loc} (d : WDist L) : ¬ cellW L L.bS := by
   · exact d.bW_bS h.symm
   · exact d.bS_bB h
 
-theorem wp_cellLoopN {f : function} {Q : Post} {le : temp_env} {m0 m : mem} {n : Nat} {L : Loc} {ctx : Ctx n}
-    {st0 : RefineSt n} {ws : VSet n} {wsw : Nat → Lib.Integers.int64} {R stc : RefineSt n}
-    (hok : Ok n L) (hcS : L.M ≤ L.capS) (hok0 : StOk n L.level st0)
-    (hI : PassInvN le m0 m L ctx st0 ws wsw R 0 stc)
+/-- What a function's one-cell statement `cn` does, as `wp_cellN` states it, with the
+temporaries `T` it assigns and the splitter facts `Sp`. -/
+def CellPass (xi : ExternalCalls) (f : function) (cn : statement) (T : List Common.AST.ident)
+    {n : Nat} (L : Loc) (ctx : Ctx n) (ws : VSet n) (Sp : temp_env → mem → Prop) : Prop :=
+  ∀ {Q : Post} {le : temp_env} {m : mem} {st : RefineSt n} {aw : Nat → Lib.Integers.int64}
+    {cell1 cell2 : Nat} {bv0 wv0 : Nat → val},
+    Sp le m → CFrame m L ctx st.lab → Mem m L ctx st aw → Tmp le L st →
+    StOk n L.level st → SBound n st st cell1 cell1 → cell1 < cell2 → cell2 < n →
+    PTree.get dense.id.cell1 le = some (.Vint (ir cell1)) →
+    PTree.get dense.id.cell2 le = some (.Vint (ir cell2)) →
+    ArrayAt m .Mint32 L.bB 0 bv0 L.capB → ArrayAt m .Mint32 L.bW 0 wv0 L.capW →
+    (∀ le' m' aw', Mem m' L ctx (nontrivialCell ctx L.level ws cell1 cell2 st) aw' →
+      Tmp le' L (nontrivialCell ctx L.level ws cell1 cell2 st) →
+      CellOut n L.level st (nontrivialCell ctx L.level ws cell1 cell2 st) cell1 cell2 →
+      (∃ bv, ArrayAt m' .Mint32 L.bB 0 bv L.capB) → (∃ wv, ArrayAt m' .Mint32 L.bW 0 wv L.capW) →
+      Unch m m' (cellW L) → Keep m m' L.bB → Keep m m' L.bW →
+      (∀ z, z ∉ T → PTree.get z le' = PTree.get z le) →
+      Q.normal E0 empty_env le' m' ∧ Q.cont E0 empty_env le' m') →
+    Wp xi ge f cn Q empty_env le m
+
+/-- The loop over the cells, with the one-cell statement `cn`. -/
+abbrev cellLoopNG (cn : statement) : statement :=
+  .Sloop
+    (.Ssequence
+      (Set.sk (.Sifthenelse (.Ebinop .Olt (tv dense.id.cell1) (tv dense.id.n) tint) .Sskip .Sbreak))
+      (.Ssequence (scanEnd dense.id.cell2 dense.id.cell1)
+        (.Ssequence
+          (Set.sk (.Sifthenelse (.Ebinop .Oeq (tv dense.id.cell1) (tv dense.id.cell2) tint)
+            .Scontinue .Sskip))
+          cn)))
+    (Set.sk (.Sset dense.id.cell1 (.Ebinop .Oadd (tv dense.id.cell2) (ci 1 tint) tint)))
+
+theorem cellLoopN_D0 : cellLoopN = cellLoopNG cellN := rfl
+
+theorem cellLoopN_D1 : Refine1.cellLoopN = cellLoopNG Refine1.cellN := rfl
+
+theorem wp_cellLoopN {cn : statement} {T : List Common.AST.ident}
+    (hcT : dense.id.cell2 ∉ T ∧ dense.id.cell1 ∉ T) {f : function} {Q : Post} {le : temp_env}
+    {m0 m : mem} {n : Nat} {L : Loc} {ctx : Ctx n}
+    {st0 : RefineSt n} {ws : VSet n} {Sp : temp_env → mem → Prop} {R stc : RefineSt n}
+    (hCP : CellPass xi f cn T L ctx ws Sp) (hSo : SpOk Sp L (dense.id.cell1 :: dense.id.cell2 :: T))
+    (hok : Ok n L) (hok0 : StOk n L.level st0)
+    (hI : PassInvN le m0 m L ctx st0 ws Sp R 0 stc)
     (hc : PTree.get dense.id.cell1 le = some (.Vint (ir (0 : Nat))))
-    (hQ : ∀ le' m', PassInvN le' m0 m' L ctx st0 ws wsw R n R → Q.normal E0 empty_env le' m') :
-    Wp xi ge f cellLoopN Q empty_env le m := by
+    (hQ : ∀ le' m', PassInvN le' m0 m' L ctx st0 ws Sp R n R → Q.normal E0 empty_env le' m') :
+    Wp xi ge f (cellLoopNG cn) Q empty_env le m := by
   have hn := hok.nlt
   have d := hok.wd
   have hsz0 : st0.ptn.size = n := hok0.ptnSize
   have hend0 : st0.ptn[n - 1]! ≤ L.level := by have := hok0.ptnEnd; rwa [hsz0] at this
   let I := fun (v : Nat) (t : trace) (e' : env) (le' : temp_env) (m' : mem) => t = E0 ∧
     e' = empty_env ∧ ∃ c stc, v = n - c ∧ PTree.get dense.id.cell1 le' = some (.Vint (ir c)) ∧
-      PassInvN le' m0 m' L ctx st0 ws wsw R c stc
+      PassInvN le' m0 m' L ctx st0 ws Sp R c stc
   let J := fun (v : Nat) (t : trace) (e' : env) (le' : temp_env) (m' : mem) => t = E0 ∧
     e' = empty_env ∧ ∃ c en stc, c ≤ en ∧ en < n ∧ v = n - c ∧
       PTree.get dense.id.cell2 le' = some (.Vint (ir en)) ∧
-      PassInvN le' m0 m' L ctx st0 ws wsw R (en + 1) stc
+      PassInvN le' m0 m' L ctx st0 ws Sp R (en + 1) stc
   refine wp_loop (I := I) (J := J) ?_ ?_ (n := n - 0) ⟨rfl, rfl, 0, stc, rfl, hc, hI⟩
   · rintro v t e' le' m' ⟨rfl, rfl, c, stc, rfl, hc, hP⟩
     have ht := hP.tmp
@@ -173,6 +206,7 @@ theorem wp_cellLoopN {f : function} {Q : Post} {le : temp_env} {m0 m : mem} {n :
           { hP with
             mem := ⟨aw, hm⟩
             tmp := ht1
+            sp := hSo.temps hP.sp fun z hz => ho1 z fun h => hz (h ▸ by simp)
             pn := hen'
             fuel := ⟨F', by omega, hR⟩
             agree := fun j h1 h2 => hP.agree j (by omega) h2
@@ -180,22 +214,23 @@ theorem wp_cellLoopN {f : function} {Q : Post} {le : temp_env} {m0 m : mem} {n :
       · rw [ite_eq_right (by simp; omega)]
         apply wp_skip
         have hlt : c < en := by omega
-        have hf := CFrame.of hok hcS hm hP.ok hP.wsA hP.wsR
+        have hf := CFrame.of hok hm hP.ok
+        have hSp1 : Sp le1 m' := hSo.temps hP.sp fun z hz => ho1 z fun h => hz (h ▸ by simp)
         obtain ⟨bv0, hbv0⟩ := malloced_array (hm.dB.mal (by have := hok.capB; omega)) .Mint32 4
           rfl rfl L.capB (Nat.le_refl _)
         obtain ⟨wv0, hwv0⟩ := malloced_array (hm.dW.mal (by have := hok.capW; have := hok.n0; omega))
           .Mint32 4 rfl rfl L.capW (Nat.le_refl _)
         have hb0 : SBound n stc stc c c := ⟨rfl, hP.ok.ptnSize, hP.small, hP.code, hP.hint, hP.maxpos,
           by omega⟩
-        refine wp_cellN hf hm ht1 hP.ok hb0 hlt hen' hc1 hcell2 hbv0 hwv0 ?_
+        refine hCP hSp1 hf hm ht1 hP.ok hb0 hlt hen' hc1 hcell2 hbv0 hwv0 ?_
         intro le2 m2 aw2 hm2 ht2 hco2 _ _ hu2 _ _ g2
         have hJ : J (n - c) E0 empty_env le2 m2 := by
           refine ⟨rfl, rfl, c, en, _, Nat.le_of_lt hlt, hen', rfl, ?_,
             { mem := ⟨aw2, hm2⟩
               unch := hP.unch.trans hu2
               tmp := ht2
-              wsA := hP.wsA.unch hu2 (notCellW_bS d)
-              wsR := hP.wsR
+              sp := hSo.temps (hSo.unch hSp1 hu2 fun z hz => hz) fun z hz =>
+                g2 z fun h => hz (List.mem_cons_of_mem _ (List.mem_cons_of_mem _ h))
               pn := hen'
               fuel := ⟨F', by omega, hR⟩
               agree := fun j h1 h2 => by
@@ -207,7 +242,7 @@ theorem wp_cellLoopN {f : function} {Q : Post} {le : temp_env} {m0 m : mem} {n :
               hint := hco2.hint
               maxpos := hco2.maxpos
               code := hco2.code }⟩
-          rw [g2 _ (by decide)]; exact hcell2
+          rw [g2 _ hcT.1]; exact hcell2
         exact ⟨hJ, hJ⟩
     · rw [ite_eq_right (by simpa using hcn)]
       apply wp_break
@@ -223,7 +258,9 @@ theorem wp_cellLoopN {f : function} {Q : Post} {le : temp_env} {m0 m : mem} {n :
     simp only [Exec.evalExpr, hc2, typeof, cop, ir_add]
     refine ⟨n - (en + 1), by omega, by simp, rfl, en + 1, stc, rfl, ?_, ?_⟩
     · rw [temps_gss]; push_cast; rfl
-    · exact { hP with tmp := hP.tmp.set _ (by decide) }
+    · exact { hP with
+        tmp := hP.tmp.set _ (by decide)
+        sp := hSo.temps hP.sp fun z hz => temps_gso _ _ fun h => hz (h ▸ by simp) }
 
 /-- The splitter's set after its first `k` members. -/
 def wsPre {n : Nat} (lab : Array Nat) (split1 k : Nat) : VSet n :=
@@ -379,13 +416,20 @@ theorem wp_nontrivial : NontrivialPass xi := by
   have hR : refineNontrivial ctx L.level split1 split2 st =
       refineNontrivialFast.go ctx L.level (worksetOf n st.lab split1 split2) st1.ptn n 0 st1 := by
     rw [refineNontrivial_eq_fast]; rfl
-  refine wp_cellLoopN (st0 := st1) (stc := st1) (R := refineNontrivial ctx L.level split1 split2 st)
-    hok hcS ⟨hso.labSize, hso.labOk, hso.ptnSize, hso.ptnEnd⟩
+  have hwsp2 : Mem.load .Mint64 m2 Block.naugraphWorkset (zOfInt 0) =
+      some (.Vptr L.bS Ptrofs.zero) := by rw [hu2.load _ _ _ (Ne.symm d.bS_g2)]; exact hwsp1
+  have hCP : CellPass xi Source.dense.fn.refine cellN cellTemps L ctx
+      (worksetOf n st.lab split1 split2) (SpWords L (worksetOf n st.lab split1 split2) w2) :=
+    fun hSp hf hm ht hso hb0 h12 h2n hcl1 hcl2 hbkt hwp hQ =>
+      wp_cellN (by decide) D0_sem (cntHead_ok (by decide)) (cntHead_ok (by decide)) hSp
+        (SpWords.ok d _) True.intro hf hm ht hso hb0 h12 h2n hcl1 hcl2 hbkt hwp hQ
+  refine wp_cellLoopN (by decide) hCP (SpWords.ok d _) (st0 := st1) (stc := st1)
+    (R := refineNontrivial ctx L.level split1 split2 st)
+    hok ⟨hso.labSize, hso.labOk, hso.ptnSize, hso.ptnEnd⟩
     { mem := ⟨aw, hm2.congr rfl rfl rfl rfl⟩
       unch := Unch.refl _ _
       tmp := ht3.set _ (by decide)
-      wsA := hw2
-      wsR := hr2
+      sp := ⟨hw2, hr2, hwsp2⟩
       pn := Nat.zero_le _
       fuel := ⟨n, by omega, hR⟩
       agree := fun _ _ _ => rfl

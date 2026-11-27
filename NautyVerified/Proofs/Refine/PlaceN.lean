@@ -124,7 +124,25 @@ theorem curVals_succ {cs : List Nat} {A B cell1 o : Nat} (bv0 : Nat → val)
           Nat.add_zero]
     · rw [ite_eq_right hw, ite_eq_right hw]
 
-theorem wp_placeLoop {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc} {cs : List Nat}
+/-- The counting-sort placement, with SimplExpr's temporary `t`. -/
+abbrev placeLoopG (t : Common.AST.ident) : statement :=
+  (.Sloop
+    (.Ssequence
+      (Set.sk (.Sifthenelse (.Ebinop .Ole (tv dense.id.«i») (tv dense.id.«cell2») tint) .Sskip .Sbreak))
+      (.Ssequence
+        (.Ssequence
+          (Set.sk (.Sset t (gix dense.id.«naugraph:bucket» (ix dense.id.«count» (tv dense.id.«i»)))))
+          (.Sassign
+            (gix dense.id.«naugraph:bucket» (ix dense.id.«count» (tv dense.id.«i»)))
+            (.Ebinop .Oadd (tv t) (ci 1 tint) tint)))
+        (.Sassign (gix dense.id.«naugraph:workperm» (tv t)) (ix dense.id.«lab» (tv dense.id.«i»)))))
+    (Set.sk (.Sset dense.id.«i» (.Ebinop .Oadd (tv dense.id.«i») (ci 1 tint) tint))))
+
+theorem placeLoop_D0 : placeLoop = placeLoopG (idOf 731) := rfl
+
+theorem placeLoop_D1 : Refine1.placeLoop = placeLoopG (idOf 722) := rfl
+
+theorem wp_placeLoop {t : Common.AST.ident} (hT : NTemps [t]) {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc} {cs : List Nat}
     {lab : Array Nat} {cell1 cell2 A B : Nat} {cv0 bv0 wv0 : Nat → val}
     (hok : Ok n L) (hcapW : L.capW < 2147483648) (hcapB : L.capB < 2147483648)
     (hlen : cs.length = cell2 + 1 - cell1) (h12 : cell1 < cell2) (h2n : cell2 < n)
@@ -144,9 +162,9 @@ theorem wp_placeLoop {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Na
         (wpVals cs A cell1 (members lab cell1 cs.length) n cs.length wv0) L.capW →
       (∃ v, ArrayAt m' .Mint32 L.bB 0 v L.capB) →
       Unch m m' (fun z => z = L.bB ∨ z = L.bW) → Keep m m' L.bB → Keep m m' L.bW →
-      (∀ z, z ≠ dense.id.i → z ≠ idOf 731 → PTree.get z le' = PTree.get z le) →
+      (∀ z, z ≠ dense.id.i → z ≠ t → PTree.get z le' = PTree.get z le) →
       Q.normal E0 empty_env le' m') :
-    Wp xi ge f placeLoop Q empty_env le m := by
+    Wp xi ge f (placeLoopG t) Q empty_env le m := by
   have d := hok.wd
   have hnl := hok.nlt
   have hcW := hok.capW
@@ -167,14 +185,14 @@ theorem wp_placeLoop {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Na
       ArrayAt m' .Mint32 L.bB 0 (curVals cs A B cell1 o bv0) L.capB ∧
       ArrayAt m' .Mint32 L.bW 0 (wpVals cs A cell1 mb n o wv0) L.capW ∧
       Unch m m' (fun z => z = L.bB ∨ z = L.bW) ∧ Keep m m' L.bB ∧ Keep m m' L.bW ∧
-      (∀ z, z ≠ dense.id.i → z ≠ idOf 731 → PTree.get z le' = PTree.get z le)
+      (∀ z, z ≠ dense.id.i → z ≠ t → PTree.get z le' = PTree.get z le)
   let J := fun (v : Nat) (tr : trace) (e' : env) (le' : temp_env) (m' : mem) => tr = E0 ∧
     e' = empty_env ∧ ∃ o, o < len ∧ v = len - o ∧
       PTree.get dense.id.i le' = some (.Vint (ir (cell1 + o : Nat))) ∧
       ArrayAt m' .Mint32 L.bB 0 (curVals cs A B cell1 (o + 1) bv0) L.capB ∧
       ArrayAt m' .Mint32 L.bW 0 (wpVals cs A cell1 mb n (o + 1) wv0) L.capW ∧
       Unch m m' (fun z => z = L.bB ∨ z = L.bW) ∧ Keep m m' L.bB ∧ Keep m m' L.bW ∧
-      (∀ z, z ≠ dense.id.i → z ≠ idOf 731 → PTree.get z le' = PTree.get z le)
+      (∀ z, z ≠ dense.id.i → z ≠ t → PTree.get z le' = PTree.get z le)
   refine wp_loop (I := I) (J := J) ?_ ?_ (n := len) ⟨rfl, rfl, 0, Nat.zero_le _, rfl,
     by simpa using hi, hbkt, hwp.congr fun p _ => (wpVals_zero _ _ _ _ _ _ p).symm, Unch.refl _ _,
     Keep.refl _ _, Keep.refl _ _, fun _ _ _ => rfl⟩
@@ -184,7 +202,7 @@ theorem wp_placeLoop {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Na
       · exact h1 h.symm
       · exact h2 h.symm
     have hcl2' : PTree.get dense.id.cell2 le' = some (.Vint (ir cell2)) := by
-      rw [hoth _ (by decide) (by decide)]; exact hcl2
+      rw [hoth _ (by nscr) (by nscr)]; exact hcl2
     wp_step; wp_step; wp_step
     apply wp_if_eval
     simp only [Exec.evalExpr, hio, hcl2', typeof, cop]
@@ -200,9 +218,9 @@ theorem wp_placeLoop {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Na
       have hol : o < len := by omega
       have hcm := hAc _ (hmem o hol)
       have hcount' : PTree.get dense.id.count le' = some (.Vptr L.bc L.cofs) := by
-        rw [hoth _ (by decide) (by decide)]; exact hcount
+        rw [hoth _ (by nscr) (by nscr)]; exact hcount
       have hlabp' : PTree.get dense.id.lab le' = some (.Vptr L.bl L.lofs) := by
-        rw [hoth _ (by decide) (by decide)]; exact hlabp
+        rw [hoth _ (by nscr) (by nscr)]; exact hlabp
       have hcnt' := hcnt.unch hu (nB (Ne.symm d.bc_bB) (Ne.symm d.bc_bW))
       have hlarr' := hlarr.unch hu (nB (Ne.symm d.bl_bB) (Ne.symm d.bl_bW))
       have hbkp' : Mem.load .Mint64 m' Block.naugraphBucket (zOfInt 0) =
@@ -233,9 +251,9 @@ theorem wp_placeLoop {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Na
       rw [hbread]
       refine wp_gstore rfl find_naugraphBucket hbkp' hbk hcapB (ix dense.id.count (tv dense.id.i))
         cs[o]! (by omega)
-        (eval_atV hcnt' (by omega) dense.id.count (by rw [temps_gso _ _ (by decide)]; exact hcount')
+        (eval_atV hcnt' (by omega) dense.id.count (by rw [temps_gso _ _ (by nscr)]; exact hcount')
           (tv dense.id.i) (cell1 + o) (by omega)
-          (by show PTree.get _ _ = _; rw [temps_gso _ _ (by decide)]; exact hio) rfl |>.trans (by
+          (by show PTree.get _ _ = _; rw [temps_gso _ _ (by nscr)]; exact hio) rfl |>.trans (by
             simp only [cntVals]
             rw [ite_eq_left (by omega), show cell1 + o - cell1 = o by omega])) rfl _
         ((dst cs A cell1 o : Nat) + 1)
@@ -246,17 +264,17 @@ theorem wp_placeLoop {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Na
           some (.Vptr L.bW Ptrofs.zero) := by rw [hu1.load _ _ _ (Ne.symm d.bB_g0)]; exact hwpp'
       have hlarr1 := hlarr'.unch hu1 d.bl_bB
       have hlab_o := hlabs (cell1 + o) (by omega)
-      refine wp_gstore rfl find_naugraphWorkperm hwpp1 hwk1 hcapW (tv (idOf 731)) (dst cs A cell1 o)
+      refine wp_gstore rfl find_naugraphWorkperm hwpp1 hwk1 hcapW (tv t) (dst cs A cell1 o)
         (by omega) (by show PTree.get _ _ = _; rw [temps_gss]) rfl (ix dense.id.lab (tv dense.id.i))
         (lab[cell1 + o]! : Nat) ?_ rfl ?_
-      · rw [eval_at hlarr1 (by omega) dense.id.lab (by rw [temps_gso _ _ (by decide)]; exact hlabp')
+      · rw [eval_at hlarr1 (by omega) dense.id.lab (by rw [temps_gso _ _ (by nscr)]; exact hlabp')
           (tv dense.id.i) (cell1 + o) (by omega)
-          (by show PTree.get _ _ = _; rw [temps_gso _ _ (by decide)]; exact hio) rfl]
+          (by show PTree.get _ _ = _; rw [temps_gso _ _ (by nscr)]; exact hio) rfl]
         rfl
       intro m2 hwk2 hu2 hk2
       have hmbo : mb[o]! = lab[cell1 + o]! := members_get lab cell1 len o hol
       refine ⟨by simp, rfl, o, hol, rfl,
-        by rw [temps_gso _ _ (by decide)]; exact hio,
+        by rw [temps_gso _ _ (by nscr)]; exact hio,
         (hbk1.unch hu2 (Ne.symm d.bW_bB)).congr fun v _ => curVals_succ bv0 hcm.1 hcm.2 hmul v,
         hwk2.congr fun p _ => ?_, ?_, ?_, ?_, ?_⟩
       · rw [← hmbo]

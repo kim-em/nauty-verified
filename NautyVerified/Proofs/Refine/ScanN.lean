@@ -107,10 +107,10 @@ abbrev grpMax : statement :=
     .Sskip
 
 /-- `if (c1 != cell1) { ADDELEMENT(active, c1); if (c2 - c1 == 1) hint = c1; ++*numcells; }` -/
-abbrev grpAct : statement :=
+abbrev grpAct (D : Dialect) : statement :=
   .Sifthenelse (.Ebinop .One (tv dense.id.c1) (tv dense.id.cell1) tint)
     (.Ssequence
-      (Set.addElementB dense.id.active dense.id.«naugraph:bit» (tv dense.id.c1))
+      (D.addE dense.id.active (tv dense.id.c1))
       (.Ssequence
         (Set.sk (.Sifthenelse
           (.Ebinop .Oeq (.Ebinop .Osub (tv dense.id.c2) (tv dense.id.c1) tint) (ci 1 tint) tint)
@@ -127,7 +127,7 @@ abbrev grpPtn : statement :=
     .Sskip
 
 /-- One nonempty count group of the window scan. -/
-abbrev group : statement :=
+abbrev group (D : Dialect) : statement :=
   .Ssequence
     (Set.sk (.Sset dense.id.c2
       (.Ebinop .Oadd (tv dense.id.c1) (gix dense.id.«naugraph:bucket» (tv dense.id.i)) tint)))
@@ -136,8 +136,20 @@ abbrev group : statement :=
       (.Ssequence
         (Set.sk (mash (.Ebinop .Oadd (tv dense.id.i) (tv dense.id.c1) tint)))
         (.Ssequence (Set.sk grpMax)
-          (.Ssequence (Set.sk grpAct)
+          (.Ssequence (Set.sk (grpAct D))
             (.Ssequence (Set.sk grpPtn) (Set.sk (.Sset dense.id.c1 (tv dense.id.c2))))))))
+
+/-- The window scan in dialect `D`. -/
+abbrev scanLoopG (D : Dialect) : statement :=
+  .Sloop
+    (.Ssequence
+      (Set.sk (.Sifthenelse (.Ebinop .Ole (tv dense.id.i) (tv dense.id.bmax) tint) .Sskip .Sbreak))
+      (Set.sk (.Sifthenelse (gix dense.id.«naugraph:bucket» (tv dense.id.i)) (group D) .Sskip)))
+    (Set.sk (.Sset dense.id.i (.Ebinop .Oadd (tv dense.id.i) (ci 1 tint) tint)))
+
+theorem scanLoop_D0 : scanLoop = scanLoopG D0 := rfl
+
+theorem scanLoop_D1 : Refine1.scanLoop = scanLoopG D1 := rfl
 
 theorem SBound.step {n : Nat} {st0 s : RefineSt n} {level cell1 cell2 v c1 k : Nat} {mc : Int}
     (h : SBound n st0 s cell1 c1) (hk : 0 < k) (hck : c1 + k ≤ cell2 + 1) (h2n : cell2 < n)
@@ -200,8 +212,9 @@ theorem wp_grpMax {f : function} {Q : Post} {le : temp_env} {n : Nat} {L : Loc} 
     · rw [ite_eq_right h']; exact ht
     · rw [ite_eq_right h']; exact hmc
 
-theorem wp_grpAct {f : function} {Q : Post} {le : temp_env} {n : Nat} {L : Loc} {ctx : Ctx n} {st : RefineSt n}
-    {aw : Nat → Lib.Integers.int64} {m : mem} {cell1 c1 k : Nat} (hok : Ok n L)
+theorem wp_grpAct {D : Dialect} (hD : D.Sem) {f : function} {Q : Post} {le : temp_env} {n : Nat}
+    {L : Loc} {ctx : Ctx n} {st : RefineSt n}
+    {aw : Nat → Lib.Integers.int64} {m : mem} {cell1 c1 k : Nat} (hMok : D.okM L.M) (hok : Ok n L)
     (hm : Mem m L ctx st aw) (ht : Tmp le L st)
     (hc1 : PTree.get dense.id.c1 le = some (.Vint (ir c1)))
     (hc2 : PTree.get dense.id.c2 le = some (.Vint (ir (c1 + k : Nat))))
@@ -218,7 +231,7 @@ theorem wp_grpAct {f : function} {Q : Post} {le : temp_env} {n : Nat} {L : Loc} 
       Unch m m' (fun z => z = L.ba ∨ z = L.bn) →
       (∀ z, z ≠ dense.id.hint → PTree.get z le' = PTree.get z le) →
       Q.normal E0 empty_env le' m') :
-    Wp xi ge f grpAct Q empty_env le m := by
+    Wp xi ge f (grpAct D) Q empty_env le m := by
   have hnM := hok.nM
   have hnl := hok.nlt
   have hMl := hok.Mlt
@@ -237,9 +250,9 @@ theorem wp_grpAct {f : function} {Q : Post} {le : temp_env} {n : Nat} {L : Loc} 
     have hb : (c1 != cell1) = true := by simpa using hce
     simp only [hb, ite_true, true_and] at hQ
     wp_step
-    refine Set.wp_addElementB hm.act (by omega) ht.active (tv dense.id.c1 |> fun _ => hc1) rfl
-      (by omega) (by omega) find_naugraphBit hm.bit rfl ?_
-    intro m1 hact1 hu1 _
+    refine hD.addE hMok hMl hm.act ht.active (tv dense.id.c1 |> fun _ => hc1) rfl
+      (by omega) hm.bit rfl ?_
+    intro m1 hact1 hu1
     have hm1 := hm.setAct hok hu1 hact1 (Set.setRep_add hm.actRep hcn)
     wp_step; wp_step; wp_step
     apply wp_if_eval
@@ -320,7 +333,8 @@ theorem wp_grpPtn {f : function} {Q : Post} {le : temp_env} {n : Nat} {L : Loc} 
     rw [ite_eq_right h]
     exact hm
 
-theorem wp_group {f : function} {Q : Post} {le : temp_env} {n : Nat} {L : Loc} {ctx : Ctx n} {st : RefineSt n}
+theorem wp_group {D : Dialect} (hD : D.Sem) {f : function} {Q : Post} {le : temp_env} {n : Nat}
+    {L : Loc} {ctx : Ctx n} {st : RefineSt n} (hMok : D.okM L.M)
     {aw : Nat → Lib.Integers.int64} {m : mem} {cell1 cell2 v c1 k : Nat} {mc : Int}
     {bv : Nat → val} (hok : Ok n L) (hm : Mem m L ctx st aw) (ht : Tmp le L st)
     (hsz : st.ptn.size = n) (hcode : st.longcode < 2 ^ 62)
@@ -343,7 +357,7 @@ theorem wp_group {f : function} {Q : Post} {le : temp_env} {n : Nat} {L : Loc} {
       (∀ z, z ∉ [dense.id.c1, dense.id.c2, dense.id.maxcell, dense.id.maxpos, dense.id.hint,
         dense.id.longcode] → PTree.get z le' = PTree.get z le) →
       Q.normal E0 empty_env le' m') :
-    Wp xi ge f group Q empty_env le m := by
+    Wp xi ge f (group D) Q empty_env le m := by
   have hnl := hok.nlt
   have d := hok.wd
   have hread := eval_gat (e := empty_env) (le := le) rfl find_naugraphBucket hbkp hbkt
@@ -392,7 +406,7 @@ theorem wp_group {f : function} {Q : Post} {le : temp_env} {n : Nat} {L : Loc} {
     fun z h1 h2 h3 h4 => by rw [g3 z h1 h2, g2 z h3 h4]
   dsimp only
   wp_step; wp_step; wp_step
-  refine wp_grpAct (k := k) hok hm3 ht3'
+  refine wp_grpAct hD (k := k) hMok hok hm3 ht3'
     (by rw [g3' _ (by decide) (by decide) (by decide) (by decide)]; exact hc1)
     (by rw [g3 _ (by decide) (by decide)]; rw [temps_gso _ _ (by decide)]; exact hc2)
     (by rw [g3' _ (by decide) (by decide) (by decide) (by decide)]; exact hcl1)
@@ -449,10 +463,11 @@ theorem wp_group {f : function} {Q : Post} {le : temp_env} {n : Nat} {L : Loc} {
     obtain ⟨h0, h1, h2, h3, h4, h5⟩ := hz
     rw [temps_gso _ _ h0, g4 z h4, g3' z h2 h3 h5 h1]
 
-theorem wp_scanLoop {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc} {ctx : Ctx n}
+theorem wp_scanLoop {D : Dialect} (hD : D.Sem) {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc} {ctx : Ctx n}
     {st : RefineSt n} {aw : Nat → Lib.Integers.int64} {ws : VSet n}
-    {wsw : Nat → Lib.Integers.int64} {cell1 cell2 : Nat} {bv0 : Nat → val}
-    (hf : CFrame m L ctx st.lab ws wsw) (hm : Mem m L ctx st aw) (ht : Tmp le L st)
+    {cell1 cell2 : Nat} {bv0 : Nat → val}
+    (hMok : D.okM L.M)
+    (hf : CFrame m L ctx st.lab) (hm : Mem m L ctx st aw) (ht : Tmp le L st)
     (hb0 : SBound n st st cell1 cell1) (h12 : cell1 < cell2) (h2n : cell2 < n)
     (hi : PTree.get dense.id.i le =
       some (.Vint (ir (cmin (countsOf ctx st.lab ws cell1 cell2) : Nat))))
@@ -477,7 +492,7 @@ theorem wp_scanLoop {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Nat
       (∀ z, z ∉ [dense.id.i, dense.id.c1, dense.id.c2, dense.id.maxcell, dense.id.maxpos,
         dense.id.hint, dense.id.longcode] → PTree.get z le' = PTree.get z le) →
       Q.normal E0 empty_env le' m') :
-    Wp xi ge f scanLoop Q empty_env le m := by
+    Wp xi ge f (scanLoopG D) Q empty_env le m := by
   have hok := hf.ok
   have hnl := hok.nlt
   have hcapB := hf.capB
@@ -574,7 +589,7 @@ theorem wp_scanLoop {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Nat
       · rw [ite_eq_left (by simp; omega)]
         have hbl1 : below cs (j + 1) ≤ cs.length := hbl (j + 1)
         rw [below_succ] at hbl1
-        refine wp_group (k := multOf cs j) hok hms hts hsb.psize hsb.code hij hc1' hmc' hcl1' hcl2'
+        refine wp_group hD (k := multOf cs j) hMok hok hms hts hsb.psize hsb.code hij hc1' hmc' hcl1' hcl2'
           hbk ?_ hfu.bkp hcapB (by omega) (by omega) (by omega) (by omega) (by omega) h2n hmc1
           (by omega) ?_
         · simp only [bk]; rw [ite_eq_left ⟨hj1, hjB⟩, ite_eq_right (Nat.lt_irrefl j)]
