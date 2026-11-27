@@ -40,6 +40,11 @@ variable (ce : composite_env) (m : mem) (a b : attr) (x : Lib.Integers.int64)
 @[simp, cop] theorem cast_sli : sem_cast (.Vlong x) (Tlong .Signed a) (Tint .I32 .Signed b) m =
     some (.Vint (Lib.Integers.Int.repr (Lib.Integers.Int64.unsigned x))) := rfl
 
+/-- The signed `long` cast of an `int`. -/
+@[simp, cop] theorem cast_isl (y : Lib.Integers.int) :
+    sem_cast (.Vint y) (Tint .I32 .Signed a) (Tlong .Signed b) m =
+      some (.Vlong (cast_int_long .Signed y)) := rfl
+
 end Cop
 
 /-- `l % 32767` for `0 ≤ l < 2^15`. -/

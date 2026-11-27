@@ -70,6 +70,7 @@ import NautyVerified.Proofs.Refine.Scan
 import NautyVerified.Proofs.Refine.Guard
 import NautyVerified.Proofs.Refine.Step
 import NautyVerified.Proofs.Refine.Finish
+import NautyVerified.Proofs.Refine.Satisfies
 import NautyVerified.Proofs.Refine.Frame
 import NautyVerified.Proofs.Refine.Trivial
 import NautyVerified.Proofs.Refine.Pop
