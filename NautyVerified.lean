@@ -161,3 +161,4 @@ import NautyVerified.Proofs.Harness.PartC
 import NautyVerified.Proofs.Harness.Output
 import NautyVerified.Proofs.Harness.Words
 import NautyVerified.Proofs.Harness.Tail
+import NautyVerified.Proofs.Harness.Opts
