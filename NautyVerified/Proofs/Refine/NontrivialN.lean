@@ -112,13 +112,13 @@ theorem notCellW_bS {L : Loc} (d : WDist L) : ¬ cellW L L.bS := by
   · exact d.bW_bS h.symm
   · exact d.bS_bB h
 
-theorem wp_cellLoopN {Q : Post} {le : temp_env} {m0 m : mem} {n : Nat} {L : Loc} {ctx : Ctx n}
+theorem wp_cellLoopN {f : function} {Q : Post} {le : temp_env} {m0 m : mem} {n : Nat} {L : Loc} {ctx : Ctx n}
     {st0 : RefineSt n} {ws : VSet n} {wsw : Nat → Lib.Integers.int64} {R stc : RefineSt n}
     (hok : Ok n L) (hcS : L.M ≤ L.capS) (hok0 : StOk n L.level st0)
     (hI : PassInvN le m0 m L ctx st0 ws wsw R 0 stc)
     (hc : PTree.get dense.id.cell1 le = some (.Vint (ir (0 : Nat))))
     (hQ : ∀ le' m', PassInvN le' m0 m' L ctx st0 ws wsw R n R → Q.normal E0 empty_env le' m') :
-    Wp xi ge Source.dense.fn.refine cellLoopN Q empty_env le m := by
+    Wp xi ge f cellLoopN Q empty_env le m := by
   have hn := hok.nlt
   have d := hok.wd
   have hsz0 : st0.ptn.size = n := hok0.ptnSize
@@ -233,7 +233,7 @@ theorem wsPre_succ {n : Nat} (lab : Array Nat) (split1 k : Nat) :
     (wsPre lab split1 (k + 1) : VSet n) = (wsPre lab split1 k : VSet n).insert lab[split1 + k]! := by
   simp [wsPre, List.range_succ]
 
-theorem wp_fillWS {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc} {lab : Array Nat}
+theorem wp_fillWS {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc} {lab : Array Nat}
     {split1 split2 : Nat} {w0 : Nat → Lib.Integers.int64}
     (hok : Ok n L) (hs1 : PTree.get dense.id.split1 le = some (.Vint (ir split1)))
     (hs2 : PTree.get dense.id.split2 le = some (.Vint (ir split2)))
@@ -248,7 +248,7 @@ theorem wp_fillWS {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc} {lab 
       SetRep (fun w => bv64 (w' w)) L.M (worksetOf n lab split1 split2) →
       Unch m m' (· = L.bS) → Keep m m' L.bS →
       (∀ z, z ≠ dense.id.i → PTree.get z le' = PTree.get z le) → Q.normal E0 empty_env le' m') :
-    Wp xi ge Source.dense.fn.refine fillWS Q empty_env le m := by
+    Wp xi ge f fillWS Q empty_env le m := by
   have hn := hok.nlt
   have hnM := hok.nM
   have hMl := hok.Mlt

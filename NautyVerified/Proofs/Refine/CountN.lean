@@ -41,7 +41,7 @@ theorem ptrTo_zero0 : ptrTo 0 8 0 = Ptrofs.zero := by
   have := Graph.ptrTo_zero Ptrofs.zero
   exact this
 
-theorem wp_cntHead {Q : Post} {le : temp_env} {m : mem} {a b c d : Common.AST.ident}
+theorem wp_cntHead {f : function} {Q : Post} {le : temp_env} {m : mem} {a b c d : Common.AST.ident}
     (hd : [dense.id.c1, a, b, c, d, dense.id.x, dense.id.set1, dense.id.set2, dense.id.cnt,
       dense.id.m].Pairwise (· ≠ ·)) {rest : statement}
     {n : Nat} {L : Loc} {ctx : Ctx n} {st : RefineSt n} {ws : VSet n} {wsw : Nat → Lib.Integers.int64}
@@ -57,8 +57,8 @@ theorem wp_cntHead {Q : Post} {le : temp_env} {m : mem} {a b c d : Common.AST.id
       (∀ z, z ≠ dense.id.c1 → z ≠ a → z ≠ b → z ≠ c → z ≠ d → z ≠ dense.id.x →
         z ≠ dense.id.set1 → z ≠ dense.id.set2 → z ≠ dense.id.cnt →
         PTree.get z le' = PTree.get z le) →
-      Wp xi ge Source.dense.fn.refine rest Q empty_env le' m) :
-    Wp xi ge Source.dense.fn.refine (cntHead a b c d rest) Q empty_env le m := by
+      Wp xi ge f rest Q empty_env le' m) :
+    Wp xi ge f (cntHead a b c d rest) Q empty_env le m := by
   have hM := hok.Mlt
   have hnM := hok.nM
   have hn := hok.nlt

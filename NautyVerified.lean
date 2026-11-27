@@ -69,6 +69,7 @@ import NautyVerified.Proofs.Set.One
 import NautyVerified.Proofs.Refine.Syntax
 import NautyVerified.Proofs.Refine.State
 import NautyVerified.Proofs.Refine.Dialect
+import NautyVerified.Proofs.Refine.Temps
 import NautyVerified.Proofs.Refine1.Syntax
 import NautyVerified.Proofs.Refine.Mash
 import NautyVerified.Proofs.Refine.Scan

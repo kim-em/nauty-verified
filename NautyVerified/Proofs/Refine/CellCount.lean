@@ -165,7 +165,7 @@ theorem Tmp.away {n : Nat} {le le' : temp_env} {L : Loc} {st : RefineSt n} (h : 
     · subst hx; simp
     · subst hx; simp))
 
-theorem wp_countRest {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc} {ctx : Ctx n}
+theorem wp_countRest {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc} {ctx : Ctx n}
     {st : RefineSt n} {ws : VSet n} {wsw : Nat → Lib.Integers.int64} {cell1 cell2 : Nat}
     {cv0 bv0 : Nat → val}
     (hf : CFrame m L ctx st.lab ws wsw) (ht : Tmp le L st)
@@ -190,7 +190,7 @@ theorem wp_countRest {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc} {c
       Unch m m' (fun z => z = L.bc ∨ z = L.bB) → Keep m m' L.bB →
       (∀ z, z ∉ cntTemps → PTree.get z le' = PTree.get z le) →
       Q.normal E0 empty_env le' m') :
-    Wp xi ge Source.dense.fn.refine countRest Q empty_env le m := by
+    Wp xi ge f countRest Q empty_env le m := by
   have hok := hf.ok
   have d := hok.wd
   have hcap := hok.capB

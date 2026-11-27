@@ -20,14 +20,14 @@ open Hex.GraphIso.Nauty
 
 variable {xi : ExternalCalls}
 
-theorem wp_fixN {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc} {ctx : Ctx n}
+theorem wp_fixN {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc} {ctx : Ctx n}
     {st : RefineSt n} {aw : Nat → Lib.Integers.int64} {cell1 : Nat}
     (hok : Ok n L) (hm : Mem m L ctx st aw) (ht : Tmp le L st)
     (hcl1 : PTree.get dense.id.cell1 le = some (.Vint (ir cell1))) (hc : cell1 < n)
     (hmp : st.maxpos < n)
     (hQ : ∀ m' aw', Mem m' L ctx (nontrivialFix cell1 st) aw' → Unch m m' (· = L.ba) →
       Q.normal E0 empty_env le m') :
-    Wp xi ge Source.dense.fn.refine fixN Q empty_env le m := by
+    Wp xi ge f fixN Q empty_env le m := by
   have hnM := hok.nM
   have hnl := hok.nlt
   have hMl := hok.Mlt
@@ -143,7 +143,7 @@ def splitTemps : List Common.AST.ident :=
   [dense.id.i, dense.id.c1, dense.id.c2, dense.id.maxcell, dense.id.maxpos, dense.id.hint,
    dense.id.longcode, idOf 731]
 
-theorem wp_splitN {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc} {ctx : Ctx n}
+theorem wp_splitN {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc} {ctx : Ctx n}
     {st : RefineSt n} {aw : Nat → Lib.Integers.int64} {ws : VSet n}
     {wsw : Nat → Lib.Integers.int64} {cell1 cell2 : Nat} {cv0 bv0 wv0 : Nat → val}
     (hf : CFrame m L ctx st.lab ws wsw) (hm : Mem m L ctx st aw) (ht : Tmp le L st)
@@ -168,7 +168,7 @@ theorem wp_splitN {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc} {ctx 
       Unch m m' (cellW L) → Keep m m' L.bB → Keep m m' L.bW →
       (∀ z, z ∉ splitTemps → PTree.get z le' = PTree.get z le) →
       Q.normal E0 empty_env le' m' ∧ Q.cont E0 empty_env le' m') :
-    Wp xi ge Source.dense.fn.refine splitN Q empty_env le m := by
+    Wp xi ge f splitN Q empty_env le m := by
   have hok := hf.ok
   have d := hok.wd
   have hnl := hok.nlt
@@ -395,7 +395,7 @@ theorem wp_splitN {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc} {ctx 
 def cellTemps : List Common.AST.ident :=
   cntTemps ++ [idOf 718, idOf 719, idOf 720, idOf 721, idOf 722, idOf 723] ++ splitTemps
 
-theorem wp_cellN {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc} {ctx : Ctx n}
+theorem wp_cellN {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc} {ctx : Ctx n}
     {st : RefineSt n} {aw : Nat → Lib.Integers.int64} {ws : VSet n}
     {wsw : Nat → Lib.Integers.int64} {cell1 cell2 : Nat} {bv0 wv0 : Nat → val}
     (hf : CFrame m L ctx st.lab ws wsw) (hm : Mem m L ctx st aw) (ht : Tmp le L st)
@@ -412,7 +412,7 @@ theorem wp_cellN {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc} {ctx :
       Unch m m' (cellW L) → Keep m m' L.bB → Keep m m' L.bW →
       (∀ z, z ∉ cellTemps → PTree.get z le' = PTree.get z le) →
       Q.normal E0 empty_env le' m' ∧ Q.cont E0 empty_env le' m') :
-    Wp xi ge Source.dense.fn.refine cellN Q empty_env le m := by
+    Wp xi ge f cellN Q empty_env le m := by
   have hok := hf.ok
   have d := hok.wd
   have hnl := hok.nlt

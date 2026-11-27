@@ -220,7 +220,7 @@ theorem pops_le (a b : Nat → Lib.Integers.int64) : ∀ j, pops a b j ≤ 64 * 
     omega
 
 /-- `for (c1 = m; --c1 >= 0;) if ((x = *set1++ & *set2++) != 0) cnt += POPCOUNT(x);` -/
-theorem wp_popLoop {Q : Post} {le : temp_env} {m : mem} {a b c d : Common.AST.ident}
+theorem wp_popLoop {f : function} {Q : Post} {le : temp_env} {m : mem} {a b c d : Common.AST.ident}
     (hd : [dense.id.c1, a, b, c, d, dense.id.x, dense.id.set1, dense.id.set2, dense.id.cnt,
       dense.id.m].Pairwise (· ≠ ·))
     {bA bB : block} {baseA baseB : Int} {wa wb : Nat → Lib.Integers.int64} {M k : Nat}
@@ -235,7 +235,7 @@ theorem wp_popLoop {Q : Post} {le : temp_env} {m : mem} {a b c d : Common.AST.id
         z ≠ dense.id.set1 → z ≠ dense.id.set2 → z ≠ dense.id.cnt →
         PTree.get z le' = PTree.get z le) →
       Q.normal E0 empty_env le' m) :
-    Wp xi ge Source.dense.fn.refine (popLoop a b c d) Q empty_env le m := by
+    Wp xi ge f (popLoop a b c d) Q empty_env le m := by
   have n01 := pwNe hd 0 1 (by decide) (by simp)
   have n02 := pwNe hd 0 2 (by decide) (by simp)
   have n03 := pwNe hd 0 3 (by decide) (by simp)

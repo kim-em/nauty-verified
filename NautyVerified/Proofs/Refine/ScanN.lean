@@ -164,7 +164,7 @@ theorem SBound.step {n : Nat} {st0 s : RefineSt n} {level cell1 cell2 v c1 k : N
     · exact h.maxpos
   · rw [e5]; have := h.nc; split <;> omega
 
-theorem wp_grpMax {Q : Post} {le : temp_env} {n : Nat} {L : Loc} {st : RefineSt n} {m : mem}
+theorem wp_grpMax {f : function} {Q : Post} {le : temp_env} {n : Nat} {L : Loc} {st : RefineSt n} {m : mem}
     {c1 k : Nat} {mc : Int} (ht : Tmp le L st)
     (hc1 : PTree.get dense.id.c1 le = some (.Vint (ir c1)))
     (hc2 : PTree.get dense.id.c2 le = some (.Vint (ir (c1 + k : Nat))))
@@ -174,7 +174,7 @@ theorem wp_grpMax {Q : Post} {le : temp_env} {n : Nat} {L : Loc} {st : RefineSt 
       PTree.get dense.id.maxcell le' = some (.Vint (ir (if Int.ofNat k > mc then (k : Int) else mc))) →
       (∀ z, z ≠ dense.id.maxcell → z ≠ dense.id.maxpos → PTree.get z le' = PTree.get z le) →
       Q.normal E0 empty_env le' m) :
-    Wp xi ge Source.dense.fn.refine grpMax Q empty_env le m := by
+    Wp xi ge f grpMax Q empty_env le m := by
   apply wp_if_eval
   simp only [Exec.evalExpr, hc1, hc2, hmc, typeof, cop, ir_sub]
   have hk : ((c1 + k : Nat) : Int) - c1 = k := by omega
@@ -200,7 +200,7 @@ theorem wp_grpMax {Q : Post} {le : temp_env} {n : Nat} {L : Loc} {st : RefineSt 
     · rw [ite_eq_right h']; exact ht
     · rw [ite_eq_right h']; exact hmc
 
-theorem wp_grpAct {Q : Post} {le : temp_env} {n : Nat} {L : Loc} {ctx : Ctx n} {st : RefineSt n}
+theorem wp_grpAct {f : function} {Q : Post} {le : temp_env} {n : Nat} {L : Loc} {ctx : Ctx n} {st : RefineSt n}
     {aw : Nat → Lib.Integers.int64} {m : mem} {cell1 c1 k : Nat} (hok : Ok n L)
     (hm : Mem m L ctx st aw) (ht : Tmp le L st)
     (hc1 : PTree.get dense.id.c1 le = some (.Vint (ir c1)))
@@ -218,7 +218,7 @@ theorem wp_grpAct {Q : Post} {le : temp_env} {n : Nat} {L : Loc} {ctx : Ctx n} {
       Unch m m' (fun z => z = L.ba ∨ z = L.bn) →
       (∀ z, z ≠ dense.id.hint → PTree.get z le' = PTree.get z le) →
       Q.normal E0 empty_env le' m') :
-    Wp xi ge Source.dense.fn.refine grpAct Q empty_env le m := by
+    Wp xi ge f grpAct Q empty_env le m := by
   have hnM := hok.nM
   have hnl := hok.nlt
   have hMl := hok.Mlt
@@ -249,7 +249,7 @@ theorem wp_grpAct {Q : Post} {le : temp_env} {n : Nat} {L : Loc} {ctx : Ctx n} {
     have hrest : ∀ le1 (h : Nat), Tmp le1 L { st with active := st.active.insert c1, hint := h } →
         (∀ z, z ≠ dense.id.hint → PTree.get z le1 = PTree.get z le) →
         ((k == 1) = true → h = c1) → (¬ (k == 1) = true → h = st.hint) →
-        Wp xi ge Source.dense.fn.refine
+        Wp xi ge f
           (Set.sk (.Sassign (.Ederef (pi dense.id.numcells) tint)
             (.Ebinop .Oadd (.Ederef (pi dense.id.numcells) tint) (ci 1 tint) tint)))
           { normal := fun t => Q.normal (E0 ++ E0 ++ t), brk := fun t => Q.brk (E0 ++ E0 ++ t),
@@ -286,7 +286,7 @@ theorem wp_grpAct {Q : Post} {le : temp_env} {n : Nat} {L : Loc} {ctx : Ctx n} {
       exact hrest le st.hint (ht.congr rfl rfl rfl) (fun _ _ => rfl)
         (fun h => absurd (by simpa using h) hk1) (fun _ => rfl)
 
-theorem wp_grpPtn {Q : Post} {le : temp_env} {n : Nat} {L : Loc} {ctx : Ctx n} {st : RefineSt n}
+theorem wp_grpPtn {f : function} {Q : Post} {le : temp_env} {n : Nat} {L : Loc} {ctx : Ctx n} {st : RefineSt n}
     {aw : Nat → Lib.Integers.int64} {m : mem} {cell2 c1 k : Nat} (hok : Ok n L)
     (hm : Mem m L ctx st aw) (ht : Tmp le L st) (hsz : st.ptn.size = n)
     (hc2 : PTree.get dense.id.c2 le = some (.Vint (ir (c1 + k : Nat))))
@@ -295,7 +295,7 @@ theorem wp_grpPtn {Q : Post} {le : temp_env} {n : Nat} {L : Loc} {ctx : Ctx n} {
     (hQ : ∀ m', Mem m' L ctx { st with
         ptn := if c1 + k ≤ cell2 then st.ptn.set! (c1 + k - 1) L.level else st.ptn } aw →
       Unch m m' (· = L.bp) → Q.normal E0 empty_env le m') :
-    Wp xi ge Source.dense.fn.refine grpPtn Q empty_env le m := by
+    Wp xi ge f grpPtn Q empty_env le m := by
   have hnl := hok.nlt
   have hlv := hok.levlt
   apply wp_if_eval
@@ -320,7 +320,7 @@ theorem wp_grpPtn {Q : Post} {le : temp_env} {n : Nat} {L : Loc} {ctx : Ctx n} {
     rw [ite_eq_right h]
     exact hm
 
-theorem wp_group {Q : Post} {le : temp_env} {n : Nat} {L : Loc} {ctx : Ctx n} {st : RefineSt n}
+theorem wp_group {f : function} {Q : Post} {le : temp_env} {n : Nat} {L : Loc} {ctx : Ctx n} {st : RefineSt n}
     {aw : Nat → Lib.Integers.int64} {m : mem} {cell1 cell2 v c1 k : Nat} {mc : Int}
     {bv : Nat → val} (hok : Ok n L) (hm : Mem m L ctx st aw) (ht : Tmp le L st)
     (hsz : st.ptn.size = n) (hcode : st.longcode < 2 ^ 62)
@@ -343,7 +343,7 @@ theorem wp_group {Q : Post} {le : temp_env} {n : Nat} {L : Loc} {ctx : Ctx n} {s
       (∀ z, z ∉ [dense.id.c1, dense.id.c2, dense.id.maxcell, dense.id.maxpos, dense.id.hint,
         dense.id.longcode] → PTree.get z le' = PTree.get z le) →
       Q.normal E0 empty_env le' m') :
-    Wp xi ge Source.dense.fn.refine group Q empty_env le m := by
+    Wp xi ge f group Q empty_env le m := by
   have hnl := hok.nlt
   have d := hok.wd
   have hread := eval_gat (e := empty_env) (le := le) rfl find_naugraphBucket hbkp hbkt
@@ -449,7 +449,7 @@ theorem wp_group {Q : Post} {le : temp_env} {n : Nat} {L : Loc} {ctx : Ctx n} {s
     obtain ⟨h0, h1, h2, h3, h4, h5⟩ := hz
     rw [temps_gso _ _ h0, g4 z h4, g3' z h2 h3 h5 h1]
 
-theorem wp_scanLoop {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc} {ctx : Ctx n}
+theorem wp_scanLoop {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc} {ctx : Ctx n}
     {st : RefineSt n} {aw : Nat → Lib.Integers.int64} {ws : VSet n}
     {wsw : Nat → Lib.Integers.int64} {cell1 cell2 : Nat} {bv0 : Nat → val}
     (hf : CFrame m L ctx st.lab ws wsw) (hm : Mem m L ctx st aw) (ht : Tmp le L st)
@@ -477,7 +477,7 @@ theorem wp_scanLoop {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc} {ct
       (∀ z, z ∉ [dense.id.i, dense.id.c1, dense.id.c2, dense.id.maxcell, dense.id.maxpos,
         dense.id.hint, dense.id.longcode] → PTree.get z le' = PTree.get z le) →
       Q.normal E0 empty_env le' m') :
-    Wp xi ge Source.dense.fn.refine scanLoop Q empty_env le m := by
+    Wp xi ge f scanLoop Q empty_env le m := by
   have hok := hf.ok
   have hnl := hok.nlt
   have hcapB := hf.capB

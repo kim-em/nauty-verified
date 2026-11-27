@@ -124,7 +124,7 @@ theorem curVals_succ {cs : List Nat} {A B cell1 o : Nat} (bv0 : Nat → val)
           Nat.add_zero]
     · rw [ite_eq_right hw, ite_eq_right hw]
 
-theorem wp_placeLoop {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc} {cs : List Nat}
+theorem wp_placeLoop {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc} {cs : List Nat}
     {lab : Array Nat} {cell1 cell2 A B : Nat} {cv0 bv0 wv0 : Nat → val}
     (hok : Ok n L) (hcapW : L.capW < 2147483648) (hcapB : L.capB < 2147483648)
     (hlen : cs.length = cell2 + 1 - cell1) (h12 : cell1 < cell2) (h2n : cell2 < n)
@@ -146,7 +146,7 @@ theorem wp_placeLoop {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc} {c
       Unch m m' (fun z => z = L.bB ∨ z = L.bW) → Keep m m' L.bB → Keep m m' L.bW →
       (∀ z, z ≠ dense.id.i → z ≠ idOf 731 → PTree.get z le' = PTree.get z le) →
       Q.normal E0 empty_env le' m') :
-    Wp xi ge Source.dense.fn.refine placeLoop Q empty_env le m := by
+    Wp xi ge f placeLoop Q empty_env le m := by
   have d := hok.wd
   have hnl := hok.nlt
   have hcW := hok.capW
@@ -273,7 +273,7 @@ theorem wp_placeLoop {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc} {c
       fun z h1 h2 => by rw [temps_gso _ _ h1, hoth z h1 h2]⟩
     rw [temps_gss]; push_cast; rw [Int.add_assoc]
 
-theorem wp_copyLoop {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc}
+theorem wp_copyLoop {f : function} {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc}
     {lab0 T : Array Nat} {cell1 cell2 : Nat} {wv : Nat → val}
     (hok : Ok n L) (hcapW : L.capW < 2147483648) (h12 : cell1 < cell2) (h2n : cell2 < n)
     (hi : PTree.get dense.id.i le = some (.Vint (ir cell1)))
@@ -287,7 +287,7 @@ theorem wp_copyLoop {Q : Post} {le : temp_env} {m : mem} {n : Nat} {L : Loc}
     (hQ : ∀ le' m', ArrayAt m' .Mint32 L.bl L.lb (ints T) n → Unch m m' (· = L.bl) →
       (∀ z, z ≠ dense.id.i → PTree.get z le' = PTree.get z le) →
       Q.normal E0 empty_env le' m') :
-    Wp xi ge Source.dense.fn.refine copyLoop Q empty_env le m := by
+    Wp xi ge f copyLoop Q empty_env le m := by
   have d := hok.wd
   have hnl := hok.nlt
   have hcW := hok.capW

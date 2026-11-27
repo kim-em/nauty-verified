@@ -43,7 +43,7 @@ abbrev widenHi (t : Common.AST.ident) : statement :=
         (.Sassign (gix dense.id.«naugraph:bucket» (tv t)) (ci 0 tint))))
     .Sskip
 
-theorem wp_widenLo {Q : Post} {le : temp_env} {m : mem} {t : Common.AST.ident}
+theorem wp_widenLo {f : function} {Q : Post} {le : temp_env} {m : mem} {t : Common.AST.ident}
     (ht1 : t ≠ dense.id.bmin) (ht2 : t ≠ dense.id.cnt) {bB : block} {bv : Nat → val} {cap B c : Nat}
     (hb : PTree.get dense.id.bmin le = some (.Vint (ir B)))
     (hc : PTree.get dense.id.cnt le = some (.Vint (ir c)))
@@ -55,7 +55,7 @@ theorem wp_widenLo {Q : Post} {le : temp_env} {m : mem} {t : Common.AST.ident}
       Unch m m' (· = bB) → Keep m m' bB →
       (∀ z, z ≠ dense.id.bmin → z ≠ t → PTree.get z le' = PTree.get z le) →
       Q.normal E0 empty_env le' m') :
-    Wp xi ge Source.dense.fn.refine (widenLo t) Q empty_env le m := by
+    Wp xi ge f (widenLo t) Q empty_env le m := by
   let I := fun (v : Nat) (tr : trace) (e' : env) (le' : temp_env) (m' : mem) => tr = E0 ∧
     e' = empty_env ∧ ∃ j, min B c ≤ j ∧ j ≤ B ∧ v = j - min B c ∧
       PTree.get dense.id.bmin le' = some (.Vint (ir (j : Nat))) ∧
@@ -107,7 +107,7 @@ theorem wp_widenLo {Q : Post} {le : temp_env} {m : mem} {t : Common.AST.ident}
     apply wp_skip
     simpa using hJ
 
-theorem wp_widenHi {Q : Post} {le : temp_env} {m : mem} {t : Common.AST.ident}
+theorem wp_widenHi {f : function} {Q : Post} {le : temp_env} {m : mem} {t : Common.AST.ident}
     (ht1 : t ≠ dense.id.bmax) (ht2 : t ≠ dense.id.cnt) {bB : block} {bv : Nat → val} {cap B c : Nat}
     (hb : PTree.get dense.id.bmax le = some (.Vint (ir B)))
     (hc : PTree.get dense.id.cnt le = some (.Vint (ir c)))
@@ -119,7 +119,7 @@ theorem wp_widenHi {Q : Post} {le : temp_env} {m : mem} {t : Common.AST.ident}
       Unch m m' (· = bB) → Keep m m' bB →
       (∀ z, z ≠ dense.id.bmax → z ≠ t → PTree.get z le' = PTree.get z le) →
       Q.normal E0 empty_env le' m') :
-    Wp xi ge Source.dense.fn.refine (widenHi t) Q empty_env le m := by
+    Wp xi ge f (widenHi t) Q empty_env le m := by
   let I := fun (v : Nat) (tr : trace) (e' : env) (le' : temp_env) (m' : mem) => tr = E0 ∧
     e' = empty_env ∧ ∃ j, B ≤ j ∧ j ≤ max B c ∧ v = max B c - j ∧
       PTree.get dense.id.bmax le' = some (.Vint (ir (j : Nat))) ∧
