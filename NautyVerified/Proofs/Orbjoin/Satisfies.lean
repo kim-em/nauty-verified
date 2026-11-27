@@ -57,15 +57,15 @@ theorem orbjoin_satisfies {xi : ExternalCalls} (bo : block) (ofs : ptrofs) (bm :
     wp_step
     refine wp_joinLoop hf ?_
     intro le1 m1 hf1 hu1
-    simp only [seqPost, Post.after, E0_append]
+    simp only [E0_append]
     wp_step; wp_step; wp_step
     apply wp_set_eval
-    simp only [Exec.evalExpr, seqPost, Post.after, E0_append]
+    simp only [Exec.evalExpr, E0_append]
     wp_step
     refine wp_compressLoop (hf1.temps fun k hk => ?_) (temps_gss _ _ _) ?_
     · rw [temps_gso _ _ (by rcases hk with rfl | rfl | rfl <;> decide)]
     intro le2 m2 hf2 hj hu2
-    simp only [seqPost, Post.after, E0_append]
+    simp only [E0_append]
     wp_step; wp_step
     apply wp_return_some_eval
     simp only [Exec.evalExpr, hj, typeof, cop, Source.dense.fn.orbjoin.fn_return_eq,
