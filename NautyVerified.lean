@@ -64,6 +64,8 @@ import NautyVerified.Proofs.Set.Elem
 import NautyVerified.Proofs.Set.Bit
 import NautyVerified.Proofs.Refine.Syntax
 import NautyVerified.Proofs.Refine.State
+import NautyVerified.Proofs.Refine.Mash
+import NautyVerified.Proofs.Refine.Scan
 import NautyVerified.Proofs.Refine.Guard
 import NautyVerified.Proofs.Isautom.Scan
 import NautyVerified.Proofs.Isautom.Satisfies
