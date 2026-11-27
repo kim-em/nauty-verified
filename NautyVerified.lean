@@ -19,6 +19,7 @@ import NautyVerified.Statement.Dense
 import NautyVerified.Statement.Compiler
 import NautyVerified.Statement.Compose
 import NautyVerified.Logic.Array
+import NautyVerified.Logic.Grow
 import NautyVerified.Logic.Ints
 import NautyVerified.Proofs.Orbjoin.Chase
 import NautyVerified.Proofs.Orbjoin.Join
