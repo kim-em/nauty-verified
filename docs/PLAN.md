@@ -339,7 +339,38 @@ Conventions settled while doing these:
   `inf = 2000000002`, and `Spec/SearchInf.lean` proves the search's results
   independent of `inf > n + 1`.
 
+- nauty.c's search is specified over `Proofs/Search/State.lean`:
+  `SLoc` (the caller's arrays, the workspace, nauty.c's `DYNALLSTAT` arrays,
+  the harness callback, `M`) and `SearchAt m S ctx st pre nsp` (pointer
+  globals, option copies and dispatch table fixed by `nauty()`; static
+  scalars = `st`'s fields; `statsblk` = `st`'s counters, `maxlevel` only once
+  the first leaf is reached since the harness leaves it uninitialised; the
+  arrays, `canong`'s first `samerows` rows, the workspace ring = `st.autos`;
+  naugraph/nautil work arrays somewhere apart (`WorkAt`)). HexGraphIso
+  carries the short-prune request in `Exit.unwind`, nauty in
+  `needshortprune`, hence `nsp`. The `unsigned long` counters are related
+  through `lr` (modular), so increments need no bound; bounds below `2^31`
+  for the written outputs are a Phase 6 lemma. Generators found are written
+  through the harness's `userautomproc` (`AutomCb`), so specs state the
+  trace as `Writes t (gensWords …)`. Leaf functions' specs are in
+  `Proofs/Search/Spec.lean`; the recursive nodes are specified against
+  `node`/`sweep` with fuel `n + 3 - level` (sweep `n + 1`), and HexGraphIso's
+  `node_noFuel` shows the fuel is never the reason a call returns.
+- The C initial state differs from `Nauty.initial` in `ptn` (`NAUTY_INFINITY`
+  for `n + 2`) and `firsttc` (zero-filled by the allocator, `-1` in Hex); both
+  are absorbed by `Spec/SearchInf.lean`.
+
 ## Phase 6: dense end-to-end
+
+Shape of the composition: `main`'s specification (`Proofs/Harness/`) is an
+existence statement (some execution, the one whose `nv_read`s return `ins`,
+terminates with `writes t = expected G`); every behaviour consistent with
+`ins` is that one by determinism of Clight steps up to the results of
+external calls (`nv_write`'s event result is arbitrary but does not affect
+the state), and Phase 3's backward simulation carries the behaviour to the
+binary. The written statistics need HexGraphIso bounds (`numgenerators`,
+`numnodes`, … fit the C types) to read back as the exact naturals of
+`expected`.
 
 Compose Phase 5 with Phase 3 into `densenauty_binary_correct`; derive the
 corollaries from `HexGraphIso` (`canon_iso`, `canon_invariant`,
