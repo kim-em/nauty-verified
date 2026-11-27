@@ -53,4 +53,10 @@ theorem setRep_insert {n M : Nat} {ws : Nat → BitVec 64} {s : VSet n} (h : Set
     have : u ≠ v := fun h' => hw (by rw [h'])
     simp [Ne.symm this]
 
+theorem setRep_inter {n M : Nat} {ws wt : Nat → BitVec 64} {s t : VSet n} (hs : SetRep ws M s)
+    (ht : SetRep wt M t) : SetRep (fun w => ws w &&& wt w) M (s.inter t) :=
+  ⟨hs.1, fun v hv => by
+    rw [VSet.mem_inter, ← hs.2 v hv, ← ht.2 v hv]
+    simp only [SetwordsMem, BitVec.getMsbD_and]⟩
+
 end NautyVerified.Spec

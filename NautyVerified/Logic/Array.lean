@@ -195,4 +195,9 @@ theorem load_array {m : mem} {chunk : memory_chunk} {b : block} {base : Int}
   show Mem.load _ _ _ _ = _
   rw [hofs]; exact h.load i hi
 
+theorem ArrayAt.congr {m : mem} {chunk : memory_chunk} {b : block} {base : Int}
+    {vals vals' : Nat → val} {n : Nat} (h : ArrayAt m chunk b base vals n)
+    (he : ∀ i < n, vals i = vals' i) : ArrayAt m chunk b base vals' n :=
+  ⟨h.base_nonneg, h.fits, fun i hi => by rw [← he i hi]; exact h.load i hi, h.writable⟩
+
 end NautyVerified.Logic
