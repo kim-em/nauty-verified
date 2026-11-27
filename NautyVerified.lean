@@ -18,3 +18,4 @@ import NautyVerified.Proofs.Nextelement.Satisfies
 import NautyVerified.Statement.Dense
 import NautyVerified.Statement.Compiler
 import NautyVerified.Logic.Array
+import NautyVerified.Proofs.Orbjoin.Chase
