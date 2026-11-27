@@ -95,6 +95,7 @@ import NautyVerified.Proofs.Harness.Syntax
 import NautyVerified.Proofs.Search.Ops
 import NautyVerified.Proofs.Search.Node.Fields
 import NautyVerified.Proofs.Search.Node.Tc
+import NautyVerified.Proofs.Search.Node.TcOps
 import NautyVerified.Proofs.Refine.Frame
 import NautyVerified.Proofs.Refine.Trivial
 import NautyVerified.Proofs.Refine.Pop
