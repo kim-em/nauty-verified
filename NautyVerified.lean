@@ -6,3 +6,5 @@ import NautyVerified.Logic.Wp
 import NautyVerified.Logic.Simp
 import NautyVerified.Word.BitVec
 import NautyVerified.Spec.VSet
+import NautyVerified.Exec.Cop
+import NautyVerified.Program.Dense

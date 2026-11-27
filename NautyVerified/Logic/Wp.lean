@@ -242,3 +242,17 @@ theorem wp_assign_eval {f : function} {a1 a2 : expr} {Q : Post} {e le m}
   · exact h.elim
 
 end NautyVerified.Logic
+
+namespace NautyVerified.Logic
+
+/-- Apply the weakest-precondition rule for the head statement and normalise
+the postconditions it introduces. Conditionals are evaluated but not split. -/
+macro "wp_step" : tactic => `(tactic| first
+  | (apply wp_seq; simp only [seqPost, Post.after])
+  | (apply wp_skip; simp only [seqPost, Post.after, E0_append, append_E0])
+  | (apply wp_set_eval; simp only [Exec.evalExpr])
+  | (apply wp_if_eval; simp only [Exec.evalExpr])
+  | (apply wp_return_some_eval; simp only [Exec.evalExpr])
+  | (apply wp_assign_eval; simp only [Exec.evalExpr, Exec.evalLvalue]))
+
+end NautyVerified.Logic

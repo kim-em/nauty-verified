@@ -19,7 +19,8 @@ driver runs), and adds:
 
 * `foo.clight` (and `foo.clight.<c_name>`), the output of CompCert4Lean's
   `SimplExpr.transl_program`, with `foo.clight_eq` stating so;
-* `foo.locals` (and `foo.locals.<c_name>`), the output of
+* `foo.locals` (and `foo.locals.<c_name>`, with each internal function also
+  its own constant `foo.fn.<c_name>`), the output of
   `SimplLocals.transf_program` on `foo.clight` under any configuration with
   debug information off, with `foo.locals_eq` stating so.
 
@@ -107,6 +108,21 @@ def emitDefs {α : Type} [ToExpr α] (base sub listName : Name) (nameOf : positi
     (entries.foldr (fun e acc => mkApp3 (mkConst ``List.cons [0]) pairTy e acc)
       (mkApp (mkConst ``List.nil [0]) pairTy))
 
+/-- `emitDefs`, with each definition's term given by `term`. -/
+def emitDefsWith {α : Type} [ToExpr α] (base sub listName : Name) (nameOf : positive → Name)
+    (defs : List (positive × α)) (term : positive → α → Expr) : CommandElabM Unit := do
+  let ty := toTypeExpr α
+  let pairTy := mkApp2 (mkConst ``Prod [0, 0]) (toTypeExpr positive) ty
+  let mut entries : Array Expr := #[]
+  for (ident, d) in defs do
+    let n := base ++ sub ++ nameOf ident
+    addDef n ty (term ident d)
+    entries := entries.push (mkApp4 (mkConst ``Prod.mk [0, 0]) (toTypeExpr positive) ty
+      (toExpr ident) (mkConst n))
+  addDef (base ++ listName) (mkApp (mkConst ``List [0]) pairTy)
+    (entries.foldr (fun e acc => mkApp3 (mkConst ``List.cons [0]) pairTy e acc)
+      (mkApp (mkConst ``List.nil [0]) pairTy))
+
 /-- Add `base.id.<name>` for each identifier name. -/
 def emitNames (base : Name) (names : List (Nat × String)) : CommandElabM Unit := do
   for (i, str) in names do
@@ -149,7 +165,32 @@ def emitPasses (base : Name) (nameOf : positive → Name) (p : Cfrontend.Csyntax
   let locals ← match Cfrontend.SimplLocals.transf_program Prototype.cfg clight with
     | .OK c => pure c
     | .Error _ => throwError "{base}: SimplLocals failed"
-  emitDefs base `locals `localsDefs nameOf locals.prog_defs
+  -- Each internal function is its own constant `base.fn.<c_name>`.
+  let fnTy := mkConst ``Cfrontend.Clight.function
+  for (ident, d) in locals.prog_defs do
+    match d with
+    | .Gfun (.Internal fn) =>
+        let fnName := base ++ `fn ++ nameOf ident
+        let bodyName := base ++ `body ++ nameOf ident
+        addDef bodyName (mkConst ``Cfrontend.Clight.statement) (toExpr fn.fn_body)
+        addDef fnName fnTy (mkAppN (mkConst ``Cfrontend.Clight.function.mk)
+          #[toExpr fn.fn_return, toExpr fn.fn_callconv, toExpr fn.fn_params,
+            toExpr fn.fn_vars, toExpr fn.fn_temps, mkConst bodyName])
+        for (field, value) in [(`fn_body_eq, (``Cfrontend.Clight.function.fn_body, mkConst bodyName)),
+            (`fn_return_eq, (``Cfrontend.Clight.function.fn_return, toExpr fn.fn_return))] do
+          let ty ← liftTermElabM (mkEq (mkApp (mkConst value.1) (mkConst fnName)) value.2)
+          addKernelRfl (fnName ++ field) ty
+          elabCommand (← `(command| attribute [simp] $(rootIdent (fnName ++ field))))
+    | _ => pure ()
+  emitDefsWith base `locals `localsDefs nameOf locals.prog_defs fun ident d =>
+    match d with
+    | .Gfun (.Internal _) =>
+        mkApp3 (mkConst ``Common.AST.globdef.Gfun)
+          (toTypeExpr (Cfrontend.Ctypes.fundef Cfrontend.Clight.function))
+          (toTypeExpr Cfrontend.Ctypes.type)
+          (mkApp2 (mkConst ``Cfrontend.Ctypes.fundef.Internal) fnTy
+            (mkConst (base ++ `fn ++ nameOf ident)))
+    | _ => toExpr d
   elabCommand (← `(command|
     def $(mk `locals) : Cfrontend.Clight.program := clightOf $(mk `program) $(mk `localsDefs)))
   addKernelRfl (base ++ `locals_eq) (← elabType (← `(
@@ -193,6 +234,11 @@ def readUnitFile (path : System.FilePath) : CommandElabM UnitFile := do
     | .ok r => pure r
     | .error e => throwError "{path}: {e}"
   return { program, fresh := Cfrontend.SimplExpr.first_unused_ident ctx (), names, statics }
+
+/-- `kernel_rfl name : lhs = rhs` adds the theorem, proved by `Eq.refl` and checked
+by the kernel alone. -/
+elab "kernel_rfl " id:ident " : " t:term : command => do
+  addKernelRfl ((← getCurrNamespace) ++ id.getId) (← elabType t)
 
 elab "c_unit " id:ident " from " path:str : command => do
   let base := (← getCurrNamespace) ++ id.getId

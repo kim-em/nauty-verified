@@ -7,8 +7,8 @@ import CompCert4Lean.Lib.Floats
 
 `ToExpr` instances for the CompCert4Lean types that occur in a `Csyntax`
 program. Machine integers and floats carry range proofs, so they are rebuilt
-from their canonical integer contents through `WordCore.repr` and
-`Float.of_bits`; everything else is the derived constructor term.
+from their canonical integer contents through `Int.repr`, `Int64.repr`,
+`Ptrofs.repr` and `Float.of_bits`; everything else is the derived constructor term.
 -/
 
 namespace NautyVerified.Source
@@ -26,9 +26,20 @@ instance : ToExpr Common.Values.block := inferInstanceAs (ToExpr positive)
 deriving instance ToExpr for
   Foundation.RocqString.Rocq.Coq.Strings.String.string
 
-instance (bits : Nat) : ToExpr (Lib.Integers.WordCore.Word bits) where
-  toTypeExpr := mkApp (mkConst ``Lib.Integers.WordCore.Word) (toExpr bits)
-  toExpr w := mkApp2 (mkConst ``Lib.Integers.WordCore.repr) (toExpr bits) (toExpr w.intval)
+/- One instance per word type, so that each literal has exactly the type its
+position expects (`Int.int`, `Int64.int`, `Ptrofs.int` are `Word` of three
+distinct `wordsize` constants, equal only after unfolding). -/
+instance : ToExpr Lib.Integers.int where
+  toTypeExpr := mkConst ``Lib.Integers.int
+  toExpr w := mkApp (mkConst ``Lib.Integers.Int.repr) (toExpr w.intval)
+
+instance : ToExpr Lib.Integers.int64 where
+  toTypeExpr := mkConst ``Lib.Integers.int64
+  toExpr w := mkApp (mkConst ``Lib.Integers.Int64.repr) (toExpr w.intval)
+
+instance : ToExpr Lib.Integers.ptrofs where
+  toTypeExpr := mkConst ``Lib.Integers.ptrofs
+  toExpr w := mkApp (mkConst ``Lib.Integers.Ptrofs.repr) (toExpr w.intval)
 
 instance : ToExpr Lib.Floats.float where
   toTypeExpr := mkConst ``Lib.Floats.float
