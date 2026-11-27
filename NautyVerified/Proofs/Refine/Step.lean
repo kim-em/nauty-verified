@@ -205,4 +205,41 @@ theorem wp_iter (hT : TrivialPass xi) (hN : NontrivialPass xi) {n : Nat} {Q : Po
       simp only [refineStep]; rw [ite_eq_right (by simpa [en] using hse)]
     rw [this]; exact hd
 
+/-- The loop state with fuel `F`: memory and temporaries describe `st`, and the
+rest of HexGraphIso's loop from `st` with fuel `F` gives the final result. -/
+def LoopAt {n : Nat} (L : Loc) (ctx : Ctx n) (st₀ : RefineSt n) (m₀ : mem) (F : Nat)
+    (le : temp_env) (m : mem) : Prop :=
+  ∃ st, Done le m L ctx st ∧ refineFuel st < F ∧
+    refineLoop ctx L.level (4 * n + 8) st₀ = refineLoop ctx L.level F st ∧ Unch m₀ m L.writes
+
+/-- `refine`'s main loop is HexGraphIso's `refineLoop` with fuel `4n + 8`. -/
+theorem wp_mainLoop (hT : TrivialPass xi) (hN : NontrivialPass xi) {n : Nat} {Q : Post}
+    {le : temp_env} {m : mem} {L : Loc} {ctx : Ctx n} {st₀ : RefineSt n} (hok : Ok n L)
+    (hd : Done le m L ctx st₀)
+    (hQ : ∀ le' m', Done le' m' L ctx (refineLoop ctx L.level (4 * n + 8) st₀) →
+      Unch m m' L.writes → Q.normal E0 empty_env le' m') :
+    Wp xi ge dense.fn.refine mainLoop Q empty_env le m := by
+  simp only [mainLoop]
+  refine wp_loop (I := fun F t e le' m' => t = E0 ∧ e = empty_env ∧ LoopAt L ctx st₀ m F le' m')
+    (J := fun F t e le' m' => t = E0 ∧ e = empty_env ∧ ∃ G, G < F ∧ LoopAt L ctx st₀ m G le' m')
+    ?_ ?_ (n := 4 * n + 8)
+    ⟨rfl, rfl, st₀, hd, refineFuel_lt_init st₀, rfl, Unch.refl _ _⟩
+  · rintro F t e le' m' ⟨rfl, rfl, st, ⟨aw, hm, ht, hi⟩, hF, hloop, hu⟩
+    wp_step
+    refine wp_guard hok hm ht hi ?_ ?_
+    · intro le'' hstop ht''
+      simp only [E0_append]
+      refine hQ le'' m' ?_ hu
+      rw [hloop, refineLoop_stop ctx L.level st hstop]
+      exact ⟨aw, hm, ht'', hi⟩
+    · intro le'' s hnc hps ht'' hs1
+      simp only [E0_append]
+      obtain ⟨G, rfl, hG, hloop'⟩ := refineLoop_next ctx L.level hF hnc hps
+      refine wp_iter hT hN hok hm ht'' hi hnc hps hs1 fun le3 m3 hd3 hu3 => ?_
+      simp only [E0_append]
+      exact ⟨True.intro, True.intro, G, by omega, _, hd3, hG, hloop.trans hloop', hu.trans hu3⟩
+  · rintro F t e le' m' ⟨rfl, rfl, G, hG, hl⟩
+    apply wp_skip
+    exact ⟨G, hG, by simp, rfl, hl⟩
+
 end NautyVerified.Proofs.Refine
