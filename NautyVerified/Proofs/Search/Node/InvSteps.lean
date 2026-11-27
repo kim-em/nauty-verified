@@ -1,9 +1,11 @@
 import NautyVerified.Proofs.Search.State
 import NautyVerified.Spec.PartOk
+import NautyVerified.Spec.NodeOk
 import NautyVerified.Spec.Processnode
 import NautyVerified.Spec.Firstterminal
 import NautyVerified.Spec.Recover
 import NautyVerified.Spec.Testcanlab
+import NautyVerified.Spec.Updatecan
 import NautyVerified.Spec.Bestcell
 import NautyVerified.Proofs.Search.Node.Compare
 
@@ -303,5 +305,252 @@ theorem PartFacts.target_lt {ctx : Ctx n} {level numcells tcLevel : Nat} {st : S
   obtain ⟨x, hx, hgt⟩ := exists_gt_of_bcount (hp.count ▸ hlt)
   exact (Bestcell.targetcell_mem ctx st.lab st.ptn level tcLevel hint hp.ptnSize
     (Nat.le_trans hp.ptnLast h1) hh hx hgt).1
+
+/-! ## Leaves -/
+
+theorem SRest.scatter {st : Search n} (h : SRest st) (hlab : ∀ i < n, st.lab[i]! < n)
+    (ref : Array Nat) : SRest (Hex.GraphIso.Nauty.scatter ref st) := by
+  rw [Spec.scatter_eq]
+  have hsz := h.workpermSize
+  refine { h with
+    workpermSmall := fun i hi => scatterW_small (ref := ref) hlab
+      (fun x hx => h.workpermSmall x (hsz ▸ hx)) n (Nat.le_refl _) i (by omega)
+    workpermSize := by simp only [scatterW_size]; exact hsz }
+
+theorem updatecan_size (ctx : Ctx n) (c : Array (VSet n)) (lab : Array Nat) (sr : Nat) :
+    (updatecan ctx c lab sr).size = c.size := by
+  rw [Spec.updatecan_eq]
+  generalize List.range' sr (n - sr) = l
+  induction l generalizing c with
+  | nil => rfl
+  | cons i l ih => simp only [List.foldl_cons, canStep]; rw [ih, Array.size_set!]
+
+theorem tclGo_range (ctx : Ctx n) (c : Array (VSet n)) (lab : Array Nat) :
+    ∀ l : List Nat, (∀ i ∈ l, i < n) →
+      (-1 ≤ (tclGo ctx c lab l).1 ∧ (tclGo ctx c lab l).1 ≤ 1) ∧ (tclGo ctx c lab l).2 ≤ n
+  | [], _ => by simp [tclGo]
+  | i :: l, hl => by
+    have hi := hl i (by simp)
+    simp only [tclGo]
+    split
+    · exact ⟨⟨by simp, by simp⟩, by simp only; omega⟩
+    · exact ⟨⟨by simp, by simp⟩, by simp only; omega⟩
+    · exact tclGo_range ctx c lab l fun j hj => hl j (by simp [hj])
+
+theorem testcanlab_range (ctx : Ctx n) (c : Array (VSet n)) (lab : Array Nat) :
+    (-1 ≤ (testcanlab ctx c lab).1 ∧ (testcanlab ctx c lab).1 ≤ 1) ∧ (testcanlab ctx c lab).2 ≤ n := by
+  rw [testcanlab_eq]
+  exact tclGo_range ctx c lab _ fun i hi => List.mem_range.1 hi
+
+/-- The last step of `classifyCanon`, for any comparison outcome `p`. -/
+theorem classifyCanon_tail (p : Search n × Nat) (h : SRest p.1) (hlab : ∀ i < n, p.1.lab[i]! < n)
+    (hp : p.2 ≤ n) :
+    SRest (if p.1.compCanon = 0 then ((.autoCanon : Leaf), Hex.GraphIso.Nauty.scatter p.1.canonlab p.1)
+      else if p.1.compCanon > 0 then (.better p.2, p.1) else (.bad, p.1)).2 ∧
+      ∀ sr, (if p.1.compCanon = 0 then ((.autoCanon : Leaf), Hex.GraphIso.Nauty.scatter p.1.canonlab p.1)
+        else if p.1.compCanon > 0 then (.better p.2, p.1) else (.bad, p.1)).1 = .better sr → sr ≤ n := by
+  split
+  · exact ⟨h.scatter hlab _, fun _ e => by cases e⟩
+  · split
+    · exact ⟨h, fun sr e => by cases e; exact hp⟩
+    · exact ⟨h, fun _ e => by cases e⟩
+
+theorem SRest.classifyCanon {ctx : Ctx n} {level : Nat} {st : Search n} (h : SRest st)
+    (hlab : ∀ i < n, st.lab[i]! < n) :
+    SRest (classifyCanon ctx level st).2 ∧
+      ∀ sr, (classifyCanon ctx level st).1 = .better sr → sr ≤ n := by
+  have := h.scalars
+  unfold Spec.classifyCanon
+  apply classifyCanon_tail
+  · split
+    · split
+      · exact { h with scalars := by simp only; omega }
+      · obtain ⟨⟨r1, r2⟩, r3⟩ := testcanlab_range ctx
+          (updatecan ctx st.canong st.canonlab st.samerows) st.lab
+        exact { h with
+          samerows := Nat.le_refl _
+          canongSize := by simp only [updatecan_size]; exact h.canongSize
+          scalars := by simp only; omega }
+    · exact h
+  · split
+    · split <;> exact hlab
+    · exact hlab
+  · split
+    · split
+      · exact Nat.zero_le _
+      · exact (testcanlab_range ctx _ _).2
+    · exact Nat.zero_le _
+
+theorem SRest.classify {ctx : Ctx n} {level numcells : Nat} {st : Search n} (h : SRest st)
+    (hlab : ∀ i < n, st.lab[i]! < n) :
+    SRest (Hex.GraphIso.Nauty.classify ctx level numcells st).2 ∧
+      ∀ sr, (Hex.GraphIso.Nauty.classify ctx level numcells st).1 = .better sr → sr ≤ n := by
+  rw [Spec.classify_eq]
+  have hsc : ∀ i < n, (Hex.GraphIso.Nauty.scatter st.firstlab st).lab[i]! < n := by
+    simpa [Spec.scatter_eq] using hlab
+  split
+  · exact ⟨h, fun _ h => by cases h⟩
+  · split
+    · exact ⟨h, fun _ h => by cases h⟩
+    · split
+      · split
+        · exact ⟨h.scatter hlab _, fun _ h => by cases h⟩
+        · exact (h.scatter hlab _).classifyCanon hsc
+      · exact h.classifyCanon hlab
+
+theorem SRest.pushAuto {st : Search n} (h : SRest st) (pair : VSet n × VSet n) :
+    SRest (Hex.GraphIso.Nauty.pushAuto st pair) := by
+  unfold Hex.GraphIso.Nauty.pushAuto
+  split
+  · exact h.congr rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl
+  · exact h.congr rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl
+
+/-- `SRest.congr` with new orbits and orbit count. -/
+theorem SRest.congrO {st st' : Search n} (h : SRest st) (h1 : st'.firstcode = st.firstcode)
+    (h2 : st'.canoncode = st.canoncode) (h3 : st'.firsttc = st.firsttc)
+    (h4 : st'.workperm = st.workperm) (h5 : st'.samerows = st.samerows)
+    (h6 : st'.firstlab = st.firstlab) (h7 : st'.canonlab = st.canonlab)
+    (h8 : st'.canong = st.canong) (h9 : st'.gcaFirst = st.gcaFirst)
+    (h10 : st'.gcaCanon = st.gcaCanon) (h11 : st'.noncheaplevel = st.noncheaplevel)
+    (h12 : st'.allsamelevel = st.allsamelevel) (h13 : st'.eqlevFirst = st.eqlevFirst)
+    (h14 : st'.eqlevCanon = st.eqlevCanon) (h15 : st'.compCanon = st.compCanon)
+    (h16 : st'.canonlevel = st.canonlevel) (h17 : st'.stabvertex = st.stabvertex)
+    (h18 : st'.cosetindex = st.cosetindex) (h19 : st'.wsCap = st.wsCap)
+    (h20 : st'.maxlevel = st.maxlevel) (hk : st'.numorbits ≤ n)
+    (hd : Hex.GraphIso.Nauty.Orbit.Descending st'.orbits n) : SRest st' := by
+  obtain ⟨a, b, c, d, e, f, g, i, j, k, l, mm, o, p, -, -⟩ := h
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, hk, hd⟩ <;>
+    simp only [h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18,
+      h19, h20] <;> assumption
+
+theorem pushAuto_fields {st : Search n} (pair : VSet n × VSet n) :
+    (Hex.GraphIso.Nauty.pushAuto st pair).orbits = st.orbits ∧
+      (Hex.GraphIso.Nauty.pushAuto st pair).workperm = st.workperm := by
+  unfold Hex.GraphIso.Nauty.pushAuto; split <;> exact ⟨rfl, rfl⟩
+
+theorem SRest.admit {st : Search n} (h : SRest st) : SRest (Hex.GraphIso.Nauty.admit st) := by
+  have hpa : SRest (Hex.GraphIso.Nauty.pushAuto { st with genTrace := st.genTrace.push st.workperm }
+      (fmperm st.workperm n)) :=
+    (h.congr (st' := { st with genTrace := st.genTrace.push st.workperm }) rfl rfl rfl rfl rfl rfl rfl
+      rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl).pushAuto _
+  have hd := joins_desc h.orbitsDesc h.workpermSmall n (Nat.le_refl _)
+  have hc := compresses_desc hd n (Nat.le_refl _)
+  rw [← orbjoin_eq] at hc
+  obtain ⟨ho, hw⟩ := pushAuto_fields (st := { st with genTrace := st.genTrace.push st.workperm })
+    (fmperm st.workperm n)
+  unfold Hex.GraphIso.Nauty.admit
+  simp only [Id.run, pure]
+  refine hpa.congrO rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl
+    ?_ ?_
+  · simp only [ho, hw]; exact hc.2
+  · simp only [ho, hw]; exact hc.1
+
+theorem SRest.install {level sr : Nat} {st : Search n} (h : SRest st) (hl : level < 2147483648)
+    (hsr : sr ≤ n) (hlab : st.lab.size = n) : SRest (Hex.GraphIso.Nauty.install level sr st) := by
+  have := h.scalars
+  exact { h with
+    codesSmall := fun j hj => ⟨(h.codesSmall j hj).1,
+      forall_set! (P := (· < 32768)) (fun j hj => (h.codesSmall j hj).2) (by decide) _ j hj⟩
+    canonlabSize := hlab
+    canoncodeSize := by simp only [Hex.GraphIso.Nauty.install, Array.size_set!]; exact h.canoncodeSize
+    samerows := hsr
+    scalars := by simp only [Hex.GraphIso.Nauty.install, Int.ofNat_eq_natCast]; omega }
+
+theorem SRest.pruneReturn {level : Nat} {st : Search n} (h : SRest st) :
+    SRest (Hex.GraphIso.Nauty.pruneReturn level st).2 := by
+  unfold Hex.GraphIso.Nauty.pruneReturn
+  simp only [Id.run]
+  split
+  · exact h.pushAuto _
+  · exact h
+
+/-- `leafExit` after its `maxlevel` update. -/
+def lxBody (leaf : Leaf) (level : Nat) (st : Search n) : Exit × Search n :=
+  match leaf with
+  | .internal => (.done, st)
+  | .autoFirst =>
+    let st := { Hex.GraphIso.Nauty.admit st with
+      numgenerators := (Hex.GraphIso.Nauty.admit st).numgenerators + 1 }
+    (.unwind st.gcaFirst false, st)
+  | .autoCanon =>
+    let save := st.numorbits
+    let st := Hex.GraphIso.Nauty.admit st
+    if st.numorbits == save then (.unwind st.gcaCanon (st.gcaCanon != st.gcaFirst), st)
+    else
+      let st := { st with numgenerators := st.numgenerators + 1 }
+      if st.orbits[st.cosetindex]! < st.cosetindex then (.unwind st.gcaFirst false, st)
+      else (.unwind st.gcaCanon (st.gcaCanon != st.gcaFirst), st)
+  | .better sr => Hex.GraphIso.Nauty.pruneReturn level (Hex.GraphIso.Nauty.install level sr st)
+  | .bad => Hex.GraphIso.Nauty.pruneReturn level { st with numbadleaves := st.numbadleaves + 1 }
+
+theorem leafExit_eq (leaf : Leaf) (level : Nat) (st : Search n) :
+    Hex.GraphIso.Nauty.leafExit leaf level st = lxBody leaf level
+      (if leaf != .internal && level > st.maxlevel then { st with maxlevel := level } else st) := by
+  cases leaf <;> simp only [Hex.GraphIso.Nauty.leafExit, lxBody, Id.run, pure] <;> split <;> rfl
+
+theorem SRest.leafExit {leaf : Leaf} {level : Nat} {st : Search n} (h : SRest st)
+    (hl : level ≤ n) (hn : n < 1073741824) (hlab : st.lab.size = n)
+    (hsr : ∀ sr, leaf = .better sr → sr ≤ n) :
+    SRest (Hex.GraphIso.Nauty.leafExit leaf level st).2 := by
+  rw [leafExit_eq]
+  have h0 : SRest (if leaf != .internal && level > st.maxlevel then { st with maxlevel := level }
+      else st) := by
+    split
+    · exact { h with maxlevelLe := hl }
+    · exact h
+  have hlab0 : (if leaf != .internal && level > st.maxlevel then { st with maxlevel := level }
+      else st).lab.size = n := by split <;> exact hlab
+  generalize (if leaf != .internal && level > st.maxlevel then { st with maxlevel := level }
+      else st) = st₀ at h0 hlab0
+  cases leaf with
+  | internal => exact h0
+  | autoFirst =>
+    exact h0.admit.congr rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl
+      rfl rfl rfl
+  | autoCanon =>
+    simp only [lxBody]
+    split
+    · exact h0.admit
+    · split
+      · exact h0.admit.congr rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl
+          rfl rfl rfl rfl
+      · exact h0.admit.congr rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl
+          rfl rfl rfl rfl
+  | better sr => exact (h0.install (by omega) (hsr sr rfl) hlab0).pruneReturn
+  | bad =>
+    exact (h0.congr (st' := { st₀ with numbadleaves := st₀.numbadleaves + 1 }) rfl rfl rfl rfl rfl
+      rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl).pruneReturn
+
+/-! ## The root -/
+
+theorem SRest.initialC (hn0 : 0 < n) (lab0 : Array Nat) (cellEnds : List Nat) :
+    SRest (SearchInf.initialC n lab0 cellEnds) := by
+  have hd : Hex.GraphIso.Nauty.Orbit.Descending (Array.ofFn (n := n) fun i => i.val) n :=
+    ⟨by simp, fun v hv => by simp [hv]⟩
+  refine
+    { codesSmall := fun i hi => ⟨?_, ?_⟩
+      firsttcRange := fun i hi => ⟨?_, ?_⟩
+      workpermSmall := fun i hi => ?_
+      samerows := Nat.zero_le _
+      workpermSize := by simp [SearchInf.initialC, initial]
+      firstlabSize := by simp [SearchInf.initialC, initial]
+      canonlabSize := by simp [SearchInf.initialC, initial]
+      firstcodeSize := by simp [SearchInf.initialC, initial]
+      canoncodeSize := by simp [SearchInf.initialC, initial]
+      firsttcSize := by simp [SearchInf.initialC, initial]
+      canongSize := by simp [SearchInf.initialC, initial]
+      scalars := by simp [SearchInf.initialC, initial]
+      wsCap := rfl
+      maxlevelLe := hn0
+      numorbitsLe := Nat.le_refl _
+      orbitsDesc := hd } <;>
+    simp [SearchInf.initialC, initial, hi] <;> omega
+
+/-- `SInv` at nauty's root state. -/
+theorem SInv.root {k : Nat} (G : Hex.GraphIso.Colored n k) (hn0 : 0 < n) (hn : n < 1073741824) :
+    SInv (SearchInf.initialC n (initialPartition G).1 (initialPartition G).2) :=
+  have hi : n + 2 < nautyInfinity := by simp only [nautyInfinity]; omega
+  SInv.of (PartOk.facts hn0 hi (PartOk.of_nodeOk hi (SearchInf.nodeOk_root G hn0)))
+    (SRest.initialC hn0 _ _)
 
 end NautyVerified.Proofs.Search
