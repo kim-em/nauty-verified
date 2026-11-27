@@ -18,6 +18,15 @@ def mark (perm : Array Nat) (i : Nat) : List Nat → Array Bool → Nat → Arra
   | _ :: rest, seen, l =>
     if perm[l]! == i then seen.set! l true else mark perm i rest (seen.set! l true) perm[l]!
 
+theorem mark_size (perm : Array Nat) (i : Nat) :
+    ∀ (l : List Nat) (seen : Array Bool) (cur : Nat), (mark perm i l seen cur).size = seen.size
+  | [], _, _ => rfl
+  | _ :: l, seen, cur => by
+    rw [mark]
+    split
+    · exact Array.size_set! ..
+    · rw [mark_size perm i l, Array.size_set!]
+
 /-- One vertex of `fmperm`. -/
 def permStep {n : Nat} (perm : Array Nat) (s : VSet n × VSet n × Array Bool) (i : Nat) :
     VSet n × VSet n × Array Bool :=
