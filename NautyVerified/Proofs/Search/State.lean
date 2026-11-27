@@ -210,7 +210,9 @@ structure Arrays {n : Nat} (m : mem) (S : SLoc) (ctx : Ctx n) (st : Search n) : 
     SetRep (fun w => bv64 (aw w)) S.M st.active
   fixedpts : ∃ fw, ArrayAt m .Mint64 S.bF 0 (longs fw) S.M ∧
     SetRep (fun w => bv64 (fw w)) S.M st.fixedpts
-  workperm : ArrayAt m .Mint32 S.bWP 0 (ints st.workperm) n
+  /-- `workperm` is scratch: `doref` passes it to `refine` as the count array,
+  and every reader refills it first, so its contents are not related to `st`. -/
+  workperm : ∃ v, ArrayAt m .Mint32 S.bWP 0 v n
   firstlab : ArrayAt m .Mint32 S.bFL 0 (ints st.firstlab) n
   canonlab : ArrayAt m .Mint32 S.bCL 0 (ints st.canonlab) n
   firstcode : ArrayAt m .Mint16signed S.bFC 0 (shorts st.firstcode) (n + 2)

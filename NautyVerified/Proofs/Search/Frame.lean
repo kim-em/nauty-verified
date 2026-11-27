@@ -167,8 +167,9 @@ theorem Arrays.unch {n : Nat} {m m' : mem} {S : SLoc} {ctx : Ctx n} {st : Search
   obtain ⟨h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11, h12, h13, h14, h15, -⟩ := hW
   obtain ⟨aw, ha, har⟩ := h.active
   obtain ⟨fw, hf, hfr⟩ := h.fixedpts
+  obtain ⟨wv, hwv⟩ := h.workperm
   exact ⟨h.lab.unch hu h1, h.ptn.unch hu h2, h.orbits.unch hu h3, ⟨aw, ha.unch hu h4, har⟩,
-    ⟨fw, hf.unch hu h5, hfr⟩, h.workperm.unch hu h6, h.firstlab.unch hu h7,
+    ⟨fw, hf.unch hu h5, hfr⟩, ⟨wv, hwv.unch hu h6⟩, h.firstlab.unch hu h7,
     h.canonlab.unch hu h8, h.firstcode.unch hu h9, h.canoncode.unch hu h10,
     h.firsttc.unch hu h11, h.canong.unch hu h12, h.autos.unch hu h13 h14,
     ⟨h.graph.arr.unch hu h15, h.graph.rep⟩⟩

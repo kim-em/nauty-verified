@@ -312,7 +312,8 @@ theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx :
                 ⟨aw, ha.unch hU16 (by sep_notin hd), hr⟩
               fixedpts := let ⟨fw, hf, hr⟩ := h.arrays.fixedpts
                 ⟨fw, hf.unch hU16 (by sep_notin hd), hr⟩
-              workperm := h.arrays.workperm.unch hU16 (by sep_notin hd)
+              workperm := let ⟨wv, hwv⟩ := h.arrays.workperm
+                ⟨wv, hwv.unch hU16 (by sep_notin hd)⟩
               firstlab := aFL
               canonlab := aCL
               firstcode := by rw [shorts_set (by omega), hcs]; exact aFC

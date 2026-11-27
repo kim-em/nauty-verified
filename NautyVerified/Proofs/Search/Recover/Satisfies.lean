@@ -244,7 +244,8 @@ theorem recover_satisfies {n : Nat} (S : SLoc) (ctx : Ctx n) (st : Search n) (le
                   ⟨aw, ha.unch hUf (by sep_notin hd), hr⟩
                 fixedpts := let ⟨fw, hf, hr⟩ := h.arrays.fixedpts
                   ⟨fw, hf.unch hUf (by sep_notin hd), hr⟩
-                workperm := h.arrays.workperm.unch hUf (by sep_notin hd)
+                workperm := let ⟨wv, hwv⟩ := h.arrays.workperm
+                ⟨wv, hwv.unch hUf (by sep_notin hd)⟩
                 firstlab := h.arrays.firstlab.unch hUf (by sep_notin hd)
                 canonlab := h.arrays.canonlab.unch hUf (by sep_notin hd)
                 firstcode := h.arrays.firstcode.unch hUf (by sep_notin hd)
