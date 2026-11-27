@@ -889,4 +889,23 @@ theorem dest_range (counts : Array Nat) (bmin W cell1 : Nat)
   rw [dest]
   omega
 
+theorem seg_length (lab counts : Array Nat) (cell1 bmin W : Nat)
+    (hmem : ∀ q, q < counts.size → bmin ≤ counts[q]!)
+    (hbd : ∀ q, q < counts.size → counts[q]! - bmin < W)
+    (hcv : countValues counts.toList = (List.range W).map (bmin + ·)) :
+    (segmentOf lab cell1 counts.toList (countValues counts.toList)).length = counts.size := by
+  have hmem' : ∀ c ∈ counts.toList, bmin ≤ c := by
+    intro c hc
+    rw [List.mem_iff_getElem] at hc
+    obtain ⟨i, hi, rfl⟩ := hc
+    have hsz : i < counts.size := by rw [Array.length_toList] at hi; exact hi
+    rw [Array.getElem_toList, ← getElem!_pos counts i hsz]
+    exact hmem i hsz
+  have hflat : segmentOf lab cell1 counts.toList (countValues counts.toList) =
+      ((List.range W).map (bmin + ·)).flatMap
+        (fun w => grpAt counts.toList w (fun j => lab[cell1 + j]!) 0) := by
+    rw [hcv]; rfl
+  rw [hflat, flatMap_grpAt_length counts.toList _ bmin hmem' W,
+    ← baseOff_eq_countP, baseOff_eq_size counts bmin W hbd]
+
 end NautyVerified.Spec.Ntc

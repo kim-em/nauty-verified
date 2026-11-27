@@ -64,6 +64,18 @@ theorem Mem.away {n : Nat} {m m' : mem} {L : Loc} {ctx : Ctx n} {st : RefineSt n
     (hm.nc.unch hu (nS d.bn_bc.symm d.bn_bB.symm d.bn_bW.symm))
     (hm.act.unch hu (nS d.bc_ba d.ba_bB.symm d.ba_bW.symm)) hm.actRep hc
 
+theorem Mem.setLab {n : Nat} {m m' : mem} {L : Loc} {ctx : Ctx n} {st : RefineSt n}
+    {aw : Nat → Lib.Integers.int64} {T : Array Nat} (hok : Ok n L) (hm : Mem m L ctx st aw)
+    (hu : Unch m m' (· = L.bl)) (harr : ArrayAt m' .Mint32 L.bl L.lb (ints T) n) :
+    Mem m' L ctx { st with lab := T } aw := by
+  have d := hok.wd
+  have hu' : Unch m m' L.writes := hu.mono fun z hz => .inl hz
+  obtain ⟨cv, hcv⟩ := hm.cnt
+  exact hm.frame hok hu' (Keep.unch hu (Ne.symm d.bl_bW)) (Keep.unch hu (Ne.symm d.bl_bS))
+    (Keep.unch hu (Ne.symm d.bl_bB)) harr (hm.ptn.unch hu (Ne.symm d.bl_bp))
+    (hm.nc.unch hu (Ne.symm d.bl_bn)) (hm.act.unch hu (Ne.symm d.bl_ba)) hm.actRep
+    ⟨cv, hcv.unch hu (Ne.symm d.bl_bc)⟩
+
 theorem Tmp.setHint {n : Nat} {le : temp_env} {L : Loc} {st : RefineSt n} (h : Tmp le L st)
     (c : Nat) : Tmp (PTree.set dense.id.hint (.Vint (ir c)) le) L { st with hint := c } where
   g := by rw [temps_gso _ _ (by decide)]; exact h.g
