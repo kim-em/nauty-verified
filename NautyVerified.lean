@@ -48,6 +48,7 @@ import NautyVerified.Proofs.Alloc.Zero
 import NautyVerified.Proofs.Alloc.Free
 import NautyVerified.Proofs.Alloc.Dyn
 import NautyVerified.Proofs.Alloc.Dyn3
+import NautyVerified.Proofs.Alloc.Dyn2
 import NautyVerified.Proofs.Fmperm.Syntax
 import NautyVerified.Proofs.Alloc.Global
 import NautyVerified.Spec.Fmperm
@@ -75,6 +76,7 @@ import NautyVerified.Proofs.Refine.Step
 import NautyVerified.Proofs.Refine.Finish
 import NautyVerified.Proofs.Refine.Satisfies
 import NautyVerified.Proofs.Refine.Fn
+import NautyVerified.Proofs.Refine1.Satisfies
 import NautyVerified.Proofs.Doref.Syntax
 import NautyVerified.Proofs.Doref.Satisfies
 import NautyVerified.Proofs.Refine.Frame

@@ -82,7 +82,7 @@ theorem repr_unsigned_lr {c : Nat} (hc : c < 2147483648) :
 variable {xi : ExternalCalls}
 
 /-- `longcode = MASH(longcode, *numcells); *code = CLEANUP(longcode);` -/
-theorem wp_finish {n : Nat} {Q : Post} {le : temp_env} {m : mem} {L : Loc} {ctx : Ctx n}
+theorem wp_finish {f : function} {n : Nat} {Q : Post} {le : temp_env} {m : mem} {L : Loc} {ctx : Ctx n}
     {st : RefineSt n} {aw : Nat → Lib.Integers.int64} (hok : Ok n L) (hm : Mem m L ctx st aw)
     (ht : Tmp le L st) (hi : StInv n L st) {kv : Nat → val}
     (hk : ArrayAt m .Mint32 L.bk L.kb kv 1)
@@ -91,7 +91,7 @@ theorem wp_finish {n : Nat} {Q : Post} {le : temp_env} {m : mem} {L : Loc} {ctx 
       Unch m m' (· = L.bk) →
       Q.normal E0 empty_env (PTree.set dense.id.longcode
         (.Vlong (lr (Hex.GraphIso.Nauty.mash st.longcode st.numcells : Nat))) le) m') :
-    Wp xi ge dense.fn.refine finish Q empty_env le m := by
+    Wp xi ge f finish Q empty_env le m := by
   have hnc := hi.ncSmall
   have hnl := hok.nlt
   have hml := mash_lt st.longcode st.numcells
