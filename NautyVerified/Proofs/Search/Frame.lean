@@ -106,11 +106,15 @@ theorem Fixed.unch {n : Nat} {m m' : mem} {S : SLoc} {W : block → Prop} (h : F
     (hW : ∀ z ∈ [Block.g, Block.canong, Block.orbits, Block.stats, Block.workspace, Block.worktop,
       Block.m, Block.n, Block.getcanon, Block.digraph, Block.writeautoms, Block.domarkers,
       Block.doschreier, Block.tcLevel, Block.invarproc, Block.usernodeproc, Block.userlevelproc,
-      Block.usercanonproc, Block.userautomproc, Block.dispatch, Block.killRequest, Block.allocM],
+      Block.usercanonproc, Block.userautomproc, Block.dispatch, Block.killRequest, Block.allocM,
+      Block.mininvarlevel, Block.maxinvarlevel, Block.invararg],
       ¬ W z) : Fixed n m' S := by
   simp only [List.forall_mem_cons] at hW
   obtain ⟨h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19,
-    h20, h21, h22, -⟩ := hW
+    h20, h21, h22, h23, h24, h25, -⟩ := hW
+  obtain ⟨v1, f1⟩ := h.mininv
+  obtain ⟨v2, f2⟩ := h.maxinv
+  obtain ⟨v3, f3⟩ := h.invarg
   exact ⟨h.g.unch hu h1, h.canong.unch hu h2, h.orbits.unch hu h3, h.stats.unch hu h4,
     h.workspace.unch hu h5, h.worktop.unch hu h6, h.mm.unch hu h7, h.nn.unch hu h8,
     h.getcanon.unch hu h9, h.digraph.unch hu h10, h.writeautoms.unch hu h11,
@@ -119,7 +123,8 @@ theorem Fixed.unch {n : Nat} {m m' : mem} {S : SLoc} {W : block → Prop} (h : F
     h.usercanonproc.unch hu h18, h.userautomproc.unch hu h19, h.dIsautom.unch hu h20,
     h.dTestcanlab.unch hu h20, h.dUpdatecan.unch hu h20, h.dRefine.unch hu h20,
     h.dRefine1.unch hu h20, h.dCheapautom.unch hu h20, h.dTargetcell.unch hu h20,
-    h.kill.unch hu h21, h.allocM.unch hu h22⟩
+    h.kill.unch hu h21, h.allocM.unch hu h22, ⟨v1, f1.unch hu h23⟩, ⟨v2, f2.unch hu h24⟩,
+    ⟨v3, f3.unch hu h25⟩⟩
 
 theorem Tables.unch {m m' : mem} {W : block → Prop} (h : Tables m) (hu : Unch m m' W)
     (hW : ∀ z ∈ [Program.Block.nautyBit, Block.naugraphBit, Block.nautilBit,

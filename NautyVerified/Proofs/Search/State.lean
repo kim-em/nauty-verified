@@ -155,6 +155,11 @@ structure Fixed (n : Nat) (m : mem) (S : SLoc) : Prop where
   dTargetcell : FieldAt m .Mint64 Block.dispatch 48 (.Vptr Block.targetcellFn Ptrofs.zero)
   kill : IntAt m Block.killRequest 0
   allocM : IntAt m Block.allocM S.M
+  /-- `mininvarlevel`, `maxinvarlevel`, `invararg`: some `int`s, passed to
+  `doref` and unused there since `invarproc` is `NULL`. -/
+  mininv : ∃ v, FieldAt m .Mint32 Block.mininvarlevel 0 (.Vint v)
+  maxinv : ∃ v, FieldAt m .Mint32 Block.maxinvarlevel 0 (.Vint v)
+  invarg : ∃ v, FieldAt m .Mint32 Block.invararg 0 (.Vint v)
 
 /-- nauty.c's static `int`s hold `st`'s fields. -/
 structure Scalars {n : Nat} (m : mem) (st : Search n) (nsp : Bool) : Prop where
@@ -267,7 +272,7 @@ def SLoc.blocks (S : SLoc) : List block :=
    Block.naugraphWorksetSz, Block.naugraphBucket, Block.naugraphBucketSz,
    Block.nautilWorkperm, Block.nautilWorkpermSz,
    Program.Block.nautyBit, Block.naugraphBit, Block.nautilBit, Block.naugraphBytecount,
-   Block.leftbit]
+   Block.leftbit, Block.mininvarlevel, Block.maxinvarlevel, Block.invararg]
 
 /-- nauty.c's `DYNALLSTAT` pairs, with the capacities the search needs. -/
 structure Dyns (n : Nat) (m : mem) (S : SLoc) : Prop where
