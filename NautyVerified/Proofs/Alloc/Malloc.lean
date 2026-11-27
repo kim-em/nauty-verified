@@ -49,7 +49,7 @@ theorem Unch.alloc {m m' : mem} {lo hi : Z} {b : block} (h : Mem.alloc m lo hi =
         · rw [hdec] at this
           obtain ⟨v', hv'⟩ := Mem.valid_access_load _ _ _ _ this
           rw [hl] at hv'; cases hv'
-  access chunk b' ofs p hva :=
+  access chunk b' ofs p _ hva :=
     ⟨fun o ho => Mem.perm_alloc_1 _ _ _ _ _ h _ _ _ _ (hva.1 o ho), hva.2⟩
 
 /-- A fresh block of `sz` bytes from `malloc`. -/
