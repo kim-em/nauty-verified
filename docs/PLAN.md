@@ -385,6 +385,28 @@ Conventions settled while doing these:
   `SearchAt.rebuildW`); `Spec/Processnode.lean` restates `classify` in the
   C's order.
 
+- `densenauty` and `nauty()` (`Proofs/Top/`). `densenauty_satisfies`
+  proves the harness's `densenautySpec` from `nauty` against `nautySpec`
+  (`Top/Spec.lean`: `densenautySpec`'s memory plus the reallocated `dnwork`
+  pair; its post is `densenautySpec`'s, and `options->digraph` stays writable
+  for the write-back). The loop scan is `wp_scanLoop` (HexGraphIso's graphs
+  are loopless). `nauty()`'s body is factored by stage (`Top/NautySyntax.lean`:
+  `tSizes`, `tZero`, `tMain`, `tAlloc`, `tTc`, `tOpts`, `tPtn`, `tInit`,
+  `tOrbits`, `tStats`, `tWork`, `tRoot`, `tPost`, `tFree`); `tAlloc` is done
+  (`wp_tAlloc`, over the generic `Alloc.wp_dynSeq` for a run of `DYNALLOC1`s
+  from capacity 0, with sizes read through `Alloc.wp_dynalloc1G`). Still to
+  prove for `nauty()`: the dispatch struct copy (`dispatch =
+  *options->dispatch`, a byte copy of 11 function pointers) and the `refine1`
+  substitution for `m = 1`; the size checks and the `n == 0` test (false);
+  `nautil_check` and `dispatch.check` (`naugraph_check`) as calls that return;
+  the target-cell list reset (`alloc_m = 0 < m`, empty list); the option
+  copies; ptn normalisation to `NAUTY_INFINITY` and the active set from the
+  cells; orbits, statistics, `fixedpts` and workspace initialisation, giving
+  `SearchAt … (initialC …) true false` for the root call
+  (`firstpathnodeSpecG` with `SearchInf.nodeOk_root`); `updatecan` and the copy
+  of `canonlab` into `lab`; the `n >= 320` release through the three
+  `*_freedyn` functions; `dispatch.cleanup = NULL`.
+
 ## Phase 6: dense end-to-end
 
 Shape of the composition: `main`'s specification (`Proofs/Harness/`) is an
