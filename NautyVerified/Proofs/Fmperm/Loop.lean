@@ -1,3 +1,4 @@
+import NautyVerified.Proofs.Alloc.KeepV
 import NautyVerified.Proofs.Fmperm.Cycle
 
 /-!
@@ -84,7 +85,7 @@ theorem wp_vertex {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} 
     (hi : PTree.get id.i le = some (.Vint (ir i0))) (hi0 : i0 < n)
     (hQ : ∀ le' m' wf' wm', Frame m' le' bpm pofs b perm n →
       St m' le' b bf fofs bm mofs n M wf' wm' (permStep perm s i0) →
-      Unch m m' (fun z => z = b ∨ z = bf ∨ z = bm) → Alloc.Keep m m' b →
+      Unch m m' (fun z => z = b ∨ z = bf ∨ z = bm) → Alloc.KeepA m m' →
       (∀ x, x ≠ id.k → x ≠ id.l → PTree.get x le' = PTree.get x le) → Q.normal E0 e le' m') :
     Wp xi ge f step Q e le m := by
   have hnlt := h.nlt
@@ -99,17 +100,17 @@ theorem wp_vertex {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} 
   by_cases hfx : perm[i0]! = i0
   · rw [ite_eq_left (by simp; omega)]
     wp_step
-    refine Set.wp_addElement hs.farr hs.Mlt hs.hfix hi rfl (by omega) (by omega) hs.bit he ?_
-    intro m1 harr1 hu1
-    refine Set.wp_addElement (hs.marr.unch hu1 (Ne.symm hd.fm)) hs.Mlt hs.hmcr hi rfl (by omega)
+    refine Set.wp_addElement' hs.farr hs.Mlt hs.hfix hi rfl (by omega) (by omega) hs.bit he ?_
+    intro m1 harr1 hu1 hO1
+    refine Set.wp_addElement' (hs.marr.unch hu1 (Ne.symm hd.fm)) hs.Mlt hs.hmcr hi rfl (by omega)
       (by omega) (hs.bit.unch hu1 hd.bitf) he ?_
-    intro m2 harr2 hu2
+    intro m2 harr2 hu2 hO2
     have hps : permStep perm s i0 = (s.1.insert i0, s.2.1.insert i0, s.2.2) := by
       simp [permStep, hfx]
     refine hQ le m2 (addW wf i0) (addW wm i0) ((h.unch hu1 (Ne.symm hd.fp) hd.wf).unch hu2 (Ne.symm hd.mp) hd.wm) ?_
       ((hu1.mono fun z hz => .inr (.inl hz)).trans (hu2.mono fun z hz => .inr (.inr hz)))
-      ((Alloc.Keep.unch hu1 (Ne.symm (hd.fb (by omega)))).trans
-        (Alloc.Keep.unch hu2 (Ne.symm (hd.mb (by omega)))))
+      ((Alloc.KeepA.of_outside hu1 hO1 hs.farr.base_nonneg).trans
+        (Alloc.KeepA.of_outside hu2 hO2 (hs.marr.unch hu1 (Ne.symm hd.fm)).base_nonneg))
       (fun _ _ _ => rfl)
     rw [hps]
     exact { hs with
@@ -134,7 +135,7 @@ theorem wp_vertex {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} 
       apply wp_skip
       have hps : permStep perm s i0 = s := by simp [permStep, hfx, hseen]
       rw [← hps] at hs
-      exact hQ le m wf wm h hs (Unch.refl _ _) (Alloc.Keep.refl _ _) (fun _ _ _ => rfl)
+      exact hQ le m wf wm h hs (Unch.refl _ _) (Alloc.KeepA.refl _) (fun _ _ _ => rfl)
     · rw [ite_eq_right hseen]
       rw [ir_eq (a := 0) (b := 0) ⟨by decide, by decide⟩ ⟨by decide, by decide⟩]
       try simp only [cop]
@@ -155,15 +156,16 @@ theorem wp_vertex {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} 
       have hi2 : PTree.get id.i le2 = some (.Vint (ir i0)) := by rw [hoth _ (by decide) (by decide)]; exact hi
       have hmcr2 : PTree.get id.mcr le2 = some (.Vptr bm mofs) := by
         rw [hoth _ (by decide) (by decide)]; exact hs.hmcr
-      refine Set.wp_addElement (hs.marr.unch hu2 (hd.mb (by omega))) hs.Mlt hmcr2 hi2 rfl (by omega)
+      refine Set.wp_addElement' (hs.marr.unch hu2 (hd.mb (by omega))) hs.Mlt hmcr2 hi2 rfl (by omega)
         (by omega) (hs.bit.unch hu2 (hd.bitb (by omega))) he ?_
-      intro m3 harr3 hu3
+      intro m3 harr3 hu3 hO3
       have hps : permStep perm s i0 = (s.1, s.2.1.insert i0, mark perm i0 (List.range n) s.2.2 i0) := by
         simp [permStep, hfx, hseen]
       refine hQ le2 m3 wf (addW wm i0) (((h.temps fun x _ h2 h3 => hoth x h2 h3).unch hu2
           (h.bpm_b (by omega)) (h.wp_b (by omega))).unch hu3 (Ne.symm hd.mp) hd.wm) ?_
         ((hu2.mono fun z hz => .inl hz).trans (hu3.mono fun z hz => .inr (.inr hz)))
-        (hk2.trans (Alloc.Keep.unch hu3 (Ne.symm (hd.mb (by omega))))) hoth
+        ((Alloc.KeepA.of_keep hu2 hk2).trans (Alloc.KeepA.of_outside hu3 hO3
+          (hs.marr.unch hu2 (hd.mb (by omega))).base_nonneg)) hoth
       rw [hps]
       exact { hfix := by rw [hoth _ (by decide) (by decide)]; exact hs.hfix
               hmcr := hmcr2
@@ -192,7 +194,7 @@ theorem wp_main {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {b
     (hQ : ∀ le' m' wf' wm', Frame m' le' bpm pofs b perm n →
       St m' le' b bf fofs bm mofs n M wf' wm'
         ((List.range n).foldl (permStep perm) (VSet.empty, VSet.empty, Array.replicate n false)) →
-      Unch m m' (fun z => (0 < n ∧ z = b) ∨ z = bf ∨ z = bm) → Alloc.Keep m m' b →
+      Unch m m' (fun z => (0 < n ∧ z = b) ∨ z = bf ∨ z = bm) → Alloc.KeepA m m' →
       (∀ x, x ≠ id.i → x ≠ id.k → x ≠ id.l → PTree.get x le' = PTree.get x le) →
       Q.normal E0 e le' m') :
     Wp xi ge f (forLoop id.i id.n step) Q e le m := by
@@ -203,16 +205,16 @@ theorem wp_main {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {b
   let Inv := fun (k : Nat) (le' : temp_env) (m' : mem) => k ≤ n ∧
     PTree.get id.i le' = some (.Vint (ir k)) ∧ ∃ wf' wm', Frame m' le' bpm pofs b perm n ∧
       St m' le' b bf fofs bm mofs n M wf' wm' (sk k) ∧
-      Unch m m' (fun z => (0 < n ∧ z = b) ∨ z = bf ∨ z = bm) ∧ Alloc.Keep m m' b ∧ Oth le'
+      Unch m m' (fun z => (0 < n ∧ z = b) ∨ z = bf ∨ z = bm) ∧ Alloc.KeepA m m' ∧ Oth le'
   let Mid := fun (k : Nat) (le' : temp_env) (m' : mem) =>
     PTree.get id.i le' = some (.Vint (ir k)) ∧ k < n ∧ ∃ wf' wm', Frame m' le' bpm pofs b perm n ∧
       St m' le' b bf fofs bm mofs n M wf' wm' (sk (k + 1)) ∧
-      Unch m m' (fun z => (0 < n ∧ z = b) ∨ z = bf ∨ z = bm) ∧ Alloc.Keep m m' b ∧ Oth le'
+      Unch m m' (fun z => (0 < n ∧ z = b) ∨ z = bf ∨ z = bm) ∧ Alloc.KeepA m m' ∧ Oth le'
   refine wp_forLoop id.i id.n step n h.nlt Inv Mid ?_ ?_ ?_ ?_ ?_
   · rintro k le' m' ⟨hk, hi, wf', wm', hf, -, -, -, -⟩
     exact ⟨hk, hi, hf.hn⟩
   · refine ⟨Nat.zero_le _, temps_gss _ _ _, wf, wm, h.temps fun x hx _ _ => temps_gso _ _ hx,
-      hs.temps fun x hx _ _ => temps_gso _ _ hx, Unch.refl _ _, Alloc.Keep.refl _ _,
+      hs.temps fun x hx _ _ => temps_gso _ _ hx, Unch.refl _ _, Alloc.KeepA.refl _,
       fun x hx _ _ => temps_gso _ _ hx⟩
   · rintro k le' m' hk ⟨-, hi, wf', wm', hf, hs', hu, hkp, ho⟩
     refine wp_vertex hf hs' hd he hge hi hk ?_

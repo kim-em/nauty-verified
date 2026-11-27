@@ -49,7 +49,8 @@ def fmpermSpec (bpm : block) (pofs : ptrofs) (bf : block) (fofs : ptrofs) (bm : 
     SetRep (fun w => bv64 (wm' w)) M (Hex.GraphIso.Nauty.fmperm perm n).2 ∧
     DynAt m' WP WPS 4 cap' b' ∧ n ≤ cap' ∧ ((cap' = cap ∧ b' = b0) ∨ ¬ Mem.valid_block m b') ∧
     Unch m m' (fun z => z = bf ∨ z = bm ∨ z = WPS ∨ z = WP ∨ (0 < cap ∧ z = b0) ∨
-      (¬ Mem.valid_block m b' ∧ z = b'))
+      (¬ Mem.valid_block m b' ∧ z = b')) ∧
+    ∀ z ∈ [bf, bm], Alloc.Keep m m' z
 
 /-- The temporaries on entry. -/
 def entryTemps (bpm : block) (pofs : ptrofs) (bf : block) (fofs : ptrofs) (bm : block)
@@ -113,22 +114,23 @@ theorem fmperm_satisfies {xi : ExternalCalls} (bpm : block) (pofs : ptrofs) (bf 
     have hT1 : ∀ k, k ≠ Fmperm.id.t1 → k ≠ Fmperm.id.t2 →
         PTree.get k le1 = PTree.get k (entryTemps bpm pofs bf fofs bm mofs n M) := ho1
     wp_step
-    refine Set.wp_emptySet (by decide) (by decide) (by decide) hfarr1 hM hM2
+    refine Set.wp_emptySet' (vals := Set.longs wf) (by decide) (by decide) (by decide) hfarr1 hM hM2
       (by rw [hT1 _ (by decide) (by decide)]
           simp (config := {decide := true}) only [entryTemps, temps_gso, temps_gss])
       (by rw [hT1 _ (by decide) (by decide)]
           simp (config := {decide := true}) only [entryTemps, temps_gso, temps_gss]) ?_
-    intro le2 m2 harr2 hu2 ho2
+    intro le2 m2 harr2 hu2 hO2 ho2
     have hT2 : ∀ k, k ≠ Fmperm.id.t1 → k ≠ Fmperm.id.t2 → k ≠ Fmperm.id.es → k ≠ Fmperm.id.t3 →
         PTree.get k le2 = PTree.get k (entryTemps bpm pofs bf fofs bm mofs n M) := fun k h1 h2 h3 h4 => by
       rw [ho2 k h3 h4, hT1 k h1 h2]
     wp_step
-    refine Set.wp_emptySet (by decide) (by decide) (by decide) (hmarr1.unch hu2 (Ne.symm hfm)) hM hM2
+    refine Set.wp_emptySet' (vals := Set.longs wm) (by decide) (by decide) (by decide)
+      (hmarr1.unch hu2 (Ne.symm hfm)) hM hM2
       (by rw [hT2 _ (by decide) (by decide) (by decide) (by decide)]
           simp (config := {decide := true}) only [entryTemps, temps_gso, temps_gss])
       (by rw [hT2 _ (by decide) (by decide) (by decide) (by decide)]
           simp (config := {decide := true}) only [entryTemps, temps_gso, temps_gss]) ?_
-    intro le3 m3 harr3 hu3 ho3
+    intro le3 m3 harr3 hu3 hO3 ho3
     have hT3 : ∀ k, k ≠ Fmperm.id.t1 → k ≠ Fmperm.id.t2 → k ≠ Fmperm.id.es → k ≠ Fmperm.id.t3 →
         k ≠ Fmperm.id.es1 → k ≠ Fmperm.id.t4 →
         PTree.get k le3 = PTree.get k (entryTemps bpm pofs bf fofs bm mofs n M) :=
@@ -197,11 +199,11 @@ theorem fmperm_satisfies {xi : ExternalCalls} (bpm : block) (pofs : ptrofs) (bf 
     intro le5 m5 wf5 wm5 hf5 hs5 hu5 hk5 ho5
     have hR := fmperm_eq perm n
     refine ⟨m5, Nextelement.free_empty m5, rfl, wf5, wm5, cap', b', hs5.farr, hs5.marr,
-      by rw [hR]; exact hs5.frep, by rw [hR]; exact hs5.mrep, ?_, hcap, hb', ?_⟩
+      by rw [hR]; exact hs5.frep, by rw [hR]; exact hs5.mrep, ?_, hcap, hb', ?_, ?_⟩
     · refine (((hD'.keep hu2 hgWP.2.1 hgWPS.2.1 fun hc0 => Alloc.Keep.unch hu2 (hbD hc0).2.1).keep
         hu3 hgWP.2.2 hgWPS.2.2 fun hc0 => Alloc.Keep.unch hu3 (hbD hc0).2.2.1).keep hu4
         (nb _ fun h => (hD'.bne h).2) (nb _ fun h => (hD'.bne h).1) fun _ => hk4).keep hu5 ?_ ?_
-        fun _ => hk5
+        fun _ => hk5 b'
       · rintro (⟨h0, h⟩ | h | h)
         · exact (hD'.bne (by omega)).2 h.symm
         · exact hgWP.2.1 h
@@ -228,5 +230,18 @@ theorem fmperm_satisfies {xi : ExternalCalls} (bpm : block) (pofs : ptrofs) (bf 
         · exact hbS z h
         · exact .inl h
         · exact .inr (.inl h)
+
+    · have kf1 : Alloc.Keep m m1 bf := Alloc.Keep.unch hu1 (hout _ hvf hgWPS.2.1.symm hgWP.2.1.symm
+        (fun ⟨h1, h2⟩ => (hb0 h1).2.1 h2.symm))
+      have km1 : Alloc.Keep m m1 bm := Alloc.Keep.unch hu1 (hout _ hvm hgWPS.2.2.symm hgWP.2.2.symm
+        (fun ⟨h1, h2⟩ => (hb0 h1).2.2.1 h2.symm))
+      have kA : Alloc.KeepA m1 m3 := (Alloc.KeepA.of_outside hu2 hO2 hfarr1.base_nonneg).trans
+        (Alloc.KeepA.of_outside hu3 hO3 hmarr1.base_nonneg)
+      intro z hz
+      simp only [List.mem_cons, List.not_mem_nil, or_false] at hz
+      rcases hz with rfl | rfl
+      · exact ((kf1.trans (kA _)).trans (Alloc.Keep.unch hu4 (nb _ fun h => (hbD h).2.1))).trans (hk5 _)
+      · exact ((km1.trans (kA _)).trans (Alloc.Keep.unch hu4 (nb _ fun h => (hbD h).2.2.1))).trans
+          (hk5 _)
 
 end NautyVerified.Proofs.Fmperm
