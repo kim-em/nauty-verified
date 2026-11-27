@@ -84,6 +84,8 @@ import NautyVerified.Proofs.Doref.Satisfies
 import NautyVerified.Proofs.Search.Blocks
 import NautyVerified.Proofs.Search.State
 import NautyVerified.Proofs.Search.Spec
+import NautyVerified.Proofs.Top.DensenautySyntax
+import NautyVerified.Proofs.Top.NautySyntax
 import NautyVerified.Proofs.Search.Node.Spec
 import NautyVerified.Proofs.Search.Frame
 import NautyVerified.Proofs.Harness.Spec

@@ -36,7 +36,14 @@ partial def tyS : type → String
   | .Tfloat .F64 _ => "tdouble" | .Tfloat .F32 _ => "tfloat"
   | .Tpointer t _ => s!"(tptr {tyS t})"
   | .Tarray t n _ => s!"(tarray {tyS t} {intOfZ n})"
-  | .Tfunction args r _ => s!"(tfun [{", ".intercalate (args.map tyS)}] {tyS r})"
+  | .Tfunction args r cc =>
+      if cc.cc_vararg.isNone && !cc.cc_unproto && !cc.cc_structret then
+        s!"(tfun [{", ".intercalate (args.map tyS)}] {tyS r})"
+      else
+        let va := match cc.cc_vararg with
+          | none => "none"
+          | some k => s!"(some (zOfInt {intOfZ k}))"
+        s!"(.Tfunction [{", ".intercalate (args.map tyS)}] {tyS r} ⟨{va}, {cc.cc_unproto}, {cc.cc_structret}⟩)"
   | .Tstruct i _ => s!"(Tstruct {idS nm i} noattr)"
   | .Tunion i _ => s!"(Tunion {idS nm i} noattr)"
 
