@@ -112,65 +112,65 @@ theorem wp_fbTree {Q : Post} {e : env} {le : temp_env} {m} (r : Common.AST.ident
   simp [hsw, typeof, intOfZ_zOfInt]
   by_cases h32 : bv64 x &&& BitVec.ofInt 64 18446744069414584320 = 0
   · have b32 := (tst_iff _ _ 32 64 k32 hxn).1 h32
-    rw [ite_eq_left_of_eq_true (eq_true (by simpa using h32))]
+    rw [ite_eq_left (by simpa using h32)]
     wp_step; wp_step; wp_step
     simp [hsw, typeof, intOfZ_zOfInt]
     by_cases h16 : bv64 x &&& BitVec.ofInt 64 4294901760 = 0
     · have b16 := (tst_iff _ _ 16 32 k16 b32).1 h16
-      rw [ite_eq_left_of_eq_true (eq_true (by simpa using h16))]
+      rw [ite_eq_left (by simpa using h16)]
       wp_step; wp_step; wp_step
       simp [hsw, typeof, intOfZ_zOfInt]
       by_cases h8 : bv64 x &&& BitVec.ofInt 64 65280 = 0
       · have b8 := (tst_iff _ _ 8 16 k8 b16).1 h8
-        rw [ite_eq_left_of_eq_true (eq_true (by simpa using h8))]
+        rw [ite_eq_left (by simpa using h8)]
         refine leafOk 56 0 sw x rfl ?_ rfl (by simp) (by simp; omega) (by simp; omega)
         simp [Exec.evalExpr, hsw, typeof]
       · have b8 : ¬ (bv64 x).toNat < 2 ^ 8 := fun h => h8 ((tst_iff _ _ 8 16 k8 b16).2 h)
-        rw [ite_eq_right_of_eq_false (eq_false (by simpa using h8))]
+        rw [ite_eq_right (by simpa using h8)]
         refine leafOk 48 8 (shr 8) (Lib.Integers.Int64.shru x (Lib.Integers.Int64.repr (Lib.Integers.Int.unsigned (Lib.Integers.Int.repr (zOfInt 8))))) rfl ?_ rfl (shr_toNat x 8 (by decide) (by decide)) (by simp; omega) (by simp; omega)
         simp (config := {decide := true}) [Exec.evalExpr, hsw, typeof]
     · have b16 : ¬ (bv64 x).toNat < 2 ^ 16 := fun h => h16 ((tst_iff _ _ 16 32 k16 b32).2 h)
-      rw [ite_eq_right_of_eq_false (eq_false (by simpa using h16))]
+      rw [ite_eq_right (by simpa using h16)]
       wp_step; wp_step; wp_step
       simp [hsw, typeof, intOfZ_zOfInt]
       by_cases h24 : bv64 x &&& BitVec.ofInt 64 4278190080 = 0
       · have b24 := (tst_iff _ _ 24 32 k24 b32).1 h24
-        rw [ite_eq_left_of_eq_true (eq_true (by simpa using h24))]
+        rw [ite_eq_left (by simpa using h24)]
         refine leafOk 40 16 (shr 16) (Lib.Integers.Int64.shru x (Lib.Integers.Int64.repr (Lib.Integers.Int.unsigned (Lib.Integers.Int.repr (zOfInt 16))))) rfl ?_ rfl (shr_toNat x 16 (by decide) (by decide)) (by simp; omega) (by simp; omega)
         simp (config := {decide := true}) [Exec.evalExpr, hsw, typeof]
       · have b24 : ¬ (bv64 x).toNat < 2 ^ 24 := fun h => h24 ((tst_iff _ _ 24 32 k24 b32).2 h)
-        rw [ite_eq_right_of_eq_false (eq_false (by simpa using h24))]
+        rw [ite_eq_right (by simpa using h24)]
         refine leafOk 32 24 (shr 24) (Lib.Integers.Int64.shru x (Lib.Integers.Int64.repr (Lib.Integers.Int.unsigned (Lib.Integers.Int.repr (zOfInt 24))))) rfl ?_ rfl (shr_toNat x 24 (by decide) (by decide)) (by simp; omega) (by simp; omega)
         simp (config := {decide := true}) [Exec.evalExpr, hsw, typeof]
   · have b32 : ¬ (bv64 x).toNat < 2 ^ 32 := fun h => h32 ((tst_iff _ _ 32 64 k32 hxn).2 h)
-    rw [ite_eq_right_of_eq_false (eq_false (by simpa using h32))]
+    rw [ite_eq_right (by simpa using h32)]
     wp_step; wp_step; wp_step
     simp [hsw, typeof, intOfZ_zOfInt]
     by_cases h48 : bv64 x &&& BitVec.ofInt 64 18446462598732840960 = 0
     · have b48 := (tst_iff _ _ 48 64 k48 hxn).1 h48
-      rw [ite_eq_left_of_eq_true (eq_true (by simpa using h48))]
+      rw [ite_eq_left (by simpa using h48)]
       wp_step; wp_step; wp_step
       simp [hsw, typeof, intOfZ_zOfInt]
       by_cases h40 : bv64 x &&& BitVec.ofInt 64 280375465082880 = 0
       · have b40 := (tst_iff _ _ 40 48 k40 b48).1 h40
-        rw [ite_eq_left_of_eq_true (eq_true (by simpa using h40))]
+        rw [ite_eq_left (by simpa using h40)]
         refine leafOk 24 32 (shr 32) (Lib.Integers.Int64.shru x (Lib.Integers.Int64.repr (Lib.Integers.Int.unsigned (Lib.Integers.Int.repr (zOfInt 32))))) rfl ?_ rfl (shr_toNat x 32 (by decide) (by decide)) (by simp; omega) (by simp; omega)
         simp (config := {decide := true}) [Exec.evalExpr, hsw, typeof]
       · have b40 : ¬ (bv64 x).toNat < 2 ^ 40 := fun h => h40 ((tst_iff _ _ 40 48 k40 b48).2 h)
-        rw [ite_eq_right_of_eq_false (eq_false (by simpa using h40))]
+        rw [ite_eq_right (by simpa using h40)]
         refine leafOk 16 40 (shr 40) (Lib.Integers.Int64.shru x (Lib.Integers.Int64.repr (Lib.Integers.Int.unsigned (Lib.Integers.Int.repr (zOfInt 40))))) rfl ?_ rfl (shr_toNat x 40 (by decide) (by decide)) (by simp; omega) (by simp; omega)
         simp (config := {decide := true}) [Exec.evalExpr, hsw, typeof]
     · have b48 : ¬ (bv64 x).toNat < 2 ^ 48 := fun h => h48 ((tst_iff _ _ 48 64 k48 hxn).2 h)
-      rw [ite_eq_right_of_eq_false (eq_false (by simpa using h48))]
+      rw [ite_eq_right (by simpa using h48)]
       wp_step; wp_step; wp_step
       simp [hsw, typeof, intOfZ_zOfInt]
       by_cases h56 : bv64 x &&& BitVec.ofInt 64 18374686479671623680 = 0
       · have b56 := (tst_iff _ _ 56 64 k56 hxn).1 h56
-        rw [ite_eq_left_of_eq_true (eq_true (by simpa using h56))]
+        rw [ite_eq_left (by simpa using h56)]
         refine leafOk 8 48 (shr 48) (Lib.Integers.Int64.shru x (Lib.Integers.Int64.repr (Lib.Integers.Int.unsigned (Lib.Integers.Int.repr (zOfInt 48))))) rfl ?_ rfl (shr_toNat x 48 (by decide) (by decide)) (by simp; omega) (by simp; omega)
         simp (config := {decide := true}) [Exec.evalExpr, hsw, typeof]
       · have b56 : ¬ (bv64 x).toNat < 2 ^ 56 := fun h => h56 ((tst_iff _ _ 56 64 k56 hxn).2 h)
-        rw [ite_eq_right_of_eq_false (eq_false (by simpa using h56))]
+        rw [ite_eq_right (by simpa using h56)]
         refine leafOk 0 56 (.Ebinop .Oand (shr 56) (cl 255 tulong) tulong)
           (Lib.Integers.Int64.and (Lib.Integers.Int64.shru x (Lib.Integers.Int64.repr (Lib.Integers.Int.unsigned (Lib.Integers.Int.repr (zOfInt 56))))) (Lib.Integers.Int64.repr (zOfInt 255)))
           rfl ?_ rfl (shr56_toNat x) (by simp; omega) (by simp; omega)
