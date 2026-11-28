@@ -141,7 +141,7 @@ theorem wp_distLoop (hC : CountPass (xi := xi)) {Q : Post} {le : temp_env} {m : 
         refine hC true hok hm hr (ht2.set (x := id.«w1») _ (by decide)) hds.valid hb hc hh hcell.1 hlt
           hcell.2.2 hkey (by rw [temps_gso _ _ (by decide), temps_gso _ _ (by decide)]; exact hv1)
           (by rw [temps_gss]; rfl) ?_
-        intro le3 m3 S3 ha hw3 _ _ _ _ hv13
+        intro le3 m3 S3 ha hw3 _ _ _ _ _ hv13
         have hJ : J (n - first) E0 empty_env le3 m3 := by
           refine ⟨rfl, rfl, s.cellend[first]! + 1, by omega, splitCounts L.level first true s, S3, F',
             hds.counts hv0 hd hfn, ha.mem, ha.rep, ?_, ha.tmp, Budget.step hcs.2 hb, ha.code,

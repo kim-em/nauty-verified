@@ -166,8 +166,8 @@ structure After {n : Nat} (L : Loc) (G : Hex.SparseGraph n) (t : RefineSt n)
 
 /-- The count split of one nontrivial cell starting at `first`, the code
 already hashed with `first` (`MASH(v1)`), `v1 = first` and
-`w1 = HITS[lab[first]]`, computes `splitCounts L.level first d s`; `HITS`
-and the marks are unchanged. When the cell's first run is the whole cell,
+`w1 = HITS[lab[first]]`, computes `splitCounts L.level first d s`; `HITS`,
+`HITCELL` and the marks are unchanged. When the cell's first run is the whole cell,
 the C leaves by `continue` (in the distance pass with `v1` at the cell's
 end), and otherwise normally; in the distance pass `v1` ends at the cell's
 end. -/
@@ -183,7 +183,7 @@ def CountPass : Prop :=
     PTree.get id.«v1» le = some (.Vint (ir first)) →
     PTree.get id.«w1» le = some (.Vint (ir s.hits[s.lab[first]!]!)) →
     (∀ le' m' S', After L G (splitCounts L.level first d s) cellTemps le m le' m' S' →
-      S'.w3 = S.w3 → S'.st1 = S.st1 → S'.mk1 = S.mk1 → S'.st2 = S.st2 → S'.mk2 = S.mk2 →
+      S'.w3 = S.w3 → S'.w4 = S.w4 → S'.st1 = S.st1 → S'.mk1 = S.mk1 → S'.st2 = S.st2 → S'.mk2 = S.mk2 →
       (d = true → PTree.get id.«v1» le' = some (.Vint (ir (s.cellend[first]! + 1)))) →
       (if Hex.GraphIso.Nauty.Sparse.CountSort.firstRun s.lab s.hits first (s.cellend[first]! + 1) =
           s.cellend[first]! + 1 then Q.cont else Q.normal) E0 empty_env le' m') →
