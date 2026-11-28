@@ -27,10 +27,10 @@ set_option linter.unusedSimpArgs false
 
 variable {xi : ExternalCalls}
 
-theorem wp_copyInts {f : function} {Q : Post} {le : temp_env} {m : mem}
+theorem wp_copyInts {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
     {dst src : ident} {bgD bD bs : block} {sofs : ptrofs} {vals : Nat → val} {o : Array Nat}
     {N : Nat} (hN : N < 2147483648)
-    (hdE : PTree.get dst empty_env = none) (hgD : Genv.find_symbol ge.genv_genv dst = some bgD)
+    (hdE : PTree.get dst e = none) (hnE : PTree.get dense.id.«nauty:n» e = none) (hgD : Genv.find_symbol ge.genv_genv dst = some bgD)
     (hpD : Mem.load .Mint64 m bgD (zOfInt 0) = some (.Vptr bD Ptrofs.zero))
     (harr : ArrayAt m .Mint32 bD 0 vals N)
     (hsrc : PTree.get src le = some (.Vptr bs sofs))
@@ -39,10 +39,10 @@ theorem wp_copyInts {f : function} {Q : Post} {le : temp_env} {m : mem}
     (hDn : bD ≠ Block.n) (hDg : bD ≠ bgD) (hDs : bD ≠ bs)
     (hQ : ∀ le' m', ArrayAt m' .Mint32 bD 0 (ints o) N → Unch m m' (· = bD) → Keep m m' bD →
       (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
-      (∀ x, x ≠ dense.id.i → PTree.get x le' = PTree.get x le) → Q.normal E0 empty_env le' m') :
+      (∀ x, x ≠ dense.id.i → PTree.get x le' = PTree.get x le) → Q.normal E0 e le' m') :
     Wp xi ge f (forLoopC dense.id.i
       (.Ebinop .Olt (tv dense.id.i) (.Evar dense.id.«nauty:n» tint) tint)
-      (sk (.Sassign (gat dst (tv dense.id.i)) (ix src (tv dense.id.i))))) Q empty_env le m := by
+      (sk (.Sassign (gat dst (tv dense.id.i)) (ix src (tv dense.id.i))))) Q e le m := by
   let Inv := fun (k : Nat) (le' : temp_env) (m' : mem) =>
     k ≤ N ∧ PTree.get dense.id.i le' = some (.Vint (ir k)) ∧
     (∀ x, x ≠ dense.id.i → PTree.get x le' = PTree.get x le) ∧
@@ -57,8 +57,8 @@ theorem wp_copyInts {f : function} {Q : Post} {le : temp_env} {m : mem}
     dense.id.i _ rfl _ N hN ?_ ?_ ?_ ?_ ?_
   · rintro k le' m' ⟨hk, hi, -, -, hu, -, -⟩
     refine ⟨hk, hi, ?_⟩
-    rw [Exec.evalExpr, eval_gint (e := empty_env) (le := le') rfl find_n (hn.unch hu (Ne.symm hDn)),
-      show Exec.evalExpr ge empty_env le' m' (tv dense.id.i) = _ from hi]
+    rw [Exec.evalExpr, eval_gint (le := le') hnE find_n (hn.unch hu (Ne.symm hDn)),
+      show Exec.evalExpr ge e le' m' (tv dense.id.i) = _ from hi]
     simp only [typeof, cop]
     rw [ir_lt (a := (k : Int)) (b := (N : Int)) ⟨by omega, by omega⟩ ⟨by omega, by omega⟩]
     simp
@@ -66,7 +66,7 @@ theorem wp_copyInts {f : function} {Q : Post} {le : temp_env} {m : mem}
       harr.congr fun j _ => by simp, Unch.refl _ _, Keep.refl _ _, fun _ h => h⟩
   · rintro k le' m' hk ⟨-, hi, ho, ha, hu, hkp, hv⟩
     have hs' : PTree.get src le' = some (.Vptr bs sofs) := by rw [ho _ hsi]; exact hsrc
-    have hsv := eval_at (ge := ge) (e := empty_env) (hsa.unch hu (Ne.symm hDs)) hN src hs'
+    have hsv := eval_at (ge := ge) (e := e) (hsa.unch hu (Ne.symm hDs)) hN src hs'
       (tv dense.id.i) k hk hi rfl
     wp_step; wp_step
     refine wp_gstoreV hdE hgD (by rw [hu.load _ _ _ (Ne.symm hDg)]; exact hpD) ha hN

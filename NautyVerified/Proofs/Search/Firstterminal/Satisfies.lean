@@ -137,7 +137,7 @@ theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx :
     -- `for (i = 0; i < n; ++i) firstlab[i] = lab[i]`
     simp only [seqPost, Post.after, E0_append]
     wp_step
-    refine wp_copyInts (le := le4) (by omega) rfl find_nautyFirstlab
+    refine wp_copyInts (le := le4) (by omega) rfl rfl find_nautyFirstlab
       (by rw [hU6.load _ _ _ (by sep_notin hd)]; exact h.dyns.firstlab.ptr hcFL)
       (h.arrays.firstlab.unch hU6 (by sep_notin hd)) hlab4
       (h.arrays.lab.unch hU6 (by sep_notin hd)) (h.fixed.nn.unch hU6 (by sep_notin hd)) (by decide)
@@ -213,7 +213,7 @@ theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx :
     -- `for (i = 0; i < n; ++i) canonlab[i] = lab[i]`
     simp only [seqPost, Post.after, E0_append]
     wp_step
-    refine wp_copyInts (le := le12) (by omega) rfl find_nautyCanonlab
+    refine wp_copyInts (le := le12) (by omega) rfl rfl find_nautyCanonlab
       (by rw [hU12.load _ _ _ (by sep_notin hd)]; exact h.dyns.canonlab.ptr hcCL)
       (h.arrays.canonlab.unch hU12 (by sep_notin hd)) hlab12
       (h.arrays.lab.unch hU12 (by sep_notin hd)) (h.fixed.nn.unch hU12 (by sep_notin hd)) (by decide)
