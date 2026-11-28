@@ -179,6 +179,8 @@ structure DispatchRep (ge : genv) [NautyEnv ge] (O : Ops) where
   /-- A scratch block in use is valid and none of the globals. -/
   isWork_valid : ∀ {m z}, IsWork m z → Mem.valid_block m z
   isWork_globs : ∀ {m z}, Work m → IsWork m z → z ∉ globs ∧ z ∉ envAvoid
+  /-- The globals are valid while the scratch state holds. -/
+  globs_valid : ∀ {m}, Work m → ∀ z ∈ globs, Mem.valid_block m z
   /-- The scratch state survives a step that leaves the written globals and
   the scratch blocks in use alone. -/
   work_unch : ∀ {m m' W}, Work m → Unch m m' W → (∀ z ∈ wglobs, ¬ W z) →

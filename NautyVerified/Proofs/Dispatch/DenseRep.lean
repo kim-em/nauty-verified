@@ -113,6 +113,7 @@ def denseRep : DispatchRep Program.ge denseOps where
     have := hw.1.notin _ hz
     simp only [List.mem_append, not_or] at this
     exact this
+  globs_valid hw z hz := hw.2 z (List.mem_append_left _ hz)
   work_unch hw hu hg hk hv :=
     let h := hw.1.unch hu (fun p hp => by
       simp only [denseSlots, List.mem_cons, List.mem_nil_iff, or_false] at hp

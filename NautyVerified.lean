@@ -29,6 +29,7 @@ import NautyVerified.Statement.SparseFinal
 import NautyVerified.Logic.Array
 import NautyVerified.Logic.Grow
 import NautyVerified.Logic.OfPre
+import NautyVerified.Logic.PermLit
 import NautyVerified.Logic.Ints
 import NautyVerified.Proofs.Orbjoin.Chase
 import NautyVerified.Proofs.Orbjoin.Join

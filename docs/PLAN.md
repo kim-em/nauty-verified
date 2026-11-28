@@ -595,6 +595,90 @@ once, not by copying:
    `Scratch.Bounded` carried as an invariant of the search
    (`Storage.invalidate_valid`, `Storage.update_valid`, `splitCounts_bounded`).
 
+### Making nauty.c's proofs generic (stage 3)
+
+Foundation (in place): `Proofs/Dispatch/DenseRep.lean` (`denseRep`, below the
+search so the state can name it), and in `Proofs/Search/` the generic forms
+next to the dense ones:
+
+- `State.lean`: `SearchAtG D m S gl cl G st pre nsp` over `[E : NautyEnv ge]`,
+  `D : DispatchRep ge O`, the representation locations `gl : D.GLoc`,
+  `cl : D.CLoc`, `G : O.Gr n`, `st : SearchState n (O.Canon n)`; its parts
+  `FixedG`, `ScalarsG`, `StatsG`, `ArraysG` (graph and store through
+  `D.GraphRep`/`D.CanonRep`), `DynsG` (workspace pair `D.wsP`/`D.wsS`),
+  `WorkG` (`D.Work`, nautil.c's `workperm` pair, both apart from the blocks),
+  `TablesG`, `SInvG`; `IsWorkG`; `S.blocksG D gl cl` (caller blocks with the
+  rep block lists, `envSearch`, `D.globs`), `S.ChgG`. Dense instance:
+  `SearchAt.toG : SearchAt … → SearchAtG denseRep … () () …` and
+  `SearchAtG.dense : SearchAtG denseRep … → (graph words, `SearchAt.gw`) →
+  SearchAt …`; `SLoc.mem_blocksG`, `SLoc.distinctG`/`distinct_ofG`
+  (`S.blocksG denseRep () ()` is a permutation of `S.blocks`, `perm_lit`).
+- `Spec.lean`: `SFrameG`, `firstterminalSpecG`, `recoverSpecG`,
+  `processnodeSpecG` (leaf step `O.classify`), `LeafOkG`; `isWork_dense`,
+  `SFrameG.dense`/`SFrame.toG`, `workMonoG_dense`, and
+  `firstterminalSpec_ofG`, `recoverSpec_ofG`, `processnodeSpec_ofG`
+  (a `Satisfies` of the generic specification at `denseRep` gives the dense
+  one).
+- `Frame.lean`: the `.unch` lemmas for every part, `SearchAtG.work_not`,
+  `SearchAtG.unch` (needs the step to keep valid blocks valid, for
+  `D.work_unch`); dense `SearchAt.work_not` is derived.
+- `Step.lean`: `WorkMonoG`, `SStepG` (`refl`, `trans`), `SValidG`,
+  `IsWorkG.valid`, `SStepG.of_unch`, and `WorkG.step`: the scratch state and
+  `WorkMonoG` after a dispatch call's `DispatchRep.Step`. This replaces the
+  dense `afterWP`/`afterWPWS`/`WorkAt.next` family, which stays dense-only.
+- `Valid.lean`: `SearchAtG.valid_blocks`, `valid_all`; dense
+  `SearchAt.valid_blocks` is derived.
+
+Recipe for converting a file (dense names and statements stay, so the files
+after it build unchanged):
+
+1. State each lemma over `SearchAtG D` (take `D : DispatchC ge O` and use
+   `D.toDispatchRep` when the code calls a dispatch procedure, with
+   `D.isautom_fn` and the others for the call). Replace `Block.x` by `E.x`,
+   `S.blocks` by `S.blocksG D gl cl`, `IsWork`/`SFrame`/`SStep`/`WorkMono`/
+   `SValid` by their `G` forms, `ctx : Ctx n` by `G : O.Gr n`, `Search n` by
+   `SearchState n (O.Canon n)`, dense HexGraphIso steps by the `O` fields or
+   the generic `SearchState` functions; naugraph.c's slots are not visible,
+   so reason about dispatch calls with `DispatchRep.Step` and `WorkG.step`.
+2. Re-derive the dense name below it: a `SearchAt` conclusion as
+   `(L_G h.toG …).dense h.gw`, a specification through a `*_ofG` lemma (add
+   one per new generic specification, as in `Search/Spec.lean`), frames
+   through `SFrameG.dense` and `workMonoG_dense`, block membership through
+   `SLoc.mem_blocksG`.
+3. A dense-only lemma with no generic counterpart (naugraph.c's slots) stays
+   as it is until its last user is converted, then goes.
+
+Remaining files (`Proofs/`), in dependency order; the files of one batch
+depend only on earlier batches, so a batch's groups can go to parallel
+agents:
+
+- Batch 1 (shared node infrastructure, one agent): `Search/Ops.lean`,
+  `Search/Node/{Spec, Rebuild, Tc, TcOps, UaFrame, Fields, Env, Steps,
+  Fixed, GcaSteps, Compare, FirstHex, OtherHex}` (the `*Hex` files are the
+  HexGraphIso-side node facts, to restate against `Generic.node`).
+- Batch 2 (four independent groups): (a) `Search/Firstterminal/*`;
+  (b) the node leaf steps `Search/Node/{Breakout, LocDistinct, InvSteps,
+  OtherSteps, Prologue, OkOff, OkFirst, Doref, Prune, Realloc, ReallocW,
+  Target, TcFrame, Choose, Visit, OtherFrame, Long, ProcFacts, Em}` (the
+  dispatch calls are in `Doref`, `Target`, `Visit`, `Choose`, `Realloc*`);
+  (c) `Search/Recover/*` and `Search/Node/LoopSteps` (after `Node/Prune`);
+  (d) `Search/Processnode/*` (after `Node/{Fields, Env, Steps, InvSteps}`;
+  `Processnode/Callback` imports `Top/NautyMain`, whose part it needs moves
+  first).
+- Batch 3 (two groups): the node bodies `Search/Node/{Process, Child,
+  FirstLocal, FirstMisc, NodePrologue, FirstShape, FirstLoopAt, FirstCall,
+  FirstHead, FirstEntry, FirstTail, FirstInit, FirstVertex, FirstLoop,
+  FirstEnd, FirstBodySteps, FirstBody}` and `Search/Node/{LoopShape,
+  OtherRest, OtherIter, OtherCarry, OtherLoop, OtherBodySteps, OtherEntry,
+  OtherTail, OtherBody}`, then `Search/Node/Nodes`.
+- Batch 4: `Top/*` for `nauty()` (`NautyAlloc`, `NautySizes`, `Spec`, `Init`,
+  `Globals`, `Copy`, `Head`, `NautyEntry`, `NautyTc`, `Opts`, `Ptn`,
+  `NautyInit` with the `init` call (`DispatchC.init_fn`, `init_null`),
+  `NautyOrbits`, `NautyStats`, `NautyWork`, `NautyRoot`, `NautyPost`,
+  `NautyFreedyn`, `NautyFree`, `Nauty`); `Top/Densenauty`, `Top/Check`,
+  `Top/Freedyn`, `Search/Emit*` and `Harness/*` stay dense (the sparse
+  program has its own `sparsenauty` and `sparse_main`).
+
 ### New specifications (nausparse.c), with their HexGraphIso counterparts
 
 Each is a `*_satisfies` over `NautyEnv` for the sparse instance, with the

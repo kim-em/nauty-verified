@@ -568,4 +568,133 @@ theorem SearchAt.afterN {n : Nat} {m m' : mem} {S : SLoc} {ctx : Ctx n} {st : Se
       (fresh_old dW) (fresh_old dW) (fresh_old dS) (fresh_old' dW) (fresh_old' dS)
       (fresh_old' dB)⟩
 
+/-! ### For any dispatch representation
+
+`WorkMonoG`, `SStepG`, `SValidG`: the frames above for `SearchAtG D`.
+`WorkG.step`: the scratch state after a call of one of `D`'s procedures
+(`DispatchRep.Step`) whose outputs avoid nautil.c's `workperm` pair; this is
+what replaces the dense `afterWP`/`afterWPWS` family for a dispatch call. -/
+
+section Generic
+
+open NautyVerified.Proofs.Dispatch (Ops DispatchRep envAvoid)
+
+variable {ge : Cfrontend.Clight.genv} [E : NautyEnv ge] {O : Ops} (D : DispatchRep ge O)
+
+/-- `WorkMono` for `D`. -/
+def WorkMonoG (m m' : mem) : Prop := ∀ z, IsWorkG D m' z → IsWorkG D m z ∨ ¬ Mem.valid_block m z
+
+/-- `SStep` for `D`. -/
+def SStepG (m m' : mem) (S : SLoc) (gl : D.GLoc) (cl : D.CLoc) : Prop :=
+  SFrameG D m m' S gl cl ∧ WorkMonoG D m m'
+
+/-- `SValid` for `D`. -/
+def SValidG (m : mem) (S : SLoc) (gl : D.GLoc) (cl : D.CLoc) : Prop :=
+  ∀ z ∈ S.blocksG D gl cl, Mem.valid_block m z
+
+variable {D}
+
+theorem WorkMonoG.refl (m : mem) : WorkMonoG D m m := fun _ h => .inl h
+
+theorem WorkMonoG.trans {m m₁ m₂ : mem} (h₁ : WorkMonoG D m m₁)
+    (hv : ∀ z, Mem.valid_block m z → Mem.valid_block m₁ z) (h₂ : WorkMonoG D m₁ m₂) :
+    WorkMonoG D m m₂ := fun z hz => by
+  rcases h₂ z hz with h | h
+  · exact h₁ z h
+  · exact .inr fun hv0 => h (hv _ hv0)
+
+theorem SStepG.refl (m : mem) (S : SLoc) (gl : D.GLoc) (cl : D.CLoc) : SStepG D m m S gl cl :=
+  ⟨⟨Unch.refl _ _, fun _ h => h⟩, fun _ h => .inl h⟩
+
+theorem SStepG.trans {m m₁ m₂ : mem} {S : SLoc} {gl : D.GLoc} {cl : D.CLoc}
+    (h₁ : SStepG D m m₁ S gl cl) (h₂ : SStepG D m₁ m₂ S gl cl) : SStepG D m m₂ S gl cl := by
+  obtain ⟨⟨u1, v1⟩, w1⟩ := h₁
+  obtain ⟨⟨u2, v2⟩, w2⟩ := h₂
+  refine ⟨⟨u1.trans (u2.mono fun z hz => ?_), fun z hz => v2 _ (v1 _ hz)⟩, fun z hz => ?_⟩
+  · rcases hz with h | h | h
+    · exact .inl h
+    · exact .inr (.inl fun hv => h (v1 _ hv))
+    · rcases w1 z h with h' | h'
+      · exact .inr (.inr h')
+      · exact .inr (.inl h')
+  · rcases w2 z hz with h | h
+    · exact w1 z h
+    · exact .inr fun hv => h (v1 _ hv)
+
+theorem SValidG.grow {m m' : mem} {S : SLoc} {gl : D.GLoc} {cl : D.CLoc}
+    (h : SValidG D m S gl cl) (hv : ∀ z, Mem.valid_block m z → Mem.valid_block m' z) :
+    SValidG D m' S gl cl :=
+  fun z hz => hv _ (h z hz)
+
+theorem IsWorkG.valid {m : mem} {z : block} (h : IsWorkG D m z) : Mem.valid_block m z := by
+  rcases h with h | ⟨c, hc, d⟩
+  · exact D.isWork_valid h
+  · exact Alloc.Malloced.valid (d.mal hc)
+
+/-- A step confined to blocks of `S` other than `D`'s written globals and
+nautil.c's `workperm` pair, and to blocks new since `m`. -/
+theorem SStepG.of_unch {n : Nat} {m m' : mem} {S : SLoc} {gl : D.GLoc} {cl : D.CLoc}
+    {G : O.Gr n} {st : SearchState n (O.Canon n)} {pre nsp : Bool}
+    (h : SearchAtG D m S gl cl G st pre nsp)
+    {W : block → Prop} (hu : Unch m m' W) (hv : ∀ z, Mem.valid_block m z → Mem.valid_block m' z)
+    (hW : ∀ z, W z → S.ChgG D gl cl z ∨ ¬ Mem.valid_block m z)
+    (hg : ∀ z ∈ D.wglobs, ¬ W z) (hN : ¬ W E.nautilWorkperm ∧ ¬ W E.nautilWorkpermSz) :
+    SStepG D m m' S gl cl := by
+  have hwk : ∀ z, IsWorkG D m z → ¬ W z := fun z hz hWz => by
+    rcases hW z hWz with h' | h'
+    · exact h.work_not hz h'.1
+    · exact h' hz.valid
+  refine ⟨⟨hu.mono fun z hz => ?_, hv⟩, fun z hz =>
+    .inl ((h.work.unch hu hg hN hwk hv).2 z hz)⟩
+  rcases hW z hz with h | h
+  · exact .inl h
+  · exact .inr (.inl h)
+
+/-- The scratch state after a call of one of `D`'s procedures whose outputs are
+none of nautil.c's `workperm` pair and its block. -/
+theorem WorkG.step {m m' : mem} {L : List block} {out : block → Prop} (h : WorkG D m L)
+    (hs : D.Step m m' out) (hL : ∀ z ∈ L, Mem.valid_block m z)
+    (hgL : ∀ z ∈ D.globs, z ∈ L)
+    (hN : ∀ z, out z → z ≠ E.nautilWorkperm ∧ z ≠ E.nautilWorkpermSz ∧
+      ∀ c b, DynAt m E.nautilWorkperm E.nautilWorkpermSz 4 c b → 0 < c → z ≠ b)
+    (hNL : E.nautilWorkperm ∈ L ∧ E.nautilWorkpermSz ∈ L) :
+    WorkG D m' L ∧ WorkMonoG D m m' := by
+  obtain ⟨cN, bN, dN, nN, uN⟩ := h.nautil
+  have eA : E.nautilWorkperm ∈ envAvoid ∧ E.nautilWorkpermSz ∈ envAvoid := by simp
+  have eB : E.nautilWorkperm ∈ E.blocks ∧ E.nautilWorkpermSz ∈ E.blocks := by
+    simp [NautyEnv.blocks]
+  have keepG : ∀ z, z ∈ envAvoid → z ∈ E.blocks → z ∈ L → ¬ out z →
+      ¬ (out z ∨ z ∈ D.wglobs ∨ D.IsWork m z ∨ ¬ Mem.valid_block m z) := by
+    rintro z hA hE hzL ho (h1 | h1 | h1 | h1)
+    · exact ho h1
+    · exact D.globs_env _ (D.wglobs_sub _ h1) hE
+    · exact (D.isWork_globs h.disp h1).2 hA
+    · exact h1 (hL z hzL)
+  have keepB : 0 < cN → ¬ (out bN ∨ bN ∈ D.wglobs ∨ D.IsWork m bN ∨ ¬ Mem.valid_block m bN) := by
+    rintro hc (h1 | h1 | h1 | h1)
+    · exact (hN _ h1).2.2 cN bN dN hc rfl
+    · exact nN hc (hgL _ (D.wglobs_sub _ h1))
+    · exact uN hc h1
+    · exact h1 (Alloc.Malloced.valid (dN.mal hc))
+  have dN' : DynAt m' E.nautilWorkperm E.nautilWorkpermSz 4 cN bN :=
+    dN.keep hs.unch
+      (keepG _ eA.1 eB.1 hNL.1 fun ho => (hN _ ho).1 rfl)
+      (keepG _ eA.2 eB.2 hNL.2 fun ho => (hN _ ho).2.1 rfl)
+      fun hc => Keep.unch hs.unch (keepB hc)
+  refine ⟨⟨hs.work, ⟨cN, bN, dN', nN, fun hc hb => ?_⟩, fun z hz hzL => ?_⟩, ?_⟩
+  · rcases hs.mono bN hb with h1 | h1
+    · exact uN hc h1
+    · exact h1 (Alloc.Malloced.valid (dN.mal hc))
+  · rcases hs.mono z hz with h1 | h1
+    · exact h.notin z h1 hzL
+    · exact h1 (hL z hzL)
+  · rintro z (hz | ⟨c, hc, d⟩)
+    · exact (hs.mono z hz).imp .inl id
+    · have e := d.same_block dN' hc
+      have hcc := d.same_cap dN'
+      subst e; subst hcc
+      exact .inl (.inr ⟨_, hc, dN⟩)
+
+end Generic
+
 end NautyVerified.Proofs.Search
