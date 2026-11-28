@@ -1,5 +1,6 @@
 import NautyVerified.Proofs.Alloc.Blocks
 import NautyVerified.Proofs.Search.Blocks
+import NautyVerified.Exec.Expr
 
 /-!
 # The globals the shared proofs use, for any linked program
@@ -391,6 +392,65 @@ class NautyEnv (ge : outParam genv) where
   /-- The blocks are pairwise distinct. -/
   distinct : List.Pairwise (· ≠ ·)
     [nextelement, leftbit, nautilBit, malloc, free, zalloc, nautilWorkperm, nautilWorkpermSz, permset, nautyBit, nautyCanonlab, nautyCanonlabSz, nautyDefltwork, nautyDefltworkSz, nautyActive, nautyActiveSz, nautyCanoncode, nautyCanoncodeSz, nautyFixedpts, nautyFixedptsSz, nautyFirstcode, nautyFirstcodeSz, nautyWorkperm, nautyWorkpermSz, nautyFirsttc, nautyFirsttcSz, nautyFirstlab, nautyFirstlabSz, getcanon, digraph, writeautoms, cartesian, linelength, outfile, userautomproc, userlevelproc, usernodeproc, usercanonproc, invarproc, tcLevel, mininvarlevel, maxinvarlevel, invararg, dispatch, orbits, domarkers, doschreier, m, n, g, canong, stats, gcaFirst, gcaCanon, noncheaplevel, allsamelevel, eqlevFirst, eqlevCanon, compCanon, samerows, canonlevel, stabvertex, cosetindex, needshortprune, tcnode0, allocM, workspace, worktop, fmptr, invapplics, invsuccesses, invarsuclevel, killRequest, firstpathnodeFn, othernodeFn, firstterminalFn, processnodeFn, recoverFn, nautyFn, maketargetcellFn, breakoutFn, fmpermFn, fmptnFn, orbjoinFn, shortpruneFn, longpruneFn, dorefFn, nautilCheck, nautilFreedyn, nautyFreedyn]
+  /-- The member offsets of `tcnode`, `statsblk` (`_1024`) and `dispatchvec`
+  (`_1027`) in the program's composite environment. -/
+  field_tcnodeNext : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«tcnode_struct» Cfrontend.Ctypes.noattr) dense.id.«next» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 0)), .Full)
+  field_tcnodeTcell : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«tcnode_struct» Cfrontend.Ctypes.noattr) dense.id.«tcellptr» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 8)), .Full)
+  field_statsGrpsize1 : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«grpsize1» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 0)), .Full)
+  field_statsGrpsize2 : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«grpsize2» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 8)), .Full)
+  field_statsNumorbits : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«numorbits» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 12)), .Full)
+  field_statsNumgenerators : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«numgenerators» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 16)), .Full)
+  field_statsErrstatus : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«errstatus» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 20)), .Full)
+  field_statsNumnodes : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«numnodes» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 24)), .Full)
+  field_statsNumbadleaves : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«numbadleaves» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 32)), .Full)
+  field_statsMaxlevel : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«maxlevel» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 40)), .Full)
+  field_statsTctotal : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«tctotal» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 48)), .Full)
+  field_statsCanupdates : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«canupdates» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 56)), .Full)
+  field_dIsautom : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«_1027» Cfrontend.Ctypes.noattr) dense.id.«isautom» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 0)), .Full)
+  field_dTestcanlab : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«_1027» Cfrontend.Ctypes.noattr) dense.id.«testcanlab» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 8)), .Full)
+  field_dUpdatecan : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«_1027» Cfrontend.Ctypes.noattr) dense.id.«updatecan» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 16)), .Full)
+  field_dRefine : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«_1027» Cfrontend.Ctypes.noattr) dense.id.«refine» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 24)), .Full)
+  field_dRefine1 : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«_1027» Cfrontend.Ctypes.noattr) dense.id.«refine1» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 32)), .Full)
+  field_dCheapautom : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«_1027» Cfrontend.Ctypes.noattr) dense.id.«cheapautom» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 40)), .Full)
+  field_dTargetcell : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«_1027» Cfrontend.Ctypes.noattr) dense.id.«targetcell» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 48)), .Full)
 
 namespace NautyEnv
 
@@ -476,6 +536,86 @@ elab "env_ne" : tactic => withMainContext do
 
 kernel_rfl dense_distinct : decide (List.Pairwise (· ≠ ·)
     [Block.nextelement, Block.leftbit, Block.nautilBit, Block.malloc, Block.free, Block.zalloc, Block.nautilWorkperm, Block.nautilWorkpermSz, Block.permset, Block.nautyBit, Block.nautyCanonlab, Block.nautyCanonlabSz, Block.nautyDefltwork, Block.nautyDefltworkSz, Block.nautyActive, Block.nautyActiveSz, Block.nautyCanoncode, Block.nautyCanoncodeSz, Block.nautyFixedpts, Block.nautyFixedptsSz, Block.nautyFirstcode, Block.nautyFirstcodeSz, Block.nautyWorkperm, Block.nautyWorkpermSz, Block.nautyFirsttc, Block.nautyFirsttcSz, Block.nautyFirstlab, Block.nautyFirstlabSz, Search.Block.getcanon, Search.Block.digraph, Search.Block.writeautoms, Search.Block.cartesian, Search.Block.linelength, Search.Block.outfile, Search.Block.userautomproc, Search.Block.userlevelproc, Search.Block.usernodeproc, Search.Block.usercanonproc, Search.Block.invarproc, Search.Block.tcLevel, Search.Block.mininvarlevel, Search.Block.maxinvarlevel, Search.Block.invararg, Search.Block.dispatch, Search.Block.orbits, Search.Block.domarkers, Search.Block.doschreier, Search.Block.m, Search.Block.n, Search.Block.g, Search.Block.canong, Search.Block.stats, Search.Block.gcaFirst, Search.Block.gcaCanon, Search.Block.noncheaplevel, Search.Block.allsamelevel, Search.Block.eqlevFirst, Search.Block.eqlevCanon, Search.Block.compCanon, Search.Block.samerows, Search.Block.canonlevel, Search.Block.stabvertex, Search.Block.cosetindex, Search.Block.needshortprune, Search.Block.tcnode0, Search.Block.allocM, Search.Block.workspace, Search.Block.worktop, Search.Block.fmptr, Search.Block.invapplics, Search.Block.invsuccesses, Search.Block.invarsuclevel, Search.Block.killRequest, Search.Block.firstpathnodeFn, Search.Block.othernodeFn, Search.Block.firstterminalFn, Search.Block.processnodeFn, Search.Block.recoverFn, Search.Block.nautyFn, Search.Block.maketargetcellFn, Search.Block.breakoutFn, Search.Block.fmpermFn, Search.Block.fmptnFn, Search.Block.orbjoinFn, Search.Block.shortpruneFn, Search.Block.longpruneFn, Search.Block.dorefFn, Top.Block.nautilCheck, Top.Block.nautilFreedyn, Top.Block.nautyFreedyn]) = true
+
+namespace DenseLayout
+
+kernel_rfl field_tcnodeNext : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField Program.ge (Cfrontend.Ctypes.Tstruct dense.id.«tcnode_struct» Cfrontend.Ctypes.noattr) dense.id.«next» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 0)), .Full)
+
+kernel_rfl field_tcnodeTcell : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField Program.ge (Cfrontend.Ctypes.Tstruct dense.id.«tcnode_struct» Cfrontend.Ctypes.noattr) dense.id.«tcellptr» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 8)), .Full)
+
+kernel_rfl field_statsGrpsize1 : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField Program.ge (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«grpsize1» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 0)), .Full)
+
+kernel_rfl field_statsGrpsize2 : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField Program.ge (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«grpsize2» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 8)), .Full)
+
+kernel_rfl field_statsNumorbits : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField Program.ge (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«numorbits» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 12)), .Full)
+
+kernel_rfl field_statsNumgenerators : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField Program.ge (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«numgenerators» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 16)), .Full)
+
+kernel_rfl field_statsErrstatus : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField Program.ge (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«errstatus» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 20)), .Full)
+
+kernel_rfl field_statsNumnodes : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField Program.ge (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«numnodes» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 24)), .Full)
+
+kernel_rfl field_statsNumbadleaves : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField Program.ge (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«numbadleaves» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 32)), .Full)
+
+kernel_rfl field_statsMaxlevel : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField Program.ge (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«maxlevel» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 40)), .Full)
+
+kernel_rfl field_statsTctotal : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField Program.ge (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«tctotal» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 48)), .Full)
+
+kernel_rfl field_statsCanupdates : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField Program.ge (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«canupdates» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 56)), .Full)
+
+kernel_rfl field_dIsautom : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField Program.ge (Cfrontend.Ctypes.Tstruct dense.id.«_1027» Cfrontend.Ctypes.noattr) dense.id.«isautom» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 0)), .Full)
+
+kernel_rfl field_dTestcanlab : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField Program.ge (Cfrontend.Ctypes.Tstruct dense.id.«_1027» Cfrontend.Ctypes.noattr) dense.id.«testcanlab» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 8)), .Full)
+
+kernel_rfl field_dUpdatecan : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField Program.ge (Cfrontend.Ctypes.Tstruct dense.id.«_1027» Cfrontend.Ctypes.noattr) dense.id.«updatecan» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 16)), .Full)
+
+kernel_rfl field_dRefine : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField Program.ge (Cfrontend.Ctypes.Tstruct dense.id.«_1027» Cfrontend.Ctypes.noattr) dense.id.«refine» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 24)), .Full)
+
+kernel_rfl field_dRefine1 : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField Program.ge (Cfrontend.Ctypes.Tstruct dense.id.«_1027» Cfrontend.Ctypes.noattr) dense.id.«refine1» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 32)), .Full)
+
+kernel_rfl field_dCheapautom : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField Program.ge (Cfrontend.Ctypes.Tstruct dense.id.«_1027» Cfrontend.Ctypes.noattr) dense.id.«cheapautom» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 40)), .Full)
+
+kernel_rfl field_dTargetcell : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField Program.ge (Cfrontend.Ctypes.Tstruct dense.id.«_1027» Cfrontend.Ctypes.noattr) dense.id.«targetcell» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 48)), .Full)
+
+end DenseLayout
 
 /-- The dense program's blocks (reducible, so `E.x` unfolds to `Block.x` at
 reducible transparency). -/
@@ -751,6 +891,25 @@ reducible transparency). -/
   var_invarsuclevel := rfl
   var_killRequest := rfl
   distinct := of_decide_eq_true dense_distinct
+  field_tcnodeNext := DenseLayout.field_tcnodeNext
+  field_tcnodeTcell := DenseLayout.field_tcnodeTcell
+  field_statsGrpsize1 := DenseLayout.field_statsGrpsize1
+  field_statsGrpsize2 := DenseLayout.field_statsGrpsize2
+  field_statsNumorbits := DenseLayout.field_statsNumorbits
+  field_statsNumgenerators := DenseLayout.field_statsNumgenerators
+  field_statsErrstatus := DenseLayout.field_statsErrstatus
+  field_statsNumnodes := DenseLayout.field_statsNumnodes
+  field_statsNumbadleaves := DenseLayout.field_statsNumbadleaves
+  field_statsMaxlevel := DenseLayout.field_statsMaxlevel
+  field_statsTctotal := DenseLayout.field_statsTctotal
+  field_statsCanupdates := DenseLayout.field_statsCanupdates
+  field_dIsautom := DenseLayout.field_dIsautom
+  field_dTestcanlab := DenseLayout.field_dTestcanlab
+  field_dUpdatecan := DenseLayout.field_dUpdatecan
+  field_dRefine := DenseLayout.field_dRefine
+  field_dRefine1 := DenseLayout.field_dRefine1
+  field_dCheapautom := DenseLayout.field_dCheapautom
+  field_dTargetcell := DenseLayout.field_dTargetcell
 
 /-! The dense instance's blocks are the dense `Block` constants. -/
 

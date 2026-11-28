@@ -1,12 +1,12 @@
-import NautyVerified.Program.Dense
-import NautyVerified.Exec.Expr
+import NautyVerified.Program.Env
 
 /-!
 # Struct fields nauty.c's search reads
 
 Offsets of the fields of `tcnode`, `statsblk` (`_1024`) and `dispatchvec`
-(`_1027`) as the composite environment of the dense program lays them out,
-each checked by the kernel.
+(`_1027`) in the composite environment of any linked program, from its
+`NautyEnv` (each instance checks them by the kernel: `DenseLayout` in
+`Program/Env.lean`, `SparseEnv` in `Program/Sparse.lean`).
 -/
 
 namespace NautyVerified.Proofs.Search
@@ -16,80 +16,101 @@ open CompCert4Lean.Common.Values CompCert4Lean.Foundation.Numbers.Rocq.Coq
 open CompCert4Lean.Lib.Integers
 open NautyVerified NautyVerified.Program NautyVerified.Source
 
-kernel_rfl field_tcnodeNext : ∀ (b : block) (ofs : ptrofs),
-  Exec.lvalOfField ge (Tstruct dense.id.«tcnode_struct» noattr) dense.id.«next» (.Vptr b ofs) =
-    some (b, Ptrofs.add ofs (Ptrofs.repr (zOfInt 0)), CompCert4Lean.Cfrontend.Ctypes.bitfield.Full)
+variable {ge : genv} [E : NautyEnv ge]
 
-kernel_rfl field_tcnodeTcell : ∀ (b : block) (ofs : ptrofs),
-  Exec.lvalOfField ge (Tstruct dense.id.«tcnode_struct» noattr) dense.id.«tcellptr» (.Vptr b ofs) =
-    some (b, Ptrofs.add ofs (Ptrofs.repr (zOfInt 8)), CompCert4Lean.Cfrontend.Ctypes.bitfield.Full)
+theorem field_tcnodeNext : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«tcnode_struct» Cfrontend.Ctypes.noattr) dense.id.«next» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 0)), .Full) :=
+  E.field_tcnodeNext
 
-kernel_rfl field_statsGrpsize1 : ∀ (b : block) (ofs : ptrofs),
-  Exec.lvalOfField ge (Tstruct dense.id.«_1024» noattr) dense.id.«grpsize1» (.Vptr b ofs) =
-    some (b, Ptrofs.add ofs (Ptrofs.repr (zOfInt 0)), CompCert4Lean.Cfrontend.Ctypes.bitfield.Full)
+theorem field_tcnodeTcell : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«tcnode_struct» Cfrontend.Ctypes.noattr) dense.id.«tcellptr» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 8)), .Full) :=
+  E.field_tcnodeTcell
 
-kernel_rfl field_statsGrpsize2 : ∀ (b : block) (ofs : ptrofs),
-  Exec.lvalOfField ge (Tstruct dense.id.«_1024» noattr) dense.id.«grpsize2» (.Vptr b ofs) =
-    some (b, Ptrofs.add ofs (Ptrofs.repr (zOfInt 8)), CompCert4Lean.Cfrontend.Ctypes.bitfield.Full)
+theorem field_statsGrpsize1 : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«grpsize1» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 0)), .Full) :=
+  E.field_statsGrpsize1
 
-kernel_rfl field_statsNumorbits : ∀ (b : block) (ofs : ptrofs),
-  Exec.lvalOfField ge (Tstruct dense.id.«_1024» noattr) dense.id.«numorbits» (.Vptr b ofs) =
-    some (b, Ptrofs.add ofs (Ptrofs.repr (zOfInt 12)), CompCert4Lean.Cfrontend.Ctypes.bitfield.Full)
+theorem field_statsGrpsize2 : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«grpsize2» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 8)), .Full) :=
+  E.field_statsGrpsize2
 
-kernel_rfl field_statsNumgenerators : ∀ (b : block) (ofs : ptrofs),
-  Exec.lvalOfField ge (Tstruct dense.id.«_1024» noattr) dense.id.«numgenerators» (.Vptr b ofs) =
-    some (b, Ptrofs.add ofs (Ptrofs.repr (zOfInt 16)), CompCert4Lean.Cfrontend.Ctypes.bitfield.Full)
+theorem field_statsNumorbits : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«numorbits» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 12)), .Full) :=
+  E.field_statsNumorbits
 
-kernel_rfl field_statsErrstatus : ∀ (b : block) (ofs : ptrofs),
-  Exec.lvalOfField ge (Tstruct dense.id.«_1024» noattr) dense.id.«errstatus» (.Vptr b ofs) =
-    some (b, Ptrofs.add ofs (Ptrofs.repr (zOfInt 20)), CompCert4Lean.Cfrontend.Ctypes.bitfield.Full)
+theorem field_statsNumgenerators : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«numgenerators» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 16)), .Full) :=
+  E.field_statsNumgenerators
 
-kernel_rfl field_statsNumnodes : ∀ (b : block) (ofs : ptrofs),
-  Exec.lvalOfField ge (Tstruct dense.id.«_1024» noattr) dense.id.«numnodes» (.Vptr b ofs) =
-    some (b, Ptrofs.add ofs (Ptrofs.repr (zOfInt 24)), CompCert4Lean.Cfrontend.Ctypes.bitfield.Full)
+theorem field_statsErrstatus : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«errstatus» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 20)), .Full) :=
+  E.field_statsErrstatus
 
-kernel_rfl field_statsNumbadleaves : ∀ (b : block) (ofs : ptrofs),
-  Exec.lvalOfField ge (Tstruct dense.id.«_1024» noattr) dense.id.«numbadleaves» (.Vptr b ofs) =
-    some (b, Ptrofs.add ofs (Ptrofs.repr (zOfInt 32)), CompCert4Lean.Cfrontend.Ctypes.bitfield.Full)
+theorem field_statsNumnodes : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«numnodes» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 24)), .Full) :=
+  E.field_statsNumnodes
 
-kernel_rfl field_statsMaxlevel : ∀ (b : block) (ofs : ptrofs),
-  Exec.lvalOfField ge (Tstruct dense.id.«_1024» noattr) dense.id.«maxlevel» (.Vptr b ofs) =
-    some (b, Ptrofs.add ofs (Ptrofs.repr (zOfInt 40)), CompCert4Lean.Cfrontend.Ctypes.bitfield.Full)
+theorem field_statsNumbadleaves : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«numbadleaves» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 32)), .Full) :=
+  E.field_statsNumbadleaves
 
-kernel_rfl field_statsTctotal : ∀ (b : block) (ofs : ptrofs),
-  Exec.lvalOfField ge (Tstruct dense.id.«_1024» noattr) dense.id.«tctotal» (.Vptr b ofs) =
-    some (b, Ptrofs.add ofs (Ptrofs.repr (zOfInt 48)), CompCert4Lean.Cfrontend.Ctypes.bitfield.Full)
+theorem field_statsMaxlevel : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«maxlevel» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 40)), .Full) :=
+  E.field_statsMaxlevel
 
-kernel_rfl field_statsCanupdates : ∀ (b : block) (ofs : ptrofs),
-  Exec.lvalOfField ge (Tstruct dense.id.«_1024» noattr) dense.id.«canupdates» (.Vptr b ofs) =
-    some (b, Ptrofs.add ofs (Ptrofs.repr (zOfInt 56)), CompCert4Lean.Cfrontend.Ctypes.bitfield.Full)
+theorem field_statsTctotal : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«tctotal» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 48)), .Full) :=
+  E.field_statsTctotal
 
-kernel_rfl field_dIsautom : ∀ (b : block) (ofs : ptrofs),
-  Exec.lvalOfField ge (Tstruct dense.id.«_1027» noattr) dense.id.«isautom» (.Vptr b ofs) =
-    some (b, Ptrofs.add ofs (Ptrofs.repr (zOfInt 0)), CompCert4Lean.Cfrontend.Ctypes.bitfield.Full)
+theorem field_statsCanupdates : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«canupdates» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 56)), .Full) :=
+  E.field_statsCanupdates
 
-kernel_rfl field_dTestcanlab : ∀ (b : block) (ofs : ptrofs),
-  Exec.lvalOfField ge (Tstruct dense.id.«_1027» noattr) dense.id.«testcanlab» (.Vptr b ofs) =
-    some (b, Ptrofs.add ofs (Ptrofs.repr (zOfInt 8)), CompCert4Lean.Cfrontend.Ctypes.bitfield.Full)
+theorem field_dIsautom : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«_1027» Cfrontend.Ctypes.noattr) dense.id.«isautom» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 0)), .Full) :=
+  E.field_dIsautom
 
-kernel_rfl field_dUpdatecan : ∀ (b : block) (ofs : ptrofs),
-  Exec.lvalOfField ge (Tstruct dense.id.«_1027» noattr) dense.id.«updatecan» (.Vptr b ofs) =
-    some (b, Ptrofs.add ofs (Ptrofs.repr (zOfInt 16)), CompCert4Lean.Cfrontend.Ctypes.bitfield.Full)
+theorem field_dTestcanlab : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«_1027» Cfrontend.Ctypes.noattr) dense.id.«testcanlab» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 8)), .Full) :=
+  E.field_dTestcanlab
 
-kernel_rfl field_dRefine : ∀ (b : block) (ofs : ptrofs),
-  Exec.lvalOfField ge (Tstruct dense.id.«_1027» noattr) dense.id.«refine» (.Vptr b ofs) =
-    some (b, Ptrofs.add ofs (Ptrofs.repr (zOfInt 24)), CompCert4Lean.Cfrontend.Ctypes.bitfield.Full)
+theorem field_dUpdatecan : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«_1027» Cfrontend.Ctypes.noattr) dense.id.«updatecan» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 16)), .Full) :=
+  E.field_dUpdatecan
 
-kernel_rfl field_dRefine1 : ∀ (b : block) (ofs : ptrofs),
-  Exec.lvalOfField ge (Tstruct dense.id.«_1027» noattr) dense.id.«refine1» (.Vptr b ofs) =
-    some (b, Ptrofs.add ofs (Ptrofs.repr (zOfInt 32)), CompCert4Lean.Cfrontend.Ctypes.bitfield.Full)
+theorem field_dRefine : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«_1027» Cfrontend.Ctypes.noattr) dense.id.«refine» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 24)), .Full) :=
+  E.field_dRefine
 
-kernel_rfl field_dCheapautom : ∀ (b : block) (ofs : ptrofs),
-  Exec.lvalOfField ge (Tstruct dense.id.«_1027» noattr) dense.id.«cheapautom» (.Vptr b ofs) =
-    some (b, Ptrofs.add ofs (Ptrofs.repr (zOfInt 40)), CompCert4Lean.Cfrontend.Ctypes.bitfield.Full)
+theorem field_dRefine1 : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«_1027» Cfrontend.Ctypes.noattr) dense.id.«refine1» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 32)), .Full) :=
+  E.field_dRefine1
 
-kernel_rfl field_dTargetcell : ∀ (b : block) (ofs : ptrofs),
-  Exec.lvalOfField ge (Tstruct dense.id.«_1027» noattr) dense.id.«targetcell» (.Vptr b ofs) =
-    some (b, Ptrofs.add ofs (Ptrofs.repr (zOfInt 48)), CompCert4Lean.Cfrontend.Ctypes.bitfield.Full)
+theorem field_dCheapautom : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«_1027» Cfrontend.Ctypes.noattr) dense.id.«cheapautom» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 40)), .Full) :=
+  E.field_dCheapautom
+
+theorem field_dTargetcell : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«_1027» Cfrontend.Ctypes.noattr) dense.id.«targetcell» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 48)), .Full) :=
+  E.field_dTargetcell
 
 end NautyVerified.Proofs.Search

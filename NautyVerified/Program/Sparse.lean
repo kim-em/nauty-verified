@@ -481,6 +481,82 @@ kernel_rfl var_killRequest : Genv.find_var_info sparseGe.genv_genv SparseBlock.k
 kernel_rfl distinct : decide (List.Pairwise (· ≠ ·)
     [SparseBlock.nextelement, SparseBlock.leftbit, SparseBlock.nautilBit, SparseBlock.malloc, SparseBlock.free, SparseBlock.zalloc, SparseBlock.nautilWorkperm, SparseBlock.nautilWorkpermSz, SparseBlock.permset, SparseBlock.nautyBit, SparseBlock.nautyCanonlab, SparseBlock.nautyCanonlabSz, SparseBlock.nautyDefltwork, SparseBlock.nautyDefltworkSz, SparseBlock.nautyActive, SparseBlock.nautyActiveSz, SparseBlock.nautyCanoncode, SparseBlock.nautyCanoncodeSz, SparseBlock.nautyFixedpts, SparseBlock.nautyFixedptsSz, SparseBlock.nautyFirstcode, SparseBlock.nautyFirstcodeSz, SparseBlock.nautyWorkperm, SparseBlock.nautyWorkpermSz, SparseBlock.nautyFirsttc, SparseBlock.nautyFirsttcSz, SparseBlock.nautyFirstlab, SparseBlock.nautyFirstlabSz, SparseBlock.getcanon, SparseBlock.digraph, SparseBlock.writeautoms, SparseBlock.cartesian, SparseBlock.linelength, SparseBlock.outfile, SparseBlock.userautomproc, SparseBlock.userlevelproc, SparseBlock.usernodeproc, SparseBlock.usercanonproc, SparseBlock.invarproc, SparseBlock.tcLevel, SparseBlock.mininvarlevel, SparseBlock.maxinvarlevel, SparseBlock.invararg, SparseBlock.dispatch, SparseBlock.orbits, SparseBlock.domarkers, SparseBlock.doschreier, SparseBlock.m, SparseBlock.n, SparseBlock.g, SparseBlock.canong, SparseBlock.stats, SparseBlock.gcaFirst, SparseBlock.gcaCanon, SparseBlock.noncheaplevel, SparseBlock.allsamelevel, SparseBlock.eqlevFirst, SparseBlock.eqlevCanon, SparseBlock.compCanon, SparseBlock.samerows, SparseBlock.canonlevel, SparseBlock.stabvertex, SparseBlock.cosetindex, SparseBlock.needshortprune, SparseBlock.tcnode0, SparseBlock.allocM, SparseBlock.workspace, SparseBlock.worktop, SparseBlock.fmptr, SparseBlock.invapplics, SparseBlock.invsuccesses, SparseBlock.invarsuclevel, SparseBlock.killRequest, SparseBlock.firstpathnodeFn, SparseBlock.othernodeFn, SparseBlock.firstterminalFn, SparseBlock.processnodeFn, SparseBlock.recoverFn, SparseBlock.nautyFn, SparseBlock.maketargetcellFn, SparseBlock.breakoutFn, SparseBlock.fmpermFn, SparseBlock.fmptnFn, SparseBlock.orbjoinFn, SparseBlock.shortpruneFn, SparseBlock.longpruneFn, SparseBlock.dorefFn, SparseBlock.nautilCheck, SparseBlock.nautilFreedyn, SparseBlock.nautyFreedyn]) = true
 
+kernel_rfl field_tcnodeNext : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField sparseGe (Cfrontend.Ctypes.Tstruct dense.id.«tcnode_struct» Cfrontend.Ctypes.noattr) dense.id.«next» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 0)), .Full)
+
+kernel_rfl field_tcnodeTcell : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField sparseGe (Cfrontend.Ctypes.Tstruct dense.id.«tcnode_struct» Cfrontend.Ctypes.noattr) dense.id.«tcellptr» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 8)), .Full)
+
+kernel_rfl field_statsGrpsize1 : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField sparseGe (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«grpsize1» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 0)), .Full)
+
+kernel_rfl field_statsGrpsize2 : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField sparseGe (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«grpsize2» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 8)), .Full)
+
+kernel_rfl field_statsNumorbits : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField sparseGe (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«numorbits» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 12)), .Full)
+
+kernel_rfl field_statsNumgenerators : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField sparseGe (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«numgenerators» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 16)), .Full)
+
+kernel_rfl field_statsErrstatus : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField sparseGe (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«errstatus» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 20)), .Full)
+
+kernel_rfl field_statsNumnodes : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField sparseGe (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«numnodes» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 24)), .Full)
+
+kernel_rfl field_statsNumbadleaves : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField sparseGe (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«numbadleaves» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 32)), .Full)
+
+kernel_rfl field_statsMaxlevel : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField sparseGe (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«maxlevel» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 40)), .Full)
+
+kernel_rfl field_statsTctotal : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField sparseGe (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«tctotal» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 48)), .Full)
+
+kernel_rfl field_statsCanupdates : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField sparseGe (Cfrontend.Ctypes.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr) dense.id.«canupdates» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 56)), .Full)
+
+kernel_rfl field_dIsautom : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField sparseGe (Cfrontend.Ctypes.Tstruct dense.id.«_1027» Cfrontend.Ctypes.noattr) dense.id.«isautom» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 0)), .Full)
+
+kernel_rfl field_dTestcanlab : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField sparseGe (Cfrontend.Ctypes.Tstruct dense.id.«_1027» Cfrontend.Ctypes.noattr) dense.id.«testcanlab» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 8)), .Full)
+
+kernel_rfl field_dUpdatecan : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField sparseGe (Cfrontend.Ctypes.Tstruct dense.id.«_1027» Cfrontend.Ctypes.noattr) dense.id.«updatecan» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 16)), .Full)
+
+kernel_rfl field_dRefine : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField sparseGe (Cfrontend.Ctypes.Tstruct dense.id.«_1027» Cfrontend.Ctypes.noattr) dense.id.«refine» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 24)), .Full)
+
+kernel_rfl field_dRefine1 : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField sparseGe (Cfrontend.Ctypes.Tstruct dense.id.«_1027» Cfrontend.Ctypes.noattr) dense.id.«refine1» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 32)), .Full)
+
+kernel_rfl field_dCheapautom : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField sparseGe (Cfrontend.Ctypes.Tstruct dense.id.«_1027» Cfrontend.Ctypes.noattr) dense.id.«cheapautom» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 40)), .Full)
+
+kernel_rfl field_dTargetcell : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
+    Exec.lvalOfField sparseGe (Cfrontend.Ctypes.Tstruct dense.id.«_1027» Cfrontend.Ctypes.noattr) dense.id.«targetcell» (.Vptr b ofs) =
+      some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 48)), .Full)
+
 end SparseEnv
 
 /-- The sparse program's blocks. -/
@@ -756,5 +832,24 @@ end SparseEnv
   var_invarsuclevel := SparseEnv.var_invarsuclevel
   var_killRequest := SparseEnv.var_killRequest
   distinct := of_decide_eq_true SparseEnv.distinct
+  field_tcnodeNext := SparseEnv.field_tcnodeNext
+  field_tcnodeTcell := SparseEnv.field_tcnodeTcell
+  field_statsGrpsize1 := SparseEnv.field_statsGrpsize1
+  field_statsGrpsize2 := SparseEnv.field_statsGrpsize2
+  field_statsNumorbits := SparseEnv.field_statsNumorbits
+  field_statsNumgenerators := SparseEnv.field_statsNumgenerators
+  field_statsErrstatus := SparseEnv.field_statsErrstatus
+  field_statsNumnodes := SparseEnv.field_statsNumnodes
+  field_statsNumbadleaves := SparseEnv.field_statsNumbadleaves
+  field_statsMaxlevel := SparseEnv.field_statsMaxlevel
+  field_statsTctotal := SparseEnv.field_statsTctotal
+  field_statsCanupdates := SparseEnv.field_statsCanupdates
+  field_dIsautom := SparseEnv.field_dIsautom
+  field_dTestcanlab := SparseEnv.field_dTestcanlab
+  field_dUpdatecan := SparseEnv.field_dUpdatecan
+  field_dRefine := SparseEnv.field_dRefine
+  field_dRefine1 := SparseEnv.field_dRefine1
+  field_dCheapautom := SparseEnv.field_dCheapautom
+  field_dTargetcell := SparseEnv.field_dTargetcell
 
 end NautyVerified.Program

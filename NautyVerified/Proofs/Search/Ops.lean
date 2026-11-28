@@ -1,3 +1,4 @@
+import NautyVerified.Program.Env
 import NautyVerified.Proofs.Search.Frame
 import NautyVerified.Logic.ForC
 import NautyVerified.Proofs.Alloc.Global
@@ -11,6 +12,9 @@ import NautyVerified.Proofs.Alloc.Global
 -/
 
 namespace NautyVerified.Proofs.Search
+
+variable {ge : CompCert4Lean.Cfrontend.Clight.genv} [E : NautyVerified.Program.NautyEnv ge]
+set_option linter.unusedSectionVars false
 
 open CompCert4Lean CompCert4Lean.Cfrontend.Clight CompCert4Lean.Cfrontend.Ctypes
 open CompCert4Lean.Common.Globalenvs
@@ -283,27 +287,34 @@ abbrev statsF (fld : ident) (ty : Cfrontend.Ctypes.type) : expr :=
   .Efield (.Ederef (.Evar dense.id.«nauty:stats» (tptr (Tstruct dense.id.«_1024» noattr)))
     (Tstruct dense.id.«_1024» noattr)) fld ty
 
-kernel_rfl fld_numorbits : ∀ (l : block) (o : Lib.Integers.ptrofs),
+theorem fld_numorbits : ∀ (l : block) (o : Lib.Integers.ptrofs),
   Exec.lvalOfField ge (Tstruct dense.id.«_1024» noattr) dense.id.numorbits (.Vptr l o) =
-    some (l, Ptrofs.add o (Ptrofs.repr (zOfInt 12)), .Full)
-kernel_rfl fld_numgenerators : ∀ (l : block) (o : Lib.Integers.ptrofs),
+    some (l, Ptrofs.add o (Ptrofs.repr (zOfInt 12)), .Full) :=
+  E.field_statsNumorbits
+theorem fld_numgenerators : ∀ (l : block) (o : Lib.Integers.ptrofs),
   Exec.lvalOfField ge (Tstruct dense.id.«_1024» noattr) dense.id.numgenerators (.Vptr l o) =
-    some (l, Ptrofs.add o (Ptrofs.repr (zOfInt 16)), .Full)
-kernel_rfl fld_numnodes : ∀ (l : block) (o : Lib.Integers.ptrofs),
+    some (l, Ptrofs.add o (Ptrofs.repr (zOfInt 16)), .Full) :=
+  E.field_statsNumgenerators
+theorem fld_numnodes : ∀ (l : block) (o : Lib.Integers.ptrofs),
   Exec.lvalOfField ge (Tstruct dense.id.«_1024» noattr) dense.id.numnodes (.Vptr l o) =
-    some (l, Ptrofs.add o (Ptrofs.repr (zOfInt 24)), .Full)
-kernel_rfl fld_numbadleaves : ∀ (l : block) (o : Lib.Integers.ptrofs),
+    some (l, Ptrofs.add o (Ptrofs.repr (zOfInt 24)), .Full) :=
+  E.field_statsNumnodes
+theorem fld_numbadleaves : ∀ (l : block) (o : Lib.Integers.ptrofs),
   Exec.lvalOfField ge (Tstruct dense.id.«_1024» noattr) dense.id.numbadleaves (.Vptr l o) =
-    some (l, Ptrofs.add o (Ptrofs.repr (zOfInt 32)), .Full)
-kernel_rfl fld_maxlevel : ∀ (l : block) (o : Lib.Integers.ptrofs),
+    some (l, Ptrofs.add o (Ptrofs.repr (zOfInt 32)), .Full) :=
+  E.field_statsNumbadleaves
+theorem fld_maxlevel : ∀ (l : block) (o : Lib.Integers.ptrofs),
   Exec.lvalOfField ge (Tstruct dense.id.«_1024» noattr) dense.id.maxlevel (.Vptr l o) =
-    some (l, Ptrofs.add o (Ptrofs.repr (zOfInt 40)), .Full)
-kernel_rfl fld_tctotal : ∀ (l : block) (o : Lib.Integers.ptrofs),
+    some (l, Ptrofs.add o (Ptrofs.repr (zOfInt 40)), .Full) :=
+  E.field_statsMaxlevel
+theorem fld_tctotal : ∀ (l : block) (o : Lib.Integers.ptrofs),
   Exec.lvalOfField ge (Tstruct dense.id.«_1024» noattr) dense.id.tctotal (.Vptr l o) =
-    some (l, Ptrofs.add o (Ptrofs.repr (zOfInt 48)), .Full)
-kernel_rfl fld_canupdates : ∀ (l : block) (o : Lib.Integers.ptrofs),
+    some (l, Ptrofs.add o (Ptrofs.repr (zOfInt 48)), .Full) :=
+  E.field_statsTctotal
+theorem fld_canupdates : ∀ (l : block) (o : Lib.Integers.ptrofs),
   Exec.lvalOfField ge (Tstruct dense.id.«_1024» noattr) dense.id.canupdates (.Vptr l o) =
-    some (l, Ptrofs.add o (Ptrofs.repr (zOfInt 56)), .Full)
+    some (l, Ptrofs.add o (Ptrofs.repr (zOfInt 56)), .Full) :=
+  E.field_statsCanupdates
 
 theorem unsigned_add_off (o : Lib.Integers.ptrofs) {off : Int} (h0 : 0 ≤ off)
     (h1 : intOfZ (Ptrofs.unsigned o) + off < 2 ^ 64) :
@@ -329,10 +340,10 @@ theorem eval_statsF {e : env} {le : temp_env} {m : mem} {S : SLoc} {fld : ident}
     (hfld : ∀ l o, Exec.lvalOfField ge (Tstruct dense.id.«_1024» noattr) fld (.Vptr l o) =
       some (l, Ptrofs.add o (Ptrofs.repr (zOfInt off)), .Full))
     (hacc : Cfrontend.Ctypes.access_mode ty = .By_value chunk)
-    (hp : PtrAt m Block.stats (.Vptr S.bst S.sofs)) (h0 : 0 ≤ off) (h1 : S.sb + off < 2 ^ 64)
+    (hp : PtrAt m E.stats (.Vptr S.bst S.sofs)) (h0 : 0 ≤ off) (h1 : S.sb + off < 2 ^ 64)
     (hf : FieldAt m chunk S.bst (S.sb + off) v) :
     Exec.evalExpr ge e le m (statsF fld ty) = some v := by
-  simp only [Exec.evalExpr, Exec.lvalOfVar, hge, find_stats, typeof, Exec.derefLoc]
+  simp only [Exec.evalExpr, Exec.lvalOfVar, hge, E.find_stats, typeof, Exec.derefLoc]
   simp only [hacc]
   simp only [Cfrontend.Ctypes.access_mode, Mem.loadv,
     show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl, Alloc.Mptr_eq, hp.load, hfld]
@@ -347,7 +358,7 @@ theorem wp_statsStore {f : function} {Q : Post} {e : env} {le : temp_env} {m : m
     (hfld : ∀ l o, Exec.lvalOfField ge (Tstruct dense.id.«_1024» noattr) fld (.Vptr l o) =
       some (l, Ptrofs.add o (Ptrofs.repr (zOfInt off)), .Full))
     (hacc : Cfrontend.Ctypes.access_mode ty = .By_value chunk)
-    (hp : PtrAt m Block.stats (.Vptr S.bst S.sofs)) (h0 : 0 ≤ off) (h1 : S.sb + off < 2 ^ 64)
+    (hp : PtrAt m E.stats (.Vptr S.bst S.sofs)) (h0 : 0 ≤ off) (h1 : S.sb + off < 2 ^ 64)
     (hw : Mem.valid_access m chunk S.bst (zOfInt (S.sb + off)) .Writable)
     {rhs : expr} {w w' : val} (hr : Exec.evalExpr ge e le m rhs = some w)
     (hc : Cfrontend.Cop.sem_cast w (typeof rhs) ty m = some w')
@@ -357,7 +368,7 @@ theorem wp_statsStore {f : function} {Q : Post} {e : env} {le : temp_env} {m : m
   obtain ⟨m', hst⟩ := Mem.valid_access_store _ _ _ _ w' hw
   apply wp_assign_eval
   simp only [hr, show typeof (statsF fld ty) = ty from rfl, hc]
-  simp only [Exec.evalLvalue, Exec.evalExpr, Exec.lvalOfVar, hge, find_stats, Exec.derefLoc,
+  simp only [Exec.evalLvalue, Exec.evalExpr, Exec.lvalOfVar, hge, E.find_stats, Exec.derefLoc,
     Exec.assignLoc]
   simp only [hacc]
   simp only [Cfrontend.Ctypes.access_mode, Mem.loadv,
