@@ -114,6 +114,7 @@ import NautyVerified.Proofs.Top.NautyStats
 import NautyVerified.Proofs.Top.NautyWork
 import NautyVerified.Proofs.Top.NautyRoot
 import NautyVerified.Proofs.Top.NautyPost
+import NautyVerified.Proofs.Top.Freedyn
 import NautyVerified.Proofs.Search.Node.Spec
 import NautyVerified.Proofs.Search.Node.OtherHex
 import NautyVerified.Proofs.Search.Node.Rebuild
