@@ -11,6 +11,8 @@ if (rtnlevel < level) return rtnlevel;
 `wp_nodeProcess`: with HexGraphIso's `classify` then `leafExit` giving the
 exit `r.1`, an internal node (`.done`) continues with the rest of the body, and
 every other exit returns its target, which lies below `level`.
+`wp_nodeProcessG` is the same over `SearchAtG D` for `processnodeSpecG`, with
+`O.classify` (`procExitO`, `procWordsO`).
 -/
 
 namespace NautyVerified.Proofs.Search
@@ -139,5 +141,120 @@ theorem wp_nodeProcess {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_
     revert this
     rcases Mem.free_list m' (blocks_of_env ge e) with _ | m'' <;> simp [Post.after]
   · exact absurd hx hnf
+
+section Generic
+
+open NautyVerified.Proofs.Dispatch (Ops DispatchRep)
+
+variable {ge : genv} [E : NautyEnv ge] {O : Ops} {D : DispatchRep ge O}
+
+/-- `procExit` for `O`: `O.classify`, then `leafExit` (`processnodeSpecG`). -/
+abbrev procExitO (O : Ops) {n : Nat} (G : O.Gr n) (level numcells : Nat)
+    (st : SearchState n (O.Canon n)) : Exit × SearchState n (O.Canon n) :=
+  leafExit (O.classify G level numcells st).1 level (O.classify G level numcells st).2
+
+/-- `procWords` for `O`. -/
+abbrev procWordsO (O : Ops) {n : Nat} (G : O.Gr n) (level numcells : Nat)
+    (st : SearchState n (O.Canon n)) : List Int :=
+  if (procExitO O G level numcells st).2.numgenerators = st.numgenerators + 1 then
+    genWords (procExitO O G level numcells st).2.workperm n else []
+
+/-- `wp_nodeProcess` over `SearchAtG D`, for `processnodeSpecG`. -/
+theorem wp_nodeProcessG {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
+    {S : SLoc} {gl : D.GLoc} {cl : D.CLoc} {G : O.Gr n}
+    {st : SearchState n (O.Canon n)} {level nc : Nat} {rest : statement}
+    (h : SearchAtG D m S gl cl G st false false)
+    (hP : Satisfies xi ge (.Internal dense.fn.«nauty:processnode»)
+      (processnodeSpecG D xi S gl cl G st level nc))
+    (hcb : AutomCb xi S.bUA) (hl1 : 1 ≤ level) (hln : level ≤ n) (hncl : nc ≤ n)
+    (hlok : LeafOkG st) (hval : ∀ z ∈ S.blocksG D gl cl, Mem.valid_block m z)
+    (hua : Mem.perm m S.bUA (zOfInt 0) .Cur .Nonempty)
+    (hfit : st.compCanon = 0 → O.Fits G (O.rows st.canong) st.canonlab st.samerows)
+    {bnc : block} (hen : PTree.get dense.id.numcells e = some (bnc, tint))
+    (hncv : Mem.load .Mint32 m bnc (zOfInt 0) = some (.Vint (ir nc)))
+    (hge : PTree.get dense.id.«nauty:processnode» e = none)
+    (hlab : PTree.get dense.id.«lab» le = some (.Vptr S.bl S.lofs))
+    (hptn : PTree.get dense.id.«ptn» le = some (.Vptr S.bp S.pofs))
+    (hlev : PTree.get dense.id.«level» le = some (.Vint (ir level)))
+    (hfret : f.fn_return = tint)
+    (hlt : ∀ tg s, (procExitO O G level nc st).1 = .unwind tg s → tg < level)
+    (hnf : (procExitO O G level nc st).1 ≠ .fuel)
+    (hRet : ∀ t m', (procExitO O G level nc st).1 ≠ .done →
+      SearchAtG D m' S gl cl G (procExitO O G level nc st).2 false
+        (exitValue level (procExitO O G level nc st).1).2 →
+      Writes t (procWordsO O G level nc st) → SFrameG D m m' S gl cl →
+      (∀ z, IsWorkG D m' z → IsWorkG D m z ∨ ¬ Mem.valid_block m z) →
+      match Mem.free_list m' (blocks_of_env ge e) with
+      | some m'' => Q.ret t (.Vint (ir (exitValue level (procExitO O G level nc st).1).1)) m''
+      | none => False)
+    (hDone : ∀ t le' m', (procExitO O G level nc st).1 = .done →
+      SearchAtG D m' S gl cl G (procExitO O G level nc st).2 false false →
+      Writes t (procWordsO O G level nc st) → SFrameG D m m' S gl cl →
+      (∀ z, IsWorkG D m' z → IsWorkG D m z ∨ ¬ Mem.valid_block m z) →
+      (∀ x, x ≠ idOf 712 → x ≠ dense.id.«rtnlevel» → PTree.get x le' = PTree.get x le) →
+      Wp xi ge f rest (Q.after t) e le' m') :
+    Wp xi ge f (.Ssequence procCall (.Ssequence (Set.sk earlyRet) rest)) Q e le m := by
+  have hnl := h.nlt
+  wp_step; wp_step; wp_step; wp_step
+  refine wp_call (vf := .Vptr E.processnodeFn Ptrofs.zero) (targs := [tptr tint, tptr tint, tint, tint])
+    (tres := tint) (cc := Common.AST.cc_default)
+    (vargs := [.Vptr S.bl S.lofs, .Vptr S.bp S.pofs, .Vint (ir level), .Vint (ir nc)])
+    (.Internal dense.fn.«nauty:processnode») _ hP rfl ?_ ?_
+    (by simp [Common.Globalenvs.Genv.find_funct, E.funct_processnodeFn]) rfl
+    ⟨rfl, h, hcb, hl1, hln, hncl, hlok, hval, hua, hfit⟩ ?_
+  · simp only [Exec.evalExpr, Exec.lvalOfVar, hge, E.find_processnodeFn, Exec.derefLoc,
+      Cfrontend.Ctypes.access_mode]
+  · simp only [Exec.evalExprlist, Exec.evalExpr, hlab, hptn, hlev, typeof, cop, Exec.lvalOfVar, hen,
+      Exec.derefLoc, Cfrontend.Ctypes.access_mode, Mem.loadv,
+      show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl, hncv, ite_true]
+  rintro t v m' ⟨hv, hS', hW, hF⟩
+  subst hv
+  simp only [set_opttemp]
+  have hle : ∀ (v : val) x, x ≠ idOf 712 → x ≠ dense.id.«rtnlevel» →
+      PTree.get x (PTree.set dense.id.rtnlevel v (PTree.set (idOf 712) v le)) = PTree.get x le :=
+    fun v x h1 h2 => by rw [temps_gso _ _ h2, temps_gso _ _ h1]
+  have hrl : ∀ v, PTree.get dense.id.«rtnlevel» (PTree.set dense.id.rtnlevel v
+      (PTree.set (idOf 712) v le)) = some v := fun v => temps_gss _ _ _
+  have hlev' : ∀ v, PTree.get dense.id.level (PTree.set dense.id.rtnlevel v
+      (PTree.set (idOf 712) v le)) = some (.Vint (ir level)) :=
+    fun v => (hle v dense.id.level (by decide) (by decide)).trans hlev
+  have hW' := hW
+  have hS'' := hS'
+  rcases hx : (leafExit (O.classify G level nc st).1 level (O.classify G level nc st).2).1 with
+    _ | ⟨tg, s⟩ | _
+  · -- internal node: continue
+    simp only [exitValue]
+    apply wp_set_eval
+    simp only [Exec.evalExpr, temps_gss]
+    wp_step; wp_step; wp_step
+    apply wp_if_eval
+    simp only [Exec.evalExpr, hrl, hlev', Refine.tv, typeof, cop]
+    rw [ir_lt (a := (level : Int)) (b := level) ⟨by omega, by omega⟩ ⟨by omega, by omega⟩]
+    simp only [Int.lt_irrefl, decide_false, Bool.false_eq_true, ite_false]
+    apply wp_skip
+    simp only [seqPost, Post.after, E0_append]
+    rw [hx] at hS''
+    exact hDone t _ m' hx hS'' hW' hF.1 hF.2 fun x h1 h2 => hle _ x h1 h2
+  · -- an unwind below this level: return its target
+    have htg := hlt tg s hx
+    simp only [exitValue]
+    apply wp_set_eval
+    simp only [Exec.evalExpr, temps_gss]
+    wp_step; wp_step; wp_step
+    apply wp_if_eval
+    simp only [Exec.evalExpr, hrl, hlev', Refine.tv, typeof, cop]
+    rw [ir_lt (a := (tg : Int)) (b := level) ⟨by omega, by omega⟩ ⟨by omega, by omega⟩]
+    simp only [show (tg : Int) < level by omega, decide_true, ite_true]
+    wp_step; wp_step
+    apply wp_return_some_eval
+    simp only [Exec.evalExpr, hrl, Refine.tv, typeof, hfret, cop]
+    have := hRet t m' (by rw [hx]; simp) hS' hW' hF.1 hF.2
+    rw [hx] at this
+    simp only [exitValue] at this
+    revert this
+    rcases Mem.free_list m' (blocks_of_env ge e) with _ | m'' <;> simp [Post.after]
+  · exact absurd hx hnf
+
+end Generic
 
 end NautyVerified.Proofs.Search
