@@ -89,6 +89,7 @@ theorem DynAt.keep {m m' : mem} {bp bs : block} {c cap : Nat} {b : block}
     bsW := hu.access _ _ _ _ hs h.bsW
     bpW := hu.access _ _ _ _ hp h.bpW
     ptr := fun hc => by rw [hu.load _ _ _ hp]; exact h.ptr hc
-    mal := fun hc => (h.mal hc).keep (hk hc) }
+    mal := fun hc => (h.mal hc).keep (hk hc)
+    null := fun hc => by rw [hu.load _ _ _ hp]; exact h.null hc }
 
 end NautyVerified.Proofs.Alloc

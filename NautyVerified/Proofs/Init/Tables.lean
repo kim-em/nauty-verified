@@ -181,6 +181,15 @@ theorem writable8 {m : mem} (hm : Genv.init_mem prog = some m) {b : block} {l : 
   rw [hp, hi, hl] at h1
   exact ⟨h1, ⟨zOfInt 0, rfl⟩⟩
 
+/-- A non-volatile global initialised as 8 bytes of space reads as `NULL`. -/
+theorem space8 {m : mem} (hm : Genv.init_mem prog = some m) {b : block} {ro : Bool}
+    (h : info b = some ([.Init_space (zOfInt 8)], ro, false)) :
+    Mem.load .Mint64 m b (zOfInt 0) = some Vnullptr := by
+  obtain ⟨v, hv, hi, -, hvol⟩ := var_of_map h
+  have h2 := (var_init hm hv hvol).2
+  rw [hi] at h2
+  exact h2.1 .Mint64 (zOfInt 0) (by decide) (by decide) ⟨zOfInt 0, rfl⟩
+
 /-- Before the first `DYNALLOC1`, a `DYNALLSTAT` pair has capacity 0 (its
 `_sz` global is initialised to 0 and its pointer global is 8 bytes of
 space), so `DynAt` holds for any block. -/
@@ -200,6 +209,8 @@ theorem dynAt_zero {m : mem} (hm : Genv.init_mem prog = some m) {bp bs : block} 
   bne := fun h => absurd h (Nat.lt_irrefl 0)
   small := by simp
   capLt := by decide
+  null := fun _ => space8 hm hp
+
 
 kernel_rfl info_nautilWorkpermSz : info Block.nautilWorkpermSz = some ([.Init_int64 (lr 0)], false, false)
 kernel_rfl info_nautilWorkperm : info Block.nautilWorkperm = some ([.Init_space (zOfInt 8)], false, false)

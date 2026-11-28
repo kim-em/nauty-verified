@@ -129,7 +129,8 @@ theorem wp_dynalloc1G {e : env} {f : function} {Q : Post} {le : temp_env} {m : m
         ne := hD.ne
         bne := fun _ => ⟨hbs'.symm, hbp'.symm⟩
         small := hcn
-        capLt := hn }
+        capLt := hn
+        null := fun h0 => absurd h0 (by omega) }
     have hnew : ¬ Mem.valid_block m b' := by
       intro hv
       apply hfr.new

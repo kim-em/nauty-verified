@@ -85,7 +85,7 @@ abbrev dynalloc1 (gs gp : Common.AST.ident) (elt : Cfrontend.Ctypes.type) (szE :
 
 /-- A `DYNALLSTAT` pair: the capacity global (block `bs`) holds `cap`; when
 `cap > 0` the pointer global (block `bp`) points to a block `b` that `malloc`
-made for `c * cap` bytes. -/
+made for `c * cap` bytes; when `cap = 0` the pointer global holds `NULL`. -/
 structure DynAt (m : mem) (bp bs : block) (c cap : Nat) (b : block) : Prop where
   capLd : Mem.load .Mint64 m bs (zOfInt 0) = some (.Vlong (lr cap))
   bsW : Mem.valid_access m .Mint64 bs (zOfInt 0) .Writable
@@ -96,6 +96,8 @@ structure DynAt (m : mem) (bp bs : block) (c cap : Nat) (b : block) : Prop where
   bne : 0 < cap → b ≠ bs ∧ b ≠ bp
   small : c * cap < 2 ^ 62
   capLt : cap < 2147483648
+  /-- At capacity 0 the pointer global holds `NULL`, so `free` of it is a no-op. -/
+  null : cap = 0 → Mem.load .Mint64 m bp (zOfInt 0) = some Vnullptr
 
 theorem valid_of_access {m : mem} {chunk : memory_chunk} {b : block} {ofs : Z} {p : permission}
     (h : Mem.valid_access m chunk b ofs p) : Mem.valid_block m b := by
@@ -275,7 +277,8 @@ theorem wp_dynalloc1' {e : env} {f : function} {Q : Post} {le : temp_env} {m : m
         ne := hD.ne
         bne := fun _ => ⟨hbs'.symm, hbp'.symm⟩
         small := hcn
-        capLt := hn }
+        capLt := hn
+        null := fun h0 => absurd h0 (by omega) }
     have hnew : ¬ Mem.valid_block m b' := by
       intro hv
       apply hfr.new
