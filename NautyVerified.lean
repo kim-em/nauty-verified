@@ -176,6 +176,7 @@ import NautyVerified.Proofs.Search.Processnode.Case3
 import NautyVerified.Proofs.Search.Processnode.Tail
 import NautyVerified.Proofs.Search.Processnode.Finish
 import NautyVerified.Proofs.Search.Processnode.Switch
+import NautyVerified.Proofs.Search.Processnode.Satisfies
 import NautyVerified.Proofs.Refine.Frame
 import NautyVerified.Proofs.Refine.Trivial
 import NautyVerified.Proofs.Refine.Pop

@@ -391,6 +391,19 @@ Conventions settled while doing these:
   reallocate the work arrays (`SStep`, `WorkMono`, `WorkAt.next`,
   `SearchAt.rebuildW`); `Spec/Processnode.lean` restates `classify` in the
   C's order.
+- `processnode_satisfies` (`Proofs/Search/Processnode/`): nauty.c's
+  `processnode` is `classify` then `leafExit`. `processnodeSpec` asks for
+  `LeafOk st` (first and best labellings are permutations, `0 ≤ eqlevCanon`,
+  `1 ≤ noncheaplevel`, `cosetindex < n`), for the blocks of `S` to be valid
+  (so the local `sr` is none of them) and for `userautomproc`'s block to have
+  a permission at offset 0 (the C compares it with `NULL`); its postcondition
+  adds that the work blocks in use afterwards were in use before or are new
+  (`WorkMono`), which composing frames across calls needs. Callee
+  specifications changed for it: `fmpermSpec` and `fmptnSpec` allow `fix` and
+  `mcr` in one block at disjoint ranges (`Logic/Rest.lean`: `Apart`, `Rest`),
+  since nauty passes `fmptr` and `fmptr + M` in the workspace;
+  `testcanlabSpec` keeps the block holding `samerows` (`Keep`), so `sr` can
+  be freed.
 
 - `densenauty` and `nauty()` (`Proofs/Top/`). `densenauty_satisfies`
   proves the harness's `densenautySpec` from `nauty` against `nautySpec`
