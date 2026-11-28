@@ -306,6 +306,34 @@ theorem nodeSpec_ofG {xi : ExternalCalls} {fd : fundef} {n : Nat}
     exact ⟨hv, hs'.dense hs.gw, hem, ⟨chain', hc', hok'.dense, h1, h2, h3⟩, hf.dense,
       workMonoG_dense hw, hu⟩
 
+theorem NodeFrame.toG {m m' : mem} {S : SLoc} {chain : List (block × block)} {level : Nat}
+    (h : NodeFrame m m' S chain level) : NodeFrameG denseRep m m' S () () chain level :=
+  ⟨h.1.mono fun _ hz => by
+    rcases hz with hz | hz | hz | hz
+    · exact .inl (SLoc.chgG_dense.2 hz)
+    · exact .inr (.inl hz)
+    · exact .inr (.inr (.inl (isWork_dense.2 hz)))
+    · exact .inr (.inr (.inr hz)), h.2⟩
+
+/-- The dense node specification gives the generic one at `denseRep`, given the
+graph's words (memory-independent, from the caller's `SearchAt`). -/
+theorem nodeSpec_toG {xi : ExternalCalls} {fd : fundef} {n : Nat}
+    {NodeOk : Bool → Nat → Nat → Search n → Prop} {Em : Bool → Nat → Nat → Search n → List Int}
+    {first : Bool} {S : SLoc} {ctx : Ctx n} {st : Search n} {level numcells : Nat}
+    {chain : List (block × block)}
+    (hgw : ∀ v < n, SetRep (fun w => bv64 (S.gw (S.M * v + w))) S.M ctx.g[v]!)
+    (h : Satisfies xi Program.ge fd (nodeSpec xi NodeOk Em first S ctx st level numcells chain)) :
+    Satisfies xi Program.ge fd
+      (nodeSpecG denseRep xi NodeOk Em first S () () ctx st level numcells chain) := by
+  refine Satisfies.mono ?_ ?_ h
+  · rintro _ _ ⟨ha, hs, hc, hok, h1, hu, h2, h3, h4, h5, h6, h7⟩
+    exact ⟨ha, hs.dense hgw, hc, hok.dense, h1, hu, h2, h3, h4, h5, h6, h7⟩
+  · rintro _ _ _ _ _ - hp
+    simp only [nodeSpecG, hexNodeG_dense]
+    obtain ⟨hv, hs', hem, ⟨chain', hc', hok', h1, h2, h3⟩, hf, hw, hu⟩ := hp
+    exact ⟨hv, hs'.toG, hem, ⟨chain', hc', hok'.toG, h1, h2, h3⟩, hf.toG,
+      fun z hz => (hw z (isWork_dense.1 hz)).imp isWork_dense.2 id, hu⟩
+
 end Dense
 
 end NautyVerified.Proofs.Search
