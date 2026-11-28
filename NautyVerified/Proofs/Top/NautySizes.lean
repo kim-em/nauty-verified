@@ -4,7 +4,7 @@ import NautyVerified.Proofs.Search.Ops
 /-!
 # `nauty()`'s size checks
 
-`wp_tSizes`: for `0 < n ≤ 64 m` and `m` small, neither size check fires and
+`wp_tSizes`: in any program, for `0 < n ≤ 64 m` and `m` small, neither size check fires and
 the graph is not empty, so `nauty()` goes on to `tMain`.
 -/
 
@@ -20,6 +20,8 @@ open NautyVerified NautyVerified.Logic NautyVerified.Program NautyVerified.Word 
 open NautyVerified.Source
 
 set_option linter.unusedSimpArgs false
+
+variable {ge : genv}
 
 theorem div_inf (ce : composite_env) (m : mem) :
     Cfrontend.Cop.sem_binary_operation ce .Odiv (.Vint (Lib.Integers.Int.repr (zOfInt 2000000002))) tint
