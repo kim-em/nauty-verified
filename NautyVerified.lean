@@ -145,6 +145,7 @@ import NautyVerified.Proofs.Search.Node.Long
 import NautyVerified.Proofs.Search.Node.Em
 import NautyVerified.Proofs.Search.Node.Child
 import NautyVerified.Proofs.Search.Node.LoopShape
+import NautyVerified.Proofs.Search.Node.NodePrologue
 import NautyVerified.Proofs.Search.Node.OtherFrame
 import NautyVerified.Proofs.Search.Node.OtherIter
 import NautyVerified.Proofs.Search.Node.OtherLoop
