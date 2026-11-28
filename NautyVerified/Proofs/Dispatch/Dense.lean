@@ -1,5 +1,4 @@
-import NautyVerified.Proofs.Dispatch.Spec
-import NautyVerified.Proofs.Alloc.Slots
+import NautyVerified.Proofs.Dispatch.DenseRep
 import NautyVerified.Proofs.Isautom.Satisfies
 import NautyVerified.Proofs.Testcanlab.Satisfies
 import NautyVerified.Proofs.Updatecan.Satisfies
@@ -14,13 +13,8 @@ import NautyVerified.Spec.Processnode
 /-!
 # naugraph.c's dispatch procedures
 
-`denseRep`: `dispatch_graph`'s procedures in the dense program, the graph as
-its setword rows (`GraphAt`), the canonical store as `canong`'s setword rows
-(`RowsAt`), the scratch state as naugraph.c's `workperm`, `workset` and
-`bucket` pairs (`denseSlots`), the tables as naugraph.c's `bit` and
-`bytecount`, the workspace as naugraph.c's `dnwork` pair.
-
-`dense`: with the specifications, from the proofs of naugraph.c's procedures.
+`dense`: `denseRep` (`Dispatch/DenseRep.lean`) with the specifications, from
+the proofs of naugraph.c's procedures.
 -/
 
 namespace NautyVerified.Proofs.Dispatch
@@ -45,158 +39,6 @@ local notation "WSS" => Block.naugraphWorksetSz
 local notation "BK" => Block.naugraphBucket
 local notation "BKS" => Block.naugraphBucketSz
 
-/-- naugraph.c's scratch pairs `workperm`, `workset`, `bucket`. -/
-def denseSlots : List Slot := [(WP, WPS, 4), (WS, WSS, 8), (BK, BKS, 4)]
-
-/-- The globals naugraph.c's procedures write. -/
-def denseWGlobs : List block := [WP, WPS, WS, WSS, BK, BKS]
-
-/-- naugraph.c's globals. -/
-def denseGlobs : List block :=
-  denseWGlobs ++ [Block.naugraphBit, Block.naugraphBytecount, Block.naugraphDnwork,
-    Block.naugraphDnworkSz]
-
-kernel_rfl denseGlobs_distinct_dec : decide (denseGlobs.Pairwise (· ≠ ·)) = true
-kernel_rfl denseGlobs_env_dec :
-  decide (∀ z ∈ denseGlobs, z ∉ (NautyEnv.dense.blocks)) = true
-
-/-- What naugraph.c's scratch blocks avoid: its globals and the shared ones. -/
-abbrev denseL : List block := denseGlobs ++ NautyEnv.dense.blocks
-
-/-- The dense graph `G`'s rows at `bg`. -/
-def denseGraphRep {n : Nat} (m : mem) (bg : block) (gofs : ptrofs) (G : Ctx n) (M : Nat) : Prop :=
-  ∃ gw, GraphAt m bg gofs gw G.g M
-
-/-- `canong`'s first `sr` rows. -/
-def denseCanonRep {n : Nat} (m : mem) (bc : block) (cofs : ptrofs) (M : Nat) (c : Array (VSet n))
-    (sr : Nat) : Prop :=
-  ∃ cw, RowsAt m bc cofs cw c sr M
-
-theorem arrayAt_valid {m : mem} {chunk : memory_chunk} {b : block} {base : Int} {vals : Nat → val}
-    {k : Nat} (h : ArrayAt m chunk b base vals k) (hk : 0 < k) : Mem.valid_block m b :=
-  Alloc.valid_of_access (h.writable 0 hk)
-
-/-- `dispatch_graph`'s representation. -/
-def denseRep : DispatchRep Program.ge denseOps where
-  isautom := Search.Block.isautomFn
-  testcanlab := Search.Block.testcanlabFn
-  updatecan := Search.Block.updatecanFn
-  refine := Refine.Block.refine
-  refine1 := Refine.Block.refine1
-  cheapautom := Search.Block.cheapautomFn
-  targetcell := Search.Block.targetcellFn
-  freedyn := Search.Block.naugraphFreedyn
-  check := Top.Block.naugraphCheck
-  init := Vnullptr
-  wsP := Block.naugraphDnwork
-  wsS := Block.naugraphDnworkSz
-  globs := denseGlobs
-  wglobs := denseWGlobs
-  Work m := SlotsOk m denseSlots denseL ∧ ∀ z ∈ denseL, Mem.valid_block m z
-  IsWork m z := InUse m denseSlots z
-  Tables m := BitTable m Block.naugraphBit ∧ BytecountTable m
-  GraphRep := denseGraphRep
-  CanonRep := denseCanonRep
-  globs_distinct := of_decide_eq_true denseGlobs_distinct_dec
-  globs_env := of_decide_eq_true denseGlobs_env_dec
-  wglobs_sub z hz := List.mem_append_left _ hz
-  wsP_mem := by simp [denseGlobs]
-  wsS_mem := by simp [denseGlobs]
-  wsP_nw := by decide
-  wsS_nw := by decide
-  isWork_valid h := h.valid
-  isWork_globs hw hz := by
-    have := hw.1.notin _ hz
-    simp only [List.mem_append, not_or] at this
-    exact this
-  work_unch hw hu hg hk hv :=
-    let h := hw.1.unch hu (fun p hp => by
-      simp only [denseSlots, List.mem_cons, List.mem_nil_iff, or_false] at hp
-      rcases hp with rfl | rfl | rfl <;> exact ⟨hg _ (by simp [denseWGlobs]), hg _ (by simp [denseWGlobs])⟩) hk
-    ⟨⟨h.1, fun z hz => hv z (hw.2 z hz)⟩, h.2⟩
-  tables_unch ht hu hg := by
-    refine ⟨fun i hi => ?_, fun i hi => ?_⟩
-    · rw [hu.load _ _ _ (hg _ (by simp [denseGlobs]) (by decide))]; exact ht.1 i hi
-    · rw [hu.load _ _ _ (hg _ (by simp [denseGlobs]) (by decide))]; exact ht.2 i hi
-  graph_unch h hu hb := let ⟨gw, hg⟩ := h; ⟨gw, hg.arr.unch hu hb, hg.rep⟩
-  canon_unch h hu hb := let ⟨cw, hc⟩ := h; ⟨cw, hc.arr.unch hu hb, hc.rep⟩
-  canon_le h hle := let ⟨cw, hc⟩ := h; ⟨cw, hc.arr, fun v hv => hc.rep v (Nat.lt_of_lt_of_le hv hle)⟩
-  graph_valid h hn hM := let ⟨_, hg⟩ := h; arrayAt_valid hg.arr (Nat.mul_pos hM hn)
-  canon_valid h hn hM := let ⟨_, hc⟩ := h; arrayAt_valid hc.arr (Nat.mul_pos hM hn)
-
-
-/-! ### naugraph.c's scratch pairs across a call -/
-
-theorem dense_dyn {m : mem} (hw : denseRep.Work m) :
-    (∃ c b, DynAt m WP WPS 4 c b) ∧ (∃ c b, DynAt m WS WSS 8 c b) ∧ (∃ c b, DynAt m BK BKS 4 c b) :=
-  ⟨hw.1.dyn (WP, WPS, 4) (by simp [denseSlots]), hw.1.dyn (WS, WSS, 8) (by simp [denseSlots]),
-    hw.1.dyn (BK, BKS, 4) (by simp [denseSlots])⟩
-
-theorem dense_inUseW {m : mem} {c : Nat} {b : block} (d : DynAt m WP WPS 4 c b) (hc : 0 < c) :
-    InUse m denseSlots b := ⟨(WP, WPS, 4), by simp [denseSlots], c, hc, d⟩
-theorem dense_inUseS {m : mem} {c : Nat} {b : block} (d : DynAt m WS WSS 8 c b) (hc : 0 < c) :
-    InUse m denseSlots b := ⟨(WS, WSS, 8), by simp [denseSlots], c, hc, d⟩
-theorem dense_inUseB {m : mem} {c : Nat} {b : block} (d : DynAt m BK BKS 4 c b) (hc : 0 < c) :
-    InUse m denseSlots b := ⟨(BK, BKS, 4), by simp [denseSlots], c, hc, d⟩
-
-/-- naugraph.c's scratch state after a call that reallocated its pairs, each to
-its old block or a new one, distinct new blocks. -/
-theorem denseWork_next {m m' : mem} (hw : denseRep.Work m)
-    (hv : ∀ z, Mem.valid_block m z → Mem.valid_block m' z)
-    {cW cS cB cW' cS' cB' : Nat} {bW bS bB bW' bS' bB' : block}
-    (dW : DynAt m WP WPS 4 cW bW) (dS : DynAt m WS WSS 8 cS bS) (dB : DynAt m BK BKS 4 cB bB)
-    (dW' : DynAt m' WP WPS 4 cW' bW') (dS' : DynAt m' WS WSS 8 cS' bS')
-    (dB' : DynAt m' BK BKS 4 cB' bB')
-    (rW : (cW' = cW ∧ bW' = bW) ∨ ¬ Mem.valid_block m bW')
-    (rS : (cS' = cS ∧ bS' = bS) ∨ ¬ Mem.valid_block m bS')
-    (rB : (cB' = cB ∧ bB' = bB) ∨ ¬ Mem.valid_block m bB')
-    (fWS : ¬ Mem.valid_block m bW' → ¬ Mem.valid_block m bS' → 0 < cW' → 0 < cS' → bW' ≠ bS')
-    (fWB : ¬ Mem.valid_block m bW' → ¬ Mem.valid_block m bB' → 0 < cW' → 0 < cB' → bW' ≠ bB')
-    (fSB : ¬ Mem.valid_block m bS' → ¬ Mem.valid_block m bB' → 0 < cS' → 0 < cB' → bS' ≠ bB') :
-    denseRep.Work m' ∧ ∀ z, denseRep.IsWork m' z → denseRep.IsWork m z ∨ ¬ Mem.valid_block m z := by
-  have hn : ∀ p ∈ denseSlots, Alloc.Slot.Next m m' p := by
-    intro p hp
-    simp only [denseSlots, List.mem_cons, List.mem_nil_iff, or_false] at hp
-    rcases hp with rfl | rfl | rfl
-    · exact Alloc.Slot.next_of dW dW' rW
-    · exact Alloc.Slot.next_of dS dS' rS
-    · exact Alloc.Slot.next_of dB dB' rB
-  have r := hw.1.next hw.2 hn (by
-    intro p hp q hq c c' z hc hc' dp dq hnv
-    simp only [denseSlots, List.mem_cons, List.mem_nil_iff, or_false] at hp hq
-    have eW : ∀ {c z}, 0 < c → DynAt m' WP WPS 4 c z → z = bW' ∧ 0 < cW' := fun hc d =>
-      ⟨dW'.same_block d (dW'.same_cap d ▸ hc), dW'.same_cap d ▸ hc⟩
-    have eS : ∀ {c z}, 0 < c → DynAt m' WS WSS 8 c z → z = bS' ∧ 0 < cS' := fun hc d =>
-      ⟨dS'.same_block d (dS'.same_cap d ▸ hc), dS'.same_cap d ▸ hc⟩
-    have eB : ∀ {c z}, 0 < c → DynAt m' BK BKS 4 c z → z = bB' ∧ 0 < cB' := fun hc d =>
-      ⟨dB'.same_block d (dB'.same_cap d ▸ hc), dB'.same_cap d ▸ hc⟩
-    rcases hp with rfl | rfl | rfl <;> rcases hq with rfl | rfl | rfl
-    · rfl
-    · obtain ⟨e1, h1⟩ := eW hc dp; obtain ⟨e2, h2⟩ := eS hc' dq
-      subst e1; exact absurd e2 (fWS hnv (e2 ▸ hnv) h1 h2)
-    · obtain ⟨e1, h1⟩ := eW hc dp; obtain ⟨e2, h2⟩ := eB hc' dq
-      subst e1; exact absurd e2 (fWB hnv (e2 ▸ hnv) h1 h2)
-    · obtain ⟨e1, h1⟩ := eS hc dp; obtain ⟨e2, h2⟩ := eW hc' dq
-      subst e1; exact absurd e2.symm (fWS (e2 ▸ hnv) hnv h2 h1)
-    · rfl
-    · obtain ⟨e1, h1⟩ := eS hc dp; obtain ⟨e2, h2⟩ := eB hc' dq
-      subst e1; exact absurd e2 (fSB hnv (e2 ▸ hnv) h1 h2)
-    · obtain ⟨e1, h1⟩ := eB hc dp; obtain ⟨e2, h2⟩ := eW hc' dq
-      subst e1; exact absurd e2.symm (fWB (e2 ▸ hnv) hnv h2 h1)
-    · obtain ⟨e1, h1⟩ := eB hc dp; obtain ⟨e2, h2⟩ := eS hc' dq
-      subst e1; exact absurd e2.symm (fSB (e2 ▸ hnv) hnv h2 h1)
-    · rfl)
-  exact ⟨⟨r.1, fun z hz => hv z (hw.2 z hz)⟩, r.2⟩
-
-/-- An unchanged pair's block is not new: the fresh-distinctness side condition. -/
-theorem fresh_l {m : mem} {bp bs : block} {k c c' : Nat} {b b' : block} (d : DynAt m bp bs k c b) :
-    ¬ Mem.valid_block m b → ¬ Mem.valid_block m b' → 0 < c → 0 < c' → b ≠ b' :=
-  fun hnv _ hc _ => absurd (Alloc.Malloced.valid (d.mal hc)) hnv
-
-theorem fresh_r {m : mem} {bp bs : block} {k c c' : Nat} {b b' : block} (d : DynAt m bp bs k c b) :
-    ¬ Mem.valid_block m b' → ¬ Mem.valid_block m b → 0 < c' → 0 < c → b' ≠ b :=
-  fun _ hnv _ hc => absurd (Alloc.Malloced.valid (d.mal hc)) hnv
-
 /-- A call's `Step`, from its frame and the scratch state after it. -/
 theorem denseStep {m m' : mem} {out : block → Prop}
     (hw' : denseRep.Work m' ∧ ∀ z, denseRep.IsWork m' z → denseRep.IsWork m z ∨ ¬ Mem.valid_block m z)
@@ -206,8 +48,8 @@ theorem denseStep {m m' : mem} {out : block → Prop}
     (hk : ∀ z, out z → Mem.valid_block m z → Keep m m' z) : denseRep.Step m m' out :=
   ⟨hu.mono hW, hv, hw'.1, hw'.2, hk⟩
 
-/-- A block of the shared environment is none of naugraph.c's scratch blocks in use. -/
-theorem dense_env_notWork {m : mem} (hw : denseRep.Work m) {z b : block} (hz : z ∈ NautyEnv.dense.blocks)
+/-- A shared table or nautil.c's `workperm` pair is none of naugraph.c's scratch blocks in use. -/
+theorem dense_env_notWork {m : mem} (hw : denseRep.Work m) {z b : block} (hz : z ∈ envAvoid)
     (hb : InUse m denseSlots b) : z ≠ b := by
   rintro rfl
   exact hw.1.notin _ hb (List.mem_append_right _ hz)
@@ -231,7 +73,7 @@ kernel_rfl type_freedynD : type_of_fundef (.Internal dense.fn.naugraph_freedyn) 
 
 theorem dense_isautom (xi : ExternalCalls) : denseRep.IsautomFn xi denseRep.isautom := by
   refine ⟨_, by simp [Genv.find_funct, denseRep, Search.funct_isautomFn], type_isautomD,
-    fun G bg gofs bpm pofs perm M => ?_⟩
+    fun G _ bg gofs bpm pofs perm M => ?_⟩
   refine Satisfies.of_pre fun args m ⟨hargs, hc, ⟨gw, hg⟩, hp, hps, _⟩ =>
     ⟨_, Isautom.isautom_satisfies bg gofs gw G.g bpm pofs perm M,
       ⟨hargs, hg, hp, hps, hc.tables.1, hc.etables.left, hc.M1, by have := hc.Mlt; omega, hc.nM⟩, ?_⟩
@@ -314,7 +156,7 @@ theorem new_ne {m : mem} {z b : block} (hz : Mem.valid_block m z) (hb : ¬ Mem.v
 
 theorem dense_testcanlab (xi : ExternalCalls) : denseRep.TestcanlabFn xi denseRep.testcanlab := by
   refine ⟨_, by simp [Genv.find_funct, denseRep, Search.funct_testcanlabFn], type_testcanlabD,
-    fun G bg gofs c bc cofs bl lofs lab bs so M => ?_⟩
+    fun G _ bg gofs c _ bc cofs bl lofs lab bs so M => ?_⟩
   refine Satisfies.of_pre fun args m ⟨hargs, hc, ⟨gw, hg⟩, ⟨cw, hcr⟩, _, hl, hls, hlsm, hsurj,
     ⟨sv, hs⟩, hsep⟩ => ?_
   have hw := hc.work
@@ -400,7 +242,7 @@ theorem dense_testcanlab (xi : ExternalCalls) : denseRep.TestcanlabFn xi denseRe
 
 theorem dense_updatecan (xi : ExternalCalls) : denseRep.UpdatecanFn xi denseRep.updatecan := by
   refine ⟨_, by simp [Genv.find_funct, denseRep, Search.funct_updatecanFn], type_updatecanD,
-    fun G bg gofs c bc cofs bl lofs lab sr M => ?_⟩
+    fun G _ bg gofs c _ bc cofs bl lofs lab sr M => ?_⟩
   refine Satisfies.of_pre fun args m ⟨hargs, hc, ⟨gw, hg⟩, ⟨cw, hcr⟩, hok, hl, hls, hlsm, hsurj,
     hsr, hsep⟩ => ?_
   have hw := hc.work
@@ -458,9 +300,9 @@ theorem dense_updatecan (xi : ExternalCalls) : denseRep.UpdatecanFn xi denseRep.
   have hw' := denseWork_next hw hval dP dS dB dP' dS' dB' rP (.inl ⟨rfl, rfl⟩) (.inl ⟨rfl, rfl⟩)
     (fresh_r dS) (fresh_r dB) (fresh_l dS)
   refine ⟨rfl, ⟨cw', hg'.arr, hg'.rep⟩, (Spec.updatecan_size _ _ _ _).trans hok,
-    denseStep hw' hu ?_ hval fun z e _ => e ▸ hkeep⟩
+    denseStep hw' hu ?_ hval fun z e _ => (by simpa using e : z = bc) ▸ hkeep⟩
   rintro z (e | e | e | ⟨h, e⟩ | ⟨h, e⟩)
-  · exact .inl e
+  · exact .inl (by simpa using e)
   · subst e; exact .inr (.inl (by simp [denseWGlobs]))
   · subst e; exact .inr (.inl (by simp [denseWGlobs]))
   · exact .inr (.inr (.inl (e ▸ dense_inUseW dP h)))
@@ -535,7 +377,7 @@ theorem dense_pre3 {m : mem} (hw : denseRep.Work m) {bs : List block} (hsep : de
 
 theorem dense_targetcell (xi : ExternalCalls) : denseRep.TargetcellFn xi denseRep.targetcell := by
   refine ⟨_, by simp [Genv.find_funct, denseRep, Search.funct_targetcellFn], type_targetcellD,
-    fun G bg gofs bl lofs lab bp pofs ptn level tcLevel dg hint M => ?_⟩
+    fun G _ bg gofs bl lofs lab bp pofs ptn level tcLevel dg hint M => ?_⟩
   refine Satisfies.of_pre fun args m ⟨hargs, hc, ⟨gw, hg⟩, hl, hlsm, hp, hps, hpsm, hpl, hlev,
     hh, hh0, htc, hsep⟩ => ?_
   have hw := hc.work
@@ -577,7 +419,7 @@ theorem slotBlk {m : mem} {bp bs : block} {k c : Nat} {b : block} (dd : DynAt m 
 theorem dense_refineFn {xi : ExternalCalls} {M : Nat} {vf : val} (h : Refine.RefineFn xi M vf) :
     denseRep.RefineFn xi M vf := by
   obtain ⟨fd, hfd, hty, hsat⟩ := h
-  refine ⟨fd, hfd, hty, fun G bg gofs bl lofs lab bp pofs ptn level bn nofs numcells bc cofs ba
+  refine ⟨fd, hfd, hty, fun G _ bg gofs bl lofs lab bp pofs ptn level bn nofs numcells bc cofs ba
     aofs active bk kofs => ?_⟩
   refine Satisfies.of_pre fun args m ⟨hargs, hc, ⟨gw, hg⟩, hl, hp, hnc, hcnt, ⟨aw, ha, har⟩, hk,
     hok, hps, hncl, hlev, hsep⟩ => ?_
@@ -847,4 +689,6 @@ def dense : DispatchC Program.ge denseOps where
   targetcell_fn := dense_targetcell
   check_fn := dense_check
   freedyn_fn := dense_freedyn
+  init_fn _ h := absurd rfl h
+
 end NautyVerified.Proofs.Dispatch

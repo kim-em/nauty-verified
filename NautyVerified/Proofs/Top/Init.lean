@@ -24,15 +24,6 @@ open NautyVerified.Proofs.Init (prog info var_init var_of_map)
 open NautyVerified.Proofs.Search (FieldAt)
 open NautyVerified.Source
 
-namespace Block
-def naugraphCheck : Common.Values.block := PArith.BinPos.Pos.of_nat 133
-end Block
-
-kernel_rfl find_naugraphCheck :
-  Genv.find_symbol ge.genv_genv dense.id.naugraph_check = some Block.naugraphCheck
-kernel_rfl funct_naugraphCheck :
-  Genv.find_funct_ptr ge.genv_genv Block.naugraphCheck = some (.Internal dense.fn.naugraph_check)
-
 /-- A function's block has `Nonempty` permission at offset 0 in the initial memory. -/
 theorem fnPerm {m : mem} (hm : Genv.init_mem prog = some m) {b : block} {f : Cfrontend.Clight.fundef}
     (hf : Genv.find_funct_ptr ge.genv_genv b = some f) :

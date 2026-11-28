@@ -210,11 +210,16 @@ open CompCert4Lean.Foundation.Numbers.Rocq.Coq
 open NautyVerified.Program NautyVerified.Source
 
 namespace Block
+def naugraphCheck : Common.Values.block := PArith.BinPos.Pos.of_nat 133
 def nautilCheck : Common.Values.block := PArith.BinPos.Pos.of_nat 217
 def nautilFreedyn : Common.Values.block := PArith.BinPos.Pos.of_nat 141
 def nautyFreedyn : Common.Values.block := PArith.BinPos.Pos.of_nat 183
 end Block
 
+kernel_rfl find_naugraphCheck :
+  Genv.find_symbol ge.genv_genv dense.id.naugraph_check = some Block.naugraphCheck
+kernel_rfl funct_naugraphCheck :
+  Genv.find_funct_ptr ge.genv_genv Block.naugraphCheck = some (.Internal dense.fn.naugraph_check)
 kernel_rfl find_nautilCheck :
   Genv.find_symbol ge.genv_genv dense.id.nautil_check = some Block.nautilCheck
 kernel_rfl funct_nautilCheck :

@@ -319,6 +319,7 @@ import NautyVerified.Proofs.Sparse.Sort.Finish
 import NautyVerified.Proofs.Sparse.Sort.Main
 import NautyVerified.Proofs.Sparse.Sort.Satisfies
 import NautyVerified.Proofs.Dispatch.Spec
+import NautyVerified.Proofs.Dispatch.DenseRep
 import NautyVerified.Proofs.Dispatch.Dense
 import NautyVerified.Proofs.Dispatch.Doref
 import NautyVerified.Spec.SparseInts
