@@ -105,6 +105,13 @@ theorem valid_of_access {m : mem} {chunk : memory_chunk} {b : block} {ofs : Z} {
 
 variable {xi : ExternalCalls}
 
+/-- `e` binds no identifier that names a global, so reading a global through
+`e` finds the global. -/
+def NoShadow (e : env) : Prop :=
+  ∀ i b, Genv.find_symbol ge.genv_genv i = some b → PTree.get i e = none
+
+theorem noShadow_empty : NoShadow empty_env := fun _ _ _ => rfl
+
 theorem Mptr_eq : Mptr = .Mint64 := rfl
 
 theorem lr_mul (a b : Nat) : Lib.Integers.Int64.mul (lr a) (lr b) = lr (a * b) := by
@@ -123,22 +130,25 @@ theorem eq_lr_zero {k : Nat} (hk : k < 2 ^ 63) :
   · intro h; subst h; rfl
 
 /-- `if (name_sz) free(name);` -/
-theorem wp_freeOld {f : function} {Q : Post} {le : temp_env} {m : mem}
+theorem wp_freeOld {e : env} {f : function} {Q : Post} {le : temp_env} {m : mem}
     {gs gp : Common.AST.ident} {elt : Cfrontend.Ctypes.type} {bs bp b : block} {c cap : Nat}
     (hgs : Genv.find_symbol ge.genv_genv gs = some bs)
     (hgp : Genv.find_symbol ge.genv_genv gp = some bp)
     (hD : DynAt m bp bs c cap b)
     (hQ : ∀ m1, Unch m m1 (fun z => 0 < cap ∧ z = b) → Mem.nextblock m1 = Mem.nextblock m →
-      Q.normal E0 empty_env le m1) :
+      Q.normal E0 e le m1)
+    (hnil : NoShadow e := by exact NautyVerified.Proofs.Alloc.noShadow_empty) :
     Wp xi ge f (sk (.Sifthenelse (.Evar gs tulong)
         (sk (.Scall none (.Evar Source.dense.id.free (tfun [tptr .Tvoid] .Tvoid))
           [.Evar gp (tptr elt)]))
-        .Sskip)) Q empty_env le m := by
-  have hnil : ∀ i, PTree.get i (empty_env : env) = none := fun _ => rfl
+        .Sskip)) Q e le m := by
+  have hnil1 := hnil _ _ hgs
+  have hnil2 := hnil _ _ hgp
+  have hnil3 := hnil _ _ find_free
   have hcap := hD.capLt
   wp_step; wp_step
   apply wp_if_eval
-  simp only [Exec.evalExpr, Exec.lvalOfVar, hnil, hgs, Exec.derefLoc,
+  simp only [Exec.evalExpr, Exec.lvalOfVar, hnil1, hnil2, hnil3, hgs, Exec.derefLoc,
     Cfrontend.Ctypes.access_mode, typeof, cop, Mem.loadv,
     show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl, hD.capLd, eq_lr_zero (k := cap) (by omega)]
   by_cases h0 : cap = 0
@@ -149,36 +159,39 @@ theorem wp_freeOld {f : function} {Q : Post} {le : temp_env} {m : mem}
     have hpos : 0 < cap := by omega
     wp_step; wp_step
     refine wp_call (vf := .Vptr Block.free Ptrofs.zero) _ (freeSpec b (c * cap)) (free_satisfies b _) rfl
-      (by simp [Exec.evalExpr, Exec.lvalOfVar, hnil, find_free, Exec.derefLoc,
+      (by simp [Exec.evalExpr, Exec.lvalOfVar, hnil1, hnil2, hnil3, find_free, Exec.derefLoc,
         Cfrontend.Ctypes.access_mode])
-      (by simp [Exec.evalExprlist, Exec.evalExpr, Exec.lvalOfVar, hnil, hgp, Exec.derefLoc,
+      (by simp [Exec.evalExprlist, Exec.evalExpr, Exec.lvalOfVar, hnil1, hnil2, hnil3, hgp, Exec.derefLoc,
         Cfrontend.Ctypes.access_mode, Mem.loadv, Mptr_eq,
         show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl, hD.ptr hpos, typeof, cop])
       (by simp [Common.Globalenvs.Genv.find_funct, funct_free]) rfl ⟨rfl, hD.mal hpos⟩ ?_
     rintro t v m1 ⟨rfl, rfl, hu, hnb⟩
     exact hQ m1 (hu.mono fun z hz => ⟨hpos, hz⟩) hnb
 
-theorem wp_dynalloc1' {f : function} {Q : Post} {le : temp_env} {m : mem}
+theorem wp_dynalloc1' {e : env} {f : function} {Q : Post} {le : temp_env} {m : mem}
     {gs gp t1 t2 msg : Common.AST.ident} {elt : Cfrontend.Ctypes.type} {msgLen : Int}
     {bs bp b : block} {c cap n : Nat}
     (hgs : Genv.find_symbol ge.genv_genv gs = some bs)
     (hgp : Genv.find_symbol ge.genv_genv gp = some bp)
     (hc : intOfZ (Cfrontend.Ctypes.sizeof ge.genv_cenv elt) = c)
     (hD : DynAt m bp bs c cap b)
-    {szE : expr} (hx : ∀ m', Exec.evalExpr ge empty_env le m' szE = some (.Vint (ir n)))
+    {szE : expr} (hx : ∀ m', Exec.evalExpr ge e le m' szE = some (.Vint (ir n)))
     (hty : typeof szE = tint) (hn : n < 2147483648) (hcn : c * n < 2 ^ 62)
     (hQ : ∀ le' m' cap' b', DynAt m' bp bs c cap' b' → n ≤ cap' →
       Unch m m' (fun z => z = bs ∨ z = bp ∨ (0 < cap ∧ z = b) ∨ (¬ Mem.valid_block m b' ∧ z = b')) →
       ((cap' = cap ∧ b' = b) ∨ ¬ Mem.valid_block m b') →
       (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
       (∀ k, k ≠ t1 → k ≠ t2 → PTree.get k le' = PTree.get k le) →
-      Q.normal E0 empty_env le' m') :
-    Wp xi ge f (dynalloc1 gs gp elt szE t1 t2 msg msgLen) Q empty_env le m := by
-  have hnil : ∀ i, PTree.get i (empty_env : env) = none := fun _ => rfl
+      Q.normal E0 e le' m')
+    (hnil : NoShadow e := by exact NautyVerified.Proofs.Alloc.noShadow_empty) :
+    Wp xi ge f (dynalloc1 gs gp elt szE t1 t2 msg msgLen) Q e le m := by
+  have hnil1 := hnil _ _ hgs
+  have hnil2 := hnil _ _ hgp
+  have hnil3 := hnil _ _ find_free
   wp_step; wp_step
   apply wp_if_eval
   simp only [Exec.evalExpr, hx, hty]
-  simp only [Exec.lvalOfVar, hnil, hgs, Exec.derefLoc,
+  simp only [Exec.lvalOfVar, hnil1, hnil2, hnil3, hgs, Exec.derefLoc,
     Cfrontend.Ctypes.access_mode, typeof, cop, Mem.loadv,
     show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl, hD.capLd,
     cast_int_long_ir (a := n) ⟨by omega, by omega⟩]
@@ -187,7 +200,7 @@ theorem wp_dynalloc1' {f : function} {Q : Post} {le : temp_env} {m : mem}
   by_cases hnc : cap < n
   · rw [ite_eq_left (by simpa using hnc)]
     wp_step
-    refine wp_freeOld hgs hgp hD ?_
+    refine wp_freeOld (hnil := hnil) hgs hgp hD ?_
     intro m1 hu1 hnb1
     have hnS : ∀ z, (z = bs ∨ z = bp) → ¬ (0 < cap ∧ z = b) := by
       rintro z (rfl | rfl) ⟨hp, rfl⟩
@@ -199,7 +212,7 @@ theorem wp_dynalloc1' {f : function} {Q : Post} {le : temp_env} {m : mem}
     wp_step; wp_step; wp_step
     apply wp_assign_eval
     simp only [Exec.evalLvalue, hx, hty]
-    simp only [Exec.lvalOfVar, hnil, hgs, typeof, cop,
+    simp only [Exec.lvalOfVar, hnil1, hnil2, hnil3, hgs, typeof, cop,
       Exec.assignLoc, Cfrontend.Ctypes.access_mode, Mem.storev,
       show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl,
       cast_int_long_ir (a := n) ⟨by omega, by omega⟩, hst2]
@@ -209,7 +222,7 @@ theorem wp_dynalloc1' {f : function} {Q : Post} {le : temp_env} {m : mem}
     wp_step; wp_step; wp_step; wp_step; wp_step
     refine wp_call (vf := .Vptr Block.zalloc Ptrofs.zero) (targs := [tulong]) (tres := tptr .Tvoid)
       (cc := Common.AST.cc_default) _ (zallocSpec (n * c)) (zalloc_satisfies _) rfl
-      (by simp [Exec.evalExpr, Exec.lvalOfVar, hnil, find_zalloc, Exec.derefLoc,
+      (by simp [Exec.evalExpr, Exec.lvalOfVar, hnil1, hnil2, hnil3, hnil _ _ find_zalloc, find_zalloc, Exec.derefLoc,
         Cfrontend.Ctypes.access_mode])
       (by simp only [Exec.evalExprlist, Exec.evalExpr, hx, hty]
           simp [typeof, cop, hsz,
@@ -228,7 +241,7 @@ theorem wp_dynalloc1' {f : function} {Q : Post} {le : temp_env} {m : mem}
     have hbpW3 := hfr.unch.access _ _ _ _ hbp' hbpW2
     obtain ⟨m4, hst4⟩ := Mem.valid_access_store _ _ _ _ (.Vptr b' Ptrofs.zero) hbpW3
     apply wp_assign_eval
-    simp only [Exec.evalLvalue, Exec.evalExpr, Exec.lvalOfVar, hnil, hgp, temps_gss, typeof, cop,
+    simp only [Exec.evalLvalue, Exec.evalExpr, Exec.lvalOfVar, hnil1, hnil2, hnil3, hgp, temps_gss, typeof, cop,
       Exec.assignLoc, Cfrontend.Ctypes.access_mode, Mem.storev, Mptr_eq,
       show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl, hst4]
     have hvp : Mem.valid_pointer m4 b' (zOfInt (-1)) = true :=
@@ -286,7 +299,7 @@ theorem wp_dynalloc1' {f : function} {Q : Post} {le : temp_env} {m : mem}
     exact hQ le m cap b hD (by omega) (Unch.refl _ _) (.inl ⟨rfl, rfl⟩) (fun _ h => h) (fun _ _ _ => rfl)
 
 /-- `wp_dynalloc1'` for a size held in a temporary. -/
-theorem wp_dynalloc1 {f : function} {Q : Post} {le : temp_env} {m : mem}
+theorem wp_dynalloc1 {e : env} {f : function} {Q : Post} {le : temp_env} {m : mem}
     {gs gp x t1 t2 msg : Common.AST.ident} {elt : Cfrontend.Ctypes.type} {msgLen : Int}
     {bs bp b : block} {c cap n : Nat}
     (hgs : Genv.find_symbol ge.genv_genv gs = some bs)
@@ -299,8 +312,9 @@ theorem wp_dynalloc1 {f : function} {Q : Post} {le : temp_env} {m : mem}
       ((cap' = cap ∧ b' = b) ∨ ¬ Mem.valid_block m b') →
       (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
       (∀ k, k ≠ t1 → k ≠ t2 → PTree.get k le' = PTree.get k le) →
-      Q.normal E0 empty_env le' m') :
-    Wp xi ge f (dynalloc1 gs gp elt (.Etempvar x tint) t1 t2 msg msgLen) Q empty_env le m :=
-  wp_dynalloc1' (msgLen := msgLen) hgs hgp hc hD (fun _ => hx) rfl hn hcn hQ
+      Q.normal E0 e le' m')
+    (hnil : NoShadow e := by exact NautyVerified.Proofs.Alloc.noShadow_empty) :
+    Wp xi ge f (dynalloc1 gs gp elt (.Etempvar x tint) t1 t2 msg msgLen) Q e le m :=
+  wp_dynalloc1' (msgLen := msgLen) hgs hgp hc hD (fun _ => hx) rfl hn hcn hQ hnil
 
 end NautyVerified.Proofs.Alloc

@@ -56,8 +56,8 @@ def dynSeq (msg : ident) (len : Int) (ds : List DynD) (rest : statement) : state
 /-- The pairs' globals. -/
 def DynD.globals (ds : List DynD) : List block := ds.flatMap fun d => [d.bs, d.bp]
 
-theorem wp_dynSeq {f : function} {Q : Post} {msg : ident} {len : Int} (rest : statement)
-    (P : block → Prop) :
+theorem wp_dynSeq {e : env} {f : function} {Q : Post} {msg : ident} {len : Int} (rest : statement)
+    (P : block → Prop) (hnil : NoShadow e) :
     ∀ (ds : List DynD) (le : temp_env) (m : mem),
     (∀ d ∈ ds, d.Ok) →
     (∀ d ∈ ds, ∀ b, DynAt m d.bp d.bs d.c 0 b) →
@@ -65,7 +65,7 @@ theorem wp_dynSeq {f : function} {Q : Post} {msg : ident} {len : Int} (rest : st
     (∀ d ∈ ds, ¬ P d.bs ∧ ¬ P d.bp) →
     (∀ z, P z → Mem.valid_block m z) →
     (∀ d ∈ ds, ∀ le' m' (S : block → Prop), Unch m m' S → (∀ z, S z → ¬ P z) →
-      Exec.evalExpr ge empty_env le' m' d.sz = some (.Vint (ir d.n))) →
+      Exec.evalExpr ge e le' m' d.sz = some (.Vint (ir d.n))) →
     (∀ le' m' (cb : Nat → Nat × block),
       (∀ i (h : i < ds.length), DynAt m' ds[i].bp ds[i].bs ds[i].c (cb i).1 (cb i).2 ∧
         ds[i].n ≤ (cb i).1 ∧ ¬ Mem.valid_block m (cb i).2) →
@@ -73,8 +73,8 @@ theorem wp_dynSeq {f : function} {Q : Post} {msg : ident} {len : Int} (rest : st
       Unch m m' (fun z => z ∈ DynD.globals ds ∨ ¬ Mem.valid_block m z) →
       (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
       (∀ k, (∀ d ∈ ds, k ≠ d.t1 ∧ k ≠ d.t2) → PTree.get k le' = PTree.get k le) →
-      Wp xi ge f rest Q empty_env le' m') →
-    Wp xi ge f (dynSeq msg len ds rest) Q empty_env le m
+      Wp xi ge f rest Q e le' m') →
+    Wp xi ge f (dynSeq msg len ds rest) Q e le m
   | [], le, m, _, _, _, _, _, _, hQ => by
     simp only [dynSeq, List.foldr_nil]
     exact hQ le m (fun _ => (0, Block.naugraphWorkperm)) (fun i h => absurd h (by simp))
@@ -87,7 +87,7 @@ theorem wp_dynSeq {f : function} {Q : Post} {msg : ident} {len : Int} (rest : st
     obtain ⟨hbs, ⟨hbp, hg'⟩⟩ := hg
     simp only [dynSeq, List.foldr_cons]
     wp_step
-    refine wp_dynalloc1G (b := d.bs) hd.gs hd.gp hd.c (hD d (by simp) d.bs)
+    refine wp_dynalloc1G (hnil := hnil) (b := d.bs) hd.gs hd.gp hd.c (hD d (by simp) d.bs)
       (fun m' hu => hsz d (by simp) le m' _ hu (fun z hz => ?_)) hd.ty hd.nlt
       hd.cn ?_
     · rcases hz with rfl | ⟨h, -⟩
@@ -117,7 +117,7 @@ theorem wp_dynSeq {f : function} {Q : Post} {msg : ident} {len : Int} (rest : st
       · exact hbp z hzg h.symm
       · exact absurd h (Nat.lt_irrefl 0)
       · exact hb1m hzv
-    refine wp_dynSeq rest P ds le1 m1 (fun d' h => hok d' (by simp [h]))
+    refine wp_dynSeq rest P hnil ds le1 m1 (fun d' h => hok d' (by simp [h]))
       (fun d' hd' b => (hD d' (by simp [hd']) b).keep hu1 (nS d' hd' _ (.inr rfl))
         (nS d' hd' _ (.inl rfl)) (fun h => absurd h (Nat.lt_irrefl 0)))
       hg' (fun d' h => hP d' (by simp [h])) (fun z hz => hg1 _ (hPv z hz)) ?_ ?_

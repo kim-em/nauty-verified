@@ -1,4 +1,4 @@
-import NautyVerified.Proofs.Top.NautySyntax
+import NautyVerified.Proofs.Top.NautyEnv
 import NautyVerified.Proofs.Alloc.DynSeq
 import NautyVerified.Proofs.Search.Ops
 
@@ -15,6 +15,8 @@ valid before (`Alloc.wp_dynSeq`).
 -/
 
 namespace NautyVerified.Proofs.Top
+
+variable {bI : CompCert4Lean.Common.Values.block}
 
 open CompCert4Lean CompCert4Lean.Cfrontend.Clight CompCert4Lean.Common.Globalenvs
 open CompCert4Lean.Common.Values CompCert4Lean.Common.ExternalCalls CompCert4Lean.Common.Events
@@ -56,10 +58,11 @@ theorem tAlloc_eq (M n : Nat) :
 
 /-- An `int` global read in a memory that left it alone. -/
 theorem eval_gint {le : temp_env} {m m' : mem} {S : block → Prop} {id : ident} {b : block}
-    {v : Int} (hf : Genv.find_symbol ge.genv_genv id = some b) (h : IntAt m b v)
+    {v : Int} (he : PTree.get id (nEnv bI : env) = none)
+    (hf : Genv.find_symbol ge.genv_genv id = some b) (h : IntAt m b v)
     (hu : Unch m m' S) (hb : ¬ S b) :
-    Exec.evalExpr ge empty_env le m' (.Evar id tint) = some (.Vint (ir v)) := by
-  simp only [Exec.evalExpr, Exec.lvalOfVar, show PTree.get id (empty_env : env) = none from rfl, hf,
+    Exec.evalExpr ge (nEnv bI) le m' (.Evar id tint) = some (.Vint (ir v)) := by
+  simp only [Exec.evalExpr, Exec.lvalOfVar, he, hf,
     Exec.derefLoc, Cfrontend.Ctypes.access_mode, Mem.loadv,
     show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl]
   rw [hu.load _ _ _ hb]
@@ -79,11 +82,11 @@ theorem wp_tAlloc {Q : Post} {le : temp_env} {m : mem} {M n : Nat}
       Unch m m' (fun z => z ∈ DynD.globals (allocDs M n) ∨ ¬ Mem.valid_block m z) →
       (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
       (∀ k, (∀ d ∈ allocDs M n, k ≠ d.t1 ∧ k ≠ d.t2) → PTree.get k le' = PTree.get k le) →
-      Wp xi ge dense.fn.nauty Nauty.tTc Q empty_env le' m') :
-    Wp xi ge dense.fn.nauty Nauty.tAlloc Q empty_env le m := by
+      Wp xi ge dense.fn.nauty Nauty.tTc Q (nEnv bI) le' m') :
+    Wp xi ge dense.fn.nauty Nauty.tAlloc Q (nEnv bI) le m := by
   rw [tAlloc_eq M n]
   let P : block → Prop := fun z => z = Search.Block.m ∨ z = Search.Block.n
-  refine Alloc.wp_dynSeq Nauty.tTc P (allocDs M n) le m ?_ hD
+  refine Alloc.wp_dynSeq Nauty.tTc P noShadow_nEnv (allocDs M n) le m ?_ hD
     (by show List.Pairwise _ (DynD.globals (allocDs 0 0)); decide) ?_ ?_ ?_ hQ
   · simp only [allocDs, List.forall_mem_cons, List.forall_mem_nil, and_true]
     refine ⟨DynD.Ok.mk (find_nautyDefltworkSz) find_nautyDefltwork rfl rfl (by dsimp only; omega) (by dsimp only; omega)
@@ -112,8 +115,8 @@ theorem wp_tAlloc {Q : Post} {le : temp_env} {m : mem} {M n : Nat}
     · exact Alloc.valid_of_access hM.writable
     · exact Alloc.valid_of_access hn.writable
   · intro d hd le' m' S hu hS
-    have hm' := eval_gint (le := le') Search.find_m hM hu (fun h => hS _ h (.inl rfl))
-    have hn' := eval_gint (le := le') Search.find_n hn hu (fun h => hS _ h (.inr rfl))
+    have hm' := eval_gint (bI := bI) (le := le') rfl Search.find_m hM hu (fun h => hS _ h (.inl rfl))
+    have hn' := eval_gint (bI := bI) (le := le') rfl Search.find_n hn hu (fun h => hS _ h (.inr rfl))
     simp only [allocDs, List.mem_cons, List.mem_nil_iff, or_false] at hd
     rcases hd with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
     · simp only [Exec.evalExpr, gM] at hm' ⊢

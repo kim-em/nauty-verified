@@ -133,6 +133,8 @@ end NautyVerified.Proofs.Set
 
 namespace NautyVerified.Proofs.Top
 
+variable {bI : CompCert4Lean.Common.Values.block}
+
 open CompCert4Lean CompCert4Lean.Cfrontend.Clight CompCert4Lean.Common.Globalenvs
 open CompCert4Lean.Common.Values CompCert4Lean.Common.ExternalCalls CompCert4Lean.Common.Events
 open CompCert4Lean.Common.Memory CompCert4Lean.Common.AST
@@ -213,10 +215,10 @@ theorem wp_normLoop {Q : Post} {le : temp_env} {m : mem} {bp : block} {n : Nat} 
       PTree.get dense.id.«numcells» le' = some (.Vint (ir (zeros h n))) →
       Unch m m' (· = bp) → (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
       (∀ x, x ≠ dense.id.«i» → x ≠ dense.id.«numcells» → PTree.get x le' = PTree.get x le) →
-      Q.normal E0 empty_env le' m') :
+      Q.normal E0 (nEnv bI) le' m') :
     Wp xi ge dense.fn.nauty (forLoopC dense.id.«i»
       (.Ebinop .Olt (Refine.tv dense.id.«i») (.Evar dense.id.«nauty:n» tint) tint) normBody)
-      Q empty_env le m := by
+      Q (nEnv bI) le m := by
   let Inv := fun (k : Nat) (le' : temp_env) (m' : mem) =>
     k ≤ n ∧ PTree.get dense.id.«i» le' = some (.Vint (ir k)) ∧
     PTree.get dense.id.«numcells» le' = some (.Vint (ir (zeros h k))) ∧
@@ -232,8 +234,8 @@ theorem wp_normLoop {Q : Post} {le : temp_env} {m : mem} {bp : block} {n : Nat} 
   refine wp_forLoopC (Inv := Inv) (Mid := Mid) dense.id.«i» _ rfl normBody n (by omega) ?_ ?_ ?_ ?_ ?_
   · rintro k le' m' ⟨hk, hi, -, -, hu, -, -⟩
     refine ⟨hk, hi, ?_⟩
-    rw [Exec.evalExpr, show Exec.evalExpr ge empty_env le' m' (Refine.tv dense.id.«i») = _ from hi,
-      Search.eval_gint (e := empty_env) rfl Search.find_n (hN.unch hu (Ne.symm hbp))]
+    rw [Exec.evalExpr, show Exec.evalExpr ge (nEnv bI) le' m' (Refine.tv dense.id.«i») = _ from hi,
+      Search.eval_gint (e := (nEnv bI)) rfl Search.find_n (hN.unch hu (Ne.symm hbp))]
     simp only [typeof, cop]
     rw [ir_lt (a := k) (b := n) ⟨by omega, by omega⟩ ⟨by omega, by omega⟩]
     simp
@@ -247,7 +249,7 @@ theorem wp_normLoop {Q : Post} {le : temp_env} {m : mem} {bp : block} {n : Nat} 
     have hget := normP_get h k k (by omega)
     rw [if_neg (by omega)] at hget
     have hhk := hh k hk
-    have hrd := eval_at (ge := ge) (e := empty_env) harr' (by omega) dense.id.«ptn» hp'
+    have hrd := eval_at (ge := ge) (e := (nEnv bI)) harr' (by omega) dense.id.«ptn» hp'
       (Refine.tv dense.id.«i») k hk hi rfl
     simp only [normBody, Set.sk]
     wp_step; wp_step
@@ -295,10 +297,10 @@ theorem wp_toEnd {Q : Post} {le : temp_env} {m : mem} {bp : block} {n : Nat} {p 
     (hz : p[e]! = 0) (hnz : ∀ q, s ≤ q → q < e → p[q]! ≠ 0)
     (hsm : ∀ q < n, p[q]! < 2147483648)
     (hQ : ∀ le', PTree.get dense.id.«i» le' = some (.Vint (ir e)) →
-      (∀ x, x ≠ dense.id.«i» → PTree.get x le' = PTree.get x le) → Q.normal E0 empty_env le' m) :
-    Wp xi ge dense.fn.nauty toEnd Q empty_env le m := by
+      (∀ x, x ≠ dense.id.«i» → PTree.get x le' = PTree.get x le) → Q.normal E0 (nEnv bI) le' m) :
+    Wp xi ge dense.fn.nauty toEnd Q (nEnv bI) le m := by
   let I := fun (v : Nat) (t : trace) (e' : env) (le' : temp_env) (m' : mem) => t = E0 ∧
-    e' = empty_env ∧ m' = m ∧ ∃ q, s ≤ q ∧ q ≤ e ∧ v = e - q ∧
+    e' = (nEnv bI) ∧ m' = m ∧ ∃ q, s ≤ q ∧ q ≤ e ∧ v = e - q ∧
       PTree.get dense.id.«i» le' = some (.Vint (ir q)) ∧
       ∀ x, x ≠ dense.id.«i» → PTree.get x le' = PTree.get x le
   refine wp_loop (I := I) (J := fun v t e' le' m' => ∃ v', v' < v ∧ I v' t e' le' m') ?_ ?_
@@ -306,7 +308,7 @@ theorem wp_toEnd {Q : Post} {le : temp_env} {m : mem} {bp : block} {n : Nat} {p 
   · rintro v t e' le' m' ⟨rfl, rfl, rfl, q, hq1, hq2, rfl, hiq, ho⟩
     have hp' : PTree.get dense.id.«ptn» le' = some (.Vptr bp Ptrofs.zero) := by
       rw [ho _ (by decide)]; exact hptn
-    have hrd := eval_at (ge := ge) (e := empty_env) harr hn dense.id.«ptn» hp'
+    have hrd := eval_at (ge := ge) (e := (nEnv bI)) harr hn dense.id.«ptn» hp'
       (Refine.tv dense.id.«i») q (by omega) hiq rfl
     have hsq := hsm q (by omega)
     wp_step; wp_step; wp_step
@@ -401,8 +403,8 @@ theorem wp_actLoop {Q : Post} {le : temp_env} {m : mem} {bp bA : block} {n M : N
     (hQ : ∀ le' m' (aw' : Nat → Lib.Integers.int64), ArrayAt m' .Mint64 bA 0 (Set.longs aw') M →
       SetRep (fun w => bv64 (aw' w)) M (initActive n ends) → Unch m m' (· = bA) →
       Alloc.Keep m m' bA → (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
-      (∀ x, x ≠ dense.id.«i» → PTree.get x le' = PTree.get x le) → Q.normal E0 empty_env le' m') :
-    Wp xi ge dense.fn.nauty actLoop Q empty_env le m := by
+      (∀ x, x ≠ dense.id.«i» → PTree.get x le' = PTree.get x le) → Q.normal E0 (nEnv bI) le' m') :
+    Wp xi ge dense.fn.nauty actLoop Q (nEnv bI) le m := by
   have hne : ends ≠ [] := fun h => by simp [h] at hlast
   have hlen : 0 < ends.length := List.length_pos_iff.2 hne
   -- the last end is `n - 1`
@@ -457,10 +459,10 @@ theorem wp_actLoop {Q : Post} {le : temp_env} {m : mem} {bp bA : block} {n M : N
       (∀ z, Mem.valid_block m z → Mem.valid_block m' z) ∧
       (∀ x, x ≠ dense.id.«i» → PTree.get x le' = PTree.get x le)
   let I := fun (v : Nat) (t : trace) (e' : env) (le' : temp_env) (m' : mem) => t = E0 ∧
-    e' = empty_env ∧ ∃ j, j ≤ ends.length ∧ v = n - st j ∧
+    e' = (nEnv bI) ∧ ∃ j, j ≤ ends.length ∧ v = n - st j ∧
       PTree.get dense.id.«i» le' = some (.Vint (ir (st j))) ∧ Fr le' m' (actPre ends j).1
   let J := fun (v : Nat) (t : trace) (e' : env) (le' : temp_env) (m' : mem) => t = E0 ∧
-    e' = empty_env ∧ ∃ j, ∃ hj : j < ends.length, v = n - st j ∧
+    e' = (nEnv bI) ∧ ∃ j, ∃ hj : j < ends.length, v = n - st j ∧
       PTree.get dense.id.«i» le' = some (.Vint (ir (ends[j]'hj))) ∧ Fr le' m' (actPre ends (j + 1)).1
   simp only [actLoop, Set.sk]
   wp_step; wp_step; wp_step
@@ -474,8 +476,8 @@ theorem wp_actLoop {Q : Post} {le : temp_env} {m : mem} {bp bA : block} {n M : N
     have hN' := hN.unch hu (Ne.symm hsep.2.1)
     wp_step; wp_step; wp_step
     apply wp_if_eval
-    rw [Exec.evalExpr, show Exec.evalExpr ge empty_env le' m' (Refine.tv dense.id.«i») = _ from hi,
-      Search.eval_gint (e := empty_env) rfl Search.find_n hN']
+    rw [Exec.evalExpr, show Exec.evalExpr ge (nEnv bI) le' m' (Refine.tv dense.id.«i») = _ from hi,
+      Search.eval_gint (e := (nEnv bI)) rfl Search.find_n hN']
     simp only [typeof, cop]
     have hstn : st j ≤ n := by
       rcases Nat.lt_or_ge j ends.length with h | h
@@ -601,8 +603,8 @@ theorem wp_tPtn {Q : Post} {le : temp_env} {m : mem} {bp bA : block} {n M : Nat}
       Unch m m' (fun z => z = bp ∨ z = bA) → (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
       (∀ x, x ≠ dense.id.«i» → x ≠ dense.id.«numcells» → x ≠ dense.id.«es___1» → x ≠ idOf 731 →
         PTree.get x le' = PTree.get x le) →
-      Wp xi ge dense.fn.nauty Nauty.tInit Q empty_env le' m') :
-    Wp xi ge dense.fn.nauty Nauty.tPtn Q empty_env le m := by
+      Wp xi ge dense.fn.nauty Nauty.tInit Q (nEnv bI) le' m') :
+    Wp xi ge dense.fn.nauty Nauty.tPtn Q (nEnv bI) le m := by
   have hS := fun z hz => hsep z hz
   simp only [List.mem_cons, List.not_mem_nil, or_false, forall_eq_or_imp, forall_eq] at hS
   obtain ⟨⟨hpn, hAn⟩, ⟨hpm, hAm⟩, ⟨hpa, hAa⟩, ⟨hpb, hAb⟩⟩ := hS
@@ -615,9 +617,9 @@ theorem wp_tPtn {Q : Post} {le : temp_env} {m : mem} {bp bA : block} {n M : Nat}
   rw [show Cfrontend.Cop.bool_val (.Vint (ir 0)) tint m = some false from rfl]
   simp only [Bool.false_eq_true, ite_false]
   wp_step; wp_step; wp_step
-  have hsub : Exec.evalExpr ge empty_env le m
+  have hsub : Exec.evalExpr ge (nEnv bI) le m
       (.Ebinop .Osub (.Evar dense.id.«nauty:n» tint) (ci 1 tint) tint) = some (.Vint (ir (n - 1 : Nat))) := by
-    rw [Exec.evalExpr, Search.eval_gint (e := empty_env) rfl Search.find_n hN]
+    rw [Exec.evalExpr, Search.eval_gint (e := (nEnv bI)) rfl Search.find_n hN]
     simp only [Exec.evalExpr, typeof, cop, ir_sub]
     congr 3; omega
   refine Search.wp_storeV (ofs := Ptrofs.zero) harr (by omega) dense.id.«ptn» hptn _ (n - 1) (by omega)
@@ -660,7 +662,7 @@ theorem wp_tPtn {Q : Post} {le : temp_env} {m : mem} {bp bA : block} {n M : Nat}
   have haw2 : ArrayAt m2 .Mint64 bA 0 aw M := haw.unch hu12 (Ne.symm hpA)
   wp_step
   refine Set.wp_emptySetGE (by decide) rfl find_nautyActive hA2 (Ne.symm hAa) haw2 hM0 (by omega)
-    (Search.eval_gint (e := empty_env) rfl Search.find_m (hMm.unch hu12 (Ne.symm hpm))) rfl ?_
+    (Search.eval_gint (e := (nEnv bI)) rfl Search.find_m (hMm.unch hu12 (Ne.symm hpm))) rfl ?_
   intro le3 m3 haw3 hu3 _ _ hg3 ho3
   simp only [seqPost, Post.after, E0_append]
   have hu23 : Unch m m3 (fun z => z = bp ∨ z = bA) :=

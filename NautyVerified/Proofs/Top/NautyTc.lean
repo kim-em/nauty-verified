@@ -11,6 +11,8 @@ empty, so `m > alloc_m`, the freeing loop stops at once, and `nauty()` sets
 
 namespace NautyVerified.Proofs.Top
 
+variable {bI : CompCert4Lean.Common.Values.block}
+
 open CompCert4Lean CompCert4Lean.Cfrontend.Clight CompCert4Lean.Common.Globalenvs
 open CompCert4Lean.Common.Values CompCert4Lean.Common.ExternalCalls CompCert4Lean.Common.Events
 open CompCert4Lean.Common.Memory CompCert4Lean.Common.AST
@@ -42,9 +44,9 @@ abbrev tcHead : expr :=
 
 theorem eval_tcHead {le : temp_env} {m : mem} {v : val}
     (h : FieldAt m .Mint64 Search.Block.tcnode0 0 v) :
-    Exec.evalExpr ge empty_env le m tcHead = some v := by
+    Exec.evalExpr ge (nEnv bI) le m tcHead = some v := by
   simp only [tcHead, Exec.evalExpr, Exec.evalLvalue, Exec.lvalOfVar,
-    show PTree.get Source.dense.id.«nauty:tcnode0» (empty_env : env) = none from rfl,
+    show PTree.get Source.dense.id.«nauty:tcnode0» (nEnv bI : env) = none from rfl,
     Search.find_tcnode0, Exec.derefLoc, Cfrontend.Ctypes.access_mode, Mem.loadv, typeof]
   rw [Search.field_tcnodeNext]
   show Mem.load _ _ _ (Ptrofs.unsigned _) = _
@@ -61,13 +63,13 @@ theorem wp_tTc {Q : Post} {le : temp_env} {m : mem} {M : Nat}
       Unch m m' (fun z => z = Search.Block.allocM ∨ z = Search.Block.tcnode0) →
       (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
       (∀ x, x ≠ dense.id.tcp → PTree.get x le' = PTree.get x le) →
-      Wp xi ge dense.fn.nauty Nauty.tOpts Q empty_env le' m') :
-    Wp xi ge dense.fn.nauty Nauty.tTc Q empty_env le m := by
+      Wp xi ge dense.fn.nauty Nauty.tOpts Q (nEnv bI) le' m') :
+    Wp xi ge dense.fn.nauty Nauty.tTc Q (nEnv bI) le m := by
   simp only [Nauty.tTc, Nauty.tcIf]
   wp_step; wp_step; wp_step
   apply wp_if_eval
-  rw [Exec.evalExpr, Search.eval_gint (e := empty_env) rfl Search.find_m hM,
-    Search.eval_gint (e := empty_env) rfl Search.find_allocM hA]
+  rw [Exec.evalExpr, Search.eval_gint (e := (nEnv bI)) rfl Search.find_m hM,
+    Search.eval_gint (e := (nEnv bI)) rfl Search.find_allocM hA]
   simp only [typeof, cop]
   rw [ir_lt (a := 0) (b := M) ⟨by decide, by decide⟩ ⟨by omega, by omega⟩]
   rw [ite_eq_left (by simp; omega)]
@@ -77,7 +79,7 @@ theorem wp_tTc {Q : Post} {le : temp_env} {m : mem} {M : Nat}
   simp only [seqPost, Post.after, E0_append]
   wp_step
   -- the loop stops at once
-  refine wp_loop (I := fun v t e' le' m' => t = E0 ∧ e' = empty_env ∧ v = 0 ∧ m' = m ∧
+  refine wp_loop (I := fun v t e' le' m' => t = E0 ∧ e' = (nEnv bI) ∧ v = 0 ∧ m' = m ∧
       le' = PTree.set dense.id.tcp Vnullptr le)
     (J := fun _ _ _ _ _ => False) ?_ ?_ (n := 0) ⟨rfl, rfl, rfl, rfl, rfl⟩
   · rintro v t e' le' m' ⟨rfl, rfl, rfl, rfl, rfl⟩
@@ -99,7 +101,7 @@ theorem wp_tTc {Q : Post} {le : temp_env} {m : mem} {M : Nat}
     obtain ⟨m2, hst⟩ := Mem.valid_access_store _ Mptr _ _ Vnullptr hTw
     apply wp_assign_eval
     simp only [tcHead, Exec.evalLvalue, Exec.evalExpr, Exec.lvalOfVar,
-      show PTree.get Source.dense.id.«nauty:tcnode0» (empty_env : env) = none from rfl,
+      show PTree.get Source.dense.id.«nauty:tcnode0» (nEnv bI : env) = none from rfl,
       Search.find_tcnode0, typeof, cop, Exec.derefLoc, Cfrontend.Ctypes.access_mode]
     rw [Search.field_tcnodeNext]
     simp only [Exec.assignLoc, Cfrontend.Ctypes.access_mode, Mem.storev]

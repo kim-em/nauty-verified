@@ -93,6 +93,7 @@ import NautyVerified.Proofs.Search.State
 import NautyVerified.Proofs.Search.Spec
 import NautyVerified.Proofs.Top.DensenautySyntax
 import NautyVerified.Proofs.Top.NautySyntax
+import NautyVerified.Proofs.Top.NautyEnv
 import NautyVerified.Proofs.Top.Spec
 import NautyVerified.Proofs.Top.Densenauty
 import NautyVerified.Proofs.Top.NautyAlloc

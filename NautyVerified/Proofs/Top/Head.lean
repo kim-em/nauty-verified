@@ -15,6 +15,8 @@ dispatch vector, which pass. Afterwards `nauty:dispatch` holds
 
 namespace NautyVerified.Proofs.Top
 
+variable {bI : CompCert4Lean.Common.Values.block}
+
 open CompCert4Lean CompCert4Lean.Cfrontend.Clight CompCert4Lean.Common.Globalenvs
 open CompCert4Lean.Common.Values CompCert4Lean.Common.ExternalCalls CompCert4Lean.Common.Events
 open CompCert4Lean.Common.Memory CompCert4Lean.Common.AST
@@ -66,9 +68,9 @@ theorem eval_dispF {le : temp_env} {m : mem} {fld : ident} {t : Cfrontend.Ctypes
       some (l, Ptrofs.add o (Ptrofs.repr (zOfInt off)), .Full))
     (h0 : 0 ≤ off) (h1 : off < 2 ^ 64)
     (hl : Mem.load .Mint64 m Search.Block.dispatch (zOfInt off) = some v) :
-    Exec.evalExpr ge empty_env le m (dispF fld (tptr t)) = some v := by
+    Exec.evalExpr ge (nEnv bI) le m (dispF fld (tptr t)) = some v := by
   simp only [dispF, Exec.evalExpr, Exec.evalLvalue, Exec.lvalOfVar,
-    show PTree.get Source.dense.id.«nauty:dispatch» (empty_env : env) = none from rfl,
+    show PTree.get Source.dense.id.«nauty:dispatch» (nEnv bI : env) = none from rfl,
     Search.find_dispatch, Exec.derefLoc, Cfrontend.Ctypes.access_mode, Mem.loadv, typeof]
   rw [hfld]
   show Mem.load _ _ _ (Ptrofs.unsigned _) = _
@@ -87,10 +89,10 @@ theorem cast_flag (m : mem) (M : Nat) :
 theorem lval_dispF {le : temp_env} {m : mem} {fld : ident} {t : Cfrontend.Ctypes.type} {off : Int}
     (hfld : ∀ l o, Exec.lvalOfField ge (.Tstruct dense.id._1027 Cfrontend.Ctypes.noattr) fld (.Vptr l o) =
       some (l, Ptrofs.add o (Ptrofs.repr (zOfInt off)), .Full)) :
-    Exec.evalLvalue ge empty_env le m (dispF fld (tptr t)) =
+    Exec.evalLvalue ge (nEnv bI) le m (dispF fld (tptr t)) =
       some (Search.Block.dispatch, Ptrofs.add Ptrofs.zero (Ptrofs.repr (zOfInt off)), .Full) := by
   simp only [dispF, Exec.evalLvalue, Exec.evalExpr, Exec.lvalOfVar,
-    show PTree.get Source.dense.id.«nauty:dispatch» (empty_env : env) = none from rfl,
+    show PTree.get Source.dense.id.«nauty:dispatch» (nEnv bI : env) = none from rfl,
     Search.find_dispatch, Exec.derefLoc, Cfrontend.Ctypes.access_mode, typeof]
   exact hfld _ _
 
@@ -105,7 +107,7 @@ theorem eval_dispNull {le : temp_env} {m : mem} {fld : ident} {t : Cfrontend.Cty
     (h0 : 0 ≤ off) (h1 : off < 2 ^ 64)
     (hl : Mem.load .Mint64 m Search.Block.dispatch (zOfInt off) = some (.Vptr b Ptrofs.zero))
     (hp : Mem.perm m b (zOfInt 0) .Cur .Nonempty) :
-    Exec.evalExpr ge empty_env le m (.Ebinop .Oeq (dispF fld (tptr t)) (.Ecast (ci 0 tint) (tptr .Tvoid))
+    Exec.evalExpr ge (nEnv bI) le m (.Ebinop .Oeq (dispF fld (tptr t)) (.Ecast (ci 0 tint) (tptr .Tvoid))
       tint) = some (Val.of_bool false) := by
   rw [Exec.evalExpr, eval_dispF hfld h0 h1 hl]
   simp only [Exec.evalExpr, typeof, cop]
@@ -132,10 +134,10 @@ theorem wp_subst {f : function} {Q : Post} {le : temp_env} {m1 : mem} {M : Nat}
       Unch m1 m2 (· = Search.Block.dispatch) →
       (∀ b z k p, Mem.perm m1 b z k p → Mem.perm m2 b z k p) →
       (∀ z, Mem.valid_block m1 z → Mem.valid_block m2 z) →
-      Q.normal E0 empty_env le m2) :
+      Q.normal E0 (nEnv bI) le m2) :
     Wp xi ge f (.Sifthenelse (Refine.tv (idOf 703))
       (Set.sk (.Sassign (dispF dense.id.refine (tptr Refine.refprocType))
-        (dispF dense.id.refine1 (tptr Refine.refprocType)))) .Sskip) Q empty_env le m1 := by
+        (dispF dense.id.refine1 (tptr Refine.refprocType)))) .Sskip) Q (nEnv bI) le m1 := by
   apply wp_if_eval
   simp only [Exec.evalExpr, Refine.tv, h703, typeof, cop]
   by_cases hM1 : M = 1
@@ -190,12 +192,12 @@ theorem wp_head {Q : Post} {le : temp_env} {m : mem} {M : Nat}
       (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
       (∀ x, x ≠ idOf 703 → x ≠ idOf 704 → x ≠ idOf 705 → x ≠ idOf 706 →
         PTree.get x le' = PTree.get x le) →
-      Wp xi ge dense.fn.nauty Nauty.tSizes Q empty_env le' m') :
-    Wp xi ge dense.fn.nauty Nauty.body Q empty_env le m := by
+      Wp xi ge dense.fn.nauty Nauty.tSizes Q (nEnv bI) le' m') :
+    Wp xi ge dense.fn.nauty Nauty.body Q (nEnv bI) le m := by
   simp only [Nauty.body]
   wp_step; wp_step; wp_step
   apply wp_if_eval
-  have hdsp := eval_optF (e := empty_env) (ty := tptr (.Tstruct dense.id.«_1027» Cfrontend.Ctypes.noattr))
+  have hdsp := eval_optF (e := (nEnv bI)) (ty := tptr (.Tstruct dense.id.«_1027» Cfrontend.Ctypes.noattr))
     hopt fld_dispatch rfl (by decide) (by decide) hO.dispatch
   rw [Exec.evalExpr, hdsp]
   simp only [Exec.evalExpr, typeof, cop]
@@ -207,7 +209,7 @@ theorem wp_head {Q : Post} {le : temp_env} {m : mem} {M : Nat}
   wp_step; wp_step
   apply wp_assign_eval
   simp only [Exec.evalLvalue, Exec.evalExpr, Exec.lvalOfVar,
-    show PTree.get Source.dense.id.«nauty:dispatch» (empty_env : env) = none from rfl,
+    show PTree.get Source.dense.id.«nauty:dispatch» (nEnv bI : env) = none from rfl,
     Search.find_dispatch, hdsp, typeof, Exec.derefLoc, Cfrontend.Ctypes.access_mode, hopt, fld_dispatch,
     Mem.loadv]
   have hl104 : Mem.load Mptr m Harness.Block.options (Ptrofs.unsigned (Ptrofs.add Ptrofs.zero
@@ -282,7 +284,7 @@ theorem wp_head {Q : Post} {le : temp_env} {m : mem} {M : Nat}
       b = Search.Block.targetcellFn ∨ b = Search.Block.cheapautomFn →
       Mem.perm m2 b (zOfInt 0) .Cur .Nonempty := fun b hb => hp2 _ _ _ _ (hp1 _ _ (hfp b hb))
   obtain ⟨br, hbr, hbr'⟩ := dispatchOf3 M
-  have hr := eval_dispNull (le := PTree.set (idOf 703) (.Vint (if M = 1 then Lib.Integers.Int.one
+  have hr := eval_dispNull (bI := bI) (le := PTree.set (idOf 703) (.Vint (if M = 1 then Lib.Integers.Int.one
     else Lib.Integers.Int.zero)) le) (t := Refine.refprocType) Search.field_dRefine (by decide) (by decide)
     ((hld2 3 (by decide)).trans (by rw [hbr])) (hpf br (by rcases hbr' with h | h <;> simp [h]))
   wp_step; wp_step; wp_step; wp_step; wp_step; wp_step

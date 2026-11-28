@@ -12,6 +12,8 @@ of `options` into nauty.c's globals (`tOpts`), with the pinned options
 
 namespace NautyVerified.Proofs.Top
 
+variable {bI : CompCert4Lean.Common.Values.block}
+
 open CompCert4Lean CompCert4Lean.Cfrontend.Clight CompCert4Lean.Common.Globalenvs
 open CompCert4Lean.Common.Values CompCert4Lean.Common.ExternalCalls CompCert4Lean.Common.Events
 open CompCert4Lean.Common.Memory CompCert4Lean.Common.AST
@@ -109,14 +111,14 @@ theorem wp_tOpts {Q : Post} {le : temp_env} {m : mem} {bo bst bc : block}
       Unch m m' (fun z => z ∈ optTargets.map Prod.snd) →
       (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
       (∀ x, x ≠ idOf 727 → x ≠ idOf 728 → x ≠ idOf 729 → PTree.get x le' = PTree.get x le) →
-      Wp xi ge dense.fn.nauty Nauty.tPtn Q empty_env le' m') :
-    Wp xi ge dense.fn.nauty Nauty.tOpts Q empty_env le m := by
+      Wp xi ge dense.fn.nauty Nauty.tPtn Q (nEnv bI) le' m') :
+    Wp xi ge dense.fn.nauty Nauty.tOpts Q (nEnv bI) le m := by
   have gw : ∀ c b, (c, b) ∈ optTargets → Mem.valid_access m c b (zOfInt 0) .Writable :=
     fun c b h => hW (c, b) h
   simp only [Nauty.tOpts]
   wp_step; wp_step; wp_step
   refine wp_gset (chunk := .Mint64) rfl Search.find_orbits rfl (gw _ _ (by simp [optTargets]))
-    (show Exec.evalExpr ge empty_env le m (Refine.pi dense.id.«orbits_arg») = _ from horb) rfl rfl rfl ?_
+    (show Exec.evalExpr ge (nEnv bI) le m (Refine.pi dense.id.«orbits_arg») = _ from horb) rfl rfl rfl ?_
   intro m1 f1 u1 g1 a1 p1
   have F1 := (Facts.nil m).step u1 (by simp) f1
   have O1 := OptionsAt.unch hO u1 (by decide)
@@ -126,7 +128,7 @@ theorem wp_tOpts {Q : Post} {le : temp_env} {m : mem} {bo bst bc : block}
   simp only [seqPost, Post.after, E0_append]
   wp_step; wp_step; wp_step
   refine wp_gset (chunk := .Mint64) rfl Search.find_stats rfl (W1 _ _ (by simp [optTargets]))
-    (show Exec.evalExpr ge empty_env le m1 (.Etempvar dense.id.«stats_arg» (tptr (.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr))) = _ from hsta) rfl rfl rfl ?_
+    (show Exec.evalExpr ge (nEnv bI) le m1 (.Etempvar dense.id.«stats_arg» (tptr (.Tstruct dense.id.«_1024» Cfrontend.Ctypes.noattr))) = _ from hsta) rfl rfl rfl ?_
   intro m2 f2 u2 g2 a2 p2
   have F2 := F1.step u2 (by simp (config := {decide := true})) f2
   have O2 := OptionsAt.unch O1 u2 (by decide)
@@ -203,7 +205,7 @@ theorem wp_tOpts {Q : Post} {le : temp_env} {m : mem} {bo bst bc : block}
   simp only [seqPost, Post.after, E0_append]
   wp_step; wp_step; wp_step
   apply wp_if_eval
-  rw [Search.eval_gint (e := empty_env) (x := 0) rfl Search.find_doschreier (F8.get (by simp))]
+  rw [Search.eval_gint (e := (nEnv bI)) (x := 0) rfl Search.find_doschreier (F8.get (by simp))]
   simp only [typeof, cop]
   rw [ite_eq_right (by decide)]
   apply wp_skip
@@ -221,7 +223,7 @@ theorem wp_tOpts {Q : Post} {le : temp_env} {m : mem} {bo bst bc : block}
   simp only [seqPost, Post.after, E0_append]
   wp_step; wp_step; wp_step
   apply wp_if_eval
-  rw [Search.eval_gint (e := empty_env) (x := 0) rfl Search.find_digraph (F9.get (by simp))]
+  rw [Search.eval_gint (e := (nEnv bI)) (x := 0) rfl Search.find_digraph (F9.get (by simp))]
   simp only [typeof, cop]
   rw [ite_eq_right (by decide)]
   wp_step; wp_step
@@ -386,7 +388,7 @@ theorem wp_tOpts {Q : Post} {le : temp_env} {m : mem} {bo bst bc : block}
   simp only [seqPost, Post.after, E0_append]
   wp_step; wp_step; wp_step
   apply wp_if_eval
-  rw [Search.eval_gint (e := empty_env) (x := 1) rfl Search.find_getcanon (F19.get (by simp))]
+  rw [Search.eval_gint (e := (nEnv bI)) (x := 1) rfl Search.find_getcanon (F19.get (by simp))]
   simp only [typeof, cop]
   rw [ite_eq_left (by decide)]
   wp_step; wp_step

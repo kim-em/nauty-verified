@@ -11,6 +11,8 @@ Both checks pass; afterwards `nauty:m`, `nauty:n` hold `M`, `n`.
 
 namespace NautyVerified.Proofs.Top
 
+variable {bI : CompCert4Lean.Common.Values.block}
+
 open CompCert4Lean CompCert4Lean.Cfrontend.Clight CompCert4Lean.Common.Globalenvs
 open CompCert4Lean.Common.Values CompCert4Lean.Common.ExternalCalls CompCert4Lean.Common.Events
 open CompCert4Lean.Common.Memory CompCert4Lean.Common.AST
@@ -58,8 +60,8 @@ theorem wp_tMain {Q : Post} {le : temp_env} {m : mem} {M n : Nat}
     (hQ : ∀ m', IntAt m' Search.Block.m M → IntAt m' Search.Block.n n →
       Unch m m' (fun z => z = Search.Block.m ∨ z = Search.Block.n) →
       (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
-      Wp xi ge dense.fn.nauty Nauty.tAlloc Q empty_env le m') :
-    Wp xi ge dense.fn.nauty Nauty.tMain Q empty_env le m := by
+      Wp xi ge dense.fn.nauty Nauty.tAlloc Q (nEnv bI) le m') :
+    Wp xi ge dense.fn.nauty Nauty.tMain Q (nEnv bI) le m := by
   simp only [Nauty.tMain]
   wp_step; wp_step; wp_step
   refine Search.wp_gint rfl Search.find_m hmw (x := M) (by simp [Exec.evalExpr, Refine.tv, hm]) rfl ?_
@@ -77,10 +79,10 @@ theorem wp_tMain {Q : Post} {le : temp_env} {m : mem} {M n : Nat}
     (tres := .Tvoid) (cc := Common.AST.cc_default) _ (checkSpec (.Vint (ir M)) (.Vint (ir n)))
     (nautil_check_satisfies _ _) rfl
     (by simp only [Exec.evalExpr, Exec.lvalOfVar,
-      show PTree.get Source.dense.id.nautil_check (empty_env : env) = none from rfl,
+      show PTree.get Source.dense.id.nautil_check (nEnv bI : env) = none from rfl,
       find_nautilCheck, Exec.derefLoc, Cfrontend.Ctypes.access_mode])
-    (by simp only [Exec.evalExprlist, Search.eval_gint (e := empty_env) rfl Search.find_m hM2,
-          Search.eval_gint (e := empty_env) rfl Search.find_n hN2]
+    (by simp only [Exec.evalExprlist, Search.eval_gint (e := (nEnv bI)) rfl Search.find_m hM2,
+          Search.eval_gint (e := (nEnv bI)) rfl Search.find_n hN2]
         simp only [Exec.evalExpr, typeof, cop]
         rw [show Lib.Integers.Int.repr (zOfInt 29300) = ir 29300 from rfl,
           show Lib.Integers.Int.repr (zOfInt 0) = ir 0 from rfl, ir_add,
@@ -119,8 +121,8 @@ theorem wp_tMain {Q : Post} {le : temp_env} {m : mem} {M n : Nat}
   refine wp_call (vf := .Vptr Block.naugraphCheck Ptrofs.zero) (targs := [tint, tint, tint, tint])
     (tres := .Tvoid) (cc := Common.AST.cc_default) _ (checkSpec (.Vint (ir M)) (.Vint (ir n)))
     (naugraph_check_satisfies _ _) rfl ?_
-    (by simp only [Exec.evalExprlist, Search.eval_gint (e := empty_env) rfl Search.find_m hM2,
-          Search.eval_gint (e := empty_env) rfl Search.find_n hN2]
+    (by simp only [Exec.evalExprlist, Search.eval_gint (e := (nEnv bI)) rfl Search.find_m hM2,
+          Search.eval_gint (e := (nEnv bI)) rfl Search.find_n hN2]
         simp only [Exec.evalExpr, typeof, cop]
         rw [show Lib.Integers.Int.repr (zOfInt 29300) = ir 29300 from rfl,
           show Lib.Integers.Int.repr (zOfInt 0) = ir 0 from rfl, ir_add,

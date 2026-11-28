@@ -1,4 +1,4 @@
-import NautyVerified.Proofs.Top.NautySyntax
+import NautyVerified.Proofs.Top.NautyEnv
 import NautyVerified.Proofs.Search.Ops
 
 /-!
@@ -9,6 +9,8 @@ the graph is not empty, so `nauty()` goes on to `tMain`.
 -/
 
 namespace NautyVerified.Proofs.Top
+
+variable {bI : CompCert4Lean.Common.Values.block}
 
 open CompCert4Lean CompCert4Lean.Cfrontend.Clight CompCert4Lean.Common.Globalenvs
 open CompCert4Lean.Common.Values CompCert4Lean.Common.ExternalCalls CompCert4Lean.Common.Events
@@ -33,8 +35,8 @@ theorem wp_tSizes {Q : Post} {le : temp_env} {m : mem} {M n : Nat}
     (hn : PTree.get dense.id.n_arg le = some (.Vint (ir n)))
     (hn0 : 0 < n) (hnl : n < 1073741824) (hnM : n ≤ 64 * M) (hMl : M ≤ 31250001)
     (hQ : ∀ le', (∀ x, x ≠ idOf 707 → PTree.get x le' = PTree.get x le) →
-      Wp xi ge dense.fn.nauty Nauty.tMain Q empty_env le' m) :
-    Wp xi ge dense.fn.nauty Nauty.tSizes Q empty_env le m := by
+      Wp xi ge dense.fn.nauty Nauty.tMain Q (nEnv bI) le' m) :
+    Wp xi ge dense.fn.nauty Nauty.tSizes Q (nEnv bI) le m := by
   simp only [Nauty.tSizes]
   wp_step; wp_step; wp_step
   apply wp_if_eval
