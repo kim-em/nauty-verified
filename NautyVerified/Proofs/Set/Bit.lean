@@ -72,7 +72,7 @@ theorem wp_addElementB {s bitId : Common.AST.ident} {a : expr} {f : function} {Q
     (hQ : ∀ m', ArrayAt m' .Mint64 ba (intOfZ (Ptrofs.unsigned ofs)) (longs (addW ws c)) M →
       Unch m m' (· = ba) →
       Outside m m' ba (intOfZ (Ptrofs.unsigned ofs)) (intOfZ (Ptrofs.unsigned ofs) + 8 * M) →
-      Q.normal E0 e le m') :
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) → Q.normal E0 e le m') :
     Wp xi ge f (addElementB s bitId a) Q e le m := by
   have hw : c / 64 < M := by omega
   have hb : c % 64 < 64 := Nat.mod_lt _ (by decide)
@@ -98,6 +98,7 @@ theorem wp_addElementB {s bitId : Common.AST.ident} {a : expr} {f : function} {Q
   rw [longs_upd] at harr'
   exact hQ m' harr' (Unch.store hst rfl) (Outside.store harr hw hst (Int.le_refl _)
     (by rw [show csize .Mint64 = 8 from rfl]; exact Int.le_refl _))
+    (fun z hz => Mem.store_valid_block_1 _ _ _ _ _ _ hst _ hz)
 
 /-- `DELELEMENT(s, a)` with the table `bitId`: word `c / 64` loses bit `c % 64`. -/
 theorem wp_delElementB {s bitId : Common.AST.ident} {a : expr} {f : function} {Q : Post} {e : env}
@@ -112,7 +113,7 @@ theorem wp_delElementB {s bitId : Common.AST.ident} {a : expr} {f : function} {Q
     (hQ : ∀ m', ArrayAt m' .Mint64 ba (intOfZ (Ptrofs.unsigned ofs)) (longs (delW ws c)) M →
       Unch m m' (· = ba) →
       Outside m m' ba (intOfZ (Ptrofs.unsigned ofs)) (intOfZ (Ptrofs.unsigned ofs) + 8 * M) →
-      Q.normal E0 e le m') :
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) → Q.normal E0 e le m') :
     Wp xi ge f (delElementB s bitId a) Q e le m := by
   have hw : c / 64 < M := by omega
   have hb : c % 64 < 64 := Nat.mod_lt _ (by decide)
@@ -138,6 +139,7 @@ theorem wp_delElementB {s bitId : Common.AST.ident} {a : expr} {f : function} {Q
   rw [longs_upd] at harr'
   exact hQ m' harr' (Unch.store hst rfl) (Outside.store harr hw hst (Int.le_refl _)
     (by rw [show csize .Mint64 = 8 from rfl]; exact Int.le_refl _))
+    (fun z hz => Mem.store_valid_block_1 _ _ _ _ _ _ hst _ hz)
 
 theorem setRep_del {n M c : Nat} {ws : Nat → Lib.Integers.int64} {s : Hex.GraphIso.Nauty.VSet n}
     (h : SetRep (fun w => bv64 (ws w)) M s) (hc : c < 64 * M) :

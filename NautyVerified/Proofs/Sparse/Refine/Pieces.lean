@@ -131,6 +131,11 @@ theorem Frame.trans {L : Loc} {m₁ m₂ m₃ : mem} (h₁ : Frame L m₁ m₂) 
     fun z hz => (h₁.keep z hz).trans (h₂.keep z (h₁.valid z hz)),
     fun z hz => h₂.valid z (h₁.valid z hz)⟩
 
+/-- A store to one written block. -/
+theorem Frame.ofOne {L : Loc} {m m' : mem} {z : block} (hu : Unch m m' (· = z)) (hk : Keep m m' z)
+    (hg : ∀ y, Mem.valid_block m y → Mem.valid_block m' y) (hz : L.writes z) : Frame L m m' :=
+  ⟨hu.mono fun y hy => .inl (hy ▸ hz), fun y _ => if h : y = z then h ▸ hk else Keep.unch hu h, hg⟩
+
 /-- `numcells` is at most `n` plus the boundaries below `n`. -/
 def Budget {n : Nat} (level : Nat) (s : RefineSt n) : Prop :=
   s.numcells + n ≤ 2 * n + bcount s.ptn level n
@@ -139,7 +144,8 @@ variable {xi : ExternalCalls}
 
 /-! ## The passes -/
 
-/-- What a pass leaves: memory holding `t` exactly, a `Frame`, the temporaries with `t`'s code and queue length,
+/-- What a pass leaves: memory holding `t` exactly, a `Frame`, `t`'s code in
+range, the temporaries with `t`'s code and queue length,
 and the temporaries outside `temps` (and the arguments) unchanged. -/
 structure After {n : Nat} (L : Loc) (G : Hex.SparseGraph n) (t : RefineSt n)
     (temps : List ident) (le : temp_env) (m : mem) (le' : temp_env) (m' : mem) (S' : Scr) : Prop where
@@ -147,6 +153,7 @@ structure After {n : Nat} (L : Loc) (G : Hex.SparseGraph n) (t : RefineSt n)
   rep : Rep L t S'
   frame : Frame L m m'
   tmp : Tmp le' L t
+  code : t.longcode < 2 ^ 62
   temps : ∀ x, x ∉ temps → x ∉ args → x ≠ id.longcode → x ≠ id.nactive →
     PTree.get x le' = PTree.get x le
 

@@ -98,10 +98,10 @@ theorem D0_sem : D0.Sem where
     Set.eval_isElement harr (by omega) hs ha hty hc (by omega) hbit he find_naugraphBit
   addE := fun _ hM harr hs ha hty hc hbit he hQ =>
     Set.wp_addElementB harr (by omega) hs ha hty hc (by omega) find_naugraphBit hbit he
-      fun m' h1 h2 h3 => hQ m' h1 h2 (Alloc.KeepA.of_outside h2 h3 harr.base_nonneg)
+      fun m' h1 h2 h3 _ => hQ m' h1 h2 (Alloc.KeepA.of_outside h2 h3 harr.base_nonneg)
   delE := fun _ hM harr hs ha hty hc hbit he hQ =>
     Set.wp_delElementB harr (by omega) hs ha hty hc (by omega) find_naugraphBit hbit he
-      fun m' h1 h2 h3 => hQ m' h1 h2 (Alloc.KeepA.of_outside h2 h3 harr.base_nonneg)
+      fun m' h1 h2 h3 _ => hQ m' h1 h2 (Alloc.KeepA.of_outside h2 h3 harr.base_nonneg)
   mE := fun _ hm => ⟨hm, rfl⟩
 
 theorem D1_sem : D1.Sem where

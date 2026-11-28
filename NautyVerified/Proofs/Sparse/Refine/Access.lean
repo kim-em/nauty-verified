@@ -86,10 +86,10 @@ theorem eval_gw2 {le : temp_env} {m : mem} (hok : Ok n L) (hm : Mem m L G t S)
 /-- `work3[a]`. -/
 theorem eval_gw3 {le : temp_env} {m : mem} (hok : Ok n L) (hm : Mem m L G t S)
     {a : expr} {c : Nat} (ha : Exec.evalExpr sge empty_env le m a = some (.Vint (ir c)))
-    (hty : typeof a = tint) (hc : c < L.c3) :
+    (hty : typeof a = tint) (hc : c < n) :
     Exec.evalExpr sge empty_env le m (gix id.«nausparse:work3» a) =
       some (.Vint (ir S.w3[c]!)) :=
-  eval_idx hm.w3 hm.d3.capLt (eval_w3 hok hm) rfl rfl rfl a c hc ha hty
+  eval_idx hm.w3 (by have := hok.nlt; omega) (eval_w3 hok hm) rfl rfl rfl a c hc ha hty
 
 /-- `work4[a]`. -/
 theorem eval_gw4 {le : temp_env} {m : mem} (hok : Ok n L) (hm : Mem m L G t S)
@@ -169,14 +169,14 @@ theorem wp_storeW2 {f : function} {Q : Post} {le : temp_env} {m : mem} (hok : Ok
 
 /-- `work3[a] = x`. -/
 theorem wp_storeW3 {f : function} {Q : Post} {le : temp_env} {m : mem} (hok : Ok n L)
-    (hm : Mem m L G t S) (hsize : S.w3.size = L.c3) {a : expr} {c : Nat}
+    (hm : Mem m L G t S) (hsize : S.w3.size = n) {a : expr} {c : Nat}
     (ha : Exec.evalExpr sge empty_env le m a = some (.Vint (ir c))) (hty : typeof a = tint)
-    (hc : c < L.c3) {rhs : expr} {x : Nat}
+    (hc : c < n) {rhs : expr} {x : Nat}
     (hrhs : Exec.evalExpr sge empty_env le m rhs = some (.Vint (ir x))) (hrty : typeof rhs = tint)
     (hQ : ∀ m', Mem m' L G t { S with w3 := S.w3.set! c x } → Unch m m' (· = L.b3) →
       (∀ z, Mem.valid_block m z → Mem.valid_block m' z) → Q.normal E0 empty_env le m') :
     Wp xi sge f (.Sassign (gix id.«nausparse:work3» a) rhs) Q empty_env le m := by
-  refine wp_idx_store hm.w3 hm.d3.capLt (eval_w3 hok hm) rfl rfl rfl a c hc ha hty rhs tint hrty
+  refine wp_idx_store hm.w3 (by have := hok.nlt; omega) (eval_w3 hok hm) rfl rfl rfl a c hc ha hty rhs tint hrty
     _ (.Vint (ir x)) hrhs rfl rfl ?_
   intro m' harr hu hk hg
   refine hQ m' (hm.setW3 hok hu hk _ ?_) hu hg

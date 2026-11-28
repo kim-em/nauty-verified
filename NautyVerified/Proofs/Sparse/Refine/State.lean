@@ -164,7 +164,7 @@ structure Mem {n : Nat} (m : mem) (L : Loc) (G : Hex.SparseGraph n) (t : RefineS
   d4 : DynAt m Block.work4 Block.work4Sz 4 L.c4 L.b4
   w1 : ArrayAt m .Mint32 L.b1 0 S.w1 L.c1
   w2 : ArrayAt m .Mint32 L.b2 0 S.w2 L.c2
-  w3 : ArrayAt m .Mint32 L.b3 0 (ints S.w3) L.c3
+  w3 : ArrayAt m .Mint32 L.b3 0 (ints S.w3) n
   w4 : ArrayAt m .Mint32 L.b4 0 S.w4 L.c4
   k1 : MarksAt m L.mc1 L.mb1 S.st1 S.mk1
   k2 : Marks2.MarksAt m L.mc2 L.mb2 S.st2 S.mk2
@@ -172,12 +172,12 @@ structure Mem {n : Nat} (m : mem) (L : Loc) (G : Hex.SparseGraph n) (t : RefineS
   left : LeftbitTable m
 
 /-- The scratch holds `t`'s cell starts at every vertex and its queue, and
-`HITS` holds naturals of `int` range. -/
+`HITS` holds naturals of `int` range below `n`. -/
 structure Rep {n : Nat} (L : Loc) (t : RefineSt n) (S : Scr) : Prop where
   starts : ∀ v < n, S.w1 v = .Vint (ir t.cellstart[v]!)
   queue : ∀ i < t.queue.size, S.w2 i = .Vint (ir t.queue[i]!)
-  w3size : S.w3.size = L.c3
-  w3small : ∀ i < L.c3, S.w3[i]! < 2147483648
+  w3size : S.w3.size = n
+  w3small : ∀ i < n, S.w3[i]! < 2147483648
 
 /-- The temporaries hold `refine_sg`'s arguments, the graph's arrays and `t`'s
 code and queue length. -/
@@ -234,6 +234,25 @@ theorem Tmp.set {n : Nat} {le : temp_env} {L : Loc} {t : RefineSt n} (h : Tmp le
     · exact hx.1 hy
     · exact hx.2.1 hy
     · exact hx.2.2 hy
+
+/-- `Tmp` survives a change of temporaries outside `ws`, none of which is an
+argument, `longcode` or `nactive` (closed by `decide` for concrete lists). -/
+theorem Tmp.frame {n : Nat} {le le' : temp_env} {L : Loc} {t : RefineSt n} (h : Tmp le L t)
+    {ws : List Common.AST.ident} (ho : ∀ x, x ∉ ws → PTree.get x le' = PTree.get x le)
+    (hws : ∀ x ∈ ws, x ∉ args ∧ x ≠ id.longcode ∧ x ≠ id.nactive) : Tmp le' L t :=
+  h.temps fun x hx => ho x fun hm => by
+    have := hws x hm
+    rcases hx with hx | hx | hx
+    · exact this.1 hx
+    · exact this.2.1 hx
+    · exact this.2.2 hx
+
+/-- An exact queue has at most `n` entries. -/
+theorem queue_size_le {n : Nat} {active : Hex.GraphIso.Nauty.VSet n} {queue : Array Nat}
+    (h : Hex.GraphIso.Nauty.Sparse.ActiveQueue active queue) : queue.size ≤ n := by
+  have hs := List.Nodup.length_le_of_subset h.nodup (l₂ := List.range n)
+    fun x hx => List.mem_range.2 (h.bound hx)
+  simpa using hs
 
 /-- `Tmp` depends only on `t`'s `longcode` and queue length. -/
 theorem Tmp.congr {n : Nat} {le : temp_env} {L : Loc} {t t' : RefineSt n} (h : Tmp le L t)
@@ -438,7 +457,7 @@ theorem Mem.setW2 {n : Nat} {m m' : mem} {L : Loc} {G : Hex.SparseGraph n}
 theorem Mem.setW3 {n : Nat} {m m' : mem} {L : Loc} {G : Hex.SparseGraph n}
     {t : RefineSt n} {S : Scr} (hok : Ok n L) (h : Mem m L G t S)
     (hu : Unch m m' (· = L.b3)) (hk : Keep m m' L.b3) (w : Array Nat)
-    (harr : ArrayAt m' .Mint32 L.b3 0 (ints w) L.c3) :
+    (harr : ArrayAt m' .Mint32 L.b3 0 (ints w) n) :
     Mem m' L G t { S with w3 := w } where
   graph := h.graph.unch hu (fun e => hok.rw L.bsg (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (fun e => hok.rw L.bv (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (fun e => hok.rw L.bd (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (fun e => hok.rw L.be (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks]))
   lab := h.lab.unch hu (pw_ne hok.wdistinct 0 7 (by decide) (by simp [Loc.wblocks]))

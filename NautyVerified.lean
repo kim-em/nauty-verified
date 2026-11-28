@@ -343,3 +343,4 @@ import NautyVerified.Proofs.Sparse.Bestcell.Spec
 import NautyVerified.Proofs.Sparse.Bestcell.Syntax
 import NautyVerified.Proofs.Sparse.Targetcell.Satisfies
 import NautyVerified.Proofs.Sparse.Bestcell.Model
+import NautyVerified.Proofs.Sparse.Refine.Ops
