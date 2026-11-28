@@ -169,7 +169,7 @@ theorem wp_dist (hC : CountPass (xi := xi)) {Q : Post} {le : temp_env} {m : mem}
           fun _ => (hok.wr h4w (by simp [Loc.rblocks])).symm⟩
       · exact ⟨hwv _ h3w, by rw [w4_eq]; exact hok.wr h3w (by simp [Loc.rblocks]),
           by rw [w4s_eq]; exact hok.wr h3w (by simp [Loc.rblocks]), fun _ => h34⟩
-    · rintro tr - m2 ⟨rfl, harr, hk3, c4', b4', hd4, hn4, hor, hu2, hg2⟩
+    · rintro tr - m2 ⟨rfl, harr, hk3, hout3, c4', b4', hd4, hn4, hor, hu2, hg2⟩
       simp only [set_opttemp, E0_append]
       have hcq : 0 < c4' := by have := hok.n0; omega
       obtain ⟨w4v, hw4⟩ := Alloc.malloced_array (hd4.mal hcq) .Mint32 4 rfl rfl c4' (by omega)
@@ -182,6 +182,7 @@ theorem wp_dist (hC : CountPass (xi := xi)) {Q : Post} {le : temp_env} {m : mem}
           · exact .inr (.inr (.inr (.inl h)))
           · exact .inr (.inl h)
           · exact .inr (.inr (.inr (.inr (h ▸ hnv))))) hk3 hd4 hw4 harr
+        (let ⟨T, hT, ha⟩ := hm3.hi; ⟨T, hT, ha.past hout3 (Int.le_refl _)⟩)
       have hok' := hok.with4 hm3 hbe1 hn4 hor
       have hor' : (c4' = L.c4 ∧ b4' = L.b4) ∨ ¬ Mem.valid_block m b4' :=
         hor.imp_right fun h hv => h (hf1.valid _ hv)

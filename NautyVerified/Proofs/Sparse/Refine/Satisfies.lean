@@ -53,7 +53,7 @@ def SgOut (G : Hex.SparseGraph n) (L : Loc) (lab ptn : Array Nat) (active : VSet
       (Hex.GraphIso.Nauty.Sparse.refine (.ofGraph G) L.level lab ptn active numcells).longcode)) 1 ∧
     (∃ c1 b1 c2 b2 c3 b3 c4 b4 mc1 mb1 mc2 mb2,
       ScrAt n m' (L.withScr c1 b1 c2 b2 c3 b3 c4 b4 mc1 mb1 mc2 mb2) ∧
-      n ≤ c1 ∧ n ≤ c2 ∧ n ≤ c3 ∧ n ≤ c4 ∧ n ≤ mc1 ∧ n ≤ mc2 ∧
+      Ok n (L.withScr c1 b1 c2 b2 c3 b3 c4 b4 mc1 mb1 mc2 mb2) ∧ n ≤ c1 ∧ n ≤ c2 ∧ n ≤ c3 ∧ n ≤ c4 ∧ n ≤ mc1 ∧ n ≤ mc2 ∧
       Slot m L.c1 L.b1 c1 b1 ∧ Slot m L.c2 L.b2 c2 b2 ∧ Slot m L.c3 L.b3 c3 b3 ∧
       Slot m L.c4 L.b4 c4 b4 ∧ Slot m L.mc1 L.mb1 mc1 mb1 ∧ Slot m L.mc2 L.mb2 mc2 mb2) ∧
     Unch m m' (fun z => z ∈ L.cblocks ∨ proSet L m z) ∧ (∀ z ∈ L.cblocks, Keep m m' z) ∧
@@ -136,7 +136,7 @@ theorem sgOut_of {G : Hex.SparseGraph n} {L : Loc} {lab ptn : Array Nat} {active
     {t : RefineSt n} {S : Scr}
     (hm : Mem m' (L.withScr c1 b1 c2 b2 c3 b3 c4 b4 mc1 mb1 mc2 mb2) G t S)
     (hok : Ok n (L.withScr c1 b1 c2 b2 c3 b3 c4 b4 mc1 mb1 mc2 mb2))
-    (hws : S.w3.size = n) (hwl : ∀ i < n, S.w3[i]! < 2147483648)
+    (hwl : ∀ i < n, S.w3[i]! < 2147483648)
     (hl : t.lab = (Hex.GraphIso.Nauty.Sparse.refine (.ofGraph G) L.level lab ptn active numcells).lab)
     (hp : t.ptn = (Hex.GraphIso.Nauty.Sparse.refine (.ofGraph G) L.level lab ptn active numcells).ptn)
     (hn : t.numcells =
@@ -151,8 +151,8 @@ theorem sgOut_of {G : Hex.SparseGraph n} {L : Loc} {lab ptn : Array Nat} {active
     SgOut G L lab ptn active numcells m m' := by
   refine ⟨hl ▸ hm.lab, hp ▸ hm.ptn, hn ▸ hm.nc, ⟨S.aw, hm.act, ha ▸ hm.actRep⟩, hk,
     ⟨c1, b1, c2, b2, c3, b3, c4, b4, mc1, mb1, mc2, mb2,
-      ⟨hm.d1, hm.d2, hm.d3, hm.d4, fun _ => ⟨S.w3, hws, hm.w3, hwl⟩, ⟨_, _, hm.k1⟩, ⟨_, _, hm.k2⟩⟩,
-      hok.c1, hok.c2, hok.c3, hok.c4, hok.mc1, hok.mc2, s1, s2, s3, s4, s5, s6⟩, hu, hkp, hv⟩
+      ⟨hm.d1, hm.d2, hm.d3, hm.d4, (let ⟨_, hT, ht⟩ := hm.hi; HitsOk.join hm.w3 hwl hT ht hok.c3),
+        ⟨_, _, hm.k1⟩, ⟨_, _, hm.k2⟩⟩, hok, hok.c1, hok.c2, hok.c3, hok.c4, hok.mc1, hok.mc2, s1, s2, s3, s4, s5, s6⟩, hu, hkp, hv⟩
 
 theorem slot_pro {m : mem} {L : Loc} {c c' : Nat} {b b' : block} (s : Slot m c b c' b') (hc : 0 < c')
     (hu : 0 < c → L.scrUsed b) : proSet L m b' := by
@@ -254,7 +254,7 @@ theorem refine_sg_satisfies_of (hC : CountPass (xi := xi)) (hT : TrivialPass (xi
     intro m3 hm3 hk3 hu3 hka3 hg3
     apply wp_return_none (Nextelement.free_empty m3)
     have hr0 := refine_empty (.ofGraph G) L.level lab ptn active numcells hq
-    refine ⟨by simp, sgOut_of hm3 hok (by rw [hw32]; exact hHs) (by rw [hw32]; exact hHl)
+    refine ⟨by simp, sgOut_of hm3 hok (by rw [hw32]; exact hHl)
       (by rw [hr0]) (by rw [hr0]) (by rw [hr0]) (by rw [hr0]) (by rw [hr0]; exact hk3)
       s1 s2 s3 s4 s5 s6 (hu12.trans (hu3.mono fun z hz => .inl (by rw [hz]; simp [Loc.cblocks, Loc.withScr])))
       (fun z hz => ((hk1 z hz).trans (Keep.unch hu2 fun h => hcp z hz (h ▸ hb2p))).trans (hka3 z))
@@ -352,7 +352,7 @@ theorem refine_sg_satisfies_of (hC : CountPass (xi := xi)) (hT : TrivialPass (xi
         (Hex.GraphIso.Nauty.Sparse.Refinement.finish s).longcode =
           Hex.GraphIso.Nauty.cleanup (Hex.GraphIso.Nauty.mash s.longcode s.numcells) :=
       fun _ => ⟨rfl, rfl, rfl, rfl, rfl⟩
-    refine ⟨m6, Nextelement.free_empty m6, by simp, sgOut_of (c4 := c4') (b4 := b4') hm6 hok2 hr5.w3size
+    refine ⟨m6, Nextelement.free_empty m6, by simp, sgOut_of (c4 := c4') (b4 := b4') hm6 hok2
       hr5.w3small (by rw [hfin, (hfl _).1]; exact hsame.lab.symm)
       (by rw [hfin, (hfl _).2.1]; exact hsame.ptn.symm)
       (by rw [hfin, (hfl _).2.2.1]; exact hsame.numcells.symm)

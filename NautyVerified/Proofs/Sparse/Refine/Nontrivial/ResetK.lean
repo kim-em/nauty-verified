@@ -42,6 +42,7 @@ theorem Mem.setK1 {n : Nat} {m m' : mem} {L : Loc} {G : Hex.SparseGraph n}
   w1 := h.w1.unch hu (fun hh => hh.elim (pw_ne hok.wdistinct 5 11 (by decide) (by simp [Loc.wblocks])) (fun hh2 => (pw_ne hok.wdistinct 5 9 (by decide) (by simp [Loc.wblocks])) hh2.2))
   w2 := h.w2.unch hu (fun hh => hh.elim (pw_ne hok.wdistinct 6 11 (by decide) (by simp [Loc.wblocks])) (fun hh2 => (pw_ne hok.wdistinct 6 9 (by decide) (by simp [Loc.wblocks])) hh2.2))
   w3 := h.w3.unch hu (fun hh => hh.elim (pw_ne hok.wdistinct 7 11 (by decide) (by simp [Loc.wblocks])) (fun hh2 => (pw_ne hok.wdistinct 7 9 (by decide) (by simp [Loc.wblocks])) hh2.2))
+  hi := h.hi.unch hu (fun hh => hh.elim (pw_ne hok.wdistinct 7 11 (by decide) (by simp [Loc.wblocks])) (fun hh2 => (pw_ne hok.wdistinct 7 9 (by decide) (by simp [Loc.wblocks])) hh2.2))
   w4 := h.w4.unch hu (fun hh => hh.elim (pw_ne hok.wdistinct 8 11 (by decide) (by simp [Loc.wblocks])) (fun hh2 => (pw_ne hok.wdistinct 8 9 (by decide) (by simp [Loc.wblocks])) hh2.2))
   actRep := h.actRep
   code := let ⟨kv, hkv⟩ := h.code; ⟨kv, hkv.unch hu (fun hh => hh.elim (pw_ne hok.wdistinct 4 11 (by decide) (by simp [Loc.wblocks])) (fun hh2 => (pw_ne hok.wdistinct 4 9 (by decide) (by simp [Loc.wblocks])) hh2.2))⟩

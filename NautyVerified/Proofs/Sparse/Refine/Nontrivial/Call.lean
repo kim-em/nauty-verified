@@ -102,6 +102,7 @@ theorem Mem.setW4Call {n : Nat} {m m' : mem} {L : Loc} {G : Hex.SparseGraph n}
   w1 := h.w1.unch hu (fun hh => hh.elim (pw_ne hok.wdistinct 5 8 (by decide) (by simp [Loc.wblocks])) (fun hnv => hnv (hv _ (by simp [Loc.wblocks]))))
   w2 := h.w2.unch hu (fun hh => hh.elim (pw_ne hok.wdistinct 6 8 (by decide) (by simp [Loc.wblocks])) (fun hnv => hnv (hv _ (by simp [Loc.wblocks]))))
   w3 := h.w3.unch hu (fun hh => hh.elim (pw_ne hok.wdistinct 7 8 (by decide) (by simp [Loc.wblocks])) (fun hnv => hnv (hv _ (by simp [Loc.wblocks]))))
+  hi := h.hi.unch hu (fun hh => hh.elim (pw_ne hok.wdistinct 7 8 (by decide) (by simp [Loc.wblocks])) (fun hnv => hnv (hv _ (by simp [Loc.wblocks]))))
   actRep := h.actRep
   code := let ⟨kv, hkv⟩ := h.code; ⟨kv, hkv.unch hu (fun hh => hh.elim (pw_ne hok.wdistinct 4 8 (by decide) (by simp [Loc.wblocks])) (fun hnv => hnv (hv _ (by simp [Loc.wblocks]))))⟩
   d1 := h.d1.keep hu (fun hh => hh.elim (fun e => hok.rw Sparse.Block.work1 (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (fun hnv => hnv (hv _ (by simp [Loc.rblocks])))) (fun hh => hh.elim (fun e => hok.rw Sparse.Block.work1Sz (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (fun hnv => hnv (hv _ (by simp [Loc.rblocks])))) (fun _ => Keep.unch hu (fun hh => hh.elim (pw_ne hok.wdistinct 5 8 (by decide) (by simp [Loc.wblocks])) (fun hnv => hnv (hv _ (by simp [Loc.wblocks])))))

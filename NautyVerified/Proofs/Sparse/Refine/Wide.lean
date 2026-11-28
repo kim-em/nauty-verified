@@ -139,7 +139,7 @@ theorem Mem.swap4 {m m' : mem} {W : block → Prop} (hok : Ok n L) (hm : Mem m L
     (hk3 : Keep m m' L.b3) {c4 : Nat} {b4 : block}
     (hd4 : DynAt m' Block.work4 Block.work4Sz 4 c4 b4) {w4 : Nat → val}
     (hw4 : ArrayAt m' .Mint32 b4 0 w4 c4) {w3 : Array Nat}
-    (hw3 : ArrayAt m' .Mint32 L.b3 0 (ints w3) n) :
+    (hw3 : ArrayAt m' .Mint32 L.b3 0 (ints w3) n) (hhi : W3Hi m' L n) :
     Mem m' (L.with4 b4 c4) G t { S with w3, w4 } := by
   have hwv := hm.wvalid hok
   have hrv := hm.rvalid hok hbe
@@ -192,6 +192,7 @@ theorem Mem.swap4 {m m' : mem} {W : block → Prop} (hok : Ok n L) (hm : Mem m L
       w2 := hm.w2.unch hu (nw _ (by simp [Loc.wblocks]) (pw_ne d 6 7 (by decide) (by simp [Loc.wblocks]))
         (pw_ne d 6 8 (by decide) (by simp [Loc.wblocks])))
       w3 := hw3
+      hi := hhi
       w4 := hw4
       k1 := hm.k1.unch hu (nr _ (by simp [Loc.rblocks]) (by decide) (by decide))
         (nr _ (by simp [Loc.rblocks]) (by decide) (by decide))

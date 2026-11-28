@@ -39,39 +39,43 @@ theorem eval_work4 {le : temp_env} {m : mem} {bQ : block}
 /-- `dist` after `fill` has run up to `k`. -/
 def filled (n : Nat) (dv : Nat → val) (k x : Nat) : val := if x < k then .Vint (ir n) else dv x
 
+/-- `m'` is `m` changed in `bD` only inside the `n` entries from `Dofs`. -/
+abbrev DOut (m m' : mem) (bD : block) (Dofs : ptrofs) (n : Nat) : Prop :=
+  Outside m m' bD (intOfZ (Ptrofs.unsigned Dofs)) (intOfZ (Ptrofs.unsigned Dofs) + csize .Mint32 * n)
+
 /-- The fill loop. -/
 theorem wp_fill {Q : Post} {le : temp_env} {m : mem} {bD : block} {Dofs : ptrofs}
     {dv : Nat → val} {n : Nat}
     (hd : PTree.get id.dist le = some (.Vptr bD Dofs)) (hnv : PTree.get id.n le = some (.Vint (ir n)))
     (hn : n < 2147483648) (harr : ArrayAt m .Mint32 bD (intOfZ (Ptrofs.unsigned Dofs)) dv n)
     (hQ : ∀ le' m', ArrayAt m' .Mint32 bD (intOfZ (Ptrofs.unsigned Dofs)) (fun _ => .Vint (ir n)) n →
-      Unch m m' (· = bD) → Alloc.Keep m m' bD → (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
+      Unch m m' (· = bD) → DOut m m' bD Dofs n → Alloc.Keep m m' bD → (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
       (∀ x, x ≠ id.i → PTree.get x le' = PTree.get x le) → Q.normal E0 empty_env le' m') :
     Wp xi sge F fill Q empty_env le m := by
   let Inv := fun (k : Nat) (le' : temp_env) (m' : mem) => k ≤ n ∧
     PTree.get id.i le' = some (.Vint (ir k)) ∧ PTree.get id.n le' = some (.Vint (ir n)) ∧
     ArrayAt m' .Mint32 bD (intOfZ (Ptrofs.unsigned Dofs)) (filled n dv k) n ∧ Unch m m' (· = bD) ∧
-    Alloc.Keep m m' bD ∧ (∀ z, Mem.valid_block m z → Mem.valid_block m' z) ∧
+    DOut m m' bD Dofs n ∧ Alloc.Keep m m' bD ∧ (∀ z, Mem.valid_block m z → Mem.valid_block m' z) ∧
     ∀ x, x ≠ id.i → PTree.get x le' = PTree.get x le
   let Mid := fun (k : Nat) (le' : temp_env) (m' : mem) =>
     PTree.get id.i le' = some (.Vint (ir k)) ∧ k < n ∧ PTree.get id.n le' = some (.Vint (ir n)) ∧
     ArrayAt m' .Mint32 bD (intOfZ (Ptrofs.unsigned Dofs)) (filled n dv (k + 1)) n ∧ Unch m m' (· = bD) ∧
-    Alloc.Keep m m' bD ∧ (∀ z, Mem.valid_block m z → Mem.valid_block m' z) ∧
+    DOut m m' bD Dofs n ∧ Alloc.Keep m m' bD ∧ (∀ z, Mem.valid_block m z → Mem.valid_block m' z) ∧
     ∀ x, x ≠ id.i → PTree.get x le' = PTree.get x le
   refine wp_forLoop id.i id.n _ n hn Inv Mid ?_ ?_ ?_ ?_ ?_
   · rintro k le' m' ⟨hk, hi, hn', -⟩
     exact ⟨hk, hi, hn'⟩
   · refine ⟨Nat.zero_le _, temps_gss _ _ _, by rw [temps_gso _ _ (by decide)]; exact hnv,
-      harr.congr fun p _ => by simp [filled], Unch.refl _ _, Alloc.Keep.refl _ _, fun _ h => h,
+      harr.congr fun p _ => by simp [filled], Unch.refl _ _, Outside.refl _ _ _ _, Alloc.Keep.refl _ _, fun _ h => h,
       fun x hx => temps_gso _ _ hx⟩
-  · rintro k le' m' hk ⟨-, hi, hn', harr', hu, hkp, hg, ho⟩
+  · rintro k le' m' hk ⟨-, hi, hn', harr', hu, hout, hkp, hg, ho⟩
     have hd' : PTree.get id.dist le' = some (.Vptr bD Dofs) := by rw [ho _ (by decide)]; exact hd
     wp_step; wp_step
-    refine wp_idx_store (chunk := .Mint32) (pe := .Etempvar id.dist (tptr tint)) harr' hn
-      (by simp only [Exec.evalExpr]; exact hd')
+    refine wp_idx_store_out (chunk := .Mint32) (pe := .Etempvar id.dist (tptr tint)) harr' hn
+      (Int.le_refl _) (Int.le_refl _) (by simp only [Exec.evalExpr]; exact hd')
       rfl rfl rfl (tv id.i) k hk hi rfl (tv id.n) tint rfl (.Vint (ir n)) (.Vint (ir n)) hn' rfl rfl ?_
-    intro m'' harr'' hu' hk' hg'
-    refine ⟨by simp, hi, hk, hn', harr''.congr fun p _ => ?_, hu.trans hu', hkp.trans hk',
+    intro m'' harr'' hout' hu' hk' hg'
+    refine ⟨by simp, hi, hk, hn', harr''.congr fun p _ => ?_, hu.trans hu', hout.trans hout', hkp.trans hk',
       fun z h => hg' _ (hg _ h), ho⟩
     simp only [upd, filled]
     by_cases hp : p = k
@@ -80,12 +84,12 @@ theorem wp_fill {Q : Post} {le : temp_env} {m : mem} {bD : block} {Dofs : ptrofs
       by_cases hpk : p < k
       · rw [ite_eq_left hpk, ite_eq_left (by omega)]
       · rw [ite_eq_right hpk, ite_eq_right (by omega)]
-  · rintro k le' m' ⟨hi, hk, hn', harr', hu, hkp, hg, ho⟩
+  · rintro k le' m' ⟨hi, hk, hn', harr', hu, hout, hkp, hg, ho⟩
     exact ⟨hi, by omega, temps_gss _ _ _,
-      by rw [temps_gso _ _ (by decide)]; exact hn', harr', hu, hkp, hg,
+      by rw [temps_gso _ _ (by decide)]; exact hn', harr', hu, hout, hkp, hg,
       fun x hx => by rw [temps_gso _ _ hx, ho x hx]⟩
-  · rintro le' m' ⟨-, -, -, harr', hu, hkp, hg, ho⟩
-    exact hQ le' m' (harr'.congr fun p hp => by simp [filled, hp]) hu hkp hg ho
+  · rintro le' m' ⟨-, -, -, harr', hu, hout, hkp, hg, ho⟩
+    exact hQ le' m' (harr'.congr fun p hp => by simp [filled, hp]) hu hout hkp hg ho
 
 /-- The queue `q` below `t` in the values `qv`. -/
 abbrev QueueIs (qv : Nat → val) (q : Array Nat) (t : Nat) : Prop :=
@@ -171,8 +175,8 @@ theorem wp_edges {n : Nat} {Q : Post} {le : temp_env} {m : mem} {G : Hex.SparseG
         (scan (Graph.ofGraph G) (d[I]! + 1) (d, q, t) (List.range' VI D)).2.2 →
       PTree.get id.tail le' =
         some (.Vint (ir (scan (Graph.ofGraph G) (d[I]! + 1) (d, q, t) (List.range' VI D)).2.2)) →
-      Unch m m' (fun z => z = bD ∨ z = bQ) → Alloc.Keep m m' bD → Alloc.Keep m m' bQ →
-      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
+      Unch m m' (fun z => z = bD ∨ z = bQ) → DOut m m' bD Dofs n → Alloc.Keep m m' bD →
+      Alloc.Keep m m' bQ → (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
       (∀ x, ¬ EdgeLocal x → PTree.get x le' = PTree.get x le) → Q.normal E0 empty_env le' m') :
     Wp xi sge F edges Q empty_env le m := by
   let g := Graph.ofGraph G
@@ -197,7 +201,7 @@ theorem wp_edges {n : Nat} {Q : Post} {le : temp_env} {m : mem} {G : Hex.SparseG
     PTree.get id.tail le' = some (.Vint (ir (S k).2.2)) ∧
     ArrayAt m' .Mint32 bD (intOfZ (Ptrofs.unsigned Dofs)) (ints (S k).1) n ∧
     ArrayAt m' .Mint32 bQ 0 qv' n ∧ QueueIs qv' (S k).2.1 (S k).2.2 ∧
-    Unch m m' (fun z => z = bD ∨ z = bQ) ∧ Alloc.Keep m m' bD ∧ Alloc.Keep m m' bQ ∧
+    Unch m m' (fun z => z = bD ∨ z = bQ) ∧ DOut m m' bD Dofs n ∧ Alloc.Keep m m' bD ∧ Alloc.Keep m m' bQ ∧
     (∀ z, Mem.valid_block m z → Mem.valid_block m' z) ∧
     ∀ x, ¬ EdgeLocal x → PTree.get x le' = PTree.get x le
   let I' := fun (v : Nat) (tr : trace) (e' : env) (le' : temp_env) (m' : mem) => tr = E0 ∧
@@ -210,9 +214,9 @@ theorem wp_edges {n : Nat} {Q : Post} {le : temp_env} {m : mem} {G : Hex.SparseG
   refine wp_loop (I := I') (J := J') ?_ ?_ (n := D - 0)
     ⟨rfl, rfl, 0, Nat.zero_le _, rfl, qv, temps_gss _ _ _,
       by rw [temps_gso _ _ (by decide)]; exact htail, hdarr, hqarr, hq, Unch.refl _ _,
-      Alloc.Keep.refl _ _, Alloc.Keep.refl _ _, fun _ h => h,
+      Outside.refl _ _ _ _, Alloc.Keep.refl _ _, Alloc.Keep.refl _ _, fun _ h => h,
       fun x hx => temps_gso _ _ (fun h => hx (.inl h))⟩
-  · rintro v tr e' le' m' ⟨rfl, rfl, k, hk, rfl, qv', hj, ht, hda, hqa, hqi, hu, hkD, hkQ, hg, ho⟩
+  · rintro v tr e' le' m' ⟨rfl, rfl, k, hk, rfl, qv', hj, ht, hda, hqa, hqi, hu, hout, hkD, hkQ, hg, ho⟩
     have hc' := (hc.temps ho).mem hu
     wp_step; wp_step; wp_step
     apply wp_if_eval
@@ -253,14 +257,14 @@ theorem wp_edges {n : Nat} {Q : Post} {le : temp_env} {m : mem} {G : Hex.SparseG
           (le := PTree.set id.k (.Vint (ir (g.neighbor (VI + k)))) le') hda hn31
           (by simp only [Exec.evalExpr]; exact hc''.hdist) rfl rfl rfl (tv id.i) _ hc''.hI hc''.hi rfl
         wp_step; wp_step; wp_step
-        refine wp_idx_store (pe := .Etempvar id.dist (tptr tint)) hda hn31
-          (by simp only [Exec.evalExpr]; exact hc''.hdist) rfl rfl rfl (tv id.k) _ hnb hkv rfl
+        refine wp_idx_store_out (pe := .Etempvar id.dist (tptr tint)) hda hn31
+          (Int.le_refl _) (Int.le_refl _) (by simp only [Exec.evalExpr]; exact hc''.hdist) rfl rfl rfl (tv id.k) _ hnb hkv rfl
           (.Ebinop .Oadd (dat (tv id.i)) (ci 1 tint) tint) tint rfl (.Vint (ir (next : Nat)))
           (.Vint (ir (next : Nat))) (by
             rw [Exec.evalExpr, hdatI]
             simp only [ints, hSI, Exec.evalExpr, typeof, cop, ir_add, next]
             push_cast; rfl) rfl rfl ?_
-        intro m1 hda1 hu1 hk1 hg1
+        intro m1 hda1 hout1 hu1 hk1 hg1
         dsimp only
         wp_step; wp_step; wp_step; wp_step
         have ht1 : PTree.get id.tail (PTree.set id.k (.Vint (ir (g.neighbor (VI + k)))) le') =
@@ -284,7 +288,7 @@ theorem wp_edges {n : Nat} {Q : Post} {le : temp_env} {m : mem} {G : Hex.SparseG
           by rw [temps_gso _ _ (by decide), temps_gso _ _ (by decide), temps_gso _ _ (by decide)]; exact hj,
           by rw [hSk1, temps_gss]; push_cast; rfl,
           ?_, hqa2, ?_, (hu.trans (hu1.mono fun z hz => .inl hz)).trans (hu2.mono fun z hz => .inr hz),
-          (hkD.trans hk1).trans (Alloc.Keep.unch hu2 hc.bDQ),
+          (hout.trans hout1).trans (Outside.of_unch hu2 hc.bDQ _ _), (hkD.trans hk1).trans (Alloc.Keep.unch hu2 hc.bDQ),
           (hkQ.trans (Alloc.Keep.unch hu1 (fun h => hc.bDQ h.symm))).trans hk2,
           fun z h => hg2 _ (hg1 _ (hg _ h)), fun x hx => ?_⟩
         · refine (hda1.unch hu2 hc.bDQ).congr fun p hp => ?_
@@ -314,20 +318,20 @@ theorem wp_edges {n : Nat} {Q : Post} {le : temp_env} {m : mem} {G : Hex.SparseG
         apply wp_skip
         refine ⟨by simp, rfl, k, hkD', rfl, qv', by rw [temps_gso _ _ (by decide)]; exact hj,
           by rw [hSk1, temps_gso _ _ (by decide)]; exact ht, by rw [hSk1]; exact hda, hqa,
-          by rw [hSk1]; exact hqi, hu, hkD, hkQ, hg, fun x hx => ?_⟩
+          by rw [hSk1]; exact hqi, hu, hout, hkD, hkQ, hg, fun x hx => ?_⟩
         rw [temps_gso _ _ (fun h => hx (.inr (.inl h))), ho x hx]
     · rw [ite_eq_right (by simpa using hkD')]
       apply wp_break
       have : k = D := by omega
       subst this
-      exact hQ le' m' qv' hda hqa hqi ht hu hkD hkQ hg ho
-  · rintro v tr e' le' m' ⟨rfl, rfl, k, hk, rfl, qv', hj, ht, hda, hqa, hqi, hu, hkD, hkQ, hg, ho⟩
+      exact hQ le' m' qv' hda hqa hqi ht hu hout hkD hkQ hg ho
+  · rintro v tr e' le' m' ⟨rfl, rfl, k, hk, rfl, qv', hj, ht, hda, hqa, hqi, hu, hout, hkD, hkQ, hg, ho⟩
     wp_step; wp_step
     apply wp_set_eval
     rw [Exec.evalExpr, show Exec.evalExpr sge empty_env le' m' (tl id.j) = _ from hj]
     simp only [Exec.evalExpr, typeof, cop, Alloc.add_lr_one]
     exact ⟨D - (k + 1), by omega, by simp, rfl, k + 1, by omega, rfl, qv', temps_gss _ _ _,
-      by rw [temps_gso _ _ (by decide)]; exact ht, hda, hqa, hqi, hu, hkD, hkQ, hg,
+      by rw [temps_gso _ _ (by decide)]; exact ht, hda, hqa, hqi, hu, hout, hkD, hkQ, hg,
       fun x hx => by rw [temps_gso _ _ (fun h => hx (.inl h)), ho x hx]⟩
 
 end NautyVerified.Proofs.Sparse.Distvals

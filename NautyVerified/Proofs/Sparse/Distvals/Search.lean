@@ -91,7 +91,7 @@ def At {n : Nat} (m m' : mem) (le le' : temp_env) (G : Hex.SparseGraph n) (bD : 
     PTree.get id.head le' = some (.Vint (ir s.head)) ∧ PTree.get id.tail le' = some (.Vint (ir s.tail)) ∧
     ArrayAt m' .Mint32 bD (intOfZ (Ptrofs.unsigned Dofs)) (ints s.dist) n ∧
     ArrayAt m' .Mint32 bQ 0 qv n ∧ QueueIs qv s.queue s.tail ∧
-    Unch m m' (fun z => z = bD ∨ z = bQ) ∧ Alloc.Keep m m' bD ∧ Alloc.Keep m m' bQ ∧
+    Unch m m' (fun z => z = bD ∨ z = bQ) ∧ DOut m m' bD Dofs n ∧ Alloc.Keep m m' bD ∧ Alloc.Keep m m' bQ ∧
     (∀ z, Mem.valid_block m z → Mem.valid_block m' z) ∧
     ∀ x, ¬ SearchLocal x → PTree.get x le' = PTree.get x le
 
@@ -105,7 +105,7 @@ theorem wp_body {n : Nat} {Q : Post} {le le' le1 : temp_env} {m m' : mem} {G : H
     (hQ : ∀ le'' m'' s' qv', n - s'.head < n - s.head → At m m'' le le'' G bD Dofs bQ v0 s' qv' →
       Q.normal E0 empty_env le'' m'') :
     Wp xi sge F step Q empty_env le1 m' := by
-  obtain ⟨hgood, hht', hrun, hhd, htl, hda, hqa, hqi, hu, hkD, hkQ, hg, ho⟩ := hA
+  obtain ⟨hgood, hht', hrun, hhd, htl, hda, hqa, hqi, hu, hout, hkD, hkQ, hg, ho⟩ := hA
   have hn31 := hc.n31
   have hTn := hgood.tle
   have hH : s.head < n := by omega
@@ -177,10 +177,10 @@ theorem wp_body {n : Nat} {Q : Post} {le le' le1 : temp_env} {m m' : mem} {G : H
     (by rw [temps_gso _ _ (by decide), temps_gso _ _ (by decide), temps_gso _ _ (by decide),
           temps_gso _ _ (by decide), temps_gso _ _ (by decide), h1 _ (by decide)]; exact htl)
     hda hqa hqi ?_
-  intro le'' m'' qv'' hda'' hqa'' hqi'' htl'' hu'' hkD'' hkQ'' hg'' ho''
+  intro le'' m'' qv'' hda'' hqa'' hqi'' htl'' hu'' hout'' hkD'' hkQ'' hg'' ho''
   have hO := Good.outer (rows_ofGraph G) hgood hns
   refine hQ le'' m'' (outer (Graph.ofGraph G) s) qv'' (by rw [hO.2.1]; omega) ⟨hO.1, hO.2.2, ?_, ?_, htl'', hda'', hqa'',
-    hqi'', hu.trans hu'', hkD.trans hkD'', hkQ.trans hkQ'', fun z h => hg'' _ (hg _ h), fun x hx => ?_⟩
+    hqi'', hu.trans hu'', hout.trans hout'', hkD.trans hkD'', hkQ.trans hkQ'', fun z h => hg'' _ (hg _ h), fun x hx => ?_⟩
   · rw [hO.2.1, ← hrun, show n - s.head = (n - (s.head + 1)) + 1 by omega, run_succ hns]
   · rw [hO.2.1, ho'' _ (by decide), temps_gso _ _ (by decide), temps_gso _ _ (by decide),
       temps_gso _ _ (by decide), temps_gss]
@@ -198,7 +198,7 @@ theorem wp_search {n : Nat} {Q : Post} {le : temp_env} {m : mem} {G : Hex.Sparse
     (hQ : ∀ le' m', ArrayAt m' .Mint32 bD (intOfZ (Ptrofs.unsigned Dofs))
         (ints (distvals (Graph.ofGraph G) v0)) n →
       (∃ qv', ArrayAt m' .Mint32 bQ 0 qv' n) → Unch m m' (fun z => z = bD ∨ z = bQ) →
-      Alloc.Keep m m' bD → Alloc.Keep m m' bQ → (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
+      DOut m m' bD Dofs n → Alloc.Keep m m' bD → Alloc.Keep m m' bQ → (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
       (∀ x, ¬ SearchLocal x → PTree.get x le' = PTree.get x le) → Q.normal E0 empty_env le' m') :
     Wp xi sge F search Q empty_env le m := by
   have hn31 := hc.n31
@@ -211,10 +211,10 @@ theorem wp_search {n : Nat} {Q : Post} {le : temp_env} {m : mem} {G : Hex.Sparse
   dsimp only
   wp_step; wp_step; wp_step
   have hda1 := hdarr.unch hu1 (fun h => hc.bDQ h)
-  refine wp_idx_store (pe := .Etempvar id.dist (tptr tint)) hda1 hn31
-    (by simp only [Exec.evalExpr]; exact hc.hdist) rfl rfl rfl (tv id.v0) v0 hv0n hv0 rfl
+  refine wp_idx_store_out (pe := .Etempvar id.dist (tptr tint)) hda1 hn31
+    (Int.le_refl _) (Int.le_refl _) (by simp only [Exec.evalExpr]; exact hc.hdist) rfl rfl rfl (tv id.v0) v0 hv0n hv0 rfl
     (ci 0 tint) tint rfl (.Vint (ir 0)) (.Vint (ir 0)) rfl rfl rfl ?_
-  intro m2 hda2 hu2 hk2 hg2
+  intro m2 hda2 hout2 hu2 hk2 hg2
   dsimp only
   have hqa2 := hqa1.unch hu2 (fun h => hc.bDQ h.symm)
   let s0 := start n v0
@@ -225,7 +225,7 @@ theorem wp_search {n : Nat} {Q : Post} {le : temp_env} {m : mem} {G : Hex.Sparse
       by simp only [le0, s0, start]; rw [temps_gss]; rfl,
       hda2.congr fun p hp => ?_, hqa2, fun p hp => ?_,
       (hu1.mono fun z hz => .inr hz).trans (hu2.mono fun z hz => .inl hz),
-      (Alloc.Keep.unch hu1 hc.bDQ).trans hk2, hk1.trans (Alloc.Keep.unch hu2 (fun h => hc.bDQ h.symm)),
+      (Outside.of_unch hu1 (fun h => hc.bDQ h) _ _).trans hout2, (Alloc.Keep.unch hu1 hc.bDQ).trans hk2, hk1.trans (Alloc.Keep.unch hu2 (fun h => hc.bDQ h.symm)),
       fun z h => hg2 _ (hg1 _ h), fun x hx => ?_⟩
     · simp only [ints, upd, s0, start]
       rw [get_set (by simp; omega)]
@@ -247,8 +247,8 @@ theorem wp_search {n : Nat} {Q : Post} {le : temp_env} {m : mem} {G : Hex.Sparse
   simp only [Exec.evalExpr, E0_append]
   have hexit : ∀ s qv' le' le'' m', At m m' le le' G bD Dofs bQ v0 s qv' → Stop n s →
       (∀ x, ¬ SearchLocal x → PTree.get x le'' = PTree.get x le') → Q.normal E0 empty_env le'' m' := by
-    rintro s qv' le' le'' m' ⟨hgood, hht, hrun, hhd, htl, hda, hqa, hqi, hu, hkD, hkQ, hg, ho⟩ hst ho'
-    refine hQ le'' m' (hda.congr fun p _ => ?_) ⟨qv', hqa⟩ hu hkD hkQ hg
+    rintro s qv' le' le'' m' ⟨hgood, hht, hrun, hhd, htl, hda, hqa, hqi, hu, hout, hkD, hkQ, hg, ho⟩ hst ho'
+    refine hQ le'' m' (hda.congr fun p _ => ?_) ⟨qv', hqa⟩ hu hout hkD hkQ hg
       (fun x hx => (ho' x hx).trans (ho x hx))
     rw [distvals_eq, ← hrun, run_stop hst]
   let I := fun (v : Nat) (t : trace) (e' : env) (le' : temp_env) (m' : mem) => t = E0 ∧
@@ -256,10 +256,10 @@ theorem wp_search {n : Nat} {Q : Post} {le : temp_env} {m : mem} {G : Hex.Sparse
   let J := fun (v : Nat) (t : trace) (e' : env) (le' : temp_env) (m' : mem) => t = E0 ∧
     e' = empty_env ∧ ∃ s qv', n - s.head < v ∧ At m m' le le' G bD Dofs bQ v0 s qv'
   refine wp_loop (I := I) (J := J) ?_ ?_ (n := n - 0) ⟨rfl, rfl, s0, _, rfl, hAt0⟩
-  · rintro v t e' le' m' ⟨rfl, rfl, s, qv', rfl, hgood, hht, hrun, hhd, htl, hda, hqa, hqi, hu, hkD, hkQ,
-      hg, ho⟩
+  · rintro v t e' le' m' ⟨rfl, rfl, s, qv', rfl, hgood, hht, hrun, hhd, htl, hda, hqa, hqi, hu, hout, hkD,
+      hkQ, hg, ho⟩
     have hA : At m m' le le' G bD Dofs bQ v0 s qv' :=
-      ⟨hgood, hht, hrun, hhd, htl, hda, hqa, hqi, hu, hkD, hkQ, hg, ho⟩
+      ⟨hgood, hht, hrun, hhd, htl, hda, hqa, hqi, hu, hout, hkD, hkQ, hg, ho⟩
     have hc' := (hc.temps ho).mem hu
     have hTn := hgood.tle
     wp_step; wp_step; wp_step; wp_step

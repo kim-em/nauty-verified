@@ -307,23 +307,17 @@ theorem wp_prologue {Q : Post} {rest : statement} {L : Loc} {G : Hex.SparseGraph
       (Alloc.not_dynSet (hg1 _ (gv _ (by decide))) (by decide) (by decide) (gb (by decide) u2))
       (Alloc.not_dynSet (hg1 _ (gv _ (by decide))) (by decide) (by decide) (gb (by decide) u2))
       (fun hc => Keep.unch hu2 (nb3b hc))
-  have hW3 : n ≤ L.c3 → ∃ H : Array Nat, H.size = n ∧ ArrayAt m2 .Mint32 L.b3 0 (ints H) n ∧
-      ∀ i < n, H[i]! < 2147483648 := fun hc => by
-    obtain ⟨H, h1, h2, h3⟩ := hscr.w3 hc
-    exact ⟨H, h1, (h2.unch hu1 (nb3a (by omega))).unch hu2 (nb3b (by omega)), h3⟩
+  have hW3 : HitsOk m2 L.c3 L.b3 := by
+    by_cases hc : 0 < L.c3
+    · exact (hscr.w3.unch hu1 (nb3a hc)).unch hu2 (nb3b hc)
+    · rw [show L.c3 = 0 by omega]; exact HitsOk.zero _ _
   wp_step
   refine wp_dynZ find_work3Sz find_work3 hD3b hn2' (by omega) (show 4 * n < 2 ^ 62 by omega) ?_
   intro le3 m3 c3 b3 hD3 hn3 hu3 hor3 hg3 ho3
-  have hW3' : ∃ H : Array Nat, H.size = n ∧ ArrayAt m3 .Mint32 b3 0 (ints H) n ∧
-      ∀ i < n, H[i]! < 2147483648 := by
+  have hW3' : HitsOk m3 c3 b3 := by
     rcases hor3 with ⟨rfl, rfl, rfl⟩ | ⟨-, hz⟩
-    · exact hW3 hn3
-    · have hmal := hD3.mal (by omega)
-      have ha := Alloc.Zeros.array hz (fun o h1 h2 => hmal.perm o (by omega) h2) (by have := hmal.small; omega)
-        .Mint32 4 rfl rfl (.Vint (ir 0)) rfl n (by omega)
-      refine ⟨Array.replicate n 0, by simp, ha.congr fun i hi => ?_, fun i hi => ?_⟩
-      · simp [ints, hi]
-      · simp [hi]
+    · exact hW3
+    · exact HitsOk.zeros hz (hD3.mal (by omega))
   have p3 : Prov m2 m3 L.c3 L.b3 b3 := by
     rcases hor3 with ⟨rfl, rfl, -⟩ | ⟨hnv, -⟩
     · exact .inl ⟨rfl, by omega⟩
@@ -487,9 +481,10 @@ theorem wp_prologue {Q : Post} {rest : statement} {L : Loc} {G : Hex.SparseGraph
     ((((hD2').keep hu3 (gl (g12 _ (gv _ (by decide))) (by decide) (by decide) (by decide) u3) (gl (g12 _ (gv _ (by decide))) (by decide) (by decide) (by decide) u3) (fun _ => Keep.unch hu3 (nd v2 G2 (by decide) (by decide) (fun hc => x2 _ (hov _ (u3 hc)) (fun h => o32 hc h))))).keep hu4 (gl (g3 _ (gv _ (by decide))) (by decide) (by decide) (by decide) u4) (gl (g3 _ (gv _ (by decide))) (by decide) (by decide) (by decide) u4) (fun _ => Keep.unch hu4 (nd (hg3 _ v2) G2 (by decide) (by decide) (fun hc => x2 _ (hov _ (u4 hc)) (fun h => o42 hc h))))).keep hu5 (glm (g4 _ (gv _ (by decide))) (by decide) (by decide) (by decide) (by decide)) (glm (g4 _ (gv _ (by decide))) (by decide) (by decide) (by decide) (by decide)) (fun _ => Keep.unch hu5 (nm1 (hg4 _ (hg3 _ v2)) G2 (fun hc => x2 _ (hov _ (u5 hc)) (fun h => o52 hc h))))).keep hu6 (glm2 (g5 _ (gv _ (by decide))) (by decide) (by decide) (by decide) (by decide)) (glm2 (g5 _ (gv _ (by decide))) (by decide) (by decide) (by decide) (by decide)) (fun _ => Keep.unch hu6 (nm2 (hg5 _ (hg4 _ (hg3 _ v2))) G2 (fun hc => x2 _ (hov _ (u6 hc)) (fun h => o62 hc h))))
   have hD3f : DynAt m6 Block.work3 Block.work3Sz 4 c3 b3 :=
     (((hD3).keep hu4 (gl (g3 _ (gv _ (by decide))) (by decide) (by decide) (by decide) u4) (gl (g3 _ (gv _ (by decide))) (by decide) (by decide) (by decide) u4) (fun _ => Keep.unch hu4 (nd v3 G3 (by decide) (by decide) (fun hc => x3 _ (hov _ (u4 hc)) (fun h => o43 hc h))))).keep hu5 (glm (g4 _ (gv _ (by decide))) (by decide) (by decide) (by decide) (by decide)) (glm (g4 _ (gv _ (by decide))) (by decide) (by decide) (by decide) (by decide)) (fun _ => Keep.unch hu5 (nm1 (hg4 _ v3) G3 (fun hc => x3 _ (hov _ (u5 hc)) (fun h => o53 hc h))))).keep hu6 (glm2 (g5 _ (gv _ (by decide))) (by decide) (by decide) (by decide) (by decide)) (glm2 (g5 _ (gv _ (by decide))) (by decide) (by decide) (by decide) (by decide)) (fun _ => Keep.unch hu6 (nm2 (hg5 _ (hg4 _ v3)) G3 (fun hc => x3 _ (hov _ (u6 hc)) (fun h => o63 hc h))))
-  obtain ⟨H, hHs, hHa, hHl⟩ := hW3'
-  have hHf : ArrayAt m6 .Mint32 b3 0 (ints H) n :=
-    (((hHa).unch hu4 (nd v3 G3 (by decide) (by decide) (fun hc => x3 _ (hov _ (u4 hc)) (fun h => o43 hc h)))).unch hu5 (nm1 (hg4 _ v3) G3 (fun hc => x3 _ (hov _ (u5 hc)) (fun h => o53 hc h)))).unch hu6 (nm2 (hg5 _ (hg4 _ v3)) G3 (fun hc => x3 _ (hov _ (u6 hc)) (fun h => o63 hc h)))
+  have hH6 : HitsOk m6 c3 b3 :=
+    (((hW3').unch hu4 (nd v3 G3 (by decide) (by decide) (fun hc => x3 _ (hov _ (u4 hc)) (fun h => o43 hc h)))).unch hu5 (nm1 (hg4 _ v3) G3 (fun hc => x3 _ (hov _ (u5 hc)) (fun h => o53 hc h)))).unch hu6 (nm2 (hg5 _ (hg4 _ v3)) G3 (fun hc => x3 _ (hov _ (u6 hc)) (fun h => o63 hc h)))
+  obtain ⟨H, hHs, hHf, hHl⟩ := hH6.head hn3
+  have hhi : W3Hi m6 (L.withScr c1 b1 c2 b2 c3 b3 c4 b4 mc1 mb1 mc2 mb2) n := hH6.tail hn3
   have hD4f : DynAt m6 Block.work4 Block.work4Sz 4 c4 b4 :=
     ((hD4').keep hu5 (glm (g4 _ (gv _ (by decide))) (by decide) (by decide) (by decide) (by decide)) (glm (g4 _ (gv _ (by decide))) (by decide) (by decide) (by decide) (by decide)) (fun _ => Keep.unch hu5 (nm1 v4 G4 (fun hc => x4 _ (hov _ (u5 hc)) (fun h => o54 hc h))))).keep hu6 (glm2 (g5 _ (gv _ (by decide))) (by decide) (by decide) (by decide) (by decide)) (glm2 (g5 _ (gv _ (by decide))) (by decide) (by decide) (by decide) (by decide)) (fun _ => Keep.unch hu6 (nm2 (hg5 _ v4) G4 (fun hc => x4 _ (hov _ (u6 hc)) (fun h => o64 hc h))))
   have hK5f : MarksAt m6 mc1 mb1 st1' mk1' :=
@@ -562,7 +557,7 @@ theorem wp_prologue {Q : Post} {rest : statement} {L : Loc} {G : Hex.SparseGraph
       actRep := hrep
       code := let ⟨kv, hkv⟩ := hcode; ⟨kv, hkv.unch hun (cb (by simp [Loc.cblocks]))⟩
       d1 := hD1f, d2 := hD2f, d3 := hD3f, d4 := hD4f
-      w1 := hw1, w2 := hw2, w3 := hHf, w4 := hw4
+      w1 := hw1, w2 := hw2, w3 := hHf, hi := hhi, w4 := hw4
       k1 := hK5f, k2 := hK6
       bit := fun q hq => by rw [hun.load _ _ _ (ntbl _ (.inl rfl))]; exact hbit q hq
       left := fun q hq => by

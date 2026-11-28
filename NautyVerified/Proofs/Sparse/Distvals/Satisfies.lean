@@ -54,7 +54,7 @@ def distvalsSpec {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sofs : ptrofs)
     bD ≠ bsg ∧ bD ≠ bv ∧ bD ≠ bd ∧ bD ≠ be
   post _ m t _ m' := t = E0 ∧
     ArrayAt m' .Mint32 bD (intOfZ (Ptrofs.unsigned Dofs)) (ints (distvals (Graph.ofGraph G) v0)) n ∧
-    Alloc.Keep m m' bD ∧
+    Alloc.Keep m m' bD ∧ DOut m m' bD Dofs n ∧
     ∃ capQ' bQ', Alloc.DynAt m' Block.work4 Block.work4Sz 4 capQ' bQ' ∧ n ≤ capQ' ∧
       ((capQ' = capQ ∧ bQ' = bQ) ∨ ¬ Mem.valid_block m bQ') ∧
       Unch m m' (fun z => z = bD ∨ z = Block.work4 ∨ z = Block.work4Sz ∨ (0 < capQ ∧ z = bQ) ∨
@@ -160,7 +160,7 @@ theorem distvals_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sofs
     wp_step
     refine wp_fill (by rw [hget1 _ (by decide) (by decide)]; exact hdistV)
       (by rw [hget1 _ (by decide) (by decide)]; exact hnV) hn31 hdarr1 ?_
-    intro le2 m2 hda2 hu2 hk2 hg2 ho2
+    intro le2 m2 hda2 hu2 hout2 hk2 hg2 ho2
     have hbQ1D : bQ1 ≠ bD := fun h => hneQ1 bD (by simp [Ext]) h.symm
     have hgr2 : SparseGraphAt m2 bsg sofs G bv vo bd dofs be eo :=
       (hgr.unch hu1 (hnot1 bsg (by simp [Ext])) (hnot1 bv (by simp [Ext])) (hnot1 bd (by simp [Ext]))
@@ -191,7 +191,7 @@ theorem distvals_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sofs
         bDQ := hbQ1D.symm }
     refine wp_search hc (by rw [hget2 _ (by decide) (by decide) (by decide)]; exact hv0V)
       hv0n hda2 hqarr2 ?_
-    intro le' m' hda' _ hu' hkD' hkQ' hg' _
+    intro le' m' hda' _ hu' hout' hkD' hkQ' hg' _
     have hDW' : Alloc.DynAt m' Block.work4 Block.work4Sz 4 capQ1 bQ1 :=
       hDW1.keep ((hu2.mono fun z hz => .inl hz).trans hu')
         (by rintro (h | h); exact hW4D h; exact (hDW1.bne hcQ1).2 h.symm)
@@ -201,6 +201,8 @@ theorem distvals_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sofs
         (fun _ => (Alloc.Keep.unch hu2 hbQ1D).trans hkQ')
     refine ⟨m', Isautom.free_empty m', rfl, hda',
       ((Alloc.Keep.unch hu1 (hnot1 bD (by simp [Ext]))).trans hk2).trans hkD',
+      ((Outside.of_unch hu1 (hnot1 bD (by simp [Ext])) _ _).trans hout2).trans
+        (hout'.trans (Outside.refl _ _ _ _)),
       capQ1, bQ1, hDW', hnQ, hor1, ?_, fun z h => hg' _ (hg2 _ (hg1 _ h))⟩
     refine (hu1.mono fun z hz => ?_).trans ((hu2.mono fun z hz => .inl hz).trans (hu'.mono fun z hz => ?_))
     · rcases hz with h | h | h | h

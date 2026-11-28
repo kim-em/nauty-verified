@@ -147,6 +147,16 @@ structure Scr where
   mk2 : Nat → Int
   aw : Nat → Lib.Integers.int64
 
+/-- `HITS` from entry `n` up to its capacity: naturals below `2^31`, which
+`refine_sg` does not write. -/
+def W3Hi (m : mem) (L : Loc) (n : Nat) : Prop :=
+  ∃ T : Nat → Nat, (∀ i, T i < 2147483648) ∧
+    ArrayAt m .Mint32 L.b3 (0 + csize .Mint32 * n) (fun i => .Vint (ir (T i))) (L.c3 - n)
+
+theorem W3Hi.unch {m m' : mem} {L : Loc} {n : Nat} {S : block → Prop} (h : W3Hi m L n)
+    (hu : Unch m m' S) (hb : ¬ S L.b3) : W3Hi m' L n :=
+  let ⟨T, hT, ha⟩ := h; ⟨T, hT, ha.unch hu hb⟩
+
 /-- Memory holds the graph, `t`'s labelling, partition, cell count and active
 set (through `S.aw`), the scratch `S` and the tables. -/
 structure Mem {n : Nat} (m : mem) (L : Loc) (G : Hex.SparseGraph n) (t : RefineSt n) (S : Scr) :
@@ -165,6 +175,7 @@ structure Mem {n : Nat} (m : mem) (L : Loc) (G : Hex.SparseGraph n) (t : RefineS
   w1 : ArrayAt m .Mint32 L.b1 0 S.w1 L.c1
   w2 : ArrayAt m .Mint32 L.b2 0 S.w2 L.c2
   w3 : ArrayAt m .Mint32 L.b3 0 (ints S.w3) n
+  hi : W3Hi m L n
   w4 : ArrayAt m .Mint32 L.b4 0 S.w4 L.c4
   k1 : MarksAt m L.mc1 L.mb1 S.st1 S.mk1
   k2 : Marks2.MarksAt m L.mc2 L.mb2 S.st2 S.mk2
@@ -293,6 +304,7 @@ theorem Mem.setLab {n : Nat} {m m' : mem} {L : Loc} {G : Hex.SparseGraph n}
   w1 := h.w1.unch hu (Ne.symm (pw_ne hok.wdistinct 0 5 (by decide) (by simp [Loc.wblocks])))
   w2 := h.w2.unch hu (Ne.symm (pw_ne hok.wdistinct 0 6 (by decide) (by simp [Loc.wblocks])))
   w3 := h.w3.unch hu (Ne.symm (pw_ne hok.wdistinct 0 7 (by decide) (by simp [Loc.wblocks])))
+  hi := h.hi.unch hu (Ne.symm (pw_ne hok.wdistinct 0 7 (by decide) (by simp [Loc.wblocks])))
   w4 := h.w4.unch hu (Ne.symm (pw_ne hok.wdistinct 0 8 (by decide) (by simp [Loc.wblocks])))
   k1 := h.k1.unch hu (fun e => hok.rw Sparse.Block.vmark1 (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (fun e => hok.rw Sparse.Block.vmark1Sz (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (Ne.symm (pw_ne hok.wdistinct 0 11 (by decide) (by simp [Loc.wblocks]))) (fun _ => (Ne.symm (pw_ne hok.wdistinct 0 9 (by decide) (by simp [Loc.wblocks]))))
   k2 := h.k2.unch hu (fun e => hok.rw Block.vmark2 (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (fun e => hok.rw Block.vmark2Sz (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (Ne.symm (pw_ne hok.wdistinct 0 12 (by decide) (by simp [Loc.wblocks]))) (fun _ => (Ne.symm (pw_ne hok.wdistinct 0 10 (by decide) (by simp [Loc.wblocks]))))
@@ -319,6 +331,7 @@ theorem Mem.setPtn {n : Nat} {m m' : mem} {L : Loc} {G : Hex.SparseGraph n}
   w1 := h.w1.unch hu (Ne.symm (pw_ne hok.wdistinct 1 5 (by decide) (by simp [Loc.wblocks])))
   w2 := h.w2.unch hu (Ne.symm (pw_ne hok.wdistinct 1 6 (by decide) (by simp [Loc.wblocks])))
   w3 := h.w3.unch hu (Ne.symm (pw_ne hok.wdistinct 1 7 (by decide) (by simp [Loc.wblocks])))
+  hi := h.hi.unch hu (Ne.symm (pw_ne hok.wdistinct 1 7 (by decide) (by simp [Loc.wblocks])))
   w4 := h.w4.unch hu (Ne.symm (pw_ne hok.wdistinct 1 8 (by decide) (by simp [Loc.wblocks])))
   k1 := h.k1.unch hu (fun e => hok.rw Sparse.Block.vmark1 (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (fun e => hok.rw Sparse.Block.vmark1Sz (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (Ne.symm (pw_ne hok.wdistinct 1 11 (by decide) (by simp [Loc.wblocks]))) (fun _ => (Ne.symm (pw_ne hok.wdistinct 1 9 (by decide) (by simp [Loc.wblocks]))))
   k2 := h.k2.unch hu (fun e => hok.rw Block.vmark2 (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (fun e => hok.rw Block.vmark2Sz (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (Ne.symm (pw_ne hok.wdistinct 1 12 (by decide) (by simp [Loc.wblocks]))) (fun _ => (Ne.symm (pw_ne hok.wdistinct 1 10 (by decide) (by simp [Loc.wblocks]))))
@@ -345,6 +358,7 @@ theorem Mem.setNc {n : Nat} {m m' : mem} {L : Loc} {G : Hex.SparseGraph n}
   w1 := h.w1.unch hu (Ne.symm (pw_ne hok.wdistinct 2 5 (by decide) (by simp [Loc.wblocks])))
   w2 := h.w2.unch hu (Ne.symm (pw_ne hok.wdistinct 2 6 (by decide) (by simp [Loc.wblocks])))
   w3 := h.w3.unch hu (Ne.symm (pw_ne hok.wdistinct 2 7 (by decide) (by simp [Loc.wblocks])))
+  hi := h.hi.unch hu (Ne.symm (pw_ne hok.wdistinct 2 7 (by decide) (by simp [Loc.wblocks])))
   w4 := h.w4.unch hu (Ne.symm (pw_ne hok.wdistinct 2 8 (by decide) (by simp [Loc.wblocks])))
   k1 := h.k1.unch hu (fun e => hok.rw Sparse.Block.vmark1 (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (fun e => hok.rw Sparse.Block.vmark1Sz (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (Ne.symm (pw_ne hok.wdistinct 2 11 (by decide) (by simp [Loc.wblocks]))) (fun _ => (Ne.symm (pw_ne hok.wdistinct 2 9 (by decide) (by simp [Loc.wblocks]))))
   k2 := h.k2.unch hu (fun e => hok.rw Block.vmark2 (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (fun e => hok.rw Block.vmark2Sz (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (Ne.symm (pw_ne hok.wdistinct 2 12 (by decide) (by simp [Loc.wblocks]))) (fun _ => (Ne.symm (pw_ne hok.wdistinct 2 10 (by decide) (by simp [Loc.wblocks]))))
@@ -372,6 +386,7 @@ theorem Mem.setAct {n : Nat} {m m' : mem} {L : Loc} {G : Hex.SparseGraph n}
   w1 := h.w1.unch hu (Ne.symm (pw_ne hok.wdistinct 3 5 (by decide) (by simp [Loc.wblocks])))
   w2 := h.w2.unch hu (Ne.symm (pw_ne hok.wdistinct 3 6 (by decide) (by simp [Loc.wblocks])))
   w3 := h.w3.unch hu (Ne.symm (pw_ne hok.wdistinct 3 7 (by decide) (by simp [Loc.wblocks])))
+  hi := h.hi.unch hu (Ne.symm (pw_ne hok.wdistinct 3 7 (by decide) (by simp [Loc.wblocks])))
   w4 := h.w4.unch hu (Ne.symm (pw_ne hok.wdistinct 3 8 (by decide) (by simp [Loc.wblocks])))
   k1 := h.k1.unch hu (fun e => hok.rw Sparse.Block.vmark1 (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (fun e => hok.rw Sparse.Block.vmark1Sz (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (Ne.symm (pw_ne hok.wdistinct 3 11 (by decide) (by simp [Loc.wblocks]))) (fun _ => (Ne.symm (pw_ne hok.wdistinct 3 9 (by decide) (by simp [Loc.wblocks]))))
   k2 := h.k2.unch hu (fun e => hok.rw Block.vmark2 (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (fun e => hok.rw Block.vmark2Sz (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (Ne.symm (pw_ne hok.wdistinct 3 12 (by decide) (by simp [Loc.wblocks]))) (fun _ => (Ne.symm (pw_ne hok.wdistinct 3 10 (by decide) (by simp [Loc.wblocks]))))
@@ -397,6 +412,7 @@ theorem Mem.setCode {n : Nat} {m m' : mem} {L : Loc} {G : Hex.SparseGraph n}
   w1 := h.w1.unch hu (Ne.symm (pw_ne hok.wdistinct 4 5 (by decide) (by simp [Loc.wblocks])))
   w2 := h.w2.unch hu (Ne.symm (pw_ne hok.wdistinct 4 6 (by decide) (by simp [Loc.wblocks])))
   w3 := h.w3.unch hu (Ne.symm (pw_ne hok.wdistinct 4 7 (by decide) (by simp [Loc.wblocks])))
+  hi := h.hi.unch hu (Ne.symm (pw_ne hok.wdistinct 4 7 (by decide) (by simp [Loc.wblocks])))
   w4 := h.w4.unch hu (Ne.symm (pw_ne hok.wdistinct 4 8 (by decide) (by simp [Loc.wblocks])))
   k1 := h.k1.unch hu (fun e => hok.rw Sparse.Block.vmark1 (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (fun e => hok.rw Sparse.Block.vmark1Sz (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (Ne.symm (pw_ne hok.wdistinct 4 11 (by decide) (by simp [Loc.wblocks]))) (fun _ => (Ne.symm (pw_ne hok.wdistinct 4 9 (by decide) (by simp [Loc.wblocks]))))
   k2 := h.k2.unch hu (fun e => hok.rw Block.vmark2 (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (fun e => hok.rw Block.vmark2Sz (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (Ne.symm (pw_ne hok.wdistinct 4 12 (by decide) (by simp [Loc.wblocks]))) (fun _ => (Ne.symm (pw_ne hok.wdistinct 4 10 (by decide) (by simp [Loc.wblocks]))))
@@ -423,6 +439,7 @@ theorem Mem.setW1 {n : Nat} {m m' : mem} {L : Loc} {G : Hex.SparseGraph n}
   w1 := harr
   w2 := h.w2.unch hu (Ne.symm (pw_ne hok.wdistinct 5 6 (by decide) (by simp [Loc.wblocks])))
   w3 := h.w3.unch hu (Ne.symm (pw_ne hok.wdistinct 5 7 (by decide) (by simp [Loc.wblocks])))
+  hi := h.hi.unch hu (Ne.symm (pw_ne hok.wdistinct 5 7 (by decide) (by simp [Loc.wblocks])))
   w4 := h.w4.unch hu (Ne.symm (pw_ne hok.wdistinct 5 8 (by decide) (by simp [Loc.wblocks])))
   k1 := h.k1.unch hu (fun e => hok.rw Sparse.Block.vmark1 (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (fun e => hok.rw Sparse.Block.vmark1Sz (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (Ne.symm (pw_ne hok.wdistinct 5 11 (by decide) (by simp [Loc.wblocks]))) (fun _ => (Ne.symm (pw_ne hok.wdistinct 5 9 (by decide) (by simp [Loc.wblocks]))))
   k2 := h.k2.unch hu (fun e => hok.rw Block.vmark2 (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (fun e => hok.rw Block.vmark2Sz (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (Ne.symm (pw_ne hok.wdistinct 5 12 (by decide) (by simp [Loc.wblocks]))) (fun _ => (Ne.symm (pw_ne hok.wdistinct 5 10 (by decide) (by simp [Loc.wblocks]))))
@@ -449,6 +466,7 @@ theorem Mem.setW2 {n : Nat} {m m' : mem} {L : Loc} {G : Hex.SparseGraph n}
   w1 := h.w1.unch hu (pw_ne hok.wdistinct 5 6 (by decide) (by simp [Loc.wblocks]))
   w2 := harr
   w3 := h.w3.unch hu (Ne.symm (pw_ne hok.wdistinct 6 7 (by decide) (by simp [Loc.wblocks])))
+  hi := h.hi.unch hu (Ne.symm (pw_ne hok.wdistinct 6 7 (by decide) (by simp [Loc.wblocks])))
   w4 := h.w4.unch hu (Ne.symm (pw_ne hok.wdistinct 6 8 (by decide) (by simp [Loc.wblocks])))
   k1 := h.k1.unch hu (fun e => hok.rw Sparse.Block.vmark1 (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (fun e => hok.rw Sparse.Block.vmark1Sz (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (Ne.symm (pw_ne hok.wdistinct 6 11 (by decide) (by simp [Loc.wblocks]))) (fun _ => (Ne.symm (pw_ne hok.wdistinct 6 9 (by decide) (by simp [Loc.wblocks]))))
   k2 := h.k2.unch hu (fun e => hok.rw Block.vmark2 (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (fun e => hok.rw Block.vmark2Sz (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (Ne.symm (pw_ne hok.wdistinct 6 12 (by decide) (by simp [Loc.wblocks]))) (fun _ => (Ne.symm (pw_ne hok.wdistinct 6 10 (by decide) (by simp [Loc.wblocks]))))
@@ -459,7 +477,7 @@ theorem Mem.setW2 {n : Nat} {m m' : mem} {L : Loc} {G : Hex.SparseGraph n}
 theorem Mem.setW3 {n : Nat} {m m' : mem} {L : Loc} {G : Hex.SparseGraph n}
     {t : RefineSt n} {S : Scr} (hok : Ok n L) (h : Mem m L G t S)
     (hu : Unch m m' (· = L.b3)) (hk : Keep m m' L.b3) (w : Array Nat)
-    (harr : ArrayAt m' .Mint32 L.b3 0 (ints w) n) :
+    (harr : ArrayAt m' .Mint32 L.b3 0 (ints w) n) (hhi : W3Hi m' L n) :
     Mem m' L G t { S with w3 := w } where
   graph := h.graph.unch hu (fun e => hok.rw L.bsg (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (fun e => hok.rw L.bv (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (fun e => hok.rw L.bd (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (fun e => hok.rw L.be (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks]))
   lab := h.lab.unch hu (pw_ne hok.wdistinct 0 7 (by decide) (by simp [Loc.wblocks]))
@@ -475,6 +493,7 @@ theorem Mem.setW3 {n : Nat} {m m' : mem} {L : Loc} {G : Hex.SparseGraph n}
   w1 := h.w1.unch hu (pw_ne hok.wdistinct 5 7 (by decide) (by simp [Loc.wblocks]))
   w2 := h.w2.unch hu (pw_ne hok.wdistinct 6 7 (by decide) (by simp [Loc.wblocks]))
   w3 := harr
+  hi := hhi
   w4 := h.w4.unch hu (Ne.symm (pw_ne hok.wdistinct 7 8 (by decide) (by simp [Loc.wblocks])))
   k1 := h.k1.unch hu (fun e => hok.rw Sparse.Block.vmark1 (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (fun e => hok.rw Sparse.Block.vmark1Sz (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (Ne.symm (pw_ne hok.wdistinct 7 11 (by decide) (by simp [Loc.wblocks]))) (fun _ => (Ne.symm (pw_ne hok.wdistinct 7 9 (by decide) (by simp [Loc.wblocks]))))
   k2 := h.k2.unch hu (fun e => hok.rw Block.vmark2 (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (fun e => hok.rw Block.vmark2Sz (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (Ne.symm (pw_ne hok.wdistinct 7 12 (by decide) (by simp [Loc.wblocks]))) (fun _ => (Ne.symm (pw_ne hok.wdistinct 7 10 (by decide) (by simp [Loc.wblocks]))))
@@ -501,6 +520,7 @@ theorem Mem.setW4 {n : Nat} {m m' : mem} {L : Loc} {G : Hex.SparseGraph n}
   w1 := h.w1.unch hu (pw_ne hok.wdistinct 5 8 (by decide) (by simp [Loc.wblocks]))
   w2 := h.w2.unch hu (pw_ne hok.wdistinct 6 8 (by decide) (by simp [Loc.wblocks]))
   w3 := h.w3.unch hu (pw_ne hok.wdistinct 7 8 (by decide) (by simp [Loc.wblocks]))
+  hi := h.hi.unch hu (pw_ne hok.wdistinct 7 8 (by decide) (by simp [Loc.wblocks]))
   w4 := harr
   k1 := h.k1.unch hu (fun e => hok.rw Sparse.Block.vmark1 (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (fun e => hok.rw Sparse.Block.vmark1Sz (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (Ne.symm (pw_ne hok.wdistinct 8 11 (by decide) (by simp [Loc.wblocks]))) (fun _ => (Ne.symm (pw_ne hok.wdistinct 8 9 (by decide) (by simp [Loc.wblocks]))))
   k2 := h.k2.unch hu (fun e => hok.rw Block.vmark2 (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (fun e => hok.rw Block.vmark2Sz (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (Ne.symm (pw_ne hok.wdistinct 8 12 (by decide) (by simp [Loc.wblocks]))) (fun _ => (Ne.symm (pw_ne hok.wdistinct 8 10 (by decide) (by simp [Loc.wblocks]))))
@@ -528,6 +548,7 @@ theorem Mem.setMk1 {n : Nat} {m m' : mem} {L : Loc} {G : Hex.SparseGraph n}
   w1 := h.w1.unch hu (pw_ne hok.wdistinct 5 9 (by decide) (by simp [Loc.wblocks]))
   w2 := h.w2.unch hu (pw_ne hok.wdistinct 6 9 (by decide) (by simp [Loc.wblocks]))
   w3 := h.w3.unch hu (pw_ne hok.wdistinct 7 9 (by decide) (by simp [Loc.wblocks]))
+  hi := h.hi.unch hu (pw_ne hok.wdistinct 7 9 (by decide) (by simp [Loc.wblocks]))
   w4 := h.w4.unch hu (pw_ne hok.wdistinct 8 9 (by decide) (by simp [Loc.wblocks]))
   k1 := h.k1.update hc hu hk harr hb
   k2 := h.k2.unch hu (fun e => hok.rw Block.vmark2 (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (fun e => hok.rw Block.vmark2Sz (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (Ne.symm (pw_ne hok.wdistinct 9 12 (by decide) (by simp [Loc.wblocks]))) (fun _ => (Ne.symm (pw_ne hok.wdistinct 9 10 (by decide) (by simp [Loc.wblocks]))))
@@ -555,6 +576,7 @@ theorem Mem.setMk2 {n : Nat} {m m' : mem} {L : Loc} {G : Hex.SparseGraph n}
   w1 := h.w1.unch hu (pw_ne hok.wdistinct 5 10 (by decide) (by simp [Loc.wblocks]))
   w2 := h.w2.unch hu (pw_ne hok.wdistinct 6 10 (by decide) (by simp [Loc.wblocks]))
   w3 := h.w3.unch hu (pw_ne hok.wdistinct 7 10 (by decide) (by simp [Loc.wblocks]))
+  hi := h.hi.unch hu (pw_ne hok.wdistinct 7 10 (by decide) (by simp [Loc.wblocks]))
   w4 := h.w4.unch hu (pw_ne hok.wdistinct 8 10 (by decide) (by simp [Loc.wblocks]))
   k1 := h.k1.unch hu (fun e => hok.rw Sparse.Block.vmark1 (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (fun e => hok.rw Sparse.Block.vmark1Sz (by simp [Loc.rblocks]) (by rw [e]; simp [Loc.writes, Loc.wblocks])) (Ne.symm (pw_ne hok.wdistinct 10 11 (by decide) (by simp [Loc.wblocks]))) (fun _ => (pw_ne hok.wdistinct 9 10 (by decide) (by simp [Loc.wblocks])))
   k2 := h.k2.update hc hu hk harr hb

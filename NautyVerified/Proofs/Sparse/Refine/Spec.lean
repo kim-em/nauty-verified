@@ -6,8 +6,8 @@ import NautyVerified.Proofs.Sparse.Refine.Wide
 `refineSgSpec`: called on a sparse graph `G` (`SparseGraphAt`), HexGraphIso's
 partition `lab`, `ptn`, active set and cell count, a `code` cell, and its
 scratch in the state `ScrAt` describes (the four `DYNALLSTAT` work arrays
-and the two mark arrays, with `HITS` holding `int`-range naturals when it
-holds `n` entries), nausparse.c's `refine_sg` leaves memory holding
+and the two mark arrays, with `HITS` holding `int`-range naturals up to its
+capacity), nausparse.c's `refine_sg` leaves memory holding
 HexGraphIso's `Sparse.refine (ofGraph G) level lab ptn active numcells`: its
 labelling, partition, cell count and active set, and its code in `*code`.
 Afterwards the scratch is again in a `ScrAt` state, each array the old one or
@@ -41,15 +41,13 @@ def Loc.withScr (L : Loc) (c1 : Nat) (b1 : block) (c2 : Nat) (b2 : block) (c3 : 
   { L with c1, b1, c2, b2, c3, b3, c4, b4, mc1, mb1, mc2, mb2 }
 
 /-- `refine_sg`'s scratch at `L`: the work arrays' `DYNALLSTAT` pairs, `HITS`
-holding `int`-range naturals when it has `n` entries, and the two mark
-arrays. -/
+holding `int`-range naturals up to its capacity, and the two mark arrays. -/
 structure ScrAt (n : Nat) (m : mem) (L : Loc) : Prop where
   d1 : DynAt m Sparse.Block.work1 Sparse.Block.work1Sz 4 L.c1 L.b1
   d2 : DynAt m Block.work2 Block.work2Sz 4 L.c2 L.b2
   d3 : DynAt m Block.work3 Block.work3Sz 4 L.c3 L.b3
   d4 : DynAt m Block.work4 Block.work4Sz 4 L.c4 L.b4
-  w3 : n ≤ L.c3 → ∃ H : Array Nat, H.size = n ∧ ArrayAt m .Mint32 L.b3 0 (ints H) n ∧
-    ∀ i < n, H[i]! < 2147483648
+  w3 : HitsOk m L.c3 L.b3
   k1 : ∃ st mk, MarksAt m L.mc1 L.mb1 st mk
   k2 : ∃ st mk, Marks2.MarksAt m L.mc2 L.mb2 st mk
 

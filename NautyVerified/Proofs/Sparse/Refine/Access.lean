@@ -176,10 +176,11 @@ theorem wp_storeW3 {f : function} {Q : Post} {le : temp_env} {m : mem} (hok : Ok
     (hQ : ∀ m', Mem m' L G t { S with w3 := S.w3.set! c x } → Unch m m' (· = L.b3) →
       (∀ z, Mem.valid_block m z → Mem.valid_block m' z) → Q.normal E0 empty_env le m') :
     Wp xi sge f (.Sassign (gix id.«nausparse:work3» a) rhs) Q empty_env le m := by
-  refine wp_idx_store hm.w3 (by have := hok.nlt; omega) (eval_w3 hok hm) rfl rfl rfl a c hc ha hty rhs tint hrty
+  obtain ⟨T, hT, htl⟩ := hm.hi
+  refine wp_idx_store_far hm.w3 (by have := hok.nlt; omega) htl (Int.le_refl _) (eval_w3 hok hm) rfl rfl rfl a c hc ha hty rhs tint hrty
     _ (.Vint (ir x)) hrhs rfl rfl ?_
-  intro m' harr hu hk hg
-  refine hQ m' (hm.setW3 hok hu hk _ ?_) hu hg
+  intro m' harr htl' hu hk hg
+  refine hQ m' (hm.setW3 hok hu hk _ ?_ ⟨T, hT, htl'⟩) hu hg
   rw [ints_set (by omega) x]; exact harr
 
 /-- `work4[a] = x`. -/
