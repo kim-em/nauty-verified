@@ -388,3 +388,6 @@ import NautyVerified.Proofs.Sparse.Refine.Trivial.Marks
 import NautyVerified.Proofs.Sparse.Refine.Trivial.Store
 import NautyVerified.Proofs.Sparse.Refine.Trivial.Part
 import NautyVerified.Proofs.Sparse.Refine.Trivial.Rev
+import NautyVerified.Proofs.Sparse.Refine.Trivial.Push
+import NautyVerified.Proofs.Sparse.Refine.Trivial.CellModel
+import NautyVerified.Proofs.Sparse.Refine.Trivial.Fix
