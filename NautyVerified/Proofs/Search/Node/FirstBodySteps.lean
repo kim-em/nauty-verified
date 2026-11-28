@@ -128,6 +128,7 @@ theorem wp_fpnLeaf {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
     (hlev : PTree.get dense.id.«level» le = some (.Vint (ir level)))
     (hl1 : 1 ≤ level) (hln : level ≤ n)
     (hQl : nc = n → ∀ m', SearchAt m' S ctx (firstterminal level st) false false → SFrame m m' S →
+      (∀ z, IsWork m' z → IsWork m z ∨ ¬ Mem.valid_block m z) →
       match Mem.free_list m' (blocks_of_env ge e) with
       | some m'' => Q.ret E0 (.Vint (ir ((level : Int) - 1))) m''
       | none => False)
@@ -153,7 +154,7 @@ theorem wp_fpnLeaf {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
     · simp only [Exec.evalExpr, Exec.lvalOfVar, g2, find_firstterminalFn, Exec.derefLoc,
         Cfrontend.Ctypes.access_mode]
     · simp only [Exec.evalExprlist, Exec.evalExpr, hlab, hlev, Refine.tv, typeof, cop]
-    rintro t v m' ⟨rfl, h', hF⟩
+    rintro t v m' ⟨rfl, h', hF, hW⟩
     simp only [set_opttemp, seqPost, Post.after, E0_append]
     -- userlevelproc
     wp_step; wp_step; wp_step
@@ -204,7 +205,7 @@ theorem wp_fpnLeaf {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
     simp only [Exec.evalExpr, Refine.tv, temps_gso _ _ (show dense.id.level ≠ idOf 709 by decide),
       hlev, typeof, cop, hfr]
     rw [show Lib.Integers.Int.repr (zOfInt 1) = ir 1 from rfl, ir_sub]
-    exact hQl hne m' h' hF
+    exact hQl hne m' h' hF hW
   · rw [ite_eq_right (by simp; omega)]
     exact wp_skip (hQn hne)
 

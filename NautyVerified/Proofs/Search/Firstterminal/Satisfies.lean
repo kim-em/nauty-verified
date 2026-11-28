@@ -1,5 +1,6 @@
 import NautyVerified.Proofs.Search.Firstterminal.Copy
 import NautyVerified.Spec.Firstterminal
+import NautyVerified.Proofs.Search.Step
 
 /-!
 # `firstterminal` installs the first leaf
@@ -387,7 +388,14 @@ theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx :
                   by simp, by simp; omega, by simp, by simp, by simp; omega, a11, a12⟩
               maxlevelLe := by simp only []; omega }
           n0 := h.n0, nlt := h.nlt, nM := h.nM, M1 := h.M1, Mlt := h.Mlt }
-    · exact ⟨hU16.mono fun z hz => .inl ⟨by revert hz; revert z; simp [SLoc.blocks], by revert hz; revert z; sep_all hd,
-          by revert hz; revert z; sep_all hd⟩, hV⟩
+    · exact ⟨⟨hU16.mono fun z hz => .inl ⟨by revert hz; revert z; simp [SLoc.blocks], by revert hz; revert z; sep_all hd,
+          by revert hz; revert z; sep_all hd⟩, hV⟩, WorkMono.of_unch h.work hU16
+        (fun g hg hg' => by
+          simp only [List.mem_cons, List.mem_nil_iff, or_false] at hg'
+          rcases hg' with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
+            first
+              | (revert hg; decide)
+              | exact SLoc.vars_ne hd _ (by simp [SLoc.vars]) _ ((by decide : ∀ z ∈ workG, z ∈ globs) _ hg) rfl)
+        (fun z hz hz' => h.work_not hz (by clear hz; revert hz'; revert z; simp [SLoc.blocks]))⟩
 
 end NautyVerified.Proofs.Search.Firstterminal

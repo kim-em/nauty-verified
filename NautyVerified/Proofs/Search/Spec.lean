@@ -79,7 +79,8 @@ def SFrame (m m' : mem) (S : SLoc) : Prop :=
 def firstterminalSpec {n : Nat} (S : SLoc) (ctx : Ctx n) (st : Search n) (level : Nat) : FunSpec where
   pre args m := args = [.Vptr S.bl S.lofs, .Vint (ir level)] ∧ SearchAt m S ctx st true false ∧
     1 ≤ level ∧ level ≤ n
-  post _ m t _ m' := t = E0 ∧ SearchAt m' S ctx (firstterminal level st) false false ∧ SFrame m m' S
+  post _ m t _ m' := t = E0 ∧ SearchAt m' S ctx (firstterminal level st) false false ∧ SFrame m m' S ∧
+    ∀ z, IsWork m' z → IsWork m z ∨ ¬ Mem.valid_block m z
 
 /-- `recover(ptn, level)`. -/
 def recoverSpec {n : Nat} (S : SLoc) (ctx : Ctx n) (st : Search n) (level : Nat) (pre : Bool) :
