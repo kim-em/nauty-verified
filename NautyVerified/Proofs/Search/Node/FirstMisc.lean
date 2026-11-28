@@ -198,4 +198,200 @@ theorem wp_fpnCheap {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem
       (fun x h1 _ => temps_gso _ _ h1)
       (by unfold cheapCheck; simp; omega)
 
+/-! ### For any dispatch representation -/
+
+section Generic
+
+open NautyVerified.Proofs.Dispatch (Ops DispatchRep DispatchC)
+
+variable {ge : genv} [E : NautyEnv ge] {O : Ops}
+
+theorem senv_find_killRequestG :
+    Senv.find_symbol (Genv.to_senv ge.genv_genv) dense.id.«nauty_kill_request» = some E.killRequest :=
+  E.find_killRequest
+
+theorem volatile_killRequestG :
+    Senv.block_is_volatile (Genv.to_senv ge.genv_genv) E.killRequest = true := by
+  have key : ∀ {F V : Type} {g g' : Genv.t F V} {b b' : block},
+      Genv.find_var_info g b = Genv.find_var_info g' b' →
+      Genv.block_is_volatile g b = Genv.block_is_volatile g' b' := by
+    intro F V g g' b b' h
+    simp only [Genv.block_is_volatile, h]
+  have hs : ∀ {F V : Type} (g : Genv.t F V) (b : block),
+      Senv.block_is_volatile (Genv.to_senv g) b = Genv.block_is_volatile g b := fun _ _ => rfl
+  have h0 := volatile_killRequest
+  rw [hs] at h0 ⊢
+  rw [key E.var_killRequest]
+  exact h0
+
+/-- `t710 = nauty_kill_request; if (t710) return -12;` reading 0, over any `NautyEnv`. -/
+theorem wp_fpnKillG {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
+    (hge : PTree.get dense.id.«nauty_kill_request» e = none)
+    (hQ : Q.normal [killEv] e (PTree.set (idOf 710) (.Vint Int.zero) le) m) :
+    Wp xi ge f (.Ssequence
+      (sk (.Sbuiltin (some (idOf 710)) (.EF_vload .Mint32)
+        [tptr (Cfrontend.Ctypes.Tint .I32 .Signed NautyVerified.Proofs.vattr)]
+        [.Eaddrof (.Evar dense.id.«nauty_kill_request»
+            (Cfrontend.Ctypes.Tint .I32 .Signed NautyVerified.Proofs.vattr))
+          (tptr (Cfrontend.Ctypes.Tint .I32 .Signed NautyVerified.Proofs.vattr))]))
+      (.Sifthenelse (.Etempvar (idOf 710) (Cfrontend.Ctypes.Tint .I32 .Signed NautyVerified.Proofs.vattr))
+        (sk (.Sreturn (some (.Eunop .Oneg (ci 12 tint) tint)))) .Sskip)) Q e le m := by
+  wp_step; wp_step; wp_step
+  refine wp_builtin (vargs := [.Vptr E.killRequest Ptrofs.zero]) (t := [killEv])
+    (vres := .Vint Int.zero) (m' := m) ?_ ?_ ?_
+  · simp only [Exec.evalExprlist, Exec.evalExpr, Exec.evalLvalue, Exec.lvalOfVar, hge,
+      E.find_killRequest, typeof]
+    rfl
+  · have hv := volatile_load_vol (ge := Genv.to_senv ge.genv_genv) .Mint32 m E.killRequest
+      Ptrofs.zero dense.id.«nauty_kill_request» (.EVint Int.zero) (.Vint Int.zero)
+      volatile_killRequestG senv_find_killRequestG (ev_match_int _)
+    exact volatile_load_sem_intro _ _ _ _ _ hv
+  simp only [set_opttemp, seqPost, Post.after]
+  apply wp_if_eval
+  simp only [Exec.evalExpr, temps_gss, typeof]
+  rw [show Cfrontend.Cop.bool_val (.Vint Int.zero)
+    (Cfrontend.Ctypes.Tint .I32 .Signed NautyVerified.Proofs.vattr) m = some false from rfl]
+  simp only [Bool.false_eq_true, ite_false]
+  apply wp_skip
+  exact hQ
+
+/-- `if (noncheaplevel >= level) t711 = !(*dispatch.cheapautom)(ptn, level, digraph, n);
+else t711 = 0; if (t711) noncheaplevel = level + 1;`, for `D`: `cheapCheck true` when
+`O.cheapautom` is HexGraphIso's. The dispatch call may change `D`'s written globals, its
+scratch blocks in use and new blocks. -/
+theorem wp_fpnCheapG {D : DispatchC ge O} {f : function} {Q : Post} {e : env} {le : temp_env}
+    {m : mem} {S : SLoc} {gl : D.GLoc} {cl : D.CLoc} {G : O.Gr n} {st : SearchState n (O.Canon n)}
+    {pre nsp : Bool} {level : Nat} (h : SearchAtG D.toDispatchRep m S gl cl G st pre nsp)
+    (hvU : Mem.valid_block m S.bUA) (hvT : Mem.valid_block m E.tcnode0)
+    (hO : O.cheapautom st.ptn level n = Hex.GraphIso.Nauty.cheapautom st.ptn level n)
+    (hE1 : PTree.get dense.id.«nauty:dispatch» e = none)
+    (hE2 : PTree.get dense.id.«nauty:digraph» e = none)
+    (hE3 : PTree.get dense.id.«nauty:n» e = none)
+    (hE4 : PTree.get dense.id.«nauty:noncheaplevel» e = none)
+    (hptn : PTree.get dense.id.ptn le = some (.Vptr S.bp S.pofs))
+    (hlev : PTree.get dense.id.level le = some (.Vint (ir level))) (h1 : 1 ≤ level) (hn : level ≤ n)
+    (hQ : ∀ le' m', SearchAtG D.toDispatchRep m' S gl cl G (cheapCheck true level st) pre nsp →
+      Unch m m' (fun z => z = E.noncheaplevel ∨ z ∈ D.wglobs ∨ D.IsWork m z ∨
+        ¬ Mem.valid_block m z) →
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) → WorkMonoG D.toDispatchRep m m' →
+      (∀ x, x ≠ idOf 711 → x ≠ idOf 712 → PTree.get x le' = PTree.get x le) →
+      Q.normal E0 e le' m') :
+    Wp xi ge f (.Ssequence (sk Firstpathnode.cheap)
+      (.Sifthenelse (tv (idOf 711))
+        (sk (.Sassign (.Evar dense.id.«nauty:noncheaplevel» tint)
+          (.Ebinop .Oadd (tv dense.id.«level») (ci 1 tint) tint))) .Sskip)) Q e le m := by
+  have hnl := h.nlt
+  have hI := h.inv
+  obtain ⟨-, -, hnc, -⟩ := hI.scalars
+  have hcast : ∀ b : Bool, Cfrontend.Cop.sem_cast (Val.of_bool b) tint tbool m =
+      some (Val.of_bool b) := fun b => by cases b <;> rfl
+  have mNC : E.noncheaplevel ∈ S.blocksG D.toDispatchRep gl cl :=
+    SLoc.mem_blocksG_of D.toDispatchRep (.inr (.inr (.inr (.inr (.inl (by simp))))))
+  -- the tail, from `t711` holding `b`, in memory `m₁` after the call (if any)
+  have tail : ∀ (m₁ : mem) (le' : temp_env) (b : Bool),
+      SearchAtG D.toDispatchRep m₁ S gl cl G st pre nsp →
+      Unch m m₁ (fun z => z = E.noncheaplevel ∨ z ∈ D.wglobs ∨ D.IsWork m z ∨
+        ¬ Mem.valid_block m z) →
+      (∀ z, Mem.valid_block m z → Mem.valid_block m₁ z) → WorkMonoG D.toDispatchRep m m₁ →
+      PTree.get (idOf 711) le' = some (Val.of_bool b) →
+      PTree.get dense.id.level le' = some (.Vint (ir level)) →
+      (∀ x, x ≠ idOf 711 → x ≠ idOf 712 → PTree.get x le' = PTree.get x le) →
+      cheapCheck true level st = (if b then { st with noncheaplevel := level + 1 } else st) →
+      Wp xi ge f (.Sifthenelse (tv (idOf 711))
+        (sk (.Sassign (.Evar dense.id.«nauty:noncheaplevel» tint)
+          (.Ebinop .Oadd (tv dense.id.«level») (ci 1 tint) tint))) .Sskip) Q e le' m₁ := by
+    intro m₁ le' b h₁ hu₁ hv₁ hw₁ h711 hlev' hle' hcc
+    apply wp_if_eval
+    simp only [Exec.evalExpr, tv, h711, typeof]
+    cases b
+    · rw [show Cfrontend.Cop.bool_val (Val.of_bool false) tint m₁ = some false from rfl]
+      simp only [Bool.false_eq_true, ite_false]
+      apply wp_skip
+      exact hQ le' m₁ (by rw [hcc]; exact h₁) hu₁ hv₁ hw₁ hle'
+    · rw [show Cfrontend.Cop.bool_val (Val.of_bool true) tint m₁ = some true from rfl]
+      simp only [ite_true]
+      wp_step; wp_step
+      refine wp_gint hE4 E.find_noncheaplevel h₁.scalars.noncheaplevel.writable
+        (x := (level : Int) + 1)
+        (by simp only [Exec.evalExpr, tv, hlev', typeof, cop]; simp) rfl ?_
+      intro m' iNC hu hv
+      have hU : Unch m₁ m' (· ∈ [E.noncheaplevel]) := hu.mono fun z hz => by simp [hz]
+      have hw₂ : WorkMonoG D.toDispatchRep m₁ m' := fun z hz => .inl ((h₁.work.unch hu
+        (fun y hy e => h₁.globs_ne (D.wglobs_sub _ hy) (.inr (.inr (.inr (.inr (by simp))))) e)
+        ⟨by sep_ne h₁.lit, by sep_ne h₁.lit⟩ (fun y hy e => h₁.work_not hy (e ▸ mNC)) hv).2 z hz)
+      refine hQ le' m' ?_ (hu₁.trans (hu.mono fun z hz => .inl hz)) (fun z hz => hv _ (hv₁ _ hz))
+        (hw₁.trans hv₁ hw₂) hle'
+      rw [hcc]
+      exact h₁.setNoncheap hU hv (v := level + 1) (by push_cast; exact iNC) (by omega)
+  wp_step
+  simp only [Firstpathnode.cheap, sk]
+  wp_step; wp_step
+  apply wp_if_eval
+  rw [Exec.evalExpr, eval_gint hE4 E.find_noncheaplevel h.scalars.noncheaplevel,
+    show Exec.evalExpr ge e le m (tv dense.id.level) = _ from hlev]
+  simp only [typeof, cop]
+  rw [ir_lt (a := (st.noncheaplevel : Int)) (b := (level : Int)) ⟨by omega, by omega⟩
+    ⟨by omega, by omega⟩]
+  by_cases hge : level ≤ st.noncheaplevel
+  · rw [ite_eq_left (by simp; omega)]
+    obtain ⟨fd, hfd, hty, hsat⟩ := D.cheapautom_fn xi
+    wp_step; wp_step; wp_step
+    refine wp_call (vf := .Vptr D.cheapautom Ptrofs.zero) (targs := [tptr tint, tint, tint, tint])
+      (tres := tint) (cc := Common.AST.cc_default) fd _ (hsat S.bp S.pofs st.ptn level n) ?_ ?_ ?_
+      hfd hty
+      ⟨rfl, h.work.disp, h.arrays.ptn, hI.ptnSize, fun x hx => by
+          rcases hI.ptnVals x hx with hv | hv
+          · omega
+          · rw [hv]; decide,
+        by have := hI.ptnLast; omega, hnl, by omega⟩ ?_
+    · rfl
+    · simp only [Exec.evalExpr, Exec.evalLvalue, Exec.lvalOfVar, hE1, E.find_dispatch, typeof,
+        Exec.derefLoc, Cfrontend.Ctypes.access_mode, field_dCheapautom, Mem.loadv, Alloc.Mptr_eq]
+      rw [show Ptrofs.unsigned (Ptrofs.add Ptrofs.zero (Ptrofs.repr (zOfInt 40))) = zOfInt 40 from rfl,
+        h.fixed.dCheapautom.load]
+    · simp only [Exec.evalExprlist, Exec.evalExpr, hptn, hlev, tv, Exec.lvalOfVar, hE2, hE3,
+        E.find_digraph, E.find_n, Exec.derefLoc, Cfrontend.Ctypes.access_mode, Mem.loadv,
+        show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl, h.fixed.digraph.load, h.fixed.nn.load,
+        typeof, cop]
+    rintro t v m₁ ⟨rfl, rfl, hstep⟩
+    obtain ⟨h₁, hw₁⟩ := h.dstep hvU hvT hstep (fun _ hz => hz.elim)
+    have hv₁ := hstep.valid
+    have hu₁ : Unch m m₁ (fun z => z = E.noncheaplevel ∨ z ∈ D.wglobs ∨ D.IsWork m z ∨
+        ¬ Mem.valid_block m z) :=
+      hstep.unch.mono fun z hz => by
+        rcases hz with hz | hz
+        · exact hz.elim
+        · exact .inr hz
+    rw [hO]
+    simp only [set_opttemp, seqPost, Post.after, E0_append]
+    apply wp_set_eval
+    simp only [Exec.evalExpr, temps_gss, tv, typeof, cop]
+    have e1 : Int.eq (ir 1) Int.zero = false := by decide
+    have e0 : Int.eq (ir 0) Int.zero = true := by decide
+    have hlev2 : PTree.get dense.id.level (PTree.set (idOf 711) (Val.of_bool
+        (!Hex.GraphIso.Nauty.cheapautom st.ptn level n))
+        (PTree.set (idOf 712) (.Vint (ir (if Hex.GraphIso.Nauty.cheapautom st.ptn level n = true
+          then 1 else 0))) le)) = some (.Vint (ir level)) := by
+      rw [temps_gso _ _ (show dense.id.level ≠ idOf 711 by decide),
+        temps_gso _ _ (show dense.id.level ≠ idOf 712 by decide)]; exact hlev
+    have key := tail m₁ _ (!Hex.GraphIso.Nauty.cheapautom st.ptn level n) h₁ hu₁ hv₁ hw₁
+      (temps_gss _ _ _) hlev2
+      (fun x h1 h2 => by rw [temps_gso _ _ h1, temps_gso _ _ h2])
+      (by unfold cheapCheck; cases Hex.GraphIso.Nauty.cheapautom st.ptn level n <;> simp [hge])
+    have hcast₁ : ∀ b : Bool, Cfrontend.Cop.sem_cast (Val.of_bool b) tint tbool m₁ =
+        some (Val.of_bool b) := fun b => by cases b <;> rfl
+    revert key
+    cases hc : Hex.GraphIso.Nauty.cheapautom st.ptn level n <;> intro key <;>
+      simp only [ite_true, Bool.false_eq_true, ite_false, e1, e0, Bool.not_false, Bool.not_true] at key ⊢ <;>
+      rw [hcast₁] <;> simpa only [E0_append] using key
+  · rw [ite_eq_right (by simp; omega)]
+    apply wp_set_eval
+    simp only [Exec.evalExpr]
+    exact tail m _ false h (Unch.refl _ _) (fun _ h => h) (WorkMonoG.refl m) (temps_gss _ _ _)
+      (by rw [temps_gso _ _ (by decide)]; exact hlev)
+      (fun x h1 _ => temps_gso _ _ h1)
+      (by unfold cheapCheck; simp; omega)
+
+end Generic
+
 end NautyVerified.Proofs.Search
