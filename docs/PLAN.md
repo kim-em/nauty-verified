@@ -492,15 +492,171 @@ these globals are pinned in `Proofs/Alloc/Blocks.lean`.
 
 ## Phase 7: sparse
 
-`nausparse.c`: `refine_sg` (`refineWith`, `splitCounts`), `distvals`,
-`sortindirect` (`Sort.indirect`; the inclusive-cursor case at the array base
-from the audit), `sortints`, `isautom_sg`, `testcanlab_sg`, `updatecan_sg`,
-`bestcell_sg`/`targetcell_sg` (cached = fresh by `maketargetCached_eq`),
-`init_sg` and stamps (C resets short stamps before wraparound; Hex's are
-unbounded: invariant needed), `sparsenauty`, `sparse_main.c`. Harness
-always supplies valid offsets and a non-null edge array, avoiding the
-audit's out-of-range pointer findings. Reuse all Phase 2/4 infrastructure
-and the generic search proofs (`Generic.node`).
+Target: `sparsenauty_binary_correct` (`Statement/SparseFinal.lean`), the
+dense theorem's shape for `sparse_main.c`: for a coloured sparse graph `G`
+(`Hex.GraphIso.Sparse.Colored`, sorted symmetric loopless rows) with
+`0 < n ≤ maxN`, `k ≤ maxN` and input `sparseInput G` (`n`, the colours, the
+degrees, the rows in `G`'s order), every behaviour of the binary of
+`scripts/build_binary.sh --sparse` consistent with the input terminates and
+writes `expectedSparse G`: `sparseOutput` of
+`Hex.GraphIso.Nauty.Sparse.runColored G` (generators, canonical labelling,
+orbits, the canonical rows in nauty's unsorted order with `dispatch_sparse`'s
+`cleanup = NULL`, the statistics). It is `binary_of_backward` (Compose.lean,
+generic over the Clight program) through `sparse_backward`, with one `sorry`
+for the execution of `main`. The generators block uses `genTrace` like the
+dense statement and switches to `TraceRun.emitted` with the same re-pin
+(CI checks nauty's generators are a subsequence of `genTrace`; on CFI-120
+`genTrace` has seven more). `maxN` is the dense one: nausparse.c's `int`
+arithmetic is on degrees, counts and cell positions below `n`, edge offsets
+are `size_t`, and `2 * 500 * m` is shared with dense.
+
+Trusted base: unchanged. `sparse` is linked by the same `c_link` model; the
+`extending dense` numbering only chooses different identifiers, and
+`sparse.fresh = dense.fresh` is a SimplExpr context, which Phase 3's theorem
+quantifies over.
+
+### Done
+
+- `c_link sparse := sparse_main nauty nautil nausparse schreier naurng zalloc
+  extending dense` (`Source/Sparse.lean`): every key of `dense` keeps its
+  identifier, new keys are numbered from `dense.fresh + 65536` (clear of
+  SimplExpr's temporaries, which start at `dense.fresh` in every function),
+  so a function both programs link has the same Clight in both.
+  `Source/Shared.lean` checks this by kernel `rfl` for all 60 functions of
+  nauty.c, nautil.c, schreier.c, naurng.c and zalloc.c, and for
+  `cheapautom_sg = dense.fn.cheapautom` (same source). Clight pinned by
+  `sparse.clight_eq`/`sparse.locals_eq` as for dense; `sparse_backward`.
+- `sparse_main.c`: offsets are the running sums of the degrees, the edge
+  array has at least one entry, all other options as dense.
+- CI: `run_native.sh` (both harnesses, `*.sparse.out`), `run_interp.sh`
+  (`nvInterp --sparse` on `sparse.locals`), `run_expected.sh`
+  (`nvSparseExpected`, HexGraphIso's sparse search, against the sparse
+  fixtures: blocks 2 to 5 equal, generators as above). The CompCert4Lean
+  binary (`build_binary.sh --sparse --check`) reproduces all 52 fixtures.
+  Regenerating `c/csyntax/` needs a built CompCert and is not in CI for
+  either program; regeneration is byte-identical locally.
+
+### What is reused, and how
+
+The shared functions have identical Clight, but every proof is stated over
+`Program.ge = globalenv dense.locals` with concrete block numbers
+(`Block.*`, pinned by `kernel_rfl`), and the sparse program puts the same
+identifiers at other blocks (`malloc` 242 against 270, `firstpathnode` 12
+against 11, because `prog_defs` differ). So the reuse is by generalising
+once, not by copying:
+
+1. **Environment record** (`Program/Env.lean`). A structure `NautyEnv ge`
+   holding the block of every global and function the nautil.c, nauty.c,
+   allocator and naugraph-independent proofs mention, with their
+   `find_symbol`, `find_funct_ptr` (bodies `dense.fn.*`) and initial-memory
+   facts and a `Nodup` of the block list for `sep_ne`. Rewrite the proofs to
+   take `E : NautyEnv ge` and use `E.<x>` for `Block.<x>`. Instances: `dense`
+   from today's `kernel_rfl` facts, `sparse` from new ones plus
+   `Source/Shared.lean`. This covers, unchanged in substance: `nextelement`,
+   `orbjoin`, `breakout`, `fmptn`, `shortprune`, `longprune`, `fmperm`,
+   `permset`, `doref`, `maketargetcell` (its target-cell argument is already a
+   function pointer), the allocator layer (`malloc`, `free`, `nauty_zalloc`,
+   `DYNALLOC1`, `DynAt`), `cheapautom` (as `cheapautom_sg`) and
+   `automCb_emit`.
+2. **Dispatch record.** `SearchAt`'s `Fixed` pins `dispatch` to naugraph.c's
+   seven procedures and their specs. Replace them by a record `DispatchC`:
+   the blocks of `isautom`, `testcanlab`, `updatecan`, `refine`, `refine1`,
+   `cheapautom`, `targetcell`, `freedyn`, `check`, `init` (`NULL` for dense)
+   and the `FunSpec` each satisfies, stated against the policy's operations
+   (below). nauty.c (`firstterminal`, `recover`, `processnode`,
+   `firstpathnode`, `othernode`, `nodes`, `nauty()`) is proved once over
+   `DispatchC`; dense instantiates it with the existing
+   naugraph.c proofs, sparse with nausparse.c's.
+3. **Canonical storage.** `SearchState n κ` is already generic in the
+   canonical store; `SearchAt` fixes `κ = Array (VSet n)` and `CanongAt`
+   (setword rows). Make the store's representation a field of `DispatchC`
+   (`CanonRep m S c samerows`): dense, the first `samerows` setword rows;
+   sparse, the `sparsegraph` struct `canong` (its `v`, `d`, `e` arrays and
+   capacities, allocated by `init_sg`) holding `Rows` up to `samerows`.
+4. **Search function.** The node proofs are stated against HexGraphIso's
+   dense `node`/`sweep`; restate them against `Generic.node`/`Generic.sweep`
+   (dense `node_eq_generic`) for any policy whose shared transitions are the
+   dense ones (`recordFirst`, `compareCodes`, `firstterminal`, `leafExit`,
+   `cheapCheck`, `afterChildFirst`, `orbit`, `shortprune`, `longprune`) and
+   whose `child`, `recover`, `afterSweep` agree with dense on every field
+   nauty.c stores. The policy-specific operations (`visit`, `chooseTarget`,
+   `classify`, `updatecan` at the end) enter only through `DispatchC`'s specs.
+   `Sparse.policy` differs from dense only in those, in `Storage.invalidate`
+   (ghost: sets `scratch.indexed := false`) and in `order` (not written).
+5. **Ghost scratch.** HexGraphIso's sparse state carries `Scratch` (cell
+   indices, hit counts, marks with an unbounded stamp), reused across calls;
+   nausparse.c keeps `work1`..`work4` and `vmark1`/`vmark2` with `short`
+   stamps reset at 32000. The C specs are stated against the fresh
+   functions (`Sparse.refine`, `Sparse.maketargetcell`), and the search
+   proof connects them to the cached ones in the policy by two HexGraphIso lemmas:
+   `maketargetCached_eq` (exists) and the analogue for `refineWith` (C-visible
+   outputs `lab`, `ptn`, `active`, `numcells`, `longcode` equal `refine`'s for
+   any `Scratch.Bounded` scratch; to be proved from `RefineSt.Equiv`), with
+   `Scratch.Bounded` carried as an invariant of the search
+   (`Storage.invalidate_valid`, `Storage.update_valid`, `splitCounts_bounded`).
+
+### New specifications (nausparse.c), with their HexGraphIso counterparts
+
+Each is a `*_satisfies` over `NautyEnv` for the sparse instance, with the
+input graph as `SparseGraphAt` (the `sparsegraph` struct: `nv`, `nde`, `v`,
+`d`, `e`, `w = NULL`, rows equal to `Sparse.Graph.ofGraph G` rows) and the
+work arrays as `DynAt` pairs.
+
+- Marks: `preparemarks1`/`preparemarks2` and `RESETMARKS1`/`RESETMARKS2`
+  with the invariant every `vmarkK[i] ≤ vmarkK_val ≤ 32000`, so after a reset
+  every entry is below the stamp (the wraparound branch zeroes the array and
+  sets the stamp to 1). Specs are relative to "entry equals the stamp", which
+  is how HexGraphIso's `marks`/`stamp` and its local stamps `i + 1` are read.
+- `isautom_sg`: `Sparse.isautom` (undirected: fixed vertices skipped).
+- `testcanlab_sg`: `Sparse.testcanlab`, writing `samerows`; uses `work1` as
+  `INVLAB` (`Sparse.inverse`).
+- `updatecan_sg`: `Sparse.updatecan` on `CanonRep`; `nv`, `nde` of `canong`
+  set; `w = NULL` branch only.
+- `init_sg`: `SG_ALLOC` of `canong` to `n` and `nde` entries, `*status = 0`;
+  establishes the sparse `CanonRep` of `Graph.blank` (zero-filled).
+- `distvals`: `Sparse.distvals` (`work4` as the queue, already allocated to
+  `n` by `refine_sg`, so its `DYNALLOC1` does nothing).
+- `sortindirect`: `Sort.indirect` (quicksort with insertion sort below the
+  cutoff, the inclusive-cursor case at the array base from the audit);
+  `sortints`: `sortCells` (on `HITCELL`). Both come from `sorttemplates.c`.
+- `refine_sg`: `Sparse.refine`, i.e. `refineWith` with fresh scratch: the
+  initial queue from `nextelement` over `active`, `CELLSTART` as
+  `indexCells`, the distance split at `level ≤ 2` (`distvals`, then
+  `splitCounts … true`), the main loop choosing a singleton splitter among the
+  first ten queue entries, `splitSingleton` (trivial split, `HITS[--k]`
+  order) and `splitNontrivial` (`splitCounts`, `minima`, `sortindirect`), the
+  `MASH`/`CLEANUP` code (`mash`, `cleanup`). Loop variant as dense
+  (`refineFuel`). Both `dispatch.refine` and `dispatch.refine1` are
+  `refine_sg`.
+- `bestcell_sg`, `targetcell_sg`: `Sparse.bestcell`, `Sparse.targetcell`;
+  the target cell's set and size as `maketargetcell` (reused).
+- `nausparse_check`, `nausparse_freedyn` (frees the seven pairs, including
+  `snwork`, the search workspace, after its last use).
+- `sparsenauty`: the `dispatch == &dispatch_sparse` test, the loop scan over
+  the rows (none, rows are loopless), `DYNALLOC1(snwork, 2*500*m)`,
+  `nauty()` through the generic proof, restoring `digraph`; spec as
+  `densenautySpec` with `SparseGraphAt` and the sparse `CanonRep`.
+- `sparse_main`: reading `sparseInput G` into `sg` (offsets as running sums,
+  `Layout` gives `G.offsets`), the partition loops (the same C as
+  `dense_main`'s; reuse `Proofs/Harness/Part*.lean` by stating them over the
+  loop's factored Clight), output of block 4 from `CanonRep`; `mainSpec`
+  writing `expectedSparse G`.
+
+### Statement-side pieces
+
+- Initial memory of `sparse.locals`: `initOk` by the kernel, `Globals` for
+  nausparse.c's statics (`vmark1_val = vmark2_val = 32000`, `fuzz1`/`fuzz2`,
+  `dispatch_sparse`, seven `DYNALLSTAT` pairs at capacity 0), block pinning.
+- `exec_of_main` for the sparse program (generalise DenseOf's over the
+  program as Compose's is), giving `sparsenauty_binary_correct` from the
+  sparse `main_ok`.
+- Emission: the same `Em` laws (`EmLawOff`, `EmLawFirst`) over
+  `Generic.node` serve both programs; discharge them for `emitted` with the
+  re-pin.
+- Corollaries: HexGraphIso's sparse theorems (`Sparse.canon`, `Aut`,
+  orbits) are about the sorted `G.relabel l`; the binary writes the same rows
+  unsorted, so the invariant corollary needs "the written rows, sorted, are
+  `G.relabel l`'s rows" (from `Sparse.updatecan`).
 
 ## Verification (continuous)
 
