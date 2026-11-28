@@ -48,10 +48,9 @@ theorem wp_dynalloc1L {e : env} {f : function} {Q : Post} {le : temp_env} {m : m
   wp_step; wp_step
   apply wp_if_eval
   simp only [Exec.evalExpr, hx]
-  simp only [Exec.lvalOfVar, hnil1, hnil2, hnil3, hgs, Exec.derefLoc,
+  simp only [Exec.lvalOfVar, hnil1, hgs, Exec.derefLoc,
     Cfrontend.Ctypes.access_mode, typeof, cop, Mem.loadv,
-    show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl, hD.capLd,
-    ]
+    show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl, hD.capLd]
   have hcap := hD.capLt
   rw [ltu_lr (a := cap) (b := n) (by omega) (by omega)]
   by_cases hnc : cap < n
@@ -69,7 +68,7 @@ theorem wp_dynalloc1L {e : env} {f : function} {Q : Post} {le : temp_env} {m : m
     wp_step; wp_step; wp_step
     apply wp_assign_eval
     simp only [Exec.evalLvalue, Exec.evalExpr, hx]
-    simp only [Exec.lvalOfVar, hnil1, hnil2, hnil3, hgs, typeof, cop,
+    simp only [Exec.lvalOfVar, hnil1, hgs, typeof, cop,
       Exec.assignLoc, Cfrontend.Ctypes.access_mode, Mem.storev,
       show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl,
       hst2]
@@ -79,7 +78,7 @@ theorem wp_dynalloc1L {e : env} {f : function} {Q : Post} {le : temp_env} {m : m
     wp_step; wp_step; wp_step; wp_step; wp_step
     refine wp_call (vf := .Vptr E.zalloc Ptrofs.zero) (targs := [tulong]) (tres := tptr .Tvoid)
       (cc := Common.AST.cc_default) _ (zallocSpec (n * c)) (zalloc_satisfies _) rfl
-      (by simp [Exec.evalExpr, Exec.lvalOfVar, hnil1, hnil2, hnil3, hnil _ _ E.find_zalloc, E.find_zalloc, Exec.derefLoc,
+      (by simp [Exec.evalExpr, Exec.lvalOfVar, hnil _ _ E.find_zalloc, E.find_zalloc, Exec.derefLoc,
         Cfrontend.Ctypes.access_mode])
       (by simp only [Exec.evalExprlist, Exec.evalExpr,
             hx]
@@ -99,7 +98,7 @@ theorem wp_dynalloc1L {e : env} {f : function} {Q : Post} {le : temp_env} {m : m
     have hbpW3 := hfr.unch.access _ _ _ _ hbp' hbpW2
     obtain ⟨m4, hst4⟩ := Mem.valid_access_store _ _ _ _ (.Vptr b' Ptrofs.zero) hbpW3
     apply wp_assign_eval
-    simp only [Exec.evalLvalue, Exec.evalExpr, Exec.lvalOfVar, hnil1, hnil2, hnil3, hgp, temps_gss, typeof, cop,
+    simp only [Exec.evalLvalue, Exec.evalExpr, Exec.lvalOfVar, hnil2, hgp, temps_gss, typeof, cop,
       Exec.assignLoc, Cfrontend.Ctypes.access_mode, Mem.storev, Mptr_eq,
       show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl, hst4]
     have hvp : Mem.valid_pointer m4 b' (zOfInt (-1)) = true :=

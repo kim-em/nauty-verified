@@ -201,39 +201,39 @@ theorem canonRows_update {n : Nat} (G : Hex.SparseGraph n) (R : Rows n) (lab : A
   have hofs : ∀ i, i ≤ n → (Hex.GraphIso.Nauty.Sparse.updatecan (Graph.ofGraph G) R lab sr).offsets[i]! = if i < sr then R.offsets[i]! else start (Graph.ofGraph G) lab sr (base R sr) (i - sr) := by
     intro i hi
     by_cases h : i < sr
-    · rw [if_pos h]; exact B.1 i h
-    · rw [if_neg h]; have := hoff (i - sr) (by omega); rwa [show sr + (i - sr) = i by omega] at this
+    · rw [ite_eq_left h]; exact B.1 i h
+    · rw [ite_eq_right h]; have := hoff (i - sr) (by omega); rwa [show sr + (i - sr) = i by omega] at this
   refine ⟨Nat.le_refl _, fun i hi => ?_, fun i hi => ?_, fun i hi => ?_, fun j hj => ?_, ?_, ?_,
     fun j hj => ?_⟩
   · -- mono
     rw [hofs i (by omega), hofs (i + 1) (by omega)]
     by_cases h1 : i + 1 < sr
-    · rw [if_pos (by omega), if_pos h1]; exact hrows.mono i (by omega)
+    · rw [ite_eq_left (by omega), ite_eq_left h1]; exact hrows.mono i (by omega)
     · by_cases h2 : i < sr
-      · rw [if_pos h2, if_neg h1, show i + 1 - sr = 0 by omega]
+      · rw [ite_eq_left h2, ite_eq_right h1, show i + 1 - sr = 0 by omega]
         have := hrows.mono i h2
         show _ ≤ base R sr
         rw [hbsr (by omega), show sr = i + 1 by omega]; exact this
-      · rw [if_neg h2, if_neg h1]; exact hst_le (by omega)
+      · rw [ite_eq_right h2, ite_eq_right h1]; exact hst_le (by omega)
   · -- v
     by_cases h : i < sr
     · rw [(P1 i h).1, hrows.v i h, B.1 i h]
     · have := (P2 (i - sr) (by omega)).1
       rw [show sr + (i - sr) = i by omega] at this
-      rw [this, hofs i (by omega), if_neg h]
+      rw [this, hofs i (by omega), ite_eq_right h]
   · -- d
     have hdeg : (Hex.GraphIso.Nauty.Sparse.updatecan (Graph.ofGraph G) R lab sr).degree i = (Hex.GraphIso.Nauty.Sparse.updatecan (Graph.ofGraph G) R lab sr).offsets[i + 1]! - (Hex.GraphIso.Nauty.Sparse.updatecan (Graph.ofGraph G) R lab sr).offsets[i]! := rfl
     by_cases h : i < sr
-    · rw [(P1 i h).2, hrows.d i h, hdeg, hofs i (by omega), hofs (i + 1) (by omega), if_pos h]
+    · rw [(P1 i h).2, hrows.d i h, hdeg, hofs i (by omega), hofs (i + 1) (by omega), ite_eq_left h]
       by_cases h1 : i + 1 < sr
-      · rw [if_pos h1]; rfl
-      · rw [if_neg h1, show i + 1 - sr = 0 by omega]
+      · rw [ite_eq_left h1]; rfl
+      · rw [ite_eq_right h1, show i + 1 - sr = 0 by omega]
         have e : start (Graph.ofGraph G) lab sr (base R sr) 0 = R.offsets[i + 1]! := by
           show base R sr = _; rw [hbsr (by omega), show sr = i + 1 by omega]
         rw [e]; rfl
     · have := (P2 (i - sr) (by omega)).2
       rw [show sr + (i - sr) = i by omega] at this
-      rw [this, hdeg, hofs i (by omega), hofs (i + 1) (by omega), if_neg h, if_neg (by omega),
+      rw [this, hdeg, hofs i (by omega), hofs (i + 1) (by omega), ite_eq_right h, ite_eq_right (by omega),
         show i + 1 - sr = (i - sr) + 1 by omega, hstq, show sr + (i - sr) = i by omega,
         Nat.add_sub_cancel_left]
   · -- e
@@ -276,13 +276,13 @@ theorem wp_setK {n : Nat} {Q : Post} {le : temp_env} {m : mem} {R : Rows n} {sr 
     ir_eq (a := (sr : Int)) (b := 0) ⟨by omega, by omega⟩ ⟨by decide, by decide⟩]
   by_cases hs0 : sr = 0
   · subst hs0
-    simp (config := {decide := true}) only [cop, ite_true, Val.of_bool]
+    simp (config := {decide := true}) only [cop, ite_true]
     wp_step; wp_step
     apply wp_set_eval
     simp only [Exec.evalExpr, typeof, cop, cast_int_long_ir (a := 0) ⟨by decide, by decide⟩]
     exact hQ _ (temps_gss _ _ _) fun x hx => temps_gso _ _ hx
   · rw [show decide ((sr : Int) = 0) = false from decide_eq_false (by omega)]
-    simp (config := {decide := true}) only [cop, ite_false, Val.of_bool]
+    simp (config := {decide := true}) only [cop, ite_false]
     have hsub : Exec.evalExpr sge empty_env le m (.Ebinop .Osub (tv id.samerows) (ci 1 tint) tint) =
         some (.Vint (ir ((sr - 1 : Nat) : Int))) := by
       simp only [Exec.evalExpr, hsrV, typeof, cop, show Lib.Integers.Int.repr (zOfInt 1) = ir 1 from rfl,
@@ -331,11 +331,11 @@ theorem updatecan_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sof
     let le0 := entryTemps bsg sofs bc cofs bl lofs sr M n
     wp_step
     refine wp_vdew (bsg := bsg) (sofs := sofs)
-      (by simp (config := {decide := true}) only [le0, entryTemps, temps_gso, temps_gss])
+      (by simp (config := {decide := true}) only [entryTemps, temps_gso, temps_gss])
       (by decide) (by decide) (by decide) hgr.v hgr.d hgr.e hgr.w ?_
     wp_step
     refine wp_vdew (bsg := bc) (sofs := cofs)
-      (by simp (config := {decide := true}) only [le0, entryTemps, temps_gso, temps_gss])
+      (by simp (config := {decide := true}) only [entryTemps, temps_gso, temps_gss])
       (by decide) (by decide) (by decide) hca.v hca.d hca.e hca.w ?_
     let leV := PTree.set id.cwt Vnullptr (PTree.set id.ce (.Vptr cbe ceo) (PTree.set id.cd (.Vptr cbd cdofs)
       (PTree.set id.cv (.Vptr cbv cvo) (PTree.set id.wt Vnullptr (PTree.set id.e (.Vptr be eo)

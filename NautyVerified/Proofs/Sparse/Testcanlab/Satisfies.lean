@@ -147,11 +147,11 @@ theorem testcanlab_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (so
     let le0 := entryTemps bsg sofs bc cofs bl lofs bs so M n
     wp_step
     refine wp_vde (bsg := bsg) (sofs := sofs)
-      (by simp (config := {decide := true}) only [le0, entryTemps, temps_gso, temps_gss])
+      (by simp (config := {decide := true}) only [entryTemps, temps_gso, temps_gss])
       (by decide) (by decide) hgr.v hgr.d hgr.e ?_
     wp_step
     refine wp_vde (bsg := bc) (sofs := cofs)
-      (by simp (config := {decide := true}) only [le0, entryTemps, temps_gso, temps_gss])
+      (by simp (config := {decide := true}) only [entryTemps, temps_gso, temps_gss])
       (by decide) (by decide) hca.v hca.d hca.e ?_
     let leV := PTree.set id.ce (.Vptr cbe ceo) (PTree.set id.cd (.Vptr cbd cdofs)
       (PTree.set id.cv (.Vptr cbv cvo) (PTree.set id.e (.Vptr be eo) (PTree.set id.d (.Vptr bd dofs)

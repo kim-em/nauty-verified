@@ -71,9 +71,8 @@ theorem updatecan_rows {n : Nat} (g : Graph n) (R : Rows n) (lab : Array Nat) (s
       st'.2 = k0 + cur.prefix.length ∧ (∀ e < k0, st'.1[e]! = nb0[e]!) ∧
       (∀ j < cur.prefix.length, st'.1[k0 + j]! = (inverse n lab)[g.neighbor (g.offsets[v]! + j)]!)⌝
   all_goals
-    simp +zetaDelta only [Std.Legacy.Range.toList, Nat.sub_zero, Nat.add_sub_cancel,
-      Nat.div_one, List.length_append, List.length_cons, List.length_nil,
-      List.mem_append, List.mem_cons, List.not_mem_nil, bne_iff_ne] at *
+    simp +zetaDelta only [Std.Legacy.Range.toList, Nat.add_sub_cancel,
+      Nat.div_one, List.length_append, List.length_cons, List.length_nil] at *
   all_goals simp_all
   case vc4.pre => simp [base]; rfl
   case vc1.step =>
