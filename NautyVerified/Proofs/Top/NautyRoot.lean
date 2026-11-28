@@ -25,6 +25,14 @@ set_option linter.unusedSimpArgs false
 
 variable {xi : ExternalCalls}
 
+/-- The root's return value is 1 (its own level) or an unwind target 0. -/
+theorem exitValue_root {e : Exit} (h : ∀ tg sh, e = .unwind tg sh → tg < 1) :
+    ∃ v : Nat, (exitValue 1 e).1 = v ∧ v ≤ 1 := by
+  cases e with
+  | done => exact ⟨1, rfl, Nat.le_refl _⟩
+  | fuel => exact ⟨1, rfl, Nat.le_refl _⟩
+  | unwind tg sh => exact ⟨tg, rfl, Nat.le_of_lt (h tg sh rfl)⟩
+
 /-- The root `firstpathnode0` call (`tRoot`). -/
 theorem wp_tRoot {n : Nat} {Q : Post} {le : temp_env} {m : mem}
     {NodeOk : Bool → Nat → Nat → Search n → Prop} {Em : Bool → Nat → Nat → Search n → List Int}
@@ -45,6 +53,7 @@ theorem wp_tRoot {n : Nat} {Q : Post} {le : temp_env} {m : mem}
         ∀ p ∈ chain', ¬ Mem.valid_block m p.1 ∧ ¬ Mem.valid_block m p.2) →
       NodeFrame m m' S [] 1 →
       (∀ z, IsWork m' z → IsWork m z ∨ ¬ Mem.valid_block m z) →
+      (∀ tg sh, r.1 = .unwind tg sh → tg < 1) →
       Wp xi ge dense.fn.nauty Nauty.tPost (Q.after t) (nEnv bI)
         (PTree.set dense.id.«retval» (.Vint (ir (exitValue 1 r.1).1))
           (PTree.set (idOf 735) (.Vint (ir (exitValue 1 r.1).1)) le)) m') :
@@ -66,12 +75,12 @@ theorem wp_tRoot {n : Nat} {Q : Post} {le : temp_env} {m : mem}
       show PTree.get dense.id.«nauty:tcnode0» (nEnv bI) = none from rfl, find_tcnode0,
       Exec.derefLoc, Cfrontend.Ctypes.access_mode, Refine.tv, Refine.pi, typeof, cop]
     rfl
-  · rintro t v m' ⟨hv, hS', hE, hC, hF, hW, -⟩
+  · rintro t v m' ⟨hv, hS', hE, hC, hF, hW, hU⟩
     subst hv
     simp only [set_opttemp, seqPost, Post.after]
     apply wp_set_eval
     simp only [Exec.evalExpr, temps_gss, Refine.tv, append_E0]
-    refine hQ t m' hS' hE ?_ hF hW
+    refine hQ t m' hS' hE ?_ hF hW hU
     obtain ⟨c', h1, h2, h3, -, h5⟩ := hC
     exact ⟨c', h1, h2, h3, fun p hp => (h5 p hp).resolve_left (by simp)⟩
 
