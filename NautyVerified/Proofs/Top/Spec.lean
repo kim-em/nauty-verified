@@ -51,7 +51,7 @@ def nautySpec {n k : Nat} (G : Colored n k) (gens : List (Array Nat)) (bg bl bp 
     ArrayAt m .Mint32 bl 0 (ints (initialPartition G).1) n ∧
     ArrayAt m .Mint32 bp 0 (ints (harnessPtn n (initialPartition G).2)) n ∧
     (∃ v, ArrayAt m .Mint32 bo 0 v n) ∧
-    (∃ v, ArrayAt m .Mint64 bc 0 v (wordsOf n * n)) ∧
+    (∃ cw, ArrayAt m .Mint64 bc 0 (longs cw) (wordsOf n * n)) ∧
     Mem.range_perm m bst (zOfInt 0) (zOfInt 88) .Cur .Freeable ∧
     [bg, bl, bp, bo, bst, bc].Pairwise (· ≠ ·) ∧
     0 < n ∧ n ≤ 65536

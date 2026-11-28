@@ -15,7 +15,8 @@ import NautyVerified.Statement.Harness
 - `g` holding HexGraphIso's rows of `G` (`m = SETWORDSNEEDED(n)` words each);
 - `lab`, `ptn` holding `initialPartition G` as the harness builds it
   (`ptn` 1 inside a cell and 0 at its end, `harnessPtn`);
-- `orbits`, `canong` and the `statsblk` `stats` writable.
+- `orbits` and the `statsblk` `stats` writable, and `canong` writable and
+  holding `unsigned long`s (the harness zero-fills it).
 
 Afterwards the trace writes the generators `gens`, in order (`gensWords
 gens`, which is what `emit_generator` writes for them), reads no input and
@@ -114,7 +115,7 @@ def densenautySpec {n k : Nat} (G : Colored n k) (gens : List (Array Nat)) (bg b
     ArrayAt m .Mint32 bl 0 (ints (initialPartition G).1) n ∧
     ArrayAt m .Mint32 bp 0 (ints (harnessPtn n (initialPartition G).2)) n ∧
     (∃ v, ArrayAt m .Mint32 bo 0 v n) ∧
-    (∃ v, ArrayAt m .Mint64 bc 0 v (wordsOf n * n)) ∧
+    (∃ cw, ArrayAt m .Mint64 bc 0 (longs cw) (wordsOf n * n)) ∧
     Mem.range_perm m bst (zOfInt 0) (zOfInt 88) .Cur .Freeable ∧
     [bg, bl, bp, bo, bst, bc].Pairwise (· ≠ ·) ∧
     0 < n ∧ n ≤ 65536

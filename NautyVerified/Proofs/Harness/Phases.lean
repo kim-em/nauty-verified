@@ -162,7 +162,7 @@ theorem wp_phases {n k : Nat} (G : Colored n k) (gens : List (Array Nat))
       fun z hz => hg3 _ (hg2 _ (hg1 _ (hgrow _ hz))), ?_⟩,
       hopt, ⟨edgeWords (wordsOf n) es es.length, ⟨hz0 ▸ hga3, fun v hv => by
         rw [← edgeRow_rowsOf hadj hv]; exact setRep_edgeWords es hNM es.length v⟩⟩,
-      hla3, hpa3, ⟨_, hoa3⟩, ⟨_, hca3⟩, hfree3, ?_, hn0, hmax⟩
+      hla3, hpa3, ⟨_, hoa3⟩, ⟨fun _ => lr 0, hca3⟩, hfree3, ?_, hn0, hmax⟩
     fun t2 m' hw => hQ t1 t2 m' hr1 hw
   · simp only [List.mem_cons, List.mem_nil_iff, or_false, forall_eq_or_imp, forall_eq]
     refine ⟨⟨ng.1, hv hMN0 hga3⟩, ⟨nl.1, hv hn0 hla3⟩, ⟨np.1, hv hn0 hpa3⟩, ⟨no.1, hv hn0 hoa3⟩,
