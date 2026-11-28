@@ -40,7 +40,7 @@ theorem refinePre_unch {n : Nat} {G : O.Gr n} {gl : R.GLoc} {bg : block} {gofs :
       ¬ R.IsWork m z ∧ z ≠ E.nautyBit ∧ z ≠ E.nautilBit ∧ z ≠ E.leftbit) :
     (R.refineSpec G gl bg gofs bl lofs lab bp pofs ptn level bn nofs numcells bc cofs ba aofs active bk
       kofs M).pre args m₁ := by
-  obtain ⟨hargs, hc, hg, hl, hp, hnc, ⟨v, hcnt⟩, ⟨aw, ha, har⟩, ⟨kv, hk⟩, hok, hps, hncl, hlev,
+  obtain ⟨hargs, hc, hg, hgo, hl, hp, hnc, ⟨v, hcnt⟩, ⟨aw, ha, har⟩, ⟨kv, hk⟩, hok, hps, hncl, hlev,
     hsep⟩ := h
   have hwk := R.work_unch hc.work hu (fun z hz hWz => (hW z hWz).2.1 (R.wglobs_sub z hz))
     (fun z hz hWz => (hW z hWz).2.2.1 hz) hv
@@ -49,7 +49,7 @@ theorem refinePre_unch {n : Nat} {G : O.Gr n} {gl : R.GLoc} {bg : block} {gofs :
   refine ⟨hargs, ⟨hwk.1, R.tables_unch hc.tables hu fun z hz _ hWz => (hW z hWz).2.1 hz,
     hc.etables.unch hu (fun hWz => (hW _ hWz).2.2.2.1 rfl) (fun hWz => (hW _ hWz).2.2.2.2.1 rfl)
       (fun hWz => (hW _ hWz).2.2.2.2.2 rfl), hc.n0, hc.nlt, hc.M1, hc.Mlt, hc.nM⟩,
-    R.graph_unch hg hu (fun z hz => nA z (List.mem_append_left _ hz)), hl.unch hu (nA bl (by simp)),
+    R.graph_unch hg hu (fun z hz => nA z (List.mem_append_left _ hz)), hgo, hl.unch hu (nA bl (by simp)),
     hp.unch hu (nA bp (by simp)), hnc.unch hu (nA bn (by simp)),
     ⟨v, hcnt.unch hu (nA bc (by simp))⟩, ⟨aw, ha.unch hu (nA ba (by simp)), har⟩,
     ⟨kv, hk.unch hu (nA bk (by simp))⟩, hok, hps, hncl, hlev,
@@ -81,7 +81,7 @@ theorem doref_refine {n : Nat} (G : O.Gr n) (gl : R.GLoc) (L : Refine.Loc) (lab 
         t = E0 ∧ ∃ W : block → Prop, Unch m₁ m₂ W ∧ ¬ W bq ∧ ¬ W NWP ∧ ¬ W NWPS ∧
           (0 < c' → ¬ W b')) := by
   have hc := h.2.1
-  have hsep := h.2.2.2.2.2.2.2.2.2.2.2.2.2
+  have hsep := h.2.2.2.2.2.2.2.2.2.2.2.2.2.2
   have eB : NWP ∈ E.blocks ∧ NWPS ∈ E.blocks := by simp [NautyEnv.blocks]
   have eA : NWP ∈ envAvoid ∧ NWPS ∈ envAvoid := by simp
   -- what the `DYNALLOC1` may change

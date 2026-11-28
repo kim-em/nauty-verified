@@ -410,6 +410,7 @@ canonical store are `D.GraphRep`/`D.CanonRep` on the blocks
 holds `D`'s procedures; the workspace is `D`'s pair `wsP`/`wsS`; the
 procedures' scratch state is `D.Work`, besides nautil.c's `workperm` pair
 (`WorkG`); the tables are nautil.c's and nauty.c's (`ETables`) and `D`'s.
+`SInvG` and the procedures' graph condition `O.GraphOk` are carried too.
 `SearchAtG.dense`/`SearchAt.toG` relate the dense instance to `SearchAt`. -/
 
 section Generic
@@ -565,7 +566,7 @@ structure TablesG (m : mem) : Prop where
   disp : D.Tables m
 
 /-- `SInv` for `O`: the store's rows are what the procedures need (`O.StoreOk`). -/
-structure SInvG {n : Nat} (O : Ops) (st : SearchState n (O.Canon n)) : Prop where
+structure SInvG {n : Nat} (O : Ops) (G : O.Gr n) (st : SearchState n (O.Canon n)) : Prop where
   labSize : st.lab.size = n
   labSmall : ∀ i < n, st.lab[i]! < n
   labSurj : ∀ v < n, ∃ i < n, st.lab[i]! = v
@@ -584,7 +585,7 @@ structure SInvG {n : Nat} (O : Ops) (st : SearchState n (O.Canon n)) : Prop wher
   firstcodeSize : st.firstcode.size = n + 2
   canoncodeSize : st.canoncode.size = n + 2
   firsttcSize : st.firsttc.size = n + 2
-  canong : O.StoreOk (O.rows st.canong)
+  canong : O.StoreOk G (O.rows st.canong)
   scalars : st.gcaFirst < 2147483648 ∧ st.gcaCanon < 2147483648 ∧
     st.noncheaplevel < 2147483648 ∧ st.allsamelevel < 2147483648 ∧
     st.eqlevFirst < 2147483648 ∧ -1 ≤ st.eqlevCanon ∧ st.eqlevCanon < 2147483648 ∧
@@ -633,7 +634,8 @@ structure SearchAtG {n : Nat} (m : mem) (S : SLoc) (gl : D.GLoc) (cl : D.CLoc) (
   work : WorkG D m (S.blocksG D gl cl)
   tables : TablesG D m
   distinct : (S.blocksG D gl cl).Pairwise (· ≠ ·)
-  inv : SInvG O st
+  inv : SInvG O G st
+  graphOk : O.GraphOk G
   n0 : 0 < n
   nlt : n < 1073741824
   nM : n ≤ 64 * S.M
@@ -846,6 +848,7 @@ theorem SearchAt.toG {n : Nat} {m : mem} {S : SLoc} {ctx : Ctx n} {st : Search n
       tables := ⟨⟨hB.nautyBit, hB.nautilBit, hB.left⟩, hB.naugraphBit, hB.bytes⟩
       distinct := SLoc.distinctG h.distinct
       inv := { h.inv with canong := h.inv.canongSize }
+      graphOk := trivial
       n0 := h.n0, nlt := h.nlt, nM := h.nM, M1 := h.M1, Mlt := h.Mlt }
 
 /-- The generic search state at `denseRep` as the dense one, given the graph's

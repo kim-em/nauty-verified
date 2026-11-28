@@ -74,7 +74,7 @@ kernel_rfl type_freedynD : type_of_fundef (.Internal dense.fn.naugraph_freedyn) 
 theorem dense_isautom (xi : ExternalCalls) : denseRep.IsautomFn xi denseRep.isautom := by
   refine ⟨_, by simp [Genv.find_funct, denseRep, Search.funct_isautomFn], type_isautomD,
     fun G _ bg gofs bpm pofs perm M => ?_⟩
-  refine Satisfies.of_pre fun args m ⟨hargs, hc, ⟨gw, hg⟩, hp, hps, _⟩ =>
+  refine Satisfies.of_pre fun args m ⟨hargs, hc, ⟨gw, hg⟩, _, hp, hps, _⟩ =>
     ⟨_, Isautom.isautom_satisfies bg gofs gw G.g bpm pofs perm M,
       ⟨hargs, hg, hp, hps, hc.tables.1, hc.etables.left, hc.M1, by have := hc.Mlt; omega, hc.nM⟩, ?_⟩
   rintro t v m' ⟨rfl, rfl, rfl⟩
@@ -157,8 +157,8 @@ theorem new_ne {m : mem} {z b : block} (hz : Mem.valid_block m z) (hb : ¬ Mem.v
 theorem dense_testcanlab (xi : ExternalCalls) : denseRep.TestcanlabFn xi denseRep.testcanlab := by
   refine ⟨_, by simp [Genv.find_funct, denseRep, Search.funct_testcanlabFn], type_testcanlabD,
     fun G _ bg gofs c _ bc cofs bl lofs lab bs so M => ?_⟩
-  refine Satisfies.of_pre fun args m ⟨hargs, hc, ⟨gw, hg⟩, ⟨cw, hcr⟩, _, hl, hls, hlsm, hsurj,
-    ⟨sv, hs⟩, hsep⟩ => ?_
+  refine Satisfies.of_pre fun args m ⟨hargs, hc, ⟨gw, hg⟩, _, ⟨cw, hcr⟩, _, hl, hls, hlsm, hsurj,
+    _, ⟨sv, hs⟩, hsep⟩ => ?_
   have hw := hc.work
   obtain ⟨⟨cP, bP, dP⟩, ⟨cS, bS, dS⟩, ⟨cB, bB, dB⟩⟩ := dense_dyn hw
   have wP := fun h => work_ne hw (dense_inUseW dP h)
@@ -243,8 +243,8 @@ theorem dense_testcanlab (xi : ExternalCalls) : denseRep.TestcanlabFn xi denseRe
 theorem dense_updatecan (xi : ExternalCalls) : denseRep.UpdatecanFn xi denseRep.updatecan := by
   refine ⟨_, by simp [Genv.find_funct, denseRep, Search.funct_updatecanFn], type_updatecanD,
     fun G _ bg gofs c _ bc cofs bl lofs lab sr M => ?_⟩
-  refine Satisfies.of_pre fun args m ⟨hargs, hc, ⟨gw, hg⟩, ⟨cw, hcr⟩, hok, hl, hls, hlsm, hsurj,
-    hsr, hsep⟩ => ?_
+  refine Satisfies.of_pre fun args m ⟨hargs, hc, ⟨gw, hg⟩, _, ⟨cw, hcr⟩, hok, hl, hls, hlsm, hsurj,
+    _, hsr, hsep⟩ => ?_
   have hw := hc.work
   obtain ⟨⟨cP, bP, dP⟩, ⟨cS, bS, dS⟩, ⟨cB, bB, dB⟩⟩ := dense_dyn hw
   have wP := fun h => work_ne hw (dense_inUseW dP h)
@@ -378,7 +378,7 @@ theorem dense_pre3 {m : mem} (hw : denseRep.Work m) {bs : List block} (hsep : de
 theorem dense_targetcell (xi : ExternalCalls) : denseRep.TargetcellFn xi denseRep.targetcell := by
   refine ⟨_, by simp [Genv.find_funct, denseRep, Search.funct_targetcellFn], type_targetcellD,
     fun G _ bg gofs bl lofs lab bp pofs ptn level tcLevel dg hint M => ?_⟩
-  refine Satisfies.of_pre fun args m ⟨hargs, hc, ⟨gw, hg⟩, hl, hlsm, hp, hps, hpsm, hpl, hlev,
+  refine Satisfies.of_pre fun args m ⟨hargs, hc, ⟨gw, hg⟩, _, hl, hlsm, hp, hps, hpsm, hpl, hlev,
     hh, hh0, htc, hsep⟩ => ?_
   have hw := hc.work
   obtain ⟨⟨cP, bP, dP⟩, ⟨cS, bS, dS⟩, ⟨cB, bB, dB⟩⟩ := dense_dyn hw
@@ -421,7 +421,7 @@ theorem dense_refineFn {xi : ExternalCalls} {M : Nat} {vf : val} (h : Refine.Ref
   obtain ⟨fd, hfd, hty, hsat⟩ := h
   refine ⟨fd, hfd, hty, fun G _ bg gofs bl lofs lab bp pofs ptn level bn nofs numcells bc cofs ba
     aofs active bk kofs => ?_⟩
-  refine Satisfies.of_pre fun args m ⟨hargs, hc, ⟨gw, hg⟩, hl, hp, hnc, hcnt, ⟨aw, ha, har⟩, hk,
+  refine Satisfies.of_pre fun args m ⟨hargs, hc, ⟨gw, hg⟩, _, hl, hp, hnc, hcnt, ⟨aw, ha, har⟩, hk,
     hok, hps, hncl, hlev, hsep⟩ => ?_
   have hw := hc.work
   obtain ⟨⟨cP, bP, dP⟩, ⟨cS, bS, dS⟩, ⟨cB, bB, dB⟩⟩ := dense_dyn hw

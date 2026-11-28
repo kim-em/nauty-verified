@@ -597,6 +597,18 @@ once, not by copying:
 
 ### Making nauty.c's proofs generic (stage 3)
 
+How the sparse procedures fit `DispatchC` (`Proofs/Dispatch/Spec.lean`): the
+graph's and store's own conditions are `Ops.GraphOk G` (in every
+specification taking `G`, carried by `SearchAtG.graphOk`) and
+`Ops.StoreOk G c` (carried by `SInvG`); `initSpec` and `init_null` produce
+`Ops.blank G` (sparse: `Graph.blank`) with no meaningful row; `testcanlab`
+and `updatecan` get `lab` injective as well as onto. Facts about memory
+belong to the instance's representations: offset bounds such as
+`cofs + 48 < 2^64` in `CanonRep`/`CanonPre`, the `e = NULL` case of an
+edgeless graph by leaving `e` out of `canonBlocks`, the separation of
+`canong` from its arrays through `Sep` over `canonBlocks`, `work1` and the
+other scratch pairs in `Work`, `snwork` as `wsP`/`wsS`.
+
 Foundation (in place): `Proofs/Dispatch/DenseRep.lean` (`denseRep`, below the
 search so the state can name it), and in `Proofs/Search/` the generic forms
 next to the dense ones:

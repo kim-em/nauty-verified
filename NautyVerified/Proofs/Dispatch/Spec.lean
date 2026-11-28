@@ -61,7 +61,11 @@ structure Ops where
   /-- The canonical store. -/
   Store : Nat → Type
   /-- What the procedures need of a store on `n` vertices (dense: `n` rows). -/
-  StoreOk : {n : Nat} → Store n → Prop
+  StoreOk : {n : Nat} → Gr n → Store n → Prop
+  /-- What the procedures need of the graph (dense: nothing). -/
+  GraphOk : {n : Nat} → Gr n → Prop
+  /-- The store `init` allocates for the graph, before the first update. -/
+  blank : {n : Nat} → Gr n → Store n
   refine : {n : Nat} → Gr n → Nat → Array Nat → Array Nat → VSet n → Nat → RefineSt n
   targetcell : {n : Nat} → Gr n → Array Nat → Array Nat → Nat → Nat → Int → Nat
   isautom : {n : Nat} → Gr n → Array Nat → Bool
@@ -80,7 +84,9 @@ structure Ops where
 @[reducible] def denseOps : Ops where
   Gr := Ctx
   Store n := Array (VSet n)
-  StoreOk {n} c := c.size = n
+  StoreOk {n} _ c := c.size = n
+  GraphOk _ := True
+  blank {n} _ := Array.replicate n VSet.empty
   refine := refine
   targetcell := targetcell
   isautom := isautom
@@ -201,9 +207,9 @@ structure DispatchRep (ge : genv) [NautyEnv ge] (O : Ops) where
     ∀ z ∈ graphBlocks gl bg, Mem.valid_block m z
   canon_valid : ∀ {n m cl bc cofs M} {c : O.Store n} {sr}, CanonRep m cl bc cofs M c sr → 0 < n →
     0 < M → ∀ z ∈ canonBlocks cl bc, Mem.valid_block m z
-  /-- With `init = NULL`, `canong`'s argument is the store, no row meaningful. -/
+  /-- With `init = NULL`, `canong`'s argument is the blank store, no row meaningful. -/
   init_null : init = Vnullptr → ∀ {n m bc cofs M}, CanonPre m bc cofs M n →
-    ∃ cl, ∀ c : O.Store n, CanonRep m cl bc cofs M c 0
+    ∃ cl, ∀ G : O.Gr n, CanonRep m cl bc cofs M (O.blank G) 0
 
 namespace DispatchRep
 
@@ -251,7 +257,7 @@ theorem Step.refl {m : mem} (h : R.Work m) (out : block → Prop) : R.Step m m o
 def isautomSpec {n : Nat} (G : O.Gr n) (gl : R.GLoc) (bg : block) (gofs : ptrofs) (bpm : block)
     (pofs : ptrofs) (perm : Array Nat) (M : Nat) : FunSpec where
   pre args m := args = [.Vptr bg gofs, .Vptr bpm pofs, .Vint (ir 0), .Vint (ir M), .Vint (ir n)] ∧
-    R.Ctx m n M ∧ R.GraphRep m gl bg gofs G M ∧
+    R.Ctx m n M ∧ R.GraphRep m gl bg gofs G M ∧ O.GraphOk G ∧
     ArrayAt m .Mint32 bpm (intOfZ (Ptrofs.unsigned pofs)) (ints perm) n ∧
     (∀ x < n, perm[x]! < n) ∧ R.Sep m (R.graphBlocks gl bg ++ [bpm])
   post _ m t v m' := t = E0 ∧ v = .Vint (ir (if O.isautom G perm then 1 else 0)) ∧
@@ -264,9 +270,10 @@ def testcanlabSpec {n : Nat} (G : O.Gr n) (gl : R.GLoc) (bg : block) (gofs : ptr
     (lab : Array Nat) (bs : block) (so : ptrofs) (M : Nat) : FunSpec where
   pre args m := args = [.Vptr bg gofs, .Vptr bc cofs, .Vptr bl lofs, .Vptr bs so, .Vint (ir M),
       .Vint (ir n)] ∧
-    R.Ctx m n M ∧ R.GraphRep m gl bg gofs G M ∧ R.CanonRep m cl bc cofs M c n ∧ O.StoreOk c ∧
+    R.Ctx m n M ∧ R.GraphRep m gl bg gofs G M ∧ O.GraphOk G ∧ R.CanonRep m cl bc cofs M c n ∧ O.StoreOk G c ∧
     ArrayAt m .Mint32 bl (intOfZ (Ptrofs.unsigned lofs)) (ints lab) n ∧ lab.size = n ∧
     (∀ j < n, lab[j]! < n) ∧ (∀ p < n, ∃ j < n, lab[j]! = p) ∧
+    (∀ i < n, ∀ j < n, lab[i]! = lab[j]! → i = j) ∧
     (∃ sv, ArrayAt m .Mint32 bs (intOfZ (Ptrofs.unsigned so)) sv 1) ∧
     R.Sep m (R.graphBlocks gl bg ++ R.canonBlocks cl bc ++ [bl, bs])
   post _ m t v m' := t = E0 ∧ v = .Vint (ir (O.testcanlab G c lab).1) ∧
@@ -281,12 +288,13 @@ def updatecanSpec {n : Nat} (G : O.Gr n) (gl : R.GLoc) (bg : block) (gofs : ptro
     (lab : Array Nat) (sr M : Nat) : FunSpec where
   pre args m := args = [.Vptr bg gofs, .Vptr bc cofs, .Vptr bl lofs, .Vint (ir sr), .Vint (ir M),
       .Vint (ir n)] ∧
-    R.Ctx m n M ∧ R.GraphRep m gl bg gofs G M ∧ R.CanonRep m cl bc cofs M c sr ∧ O.StoreOk c ∧
+    R.Ctx m n M ∧ R.GraphRep m gl bg gofs G M ∧ O.GraphOk G ∧ R.CanonRep m cl bc cofs M c sr ∧ O.StoreOk G c ∧
     ArrayAt m .Mint32 bl (intOfZ (Ptrofs.unsigned lofs)) (ints lab) n ∧ lab.size = n ∧
-    (∀ j < n, lab[j]! < n) ∧ (∀ p < n, ∃ j < n, lab[j]! = p) ∧ sr ≤ n ∧
+    (∀ j < n, lab[j]! < n) ∧ (∀ p < n, ∃ j < n, lab[j]! = p) ∧
+    (∀ i < n, ∀ j < n, lab[i]! = lab[j]! → i = j) ∧ sr ≤ n ∧
     R.Sep m (R.graphBlocks gl bg ++ R.canonBlocks cl bc ++ [bl])
   post _ m t _ m' := t = E0 ∧ R.CanonRep m' cl bc cofs M (O.updatecan G c lab sr) n ∧
-    O.StoreOk (O.updatecan G c lab sr) ∧ R.Step m m' (· ∈ R.canonBlocks cl bc)
+    O.StoreOk G (O.updatecan G c lab sr) ∧ R.Step m m' (· ∈ R.canonBlocks cl bc)
 
 /-- The refinement state a node starts from. -/
 abbrev initSt {n : Nat} (lab ptn : Array Nat) (active : VSet n) (numcells : Nat) : RefineSt n :=
@@ -302,7 +310,7 @@ def refineSpec {n : Nat} (G : O.Gr n) (gl : R.GLoc) (bg : block) (gofs : ptrofs)
     (active : VSet n) (bk : block) (kofs : ptrofs) (M : Nat) : FunSpec where
   pre args m := args = [.Vptr bg gofs, .Vptr bl lofs, .Vptr bp pofs, .Vint (ir level),
       .Vptr bn nofs, .Vptr bc cofs, .Vptr ba aofs, .Vptr bk kofs, .Vint (ir M), .Vint (ir n)] ∧
-    R.Ctx m n M ∧ R.GraphRep m gl bg gofs G M ∧
+    R.Ctx m n M ∧ R.GraphRep m gl bg gofs G M ∧ O.GraphOk G ∧
     ArrayAt m .Mint32 bl (intOfZ (Ptrofs.unsigned lofs)) (ints lab) n ∧
     ArrayAt m .Mint32 bp (intOfZ (Ptrofs.unsigned pofs)) (ints ptn) n ∧
     ArrayAt m .Mint32 bn (intOfZ (Ptrofs.unsigned nofs)) (fun _ => .Vint (ir numcells)) 1 ∧
@@ -343,7 +351,7 @@ def targetcellSpec {n : Nat} (G : O.Gr n) (gl : R.GLoc) (bg : block) (gofs : ptr
     (dg : Lib.Integers.int) (hint : Int) (M : Nat) : FunSpec where
   pre args m := args = [.Vptr bg gofs, .Vptr bl lofs, .Vptr bp pofs, .Vint (ir level),
       .Vint (ir tcLevel), .Vint dg, .Vint (ir hint), .Vint (ir M), .Vint (ir n)] ∧
-    R.Ctx m n M ∧ R.GraphRep m gl bg gofs G M ∧
+    R.Ctx m n M ∧ R.GraphRep m gl bg gofs G M ∧ O.GraphOk G ∧
     ArrayAt m .Mint32 bl (intOfZ (Ptrofs.unsigned lofs)) (ints lab) n ∧ (∀ j < n, lab[j]! < n) ∧
     ArrayAt m .Mint32 bp (intOfZ (Ptrofs.unsigned pofs)) (ints ptn) n ∧ ptn.size = n ∧
     (∀ x < n, ptn[x]! < 2147483648) ∧ ptn[n - 1]! ≤ level ∧ level < 2147483648 ∧
@@ -366,21 +374,22 @@ def freedynSpec (capD : Nat) (bD : block) : FunSpec where
     (∀ b, DynAt m' R.wsP R.wsS 8 0 b) ∧ Mem.nextblock m' = Mem.nextblock m
 
 /-- `init(g_arg, &g, canong_arg, &canong, lab, ptn, active, options, &status, m, n)`
-with `options->getcanon = 1`: makes the store at `bc` hold no meaningful row
-(sparse: `init_sg` allocates `canong`'s arrays, new blocks), writes 0 to
+with `options->getcanon = 1`: makes the store at `bc` the blank store for `G`
+with no meaningful row (sparse: `init_sg` allocates `canong`'s arrays, new
+blocks; with no edges `e` stays `NULL`, so `canonBlocks` omits it), writes 0 to
 `status`, and leaves `g`, `canong` (the pointers at `gout`, `hout`) alone. -/
 def initSpec {n : Nat} (G : O.Gr n) (gl : R.GLoc) (bg : block) (gofs : ptrofs) (gout : val)
     (bc : block) (cofs : ptrofs) (hout : val) (lab ptn act : val) (bopt : block) (oofs : ptrofs)
     (bs : block) (so : ptrofs) (M : Nat) : FunSpec where
   pre args m := args = [.Vptr bg gofs, gout, .Vptr bc cofs, hout, lab, ptn, act, .Vptr bopt oofs,
       .Vptr bs so, .Vint (ir M), .Vint (ir n)] ∧
-    R.Ctx m n M ∧ R.GraphRep m gl bg gofs G M ∧ R.CanonPre m bc cofs M n ∧
+    R.Ctx m n M ∧ R.GraphRep m gl bg gofs G M ∧ O.GraphOk G ∧ R.CanonPre m bc cofs M n ∧
     Mem.load .Mint32 m bopt (Ptrofs.unsigned oofs) = some (.Vint (ir 1)) ∧
     (∃ sv, ArrayAt m .Mint32 bs (intOfZ (Ptrofs.unsigned so)) sv 1) ∧
     R.Sep m (R.graphBlocks gl bg ++ [bc, bopt, bs])
   post _ m t _ m' := t = E0 ∧
     ArrayAt m' .Mint32 bs (intOfZ (Ptrofs.unsigned so)) (fun _ => .Vint (ir 0)) 1 ∧
-    ∃ cl, (∀ c : O.Store n, R.CanonRep m' cl bc cofs M c 0) ∧
+    ∃ cl, R.CanonRep m' cl bc cofs M (O.blank G) 0 ∧
       (∀ z ∈ R.canonBlocks cl bc, z = bc ∨ ¬ Mem.valid_block m z) ∧
       R.Step m m' (· ∈ [bc, bs])
 
