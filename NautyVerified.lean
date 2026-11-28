@@ -391,3 +391,4 @@ import NautyVerified.Proofs.Sparse.Refine.Trivial.Rev
 import NautyVerified.Proofs.Sparse.Refine.Trivial.Push
 import NautyVerified.Proofs.Sparse.Refine.Trivial.CellModel
 import NautyVerified.Proofs.Sparse.Refine.Trivial.Fix
+import NautyVerified.Proofs.Sparse.Refine.Trivial.Cell
