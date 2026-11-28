@@ -302,5 +302,6 @@ import NautyVerified.Spec.SparseSort
 import NautyVerified.Proofs.Sparse.Sort.Syntax
 import NautyVerified.Proofs.Sparse.Sort.Part
 import NautyVerified.Proofs.Sparse.Canon
+import NautyVerified.Proofs.Sparse.Prep
 import NautyVerified.Proofs.Sparse.Testcanlab.Rows
 import NautyVerified.Proofs.Alloc.DynL

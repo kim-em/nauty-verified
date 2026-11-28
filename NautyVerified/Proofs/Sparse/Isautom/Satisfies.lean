@@ -1,5 +1,6 @@
 import NautyVerified.Proofs.Sparse.Isautom.Loops
 import NautyVerified.Proofs.Sparse.Isautom.Rows
+import NautyVerified.Proofs.Sparse.Prep
 
 /-!
 # `isautom_sg` meets its specification
@@ -8,8 +9,7 @@ import NautyVerified.Proofs.Sparse.Isautom.Rows
 (`SparseGraphAt`) and an array `perm` of vertices, nausparse.c's
 `isautom_sg` returns HexGraphIso's `Sparse.isautom (ofGraph G) perm` (as 1
 or 0), emitting no events and changing only the marks (`MarksAt`), which it
-may reallocate through `preparemarks1`. The specification of
-`preparemarks1` (`prepSpec`) is a hypothesis of `isautom_satisfies`.
+may reallocate through `preparemarks1` (`prep_satisfies`).
 -/
 
 namespace NautyVerified.Proofs.Sparse.Isautom
@@ -24,20 +24,6 @@ open NautyVerified.Proofs.Sparse
 open Hex.GraphIso.Nauty.Sparse (Graph)
 
 variable {xi : ExternalCalls}
-
-/-- The blocks the marks may occupy after `preparemarks1`: the three globals,
-the old array (if any) and a new one. -/
-def MarksS (m : mem) (cap : Nat) (b b' : block) (z : block) : Prop :=
-  z = Block.vmark1 ∨ z = Block.vmark1Sz ∨ z = Block.vmark1Val ∨ (0 < cap ∧ z = b) ∨
-    (¬ Mem.valid_block m b' ∧ z = b')
-
-/-- `preparemarks1(nn)`: afterwards the marks hold at least `nn` entries; a
-reallocated array is a block new to `m`. -/
-def prepSpec (nn cap : Nat) (b : block) (st : Nat) (marks : Nat → Int) : FunSpec where
-  pre args m := args = [.Vlong (lr nn)] ∧ MarksAt m cap b st marks ∧ nn < 2147483648
-  post _ m t _ m' := t = E0 ∧ ∃ cap' b' st' marks', MarksAt m' cap' b' st' marks' ∧ nn ≤ cap' ∧
-    ((cap' = cap ∧ b' = b) ∨ ¬ Mem.valid_block m b') ∧ Unch m m' (MarksS m cap b b') ∧
-    (∀ z, Mem.valid_block m z → Mem.valid_block m' z)
 
 /-- The specification of `isautom_sg`. -/
 def isautomSpec {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sofs : ptrofs) (bv : block)
@@ -316,9 +302,7 @@ theorem type_preparemarks1 :
 
 theorem isautom_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sofs : ptrofs) (bv : block)
     (vo : ptrofs) (bd : block) (dofs : ptrofs) (be : block) (eo : ptrofs) (bp : block) (pofs : ptrofs)
-    (perm : Array Nat) (M cap : Nat) (b : block) (st : Nat) (marks : Nat → Int)
-    (hprep : ∀ nn cap b st marks, Satisfies xi sge (.Internal sparse.fn.«nausparse:preparemarks1»)
-      (prepSpec nn cap b st marks)) :
+    (perm : Array Nat) (M cap : Nat) (b : block) (st : Nat) (marks : Nat → Int) :
     Satisfies xi sge (.Internal F)
       (isautomSpec G bsg sofs bv vo bd dofs be eo bp pofs perm M cap b st marks) := by
   refine satisfies_internal (Entry := fun _ m₀ e le m =>
@@ -371,7 +355,7 @@ theorem isautom_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sofs 
         graph := hgr, parr := hparr, psmall := hps, n31 := hn31 }
     wp_step; wp_step; wp_step
     refine wp_call (vf := .Vptr Block.preparemarks1 Ptrofs.zero) (targs := [tulong]) (tres := .Tvoid)
-      (cc := Common.AST.cc_default) _ (prepSpec n cap b st marks) (hprep _ _ _ _ _) rfl
+      (cc := Common.AST.cc_default) _ (prepSpec n cap b st marks) (prep_satisfies _ _ _ _ _) rfl
       (by simp only [Exec.evalExpr, Exec.lvalOfVar,
         show PTree.get sparse.id.«nausparse:preparemarks1» (empty_env : env) = none from rfl,
         find_preparemarks1, Exec.derefLoc, Cfrontend.Ctypes.access_mode])

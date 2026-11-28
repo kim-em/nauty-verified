@@ -38,5 +38,13 @@ variable (ce : composite_env) (m : mem) (a b : attr) (x y : Lib.Integers.int) (u
   rfl
 @[simp, cop] theorem cast_si : sem_cast (.Vint x) (Tint .I16 .Signed a) (Tint .I32 .Signed b) m =
     some (.Vint x) := rfl
+@[simp, cop] theorem ne_ll (v : Lib.Integers.int64) : sem_binary_operation ce .One (.Vlong u) (Tlong .Unsigned a)
+    (.Vlong v) (Tlong .Unsigned b) m = some (Val.of_bool (!Lib.Integers.Int64.eq u v)) := rfl
+@[simp, cop] theorem ne_pp (b1 b2 : Common.Values.block) (o1 o2 : ptrofs) (t1 t2 : type) :
+    sem_binary_operation ce .One (.Vptr b1 o1) (Tpointer t1 a) (.Vptr b2 o2) (Tpointer t2 b) m =
+      (Val.cmplu_bool (Mem.valid_pointer m) .Cne (.Vptr b1 o1) (.Vptr b2 o2)).map Val.of_bool := rfl
+@[simp, cop] theorem ne_nn (v : Lib.Integers.int64) (t1 t2 : type) :
+    sem_binary_operation ce .One (.Vlong u) (Tpointer t1 a) (.Vlong v) (Tpointer t2 b) m =
+      some (Val.of_bool (!Lib.Integers.Int64.eq u v)) := rfl
 
 end NautyVerified.Proofs.Sparse
