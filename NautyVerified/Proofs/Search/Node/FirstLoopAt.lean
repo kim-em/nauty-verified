@@ -109,6 +109,7 @@ structure LoopAt (L : LCtx n) (m : mem) (st : Search n) (pre nsp : Bool) (cell :
   frame : NodeFrame L.m₀ m L.S L.chain₀ L.level
   work : ∀ z, IsWork m z → IsWork L.m₀ z ∨ ¬ Mem.valid_block L.m₀ z
   locals : ∀ z ∈ L.locals, Mem.valid_block m z ∧ z ∉ L.S.blocks ∧ ¬ IsWork m z
+  fre : ∀ z ∈ L.locals, Mem.valid_access m .Mint32 z (zOfInt 0) .Freeable
   vU : Mem.valid_block m L.S.bUA
   pU : Mem.perm m L.S.bUA (zOfInt 0) .Cur .Nonempty
 
@@ -243,6 +244,7 @@ theorem LoopAt.call {L : LCtx n} {m : mem} {st : Search n} {pre nsp : Bool} {cel
   have hloc : ∀ z ∈ L.locals, ¬ frameSet m L.S ch (L.level + 1) z := fun z hz =>
     have ⟨a, b, c⟩ := h.locals z hz
     h.chain.local_safe hz b a c _
+  have hfre := fun z hz => hu.access _ _ _ _ (hloc z hz) (h.fre z hz)
   simp only [List.mem_cons, List.mem_nil_iff, or_false] at hloc
   obtain ⟨tw, hta, htr⟩ := h.cell
   obtain ⟨vq, hq⟩ := h.q
@@ -287,6 +289,7 @@ theorem LoopAt.call {L : LCtx n} {m : mem} {st : Search n} {pre nsp : Bool} {cel
         rcases hW z hw with hw | hw
         · exact c hw
         · exact hw a
+      fre := hfre
       vU := hvU
       pU := hpU }
 
@@ -339,6 +342,7 @@ theorem LoopAt.step {L : LCtx n} {m : mem} {st : Search n} {pre nsp : Bool} {cel
     · exact hz' a
     · exact c hz'
     · exact (h.chain.apart _ (List.mem_of_getElem? h.chain.own)).2 hz
+  have hfre := fun z hz => hu.access _ _ _ _ (hloc z hz) (h.fre z hz)
   simp only [List.mem_cons, List.mem_nil_iff, or_false] at hloc
   obtain ⟨vq, hq⟩ := h.q
   obtain ⟨vk, hk⟩ := h.k
@@ -408,6 +412,7 @@ theorem LoopAt.step {L : LCtx n} {m : mem} {st : Search n} {pre nsp : Bool} {cel
         rcases hW z hw with hw | hw
         · exact c hw
         · exact hw a
+      fre := hfre
       vU := hg _ h.vU
       pU := perm_unch hu (by
           rintro (⟨-, h2, -⟩ | hz | hz | hz)
