@@ -68,7 +68,7 @@ def testcanlabSpec {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sofs : ptrof
       MarksAt m' cap' b' st' marks' ∧ n ≤ cap' ∧ ((cap' = cap ∧ b' = b) ∨ ¬ Mem.valid_block m b') ∧
       Unch m m' (fun z => z = bs ∨ z = Block.work1 ∨ z = Block.work1Sz ∨ (0 < capW ∧ z = bW) ∨
         (¬ Mem.valid_block m bW' ∧ z = bW') ∨ MarksS m cap b b' z) ∧
-      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) ∧ b' ≠ bW'
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) ∧ b' ≠ bW' ∧ Alloc.Keep m m' bs
 
 def entryTemps (bsg : block) (sofs : ptrofs) (bc : block) (cofs : ptrofs) (bl : block) (lofs : ptrofs)
     (bs : block) (so : ptrofs) (M n : Nat) : temp_env :=
@@ -311,13 +311,14 @@ theorem testcanlab_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (so
         Hex.GraphIso.Nauty.Sparse.testcanlab (Graph.ofGraph G) R lab = (r, c) →
         MarksAt m' cap2 b2 st' marks' →
         ArrayAt m' .Mint32 bs (intOfZ (Ptrofs.unsigned so)) (fun _ => .Vint (ir c)) 1 →
+        Alloc.Keep m3 m' bs →
         Unch m3 m' (fun z => z = Block.vmark1Val ∨ (0 < cap2 ∧ z = b2) ∨ z = bs) →
         (∀ z, Mem.valid_block m3 z → Mem.valid_block m' z) →
         (testcanlabSpec G bsg sofs bv vo bd dofs be eo R bc cofs cbv cvo cbd cdofs cbe ceo lab bl lofs
           bs so svals M capW bW cap b st marks).post
           [.Vptr bsg sofs, .Vptr bc cofs, .Vptr bl lofs, .Vptr bs so, .Vint (ir M), .Vint (ir n)] m E0
           (.Vint (ir r)) m' := by
-      intro m' st' marks' r c hrc hM' harr' hu' hg'
+      intro m' st' marks' r c hrc hM' harr' hK' hu' hg'
       have hbW1S : ¬ (bW1 = Block.vmark1Val ∨ (0 < cap2 ∧ bW1 = b2) ∨ bW1 = bs) := by
         rintro (h | ⟨-, h⟩ | h)
         · exact hbW1M (.inr (.inr (.inl h)))
@@ -338,7 +339,10 @@ theorem testcanlab_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (so
         hDW3.keep hu' hWS' hWSS' (fun _ => Alloc.Keep.unch hu' hbW1S)
       refine ⟨rfl, by rw [hrc], by rw [hrc]; exact harr', capW1, bW1, cap2, b2, st', marks', hDW', hnW,
         hor1, hM', hnc2, hor2.imp_right (fun h hv => h (hg1 _ hv)), ?_,
-        fun z h => hg' _ (hg3 _ (hg2 _ (hg1 _ h))), hb2W1⟩
+        fun z h => hg' _ (hg3 _ (hg2 _ (hg1 _ h))), hb2W1,
+        (((Alloc.Keep.unch hu1 (hext bs (by simp [Ext])).1).trans
+          (Alloc.Keep.unch hu2 (hext bs (by simp [Ext])).2.1)).trans
+          (Alloc.Keep.unch hu3 (fun h => (hext bs (by simp [Ext])).2.2.1 h))).trans hK'⟩
       refine (((hu1.mono fun z hz => ?_).trans (hu2.mono fun z hz => ?_)).trans
         (hu3.mono fun z hz => ?_)).trans (hu'.mono fun z hz => ?_)
       · rcases hz with h | h | h | h
@@ -409,9 +413,13 @@ theorem testcanlab_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (so
             · exact hrow i' h
             · rw [show i' = c by omega]; exact hnone
           · rw [ho'' x hx', ho x hx hx']
-        · intro r hr m'' st'' marks'' hM'' harr'' hu'' hg''
+        · intro r hr m'' st'' marks'' hM'' harr'' hK'' hu'' hg''
           simp only [E0_append]
           refine hpost m'' st'' marks'' r c (scan_eq hscan hcn hrow hr) hM'' harr''
+            ((Alloc.Keep.unch hu' (by
+              rintro (h | ⟨h0, h⟩)
+              · exact (hsepR bs (by simp [FrameB])).2.1 h
+              · exact (hsepR bs (by simp [FrameB])).1 h0 h)).trans hK'')
             ((hu'.mono fun z hz => ?_).trans hu'') fun z h => hg'' _ (hg' _ h)
           rcases hz with h | h
           · exact .inl h
@@ -431,6 +439,10 @@ theorem testcanlab_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (so
         refine wp_ret_const (c := 0) ?_
         simp only [E0_append]
         exact hpost m'' st' marks' 0 c hres hM'' harr''
+          ((Alloc.Keep.unch hu' (by
+            rintro (h | ⟨h0, h⟩)
+            · exact (hsepR bs (by simp [FrameB])).2.1 h
+            · exact (hsepR bs (by simp [FrameB])).1 h0 h)).trans hk'')
           ((hu'.mono fun z hz => by rcases hz with h | h; exact .inl h; exact .inr (.inl h)).trans
             (hu''.mono fun z hz => .inr (.inr hz))) fun z h => hg'' _ (hg' _ h)
     · rintro k t e' le' m' ⟨rfl, rfl, c, st', marks', hc, rfl, hi, hM', hu', hg', hrow, ho⟩

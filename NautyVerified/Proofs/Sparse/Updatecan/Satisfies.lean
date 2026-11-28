@@ -151,7 +151,8 @@ def updatecanSpec {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sofs : ptrofs
     Mem.load .Mint64 m' bc (fofs cofs 0) = some (.Vlong (lr G.neighbors.size)) ∧
     Unch m m' (fun z => Wr bc cbv cbd cbe z ∨ z = Block.work1 ∨ z = Block.work1Sz ∨
       (0 < capW ∧ z = bW) ∨ (¬ Mem.valid_block m bW' ∧ z = bW')) ∧
-    (∀ z, Mem.valid_block m z → Mem.valid_block m' z)
+    (∀ z, Mem.valid_block m z → Mem.valid_block m' z) ∧
+    Alloc.Keep m m' bc ∧ Alloc.Keep m m' cbv ∧ Alloc.Keep m m' cbd ∧ Alloc.Keep m m' cbe
 
 def entryTemps (bsg : block) (sofs : ptrofs) (bc : block) (cofs : ptrofs) (bl : block) (lofs : ptrofs)
     (sr M n : Nat) : temp_env :=
@@ -469,6 +470,7 @@ theorem updatecan_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sof
       (∀ e < base R sr, ev' e = ev e) ∧
       (∀ q < p, ∀ j < g.degree lab[sr + q]!, ev' (st q + j) = nbv G lab g.offsets[lab[sr + q]!]! j) ∧
       Unch m4 m' (fun z => z = cbv ∨ z = cbd ∨ z = cbe) ∧
+      Alloc.Keep m4 m' cbv ∧ Alloc.Keep m4 m' cbd ∧ Alloc.Keep m4 m' cbe ∧
       (∀ z, Mem.valid_block m4 z → Mem.valid_block m' z) ∧
       ∀ x, x ≠ id.i → ¬ RowLocal x → PTree.get x le' = PTree.get x le5
     let I := fun (v : Nat) (t : trace) (e' : env) (le' : temp_env) (m' : mem) => t = E0 ∧
@@ -485,9 +487,9 @@ theorem updatecan_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sof
       ⟨rfl, rfl, 0, Nat.zero_le _, rfl, by rw [temps_gss]; simp, vv, dv, ev,
         by rw [temps_gso _ _ (by decide)]; exact hk5, hcv4, hcd4, hce4, fun i _ => ⟨rfl, rfl⟩,
         fun q hq => absurd hq (by omega), fun _ _ => rfl, fun q hq => absurd hq (by omega), Unch.refl _ _,
-        fun _ h => h, fun x hx _ => temps_gso _ _ hx⟩
+        Alloc.Keep.refl _ _, Alloc.Keep.refl _ _, Alloc.Keep.refl _ _, fun _ h => h, fun x hx _ => temps_gso _ _ hx⟩
     · rintro v t e' le' m' ⟨rfl, rfl, p, hp, rfl, hi, vv', dv', ev', hk', hcv', hcd', hce', P1, P2, P3, P4,
-        hu', hg', ho'⟩
+        hu', hK1, hK2, hK3, hg', ho'⟩
       have hf' := (hf5.mem hu' (fun h => (hsepR _ h).1 rfl) (fun h => (hsepR _ h).2.1 rfl)
         (fun h => (hsepR _ h).2.2.1 rfl) (fun h => (hsepR _ h).2.2.2.1 rfl)
         (fun h => (hsepR _ h).2.2.2.2.1 rfl) (fun h => (hsepR _ h).2.2.2.2.2 rfl)).temps ho'
@@ -503,11 +505,12 @@ theorem updatecan_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sof
         have hKD : st p + g.degree lab[sr + p]! ≤ R.neighbors.size := by
           rw [← hstq]; exact Nat.le_trans (hst_le (by omega)) hfit
         refine wp_row hf' hi hpn hk' hcv' hcd' hce' hKD hnd hsepR ⟨hc12, hc13, hc23⟩ ?_
-        intro le'' m'' ev'' hcv'' hcd'' hce'' hlow hrow hk'' hu'' hg'' ho''
+        intro le'' m'' ev'' hcv'' hcd'' hce'' hlow hrow hk'' hu'' hK1' hK2' hK3' hg'' ho''
         refine ⟨by simp, rfl, p, by omega, rfl, by rw [ho'' _ (by decide)]; exact hi,
           upd vv' (sr + p) (.Vlong (lr (st p))), upd dv' (sr + p) (.Vint (ir (g.degree lab[sr + p]!))), ev'',
           hk'', hcv'', hcd'', hce'', fun i hi' => ?_, fun q hq => ?_, fun e he => ?_,
-          fun q hq j hj => ?_, hu'.trans hu'', fun z h => hg'' _ (hg' _ h),
+          fun q hq j hj => ?_, hu'.trans hu'', hK1.trans hK1', hK2.trans hK2', hK3.trans hK3',
+          fun z h => hg'' _ (hg' _ h),
           fun x hx hx' => by rw [ho'' x hx', ho' x hx hx']⟩
         · rw [upd_ne _ _ (by omega), upd_ne _ _ (by omega)]; exact P1 i hi'
         · by_cases hqp : q = p
@@ -568,8 +571,18 @@ theorem updatecan_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sof
           (hDW3.keep hu4 (fun h => (hDW3.bne hcW1).2 h.symm) (fun h => (hDW3.bne hcW1).1 h.symm)
             (fun _ => hk4)).keep hu' (fun h => (hWS _ h).1 rfl) (fun h => (hWS _ h).2.1 rfl)
             (fun _ => Alloc.Keep.unch hu' fun h => (hWS _ h).2.2 rfl)
+        have kc : ∀ {z}, (z = cbv ∨ z = cbd ∨ z = cbe) → z ≠ bc → Alloc.Keep m4 m' z →
+            Alloc.Keep m m' z := fun hz hzc hk =>
+          (((Alloc.Keep.unch hu1 (hext _ (.inr (.inr hz))).1).trans
+            (Alloc.Keep.unch hu23 hzc)).trans (Alloc.Keep.unch hu4 (hext _ (.inr (.inr hz))).2)).trans hk
         refine ⟨rfl, capW1, bW1, hDWf, hnW, hor1, hcanon, hnv, hnde, ?_,
-          fun z h => hg' _ (hg4 _ (hg13 _ (hg1 _ h)))⟩
+          fun z h => hg' _ (hg4 _ (hg13 _ (hg1 _ h))),
+          (((((Alloc.Keep.unch hu1 hS1).trans (Alloc.Keep.store hst2 (by
+              simp only [intOfZ_Ptrofs_unsigned]; omega))).trans
+            (Alloc.Keep.store hst3 (by simp only [intOfZ_Ptrofs_unsigned]; omega))).trans
+            (Alloc.Keep.unch hu4 hbcW1)).trans (Alloc.Keep.unch hu' hbcS)),
+          kc (.inl rfl) (fun h => hbc1 h.symm) hK1, kc (.inr (.inl rfl)) (fun h => hbc2 h.symm) hK2,
+          kc (.inr (.inr rfl)) (fun h => hbc3 h.symm) hK3⟩
         refine (((hu1.mono fun z hz => ?_).trans (hu23.mono fun z hz => .inl (.inl hz))).trans
           (hu4.mono fun z hz => ?_)).trans (hu'.mono fun z hz => .inl (.inr hz))
         · rcases hz with h | h | h | h
@@ -586,9 +599,9 @@ theorem updatecan_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sof
       apply wp_set_eval
       rw [Exec.evalExpr, show Exec.evalExpr sge empty_env le' m' (tv id.i) = _ from hi]
       simp only [Exec.evalExpr, typeof, cop, ir_add]
-      obtain ⟨vv', dv', ev', hk', hcv', hcd', hce', P1, P2, P3, P4, hu', hg', ho'⟩ := hinv
+      obtain ⟨vv', dv', ev', hk', hcv', hcd', hce', P1, P2, P3, P4, hu', hK1, hK2, hK3, hg', ho'⟩ := hinv
       exact ⟨n - sr - (p + 1), by omega, by simp, rfl, p + 1, by omega, rfl,
         by rw [temps_gss]; push_cast; rfl, vv', dv', ev', by rw [temps_gso _ _ (by decide)]; exact hk',
-        hcv', hcd', hce', P1, P2, P3, P4, hu', hg', fun x hx hx' => by rw [temps_gso _ _ hx, ho' x hx hx']⟩
+        hcv', hcd', hce', P1, P2, P3, P4, hu', hK1, hK2, hK3, hg', fun x hx hx' => by rw [temps_gso _ _ hx, ho' x hx hx']⟩
 
 end NautyVerified.Proofs.Sparse.Updatecan

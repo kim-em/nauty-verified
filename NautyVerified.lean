@@ -325,6 +325,8 @@ import NautyVerified.Proofs.Dispatch.Spec
 import NautyVerified.Proofs.Dispatch.DenseRep
 import NautyVerified.Proofs.Dispatch.Dense
 import NautyVerified.Proofs.Dispatch.Doref
+import NautyVerified.Proofs.Dispatch.Sparse
+import NautyVerified.Proofs.Dispatch.Sparse.Classifier
 import NautyVerified.Spec.SparseInts
 import NautyVerified.Proofs.Sparse.Ints.Satisfies
 import NautyVerified.Proofs.Sparse.Refine.Syntax

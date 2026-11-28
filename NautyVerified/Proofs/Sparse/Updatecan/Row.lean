@@ -106,6 +106,7 @@ theorem wp_row {n : Nat} {Q : Post} {m : mem} {le : temp_env} {G : Hex.SparseGra
         ev' (K + j) = nbv G lab (Graph.ofGraph G).offsets[lab[c]!]! j) →
       PTree.get id.k le' = some (.Vlong (lr (K + (Graph.ofGraph G).degree lab[c]!))) →
       Unch m m' (fun z => z = cbv ∨ z = cbd ∨ z = cbe) →
+      Alloc.Keep m m' cbv → Alloc.Keep m m' cbd → Alloc.Keep m m' cbe →
       (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
       (∀ x, ¬ RowLocal x → PTree.get x le' = PTree.get x le) → Q.normal E0 empty_env le' m') :
     Wp xi sge F row Q empty_env le m := by
@@ -174,7 +175,13 @@ theorem wp_row {n : Nat} {Q : Post} {m : mem} {le : temp_env} {G : Hex.SparseGra
     (by omega) hKD hN hf4.wptr hf4.warr hn31 ⟨hs3.2.2.1, hs3.2.2.2.2.2, hs3.2.2.2.2.1⟩ ?_
   intro le5 m5 ev' hce5 hlow hrow hk5 hu5 hkp5 hg5 ho5
   refine hQ le5 m5 ev' (hcv2.unch hu5 (fun h => hcc.2.1 h)) (hcd2.unch hu5 (fun h => hcc.2.2 h)) hce5
-    hlow hrow hk5 ?_ (fun z h => hg5 _ (hg2 _ (hg1 _ h))) ?_
+    hlow hrow hk5 ?_
+    ((hk1.trans (Alloc.Keep.unch hu2 (fun h => hcc.1 h))).trans (Alloc.Keep.unch hu5 (fun h => hcc.2.1 h)))
+    (((Alloc.Keep.unch hu1 (fun h => hcc.1 h.symm)).trans hk2).trans
+      (Alloc.Keep.unch hu5 (fun h => hcc.2.2 h)))
+    (((Alloc.Keep.unch hu1 (fun h => hcc.2.1 h.symm)).trans
+      (Alloc.Keep.unch hu2 (fun h => hcc.2.2 h.symm))).trans hkp5)
+    (fun z h => hg5 _ (hg2 _ (hg1 _ h))) ?_
   · exact ((hu1.mono fun z hz => .inl hz).trans (hu2.mono fun z hz => .inr (.inl hz))).trans
       (hu5.mono fun z hz => .inr (.inr hz))
   · intro x hx

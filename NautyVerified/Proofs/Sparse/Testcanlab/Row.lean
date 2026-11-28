@@ -125,6 +125,7 @@ theorem wp_row {n : Nat} {Q : Post} {m : mem} {le : temp_env} {G : Hex.SparseGra
     (hQr : ∀ r, rowCode (Graph.ofGraph G) R lab c = some r → ∀ m' st' marks',
       MarksAt m' cap b st' marks' →
       ArrayAt m' .Mint32 bs (intOfZ (Ptrofs.unsigned so)) (fun _ => .Vint (ir c)) 1 →
+      Alloc.Keep m m' bs →
       Unch m m' (fun z => z = Block.vmark1Val ∨ (0 < cap ∧ z = b) ∨ z = bs) →
       (∀ z, Mem.valid_block m z → Mem.valid_block m' z) → Q.ret E0 (.Vint (ir r)) m') :
     Wp xi sge F row Q empty_env le m := by
@@ -299,18 +300,22 @@ theorem wp_row {n : Nat} {Q : Post} {m : mem} {le : temp_env} {G : Hex.SparseGra
         (hu.mono fun z hz => by rcases hz with h | h; exact .inl h; exact .inr (.inl h)).trans
           (hu10.mono fun z hz => .inr (.inr hz))
       have hg' : ∀ z, Mem.valid_block m z → Mem.valid_block m10 z := fun z h => hg10 _ (hg _ h)
+      have hK10 : Alloc.Keep m m10 bs := (Alloc.Keep.unch hu (by
+        rintro (h | ⟨h0, h⟩)
+        · exact hbs.2.1 h
+        · exact hbs.1 h0 h)).trans hk10
       have hL10 := hL9.mem hu10 (fun h => hbsd.1 h.symm) (fun h => hbsd.2.1 h.symm)
         (fun h => hbsd.2.2.2 h.symm) (fun h => hbsd.2.2.1 h.symm)
       wp_step
       refine wp_checkLoop hL10 hM10 hnc hUle (by rw [hpass]; exact hmn) ?_ ?_
       · intro hnone le11 _
-        refine wp_ret_const (c := 1) (hQr 1 ?_ m10 st6 marks9 hM10 harr10 hU10 hg')
+        refine wp_ret_const (c := 1) (hQr 1 ?_ m10 st6 marks9 hM10 harr10 hK10 hU10 hg')
         refine rowCode_gt hdeg heq fun e h1 h2 hm => ?_
         have := hnone (e - R.offsets[c]!) (by rw [hRd]; omega)
         rw [Nat.add_sub_cancel' h1] at this
         exact this ((hrel _ (hrows.small e (by omega))).2 (by rw [hpass] at hm; exact hm))
       · rintro ⟨j, hj, hm, hlt⟩
-        refine hQr (-1) ?_ m10 st6 marks9 hM10 harr10 hU10 hg'
+        refine hQr (-1) ?_ m10 st6 marks9 hM10 harr10 hK10 hU10 hg'
         exact rowCode_lt hdeg heq (e := R.offsets[c]! + j) ⟨Nat.le_add_right _ _, by rw [hRd] at hj; omega⟩
           ((hrel _ (hrows.small _ (by rw [hRd] at hj; omega))).1 hm) hlt
   · rw [show decide ((R.degree c : Int) = g.degree lab[c]!) = false from decide_eq_false (by omega)]
@@ -335,11 +340,11 @@ theorem wp_row {n : Nat} {Q : Post} {m : mem} {le : temp_env} {G : Hex.SparseGra
     by_cases hlt : R.degree c < g.degree lab[c]!
     · rw [show decide ((R.degree c : Int) < g.degree lab[c]!) = true from decide_eq_true (by omega)]
       simp (config := {decide := true}) only [cop, ite_true]
-      refine wp_ret_neg (hQr _ ?_ m1 st marks hM1 harr1 hU1 hg1)
+      refine wp_ret_neg (hQr _ ?_ m1 st marks hM1 harr1 hk1 hU1 hg1)
       rw [hcode]; simp [hlt]
     · rw [show decide ((R.degree c : Int) < g.degree lab[c]!) = false from decide_eq_false (by omega)]
       simp (config := {decide := true}) only [cop, ite_false]
       apply wp_skip
-      refine wp_ret_const (c := 1) (hQr _ ?_ m1 st marks hM1 harr1 hU1 hg1)
+      refine wp_ret_const (c := 1) (hQr _ ?_ m1 st marks hM1 harr1 hk1 hU1 hg1)
       rw [hcode]; simp [hlt]
 end NautyVerified.Proofs.Sparse.Testcanlab
