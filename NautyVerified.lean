@@ -129,6 +129,7 @@ import NautyVerified.Proofs.Search.Node.LoopSteps
 import NautyVerified.Proofs.Search.Node.Long
 import NautyVerified.Proofs.Search.Node.Em
 import NautyVerified.Proofs.Search.Node.Child
+import NautyVerified.Proofs.Search.Node.TcFrame
 import NautyVerified.Proofs.Search.Node.InvSteps
 import NautyVerified.Proofs.Search.Frame
 import NautyVerified.Proofs.Harness.Spec
