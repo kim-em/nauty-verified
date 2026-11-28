@@ -1,13 +1,15 @@
 import NautyVerified.Proofs.Search.Recover.Syntax
 import NautyVerified.Spec.Recover
 import NautyVerified.Proofs.Search.Node.Prune
+import NautyVerified.Proofs.Search.Step
 
 /-!
 # `recover` restores the partition and the levels
 
-`recover_satisfies`: nauty.c's `recover` satisfies `recoverSpec`: it takes
-memory holding `st` to memory holding HexGraphIso's
-`recover nautyInf level st`.
+`recover_satisfiesG`: nauty.c's `recover` satisfies `recoverSpecG` for any
+dispatch representation: it takes memory holding `st` to memory holding
+HexGraphIso's `recover nautyInf level st`. `recover_satisfies` is the dense
+instance (`recoverSpec_ofG`).
 -/
 
 namespace NautyVerified.Proofs.Search.Recover
@@ -34,14 +36,22 @@ def entryTemps (S : SLoc) (level : Nat) : temp_env :=
   PTree.set dense.id.level (.Vint (ir level)) (PTree.set dense.id.ptn (.Vptr S.bp S.pofs)
     (create_undef_temps dense.fn.«nauty:recover».fn_temps))
 
+/-! ### For any dispatch representation -/
+
+section Generic
+
+open NautyVerified.Proofs.Dispatch (Ops DispatchRep)
+
+variable {ge : genv} [E : NautyEnv ge] {O : Ops} {D : DispatchRep ge O}
+
 /-- The rescan loop: `ptn` becomes the fold of `reopen`. -/
-theorem wp_rescan {Q : Post} {le : temp_env} {m : mem} {S : SLoc} {n level : Nat}
+theorem wp_rescanG {Q : Post} {le : temp_env} {m : mem} {S : SLoc} {n level : Nat}
     {p : Array Nat} (hn : n < 1073741824) (hps : p.size = n)
     (hpv : ∀ j < n, p[j]! ≤ n + 1 ∨ p[j]! = nautyInf) (hlev : level < 2147483648)
     (hptn : PTree.get dense.id.ptn le = some (.Vptr S.bp S.pofs))
     (hlv : PTree.get dense.id.level le = some (.Vint (ir level)))
-    (harr : ArrayAt m .Mint32 S.bp S.pb (ints p) n) (hN : IntAt m Block.n n)
-    (hbn : S.bp ≠ Block.n)
+    (harr : ArrayAt m .Mint32 S.bp S.pb (ints p) n) (hN : IntAt m E.n n)
+    (hbn : S.bp ≠ E.n)
     (hQ : ∀ le' m', ArrayAt m' .Mint32 S.bp S.pb (ints ((List.range n).foldl
         (reopen nautyInf level) p)) n → Unch m m' (· = S.bp) →
       (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
@@ -65,7 +75,7 @@ theorem wp_rescan {Q : Post} {le : temp_env} {m : mem} {S : SLoc} {n level : Nat
   refine wp_forLoopC (Inv := Inv) (Mid := Mid) dense.id.i _ rfl _ n (by omega) ?_ ?_ ?_ ?_ ?_
   · rintro k le' m' ⟨hk, hi, -, -, hu, -⟩
     refine ⟨hk, hi, ?_⟩
-    rw [Exec.evalExpr, eval_gint (e := empty_env) (le := le') rfl find_n (hN.unch hu (Ne.symm hbn)),
+    rw [Exec.evalExpr, eval_gint (e := empty_env) (le := le') rfl E.find_n (hN.unch hu (Ne.symm hbn)),
       show Exec.evalExpr ge empty_env le' m' (tv dense.id.i) = _ from hi]
     simp only [typeof, cop]
     rw [ir_lt (a := (k : Int)) (b := (n : Int)) ⟨by omega, by omega⟩ ⟨by omega, by omega⟩]
@@ -113,9 +123,11 @@ theorem wp_rescan {Q : Post} {le : temp_env} {m : mem} {S : SLoc} {n level : Nat
     exact hQ le' m' ha hu hv ho
 
 set_option maxHeartbeats 4000000 in
-theorem recover_satisfies {n : Nat} (S : SLoc) (ctx : Ctx n) (st : Search n) (level : Nat)
-    (pre : Bool) :
-    Satisfies xi ge (.Internal dense.fn.«nauty:recover») (recoverSpec S ctx st level pre) := by
+/-- `recover` meets `recoverSpecG` for any dispatch representation: it calls no
+dispatch procedure, and writes only `ptn` and four of nauty.c's scalars. -/
+theorem recover_satisfiesG {n : Nat} (S : SLoc) (gl : D.GLoc) (cl : D.CLoc) (G : O.Gr n)
+    (st : SearchState n (O.Canon n)) (level : Nat) (pre : Bool) :
+    Satisfies xi ge (.Internal dense.fn.«nauty:recover») (recoverSpecG D S gl cl G st level pre) := by
   refine satisfies_internal (Entry := fun _ m₀ e le m =>
     e = empty_env ∧ le = entryTemps S level ∧ m = m₀) ?_ ?_
   · rintro args m ⟨rfl, -⟩
@@ -128,7 +140,7 @@ theorem recover_satisfies {n : Nat} (S : SLoc) (ctx : Ctx n) (st : Search n) (le
     rintro e le m ⟨rfl, rfl, rfl⟩
     rw [dense.fn.«nauty:recover».fn_body_eq, body_eq]
     simp only [body]
-    have hd := h.distinct
+    have hd := h.lit
     have hn := h.nlt
     have hinv := h.inv
     obtain ⟨-, -, a3, -, a5, a6, a7, a8, a9, -, -, -⟩ := hinv.scalars
@@ -139,7 +151,7 @@ theorem recover_satisfies {n : Nat} (S : SLoc) (ctx : Ctx n) (st : Search n) (le
     have hpv : ∀ j < n, st.ptn[j]! ≤ n + 1 ∨ st.ptn[j]! = nautyInf := hinv.ptnVals
     -- the rescan
     wp_step
-    refine wp_rescan (S := S) hn hinv.ptnSize hpv (by omega) hptn hlev h.arrays.ptn h.fixed.nn
+    refine wp_rescanG (S := S) hn hinv.ptnSize hpv (by omega) hptn hlev h.arrays.ptn h.fixed.nn
       (by sep_ne hd) ?_
     intro le1 m1 aP hu1 hv1 ho1
     have hU1 : Unch m m1 (· ∈ [S.bp]) := hu1.mono fun z hz => by simp [hz]
@@ -158,9 +170,9 @@ theorem recover_satisfies {n : Nat} (S : SLoc) (ctx : Ctx n) (st : Search n) (le
     -- `if (level < noncheaplevel) noncheaplevel = level + 1`
     simp only [seqPost, Post.after, E0_append]
     wp_step
-    refine wp_clamp rfl find_noncheaplevel (h.scalars.noncheaplevel.unch hU1 (by sep_notin hd))
-      (hcmp _ _ _ _ find_noncheaplevel (h.scalars.noncheaplevel.unch hU1 (by sep_notin hd)) a3) rfl
-      (x := (level : Int) + 1)
+    refine wp_clamp rfl E.find_noncheaplevel (h.scalars.noncheaplevel.unch hU1 (by sep_notin hd))
+      (hcmp _ _ _ _ E.find_noncheaplevel (h.scalars.noncheaplevel.unch hU1 (by sep_notin hd)) a3)
+      rfl (x := (level : Int) + 1)
       (by simp only [Exec.evalExpr, Refine.tv, hlev1, typeof, cop, ir_add]) rfl ?_
     intro m2 iNC hu2 hv2
     have hU2 := hU1.snoc hu2
@@ -168,8 +180,8 @@ theorem recover_satisfies {n : Nat} (S : SLoc) (ctx : Ctx n) (st : Search n) (le
     -- `if (level < eqlev_first) eqlev_first = level`
     simp only [seqPost, Post.after, E0_append]
     wp_step
-    refine wp_clamp rfl find_eqlevFirst (h.scalars.eqlevFirst.unch hU2 (by sep_notin hd))
-      (hcmp _ _ _ _ find_eqlevFirst (h.scalars.eqlevFirst.unch hU2 (by sep_notin hd)) a5) rfl
+    refine wp_clamp rfl E.find_eqlevFirst (h.scalars.eqlevFirst.unch hU2 (by sep_notin hd))
+      (hcmp _ _ _ _ E.find_eqlevFirst (h.scalars.eqlevFirst.unch hU2 (by sep_notin hd)) a5) rfl
       (x := (level : Int)) hlev1 rfl ?_
     intro m3 iEF hu3 hv3
     have hU3 := hU2.snoc hu3
@@ -177,13 +189,13 @@ theorem recover_satisfies {n : Nat} (S : SLoc) (ctx : Ctx n) (st : Search n) (le
     -- `if (getcanon)`
     wp_step; wp_step
     apply wp_if_eval
-    rw [eval_gint rfl find_getcanon (h.fixed.getcanon.unch hU3 (by sep_notin hd))]
+    rw [eval_gint rfl E.find_getcanon (h.fixed.getcanon.unch hU3 (by sep_notin hd))]
     simp only [typeof, cop]
     rw [ite_eq_left (by decide)]
     -- `if (level < gca_canon) gca_canon = level`
     wp_step
-    refine wp_clamp rfl find_gcaCanon (h.scalars.gcaCanon.unch hU3 (by sep_notin hd))
-      (hcmp _ _ _ _ find_gcaCanon (h.scalars.gcaCanon.unch hU3 (by sep_notin hd))
+    refine wp_clamp rfl E.find_gcaCanon (h.scalars.gcaCanon.unch hU3 (by sep_notin hd))
+      (hcmp _ _ _ _ E.find_gcaCanon (h.scalars.gcaCanon.unch hU3 (by sep_notin hd))
         hinv.scalars.2.1) rfl
       (x := (level : Int)) hlev1 rfl ?_
     intro m4 iGC hu4 hv4
@@ -191,102 +203,108 @@ theorem recover_satisfies {n : Nat} (S : SLoc) (ctx : Ctx n) (st : Search n) (le
     fwd hd hu4 [aP iNC iEF]
     -- the end, from the last clamp's two cells
     let c : Prop := (level : Int) ≤ st.eqlevCanon
-    have fin : ∀ mf, IntAt mf Block.eqlevCanon (if c then (level : Int) else st.eqlevCanon) →
-        IntAt mf Block.compCanon (if c then 0 else st.compCanon) →
-        Unch m4 mf (· ∈ [Block.compCanon, Block.eqlevCanon]) →
+    have fin : ∀ mf, IntAt mf E.eqlevCanon (if c then (level : Int) else st.eqlevCanon) →
+        IntAt mf E.compCanon (if c then 0 else st.compCanon) →
+        Unch m4 mf (· ∈ [E.compCanon, E.eqlevCanon]) →
         (∀ z, Mem.valid_block m4 z → Mem.valid_block mf z) →
         ∃ m', Mem.free_list mf (blocks_of_env ge empty_env) = some m' ∧
-          (recoverSpec S ctx st level pre).post [.Vptr S.bp S.pofs, .Vint (ir level)] m E0 .Vundef m' := by
+          (recoverSpecG D S gl cl G st level pre).post [.Vptr S.bp S.pofs, .Vint (ir level)] m E0
+            .Vundef m' := by
       intro mf iEC iCC huf hvf
-      have hUf : Unch m mf (· ∈ [Block.compCanon, Block.eqlevCanon, Block.gcaCanon,
-          Block.eqlevFirst, Block.noncheaplevel, S.bp]) :=
+      have hUf : Unch m mf (· ∈ [E.compCanon, E.eqlevCanon, E.gcaCanon,
+          E.eqlevFirst, E.noncheaplevel, S.bp]) :=
         (hU4.sub (by simp)).trans (huf.sub (by simp))
+      have hvF : ∀ z, Mem.valid_block m z → Mem.valid_block mf z :=
+        fun z hz => hvf _ (hv4 _ (hv3 _ (hv2 _ (hv1 _ hz))))
+      have hL : ∀ z ∈ [E.compCanon, E.eqlevCanon, E.gcaCanon, E.eqlevFirst, E.noncheaplevel, S.bp],
+          z ∈ wrEnv ∨ z ∈ S.wrVG ∨ z ∈ D.canonBlocks cl S.bc := by
+        intro z hz
+        simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
+        rcases hz with rfl | rfl | rfl | rfl | rfl | rfl
+        iterate 5 exact .inl (by simp)
+        exact .inr (.inl (by simp))
+      have hLc : ∀ z ∈ D.canonBlocks cl S.bc, ¬ z ∈ [E.compCanon, E.eqlevCanon, E.gcaCanon,
+          E.eqlevFirst, E.noncheaplevel, S.bp] := by
+        intro z hz hzL
+        simp only [List.mem_cons, List.mem_nil_iff, or_false] at hzL
+        rcases hzL with rfl | rfl | rfl | rfl | rfl | rfl
+        iterate 5 exact h.canon_ne hz (.inr (.inr (.inr (.inl (by simp))))) rfl
+        exact h.canon_ne hz (.inr (.inl (by simp))) rfl
+      have hLg : ∀ z ∈ D.graphBlocks gl S.bg, ¬ z ∈ [E.compCanon, E.eqlevCanon, E.gcaCanon,
+          E.eqlevFirst, E.noncheaplevel, S.bp] := by
+        intro z hz hzL
+        simp only [List.mem_cons, List.mem_nil_iff, or_false] at hzL
+        rcases hzL with rfl | rfl | rfl | rfl | rfl | rfl
+        iterate 5 exact h.graph_ne hz (.inr (.inr (.inr (.inl (by simp))))) rfl
+        exact h.graph_ne hz (.inl (by simp)) rfl
+      obtain ⟨nK, nG, -⟩ := h.not_wr hL
       have iNC' := iNC.unch huf (by sep_notin hd)
       have iEF' := iEF.unch huf (by sep_notin hd)
       have iGC' := iGC.unch huf (by sep_notin hd)
       have aP' := aP.unch huf (by sep_notin hd)
       obtain ⟨hFs, hFv⟩ := reopen_fold (level := level) hinv.ptnSize hpv n
-      refine ⟨mf, Nextelement.free_empty mf, rfl, ?_, ?_⟩
-      · simp only [Hex.GraphIso.Nauty.recover]
-        rw [recoverLevels_upd, recoverPtn_eq]
-        exact
-          { fixed := h.fixed.unch hUf (by sep_all hd)
-            scalars :=
-              ⟨h.scalars.gcaFirst.unch hUf (by sep_notin hd),
-               show IntAt mf _ ((if level < st.gcaCanon then level else st.gcaCanon : Nat) : Int) from
-                 IntAt.ite_nat iGC',
-               show IntAt mf _ ((if level < st.noncheaplevel then level + 1 else st.noncheaplevel :
-                   Nat) : Int) by
-                 by_cases hc : level < st.noncheaplevel
-                 · simp only [hc, decide_true, ite_true] at iNC' ⊢; push_cast; exact iNC'
-                 · simp only [hc, decide_false, Bool.false_eq_true, ite_false] at iNC' ⊢; exact iNC',
-               h.scalars.allsamelevel.unch hUf (by sep_notin hd),
-               show IntAt mf _ ((if level < st.eqlevFirst then level else st.eqlevFirst : Nat) : Int) from
-                 IntAt.ite_nat iEF',
-               iEC, iCC,
-               h.scalars.samerows.unch hUf (by sep_notin hd),
-               h.scalars.canonlevel.unch hUf (by sep_notin hd),
-               h.scalars.stabvertex.unch hUf (by sep_notin hd),
-               h.scalars.cosetindex.unch hUf (by sep_notin hd),
-               h.scalars.needshortprune.unch hUf (by sep_notin hd)⟩
-            stats := ⟨h.stats.numorbits.unch hUf (by sep_notin hd),
-              h.stats.numgenerators.unch hUf (by sep_notin hd),
-              h.stats.numnodes.unch hUf (by sep_notin hd),
-              h.stats.numbadleaves.unch hUf (by sep_notin hd),
-              fun hp => (h.stats.maxlevel hp).unch hUf (by sep_notin hd),
-              hUf.access _ _ _ _ (by sep_notin hd) h.stats.maxlevelW,
-              h.stats.tctotal.unch hUf (by sep_notin hd),
-              h.stats.canupdates.unch hUf (by sep_notin hd), h.stats.fits,
-              (h.stats.fix.unch hUf (by sep_notin hd)).perm,
-              (h.stats.fix.unch hUf (by sep_notin hd)).errstatus,
-              (h.stats.fix.unch hUf (by sep_notin hd)).grpsize1,
-              (h.stats.fix.unch hUf (by sep_notin hd)).grpsize2⟩
-            arrays :=
-              { lab := h.arrays.lab.unch hUf (by sep_notin hd)
-                ptn := aP'
-                orbits := h.arrays.orbits.unch hUf (by sep_notin hd)
-                active := let ⟨aw, ha, hr⟩ := h.arrays.active
-                  ⟨aw, ha.unch hUf (by sep_notin hd), hr⟩
-                fixedpts := let ⟨fw, hf, hr⟩ := h.arrays.fixedpts
-                  ⟨fw, hf.unch hUf (by sep_notin hd), hr⟩
-                workperm := let ⟨wv, hwv⟩ := h.arrays.workperm
-                ⟨wv, hwv.unch hUf (by sep_notin hd)⟩
-                firstlab := h.arrays.firstlab.unch hUf (by sep_notin hd)
-                canonlab := h.arrays.canonlab.unch hUf (by sep_notin hd)
-                firstcode := h.arrays.firstcode.unch hUf (by sep_notin hd)
-                canoncode := h.arrays.canoncode.unch hUf (by sep_notin hd)
-                firsttc := h.arrays.firsttc.unch hUf (by sep_notin hd)
-                canong := h.arrays.canong.unch hUf (by sep_notin hd)
-                autos := h.arrays.autos.unch hUf (by sep_notin hd) (by sep_notin hd)
-                graph := ⟨h.arrays.graph.arr.unch hUf (by sep_notin hd), h.arrays.graph.rep⟩ }
-            dyns := h.dyns.unch hUf (by sep_all hd)
-            work := h.work.unch hUf (by sep_all hd) fun z hz hm => h.work_not hz (by
-              clear hz; revert hm; revert z; simp [SLoc.blocks])
-            tables := h.tables.unch hUf (by sep_all hd)
-            distinct := hd
-            inv :=
-              { hinv with
-                ptnSize := hFs
-                ptnVals := hFv
-                ptnLast := by
-                  rw [reopen_fold_le (show st.ptn[n - 1]! ≤ level by have := hinv.ptnLast; omega)]
-                  exact hinv.ptnLast
-                scalars := by
-                  obtain ⟨b1, b2, b3, b4, b5, b6, b7, b8, b9, b10, b11, b12⟩ := hinv.scalars
-                  refine ⟨b1, ?_, ?_, b4, ?_, ?_, ?_, ?_, ?_, b10, b11, b12⟩ <;> dsimp only <;>
-                    split <;> (try simp only [Int.ofNat_eq_natCast]) <;> omega }
-            n0 := h.n0, nlt := h.nlt, nM := h.nM, M1 := h.M1, Mlt := h.Mlt }
-      · refine ⟨⟨hUf.mono fun z hz => .inl ⟨by revert hz; revert z; simp [SLoc.blocks], by revert hz; revert z; sep_all hd,
-          by revert hz; revert z; sep_all hd⟩,
-          fun z hz => hvf _ (hv4 _ (hv3 _ (hv2 _ (hv1 _ hz))))⟩, fun z hz => .inl (IsWork.back h hUf ?_ hz)⟩
-        intro z hz
+      have hstep : SStepG D m mf S gl cl := by
+        refine SStepG.of_unch h hUf hvF (fun z hz => .inl ?_) (fun z hz => nG z (D.wglobs_sub z hz))
+          ⟨nK _ (by simp), nK _ (by simp)⟩
         simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
-        rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> sep_notin hd
+        rcases hz with rfl | rfl | rfl | rfl | rfl | rfl
+        iterate 5 exact ⟨SLoc.mem_blocksG_of D (.inr (.inr (.inr (.inr (.inl (by simp)))))),
+          by sep_ne hd, by sep_ne hd⟩
+        exact ⟨SLoc.mem_blocksG_of D (.inr (.inl (by simp))), by sep_ne hd, by sep_ne hd⟩
+      refine ⟨mf, Nextelement.free_empty mf, rfl, ?_, hstep.1, hstep.2⟩
+      simp only [Hex.GraphIso.Nauty.recover]
+      rw [recoverLevels_upd, recoverPtn_eq]
+      refine h.rebuild hUf hL (fun z hz => Keep.unch hUf (by revert z hz; sep_all hd)) hvF
+        ⟨h.scalars.gcaFirst.unch hUf (by sep_notin hd),
+         show IntAt mf _ ((if level < st.gcaCanon then level else st.gcaCanon : Nat) : Int) from
+           IntAt.ite_nat iGC',
+         show IntAt mf _ ((if level < st.noncheaplevel then level + 1 else st.noncheaplevel :
+             Nat) : Int) by
+           by_cases hc : level < st.noncheaplevel
+           · simp only [hc, decide_true, ite_true] at iNC' ⊢; push_cast; exact iNC'
+           · simp only [hc, decide_false, Bool.false_eq_true, ite_false] at iNC' ⊢; exact iNC',
+         h.scalars.allsamelevel.unch hUf (by sep_notin hd),
+         show IntAt mf _ ((if level < st.eqlevFirst then level else st.eqlevFirst : Nat) : Int) from
+           IntAt.ite_nat iEF',
+         iEC, iCC,
+         h.scalars.samerows.unch hUf (by sep_notin hd),
+         h.scalars.canonlevel.unch hUf (by sep_notin hd),
+         h.scalars.stabvertex.unch hUf (by sep_notin hd),
+         h.scalars.cosetindex.unch hUf (by sep_notin hd),
+         h.scalars.needshortprune.unch hUf (by sep_notin hd)⟩
+        { h.stats.unch hUf (by sep_notin hd) with }
+        { lab := h.arrays.lab.unch hUf (by sep_notin hd)
+          ptn := aP'
+          orbits := h.arrays.orbits.unch hUf (by sep_notin hd)
+          active := let ⟨aw, ha, hr⟩ := h.arrays.active
+            ⟨aw, ha.unch hUf (by sep_notin hd), hr⟩
+          fixedpts := let ⟨fw, hf, hr⟩ := h.arrays.fixedpts
+            ⟨fw, hf.unch hUf (by sep_notin hd), hr⟩
+          workperm := let ⟨wv, hwv⟩ := h.arrays.workperm
+            ⟨wv, hwv.unch hUf (by sep_notin hd)⟩
+          firstlab := h.arrays.firstlab.unch hUf (by sep_notin hd)
+          canonlab := h.arrays.canonlab.unch hUf (by sep_notin hd)
+          firstcode := h.arrays.firstcode.unch hUf (by sep_notin hd)
+          canoncode := h.arrays.canoncode.unch hUf (by sep_notin hd)
+          firsttc := h.arrays.firsttc.unch hUf (by sep_notin hd)
+          canong := D.canon_unch h.arrays.canong hUf hLc
+          autos := h.arrays.autos.unch hUf (by sep_notin hd) (by sep_notin hd)
+          graph := D.graph_unch h.arrays.graph hUf hLg }
+        { hinv with
+          ptnSize := hFs
+          ptnVals := hFv
+          ptnLast := by
+            rw [reopen_fold_le (show st.ptn[n - 1]! ≤ level by have := hinv.ptnLast; omega)]
+            exact hinv.ptnLast
+          scalars := by
+            obtain ⟨b1, b2, b3, b4, b5, b6, b7, b8, b9, b10, b11, b12⟩ := hinv.scalars
+            refine ⟨b1, ?_, ?_, b4, ?_, ?_, ?_, ?_, ?_, b10, b11, b12⟩ <;> dsimp only <;>
+              split <;> (try simp only [Int.ofNat_eq_natCast]) <;> omega }
     -- `if (level <= eqlev_canon) { eqlev_canon = level; comp_canon = 0; }`
     simp only [seqPost, Post.after, E0_append]
     wp_step; wp_step
     apply wp_if_eval
-    rw [Exec.evalExpr, eval_gint (e := empty_env) (le := le1) rfl find_eqlevCanon
+    rw [Exec.evalExpr, eval_gint (e := empty_env) (le := le1) rfl E.find_eqlevCanon
       (h.scalars.eqlevCanon.unch hU4 (by sep_notin hd)),
       show Exec.evalExpr ge empty_env le1 m4 (tv dense.id.level) = _ from hlev1]
     simp only [typeof, cop]
@@ -294,17 +312,18 @@ theorem recover_satisfies {n : Nat} (S : SLoc) (ctx : Ctx n) (st : Search n) (le
     by_cases hc : (level : Int) ≤ st.eqlevCanon
     · rw [ite_eq_left (by simp; omega)]
       wp_step; wp_step; wp_step
-      refine wp_gint (x := level) rfl find_eqlevCanon
+      refine wp_gint (x := level) rfl E.find_eqlevCanon
         (h.scalars.eqlevCanon.unch hU4 (by sep_notin hd)).writable hlev1 rfl ?_
       intro m5 i5 hu5 hv5
       simp only [seqPost, Post.after, E0_append]
       wp_step; wp_step
-      refine wp_gint (x := 0) rfl find_compCanon
+      refine wp_gint (x := 0) rfl E.find_compCanon
         ((h.scalars.compCanon.unch hU4 (by sep_notin hd)).unch hu5 (by sep_ne hd)).writable
         (by simp only [Exec.evalExpr]) rfl ?_
       intro m6 i6 hu6 hv6
       simp only [E0_append]
-      exact fin m6 (by rw [ite_eq_left hc]; exact i5.unch hu6 (by sep_ne hd)) (by rw [ite_eq_left hc]; exact i6)
+      exact fin m6 (by rw [ite_eq_left hc]; exact i5.unch hu6 (by sep_ne hd))
+        (by rw [ite_eq_left hc]; exact i6)
         (((Unch.refl m4 (· ∈ ([] : List block))).snoc hu5).snoc hu6)
         (fun z hz => hv6 _ (hv5 _ hz))
     · rw [ite_eq_right (by simp; omega)]
@@ -312,5 +331,31 @@ theorem recover_satisfies {n : Nat} (S : SLoc) (ctx : Ctx n) (st : Search n) (le
       exact fin m4 (by rw [ite_eq_right hc]; exact h.scalars.eqlevCanon.unch hU4 (by sep_notin hd))
         (by rw [ite_eq_right hc]; exact h.scalars.compCanon.unch hU4 (by sep_notin hd))
         (Unch.refl _ _) (fun _ h => h)
+
+end Generic
+
+/-- The rescan loop: `ptn` becomes the fold of `reopen`. -/
+theorem wp_rescan {Q : Post} {le : temp_env} {m : mem} {S : SLoc} {n level : Nat}
+    {p : Array Nat} (hn : n < 1073741824) (hps : p.size = n)
+    (hpv : ∀ j < n, p[j]! ≤ n + 1 ∨ p[j]! = nautyInf) (hlev : level < 2147483648)
+    (hptn : PTree.get dense.id.ptn le = some (.Vptr S.bp S.pofs))
+    (hlv : PTree.get dense.id.level le = some (.Vint (ir level)))
+    (harr : ArrayAt m .Mint32 S.bp S.pb (ints p) n) (hN : IntAt m Block.n n)
+    (hbn : S.bp ≠ Block.n)
+    (hQ : ∀ le' m', ArrayAt m' .Mint32 S.bp S.pb (ints ((List.range n).foldl
+        (reopen nautyInf level) p)) n → Unch m m' (· = S.bp) →
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
+      (∀ x, x ≠ dense.id.i → PTree.get x le' = PTree.get x le) → Q.normal E0 empty_env le' m') :
+    Wp xi ge dense.fn.«nauty:recover» (forLoopC dense.id.i
+      (.Ebinop .Olt (tv dense.id.i) (.Evar dense.id.«nauty:n» tint) tint)
+      (sk (.Sifthenelse (.Ebinop .Ogt (ix dense.id.ptn (tv dense.id.i)) (tv dense.id.level) tint)
+        (sk (.Sassign (ix dense.id.ptn (tv dense.id.i)) (ci 2000000002 tint))) .Sskip)))
+      Q empty_env le m :=
+  wp_rescanG hn hps hpv hlev hptn hlv harr hN hbn hQ
+
+theorem recover_satisfies {n : Nat} (S : SLoc) (ctx : Ctx n) (st : Search n) (level : Nat)
+    (pre : Bool) :
+    Satisfies xi ge (.Internal dense.fn.«nauty:recover») (recoverSpec S ctx st level pre) :=
+  recoverSpec_ofG (recover_satisfiesG (D := Dispatch.denseRep) S () () ctx st level pre)
 
 end NautyVerified.Proofs.Search.Recover
