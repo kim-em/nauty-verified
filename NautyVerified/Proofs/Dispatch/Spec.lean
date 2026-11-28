@@ -344,7 +344,9 @@ def cheapautomSpec (bp : block) (pofs : ptrofs) (ptn : Array Nat) (level n : Nat
     R.Step m m' fun _ => False
 
 /-- `targetcell(g, lab, ptn, level, tc_level, digraph, hint, m, n)`: the
-position of the target cell `O.targetcell` chooses. -/
+position of the target cell `O.targetcell` chooses. `lab` is onto `0 .. n-1`
+(sparse `bestcell_sg` reads `NNTCELL` at every vertex after writing it at
+every `lab[j]`; the search always passes a permutation). -/
 def targetcellSpec {n : Nat} (G : O.Gr n) (gl : R.GLoc) (bg : block) (gofs : ptrofs) (bl : block)
     (lofs : ptrofs)
     (lab : Array Nat) (bp : block) (pofs : ptrofs) (ptn : Array Nat) (level tcLevel : Nat)
@@ -353,6 +355,7 @@ def targetcellSpec {n : Nat} (G : O.Gr n) (gl : R.GLoc) (bg : block) (gofs : ptr
       .Vint (ir tcLevel), .Vint dg, .Vint (ir hint), .Vint (ir M), .Vint (ir n)] ∧
     R.Ctx m n M ∧ R.GraphRep m gl bg gofs G M ∧ O.GraphOk G ∧
     ArrayAt m .Mint32 bl (intOfZ (Ptrofs.unsigned lofs)) (ints lab) n ∧ (∀ j < n, lab[j]! < n) ∧
+    (∀ p < n, ∃ j < n, lab[j]! = p) ∧
     ArrayAt m .Mint32 bp (intOfZ (Ptrofs.unsigned pofs)) (ints ptn) n ∧ ptn.size = n ∧
     (∀ x < n, ptn[x]! < 2147483648) ∧ ptn[n - 1]! ≤ level ∧ level < 2147483648 ∧
     hint < n ∧ -2147483648 ≤ hint ∧ tcLevel < 2147483648 ∧ R.Sep m (R.graphBlocks gl bg ++ [bl, bp])

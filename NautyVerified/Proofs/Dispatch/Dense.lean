@@ -378,7 +378,7 @@ theorem dense_pre3 {m : mem} (hw : denseRep.Work m) {bs : List block} (hsep : de
 theorem dense_targetcell (xi : ExternalCalls) : denseRep.TargetcellFn xi denseRep.targetcell := by
   refine ⟨_, by simp [Genv.find_funct, denseRep, Search.funct_targetcellFn], type_targetcellD,
     fun G _ bg gofs bl lofs lab bp pofs ptn level tcLevel dg hint M => ?_⟩
-  refine Satisfies.of_pre fun args m ⟨hargs, hc, ⟨gw, hg⟩, _, hl, hlsm, hp, hps, hpsm, hpl, hlev,
+  refine Satisfies.of_pre fun args m ⟨hargs, hc, ⟨gw, hg⟩, _, hl, hlsm, _, hp, hps, hpsm, hpl, hlev,
     hh, hh0, htc, hsep⟩ => ?_
   have hw := hc.work
   obtain ⟨⟨cP, bP, dP⟩, ⟨cS, bS, dS⟩, ⟨cB, bB, dB⟩⟩ := dense_dyn hw
