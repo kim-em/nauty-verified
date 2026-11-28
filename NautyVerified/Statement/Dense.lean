@@ -1,4 +1,4 @@
-import NautyVerified.Statement.Harness
+import NautyVerified.Statement.Corollaries
 
 /-!
 # The end-to-end theorem for dense nauty (statement)
@@ -57,7 +57,16 @@ canonical graph alone does not see the colouring: three isolated vertices
 coloured `0, 0, 1` and `0, 1, 1` have the same canonical graph.) -/
 theorem canonWords_eq_iff {n k : Nat} (G H : Colored n k) :
     (canonWords G = canonWords H ∧ colorCounts G = colorCounts H) ↔ Isomorphic G H := by
-  sorry
+  have hw : ∀ G : Colored n k,
+      canonWords G = (Nauty.rowsOf (canon G)).toList.flatMap (rowWords (setwordsNeeded n)) :=
+    fun G => by rw [canonWords, canong_toList]
+  rw [colorCounts, colorCounts, counts_eq_iff, hw, hw, iso_iff_canon_eq]
+  constructor
+  · rintro ⟨h1, h2⟩
+    refine canon_eq_of ((rowsOf_eq_iff _ _).mp ?_) h2
+    exact flatMap_inj (fun _ _ => rowWords_inj) (length_rowWords _) _ _ (by simp [Nauty.rowsOf]) h1
+  · intro h
+    exact ⟨by rw [h], sortedColorSeq_eq h⟩
 
 /-- The generators the binary writes (block 1) are automorphisms of `G`, and
 every automorphism of `G` is a product of them. -/
@@ -73,6 +82,7 @@ theorem generators_correct {n k : Nat} (G : Colored n k) :
 representative exactly when an automorphism maps one to the other. -/
 theorem orbits_correct {n k : Nat} (G : Colored n k) (u v : Fin n) :
     (finalState G).orbits[u.val]! = (finalState G).orbits[v.val]! ↔ SameOrbit G u v := by
-  sorry
+  rw [finalState_orbits]
+  exact Aut.orbits_eq_iff_sameOrbit G u v
 
 end NautyVerified.Statement
