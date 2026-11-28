@@ -692,13 +692,12 @@ Tools from batch 1, for the batches after it:
   `node_true_succG`, `node_false_succG`, `sweep_*_someG` are the unfoldings at
   any policy; `cmpFirst`/`cmpCanon` and `compareCodes_eq` are over any store.
   `tcParent` is over any `NautyEnv`.
-- Not converted: `Node/GcaSteps.lean`. Its facts rest on `Spec/Gca.lean` and
-  `node_gca` (`Spec/SearchInfRun.lean`), stated for the dense `node`; the
-  generic form needs those over `Generic.node` with the policy's
-  `child`/`recover`/`leafExit` keeping the level counters, which belongs with
-  the node bodies (batch 3). The dense HexGraphIso unfoldings (`FirstHex`,
-  `OtherHex`) and the dense `UaFrame`/`Rebuild` lemmas keep their own proofs
-  beside the generic ones.
+- `Node/GcaSteps.lean` stays dense: its users are `OkOff`/`OkFirst`, which
+  feed `denseLaws`; for a general policy the level counters across a sweep
+  step are part of `NodeLaws`' sweep invariants (`first_next`, `off_next`),
+  so it has no generic counterpart. The dense HexGraphIso unfoldings
+  (`FirstHex`, `OtherHex`) and the dense `UaFrame`/`Rebuild` lemmas keep their
+  own proofs beside the generic ones.
 - Firstterminal (batch 2 (a)): `firstterminal_satisfiesG D` meets
   `firstterminalSpecG D` for any `D : DispatchRep ge O` (no dispatch call;
   the final state by `SearchAtG.rebuild`, the frame by `SStepG.of_unch`), and
@@ -748,11 +747,17 @@ Batch 2 group (b), the node leaf steps (generic names next to the dense ones):
   `qinvar` store.
 - Dense-only, replaced by the tools above: `LocDistinct`, `Realloc`,
   `ReallocW.reallocW`, `Doref.wp_nodeDoref` (naugraph.c's slots).
-- Not converted: `Target`, `Choose` (the generic `wp_nodeTarget` is
-  `maketargetcell_satisfiesT`
-  with `D.targetcell`, result `mtcOf n lab ptn level (O.targetcell …)`, then
-  `SearchAtG.dstep`-style rebuild; `chooseTarget_false_eq` needs the
-  policy's `chooseTarget` in terms of `O.targetcell`). The HexGraphIso-side
+- Target and Choose: `wp_nodeTargetG` is the `maketargetcell` call with
+  `D.targetcell` (`maketargetcell_satisfiesV`, which adds to
+  `maketargetcellSpecT` that blocks valid after `targetcell` stay valid, by
+  `wp_grow`), result `mtcOf n lab ptn level (O.targetcell …)`, state unchanged;
+  `wp_chooseOffG` leaves `chooseTargetG O false`'s state, and
+  `chooseTargetG_false_eq` gives its cases (the dense `chooseTarget_false_eq`
+  is its instance). Both take `htc` (the target position starts a nontrivial
+  cell), which a node body gets from `NodeLaws.target_lt`, and the policy's
+  `chooseTarget` comes in through `PolicyLink.target_eq`/`target_same`. Their
+  frames are `D`'s, so the dense `wp_nodeTarget`/`wp_chooseOff` keep their
+  own proofs. The HexGraphIso-side
   files `InvSteps`, `OkOff`, `OkFirst`, `ProcFacts`, `Em` are about the dense
   `node`, `Colored` graphs and `SearchInf`; they stay dense. The generic node
   bodies need `SInvG` of each step's state, which comes from the policy
