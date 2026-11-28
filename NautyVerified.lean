@@ -366,6 +366,8 @@ import NautyVerified.Proofs.Sparse.Refine.Count.RunLoop
 import NautyVerified.Proofs.Sparse.Refine.Count.Min
 import NautyVerified.Proofs.Sparse.Refine.Count.Starts
 import NautyVerified.Proofs.Sparse.Refine.Count.Frag
+import NautyVerified.Proofs.Sparse.Refine.Count.Push
+import NautyVerified.Proofs.Sparse.Refine.Count.FragLoop
 import NautyVerified.Proofs.Sparse.Refine.Wide
 import NautyVerified.Proofs.Sparse.Refine.DistPass
 import NautyVerified.Proofs.Sparse.Refine.Queue
