@@ -204,3 +204,121 @@ theorem classify_eq (ctx : Ctx n) (level numcells : Nat) (st : Search n) :
       rfl
 
 end NautyVerified.Spec
+
+namespace NautyVerified.Spec
+open Hex.GraphIso.Nauty
+variable {n : Nat}
+
+/-- The fields `classify` leaves alone. -/
+structure Keeps (st st' : Search n) : Prop where
+  lab : st'.lab = st.lab
+  firstlab : st'.firstlab = st.firstlab
+  canonlab : st'.canonlab = st.canonlab
+  eqlevCanon : st'.eqlevCanon = st.eqlevCanon
+  noncheaplevel : st'.noncheaplevel = st.noncheaplevel
+  cosetindex : st'.cosetindex = st.cosetindex
+  numgenerators : st'.numgenerators = st.numgenerators
+  workperm : st'.workperm.size = st.workperm.size
+
+theorem Keeps.refl (st : Search n) : Keeps st st := ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
+
+theorem Keeps.trans {a b c : Search n} (h1 : Keeps a b) (h2 : Keeps b c) : Keeps a c :=
+  ⟨h2.1.trans h1.1, h2.2.trans h1.2, h2.3.trans h1.3, h2.4.trans h1.4, h2.5.trans h1.5,
+    h2.6.trans h1.6, h2.7.trans h1.7, h2.8.trans h1.8⟩
+
+theorem Keeps.scatter (R : Array Nat) (st : Search n) : Keeps st (Hex.GraphIso.Nauty.scatter R st) := by
+  rw [Spec.scatter_eq]; exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, scatterW_size _ _ _ _⟩
+
+theorem Keeps.canonTestS (ctx : Ctx n) (level : Nat) (st : Search n) :
+    Keeps st (Spec.canonTestS ctx level st).1 := by
+  unfold Spec.canonTestS; split
+  · split
+    · exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
+    · exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
+  · exact Keeps.refl _
+
+theorem Keeps.classifyCanon (ctx : Ctx n) (level : Nat) (st : Search n) :
+    Keeps st (Spec.classifyCanon ctx level st).2 := by
+  have h := Keeps.canonTestS ctx level st
+  unfold Spec.classifyCanon; simp only []
+  split
+  · exact h.trans (Keeps.scatter _ _)
+  · split <;> exact h
+
+theorem Keeps.classify (ctx : Ctx n) (level numcells : Nat) (st : Search n) :
+    Keeps st (Hex.GraphIso.Nauty.classify ctx level numcells st).2 := by
+  rw [Spec.classify_eq]
+  split
+  · exact Keeps.refl _
+  · split
+    · exact Keeps.refl _
+    · split
+      · split
+        · exact Keeps.scatter _ _
+        · exact (Keeps.scatter _ _).trans (Keeps.classifyCanon _ _ _)
+      · exact Keeps.classifyCanon _ _ _
+
+end NautyVerified.Spec
+
+namespace NautyVerified.Spec
+open Hex.GraphIso.Nauty
+variable {n : Nat}
+
+theorem canonTestS_sr (ctx : Ctx n) (level : Nat) (st : Search n) :
+    (canonTestS ctx level st).2 ≤ (canonTestS ctx level st).1.samerows := by
+  unfold canonTestS; split
+  · split
+    · simp
+    · exact (testcanlab_range ctx _ _).2.2
+  · simp
+
+theorem classifyCanon_cases (ctx : Ctx n) (level : Nat) (st : Search n) :
+    ((classifyCanon ctx level st).1 = .autoCanon ∧ (classifyCanon ctx level st).2.workperm =
+        scatterW (canonTestS ctx level st).1.canonlab (canonTestS ctx level st).1.lab
+          (canonTestS ctx level st).1.workperm n) ∨
+      (∃ s, (classifyCanon ctx level st).1 = .better s ∧ s ≤ (classifyCanon ctx level st).2.samerows) ∨
+      (classifyCanon ctx level st).1 = .bad := by
+  unfold classifyCanon; simp only []
+  split
+  · left; exact ⟨rfl, by rw [scatter_eq]⟩
+  · split
+    · right; left; exact ⟨_, rfl, canonTestS_sr ctx level st⟩
+    · right; right; rfl
+
+/-- The classifications and what the C needs of each. -/
+theorem classify_cases (ctx : Ctx n) (level numcells : Nat) (st : Search n) :
+    let r := classify ctx level numcells st
+    r.1 = .internal ∨ (r.1 = .autoFirst ∧ r.2.workperm = scatterW st.firstlab st.lab st.workperm n) ∨
+      (r.1 = .autoCanon ∧ ∃ w : Array Nat, w.size = st.workperm.size ∧
+        r.2.workperm = scatterW st.canonlab st.lab w n) ∨
+      (∃ s, r.1 = .better s ∧ s ≤ r.2.samerows) ∨ r.1 = .bad := by
+  simp only []
+  rw [classify_eq]
+  have hc : ∀ st' : Search n, Keeps st st' →
+      (classifyCanon ctx level st').1 = .autoCanon ∧ (∃ w : Array Nat, w.size = st.workperm.size ∧
+        (classifyCanon ctx level st').2.workperm = scatterW st.canonlab st.lab w n) ∨
+      (∃ s, (classifyCanon ctx level st').1 = .better s ∧ s ≤ (classifyCanon ctx level st').2.samerows) ∨
+      (classifyCanon ctx level st').1 = .bad := by
+    intro st' hk
+    have hk2 := hk.trans (Keeps.canonTestS ctx level st')
+    rcases classifyCanon_cases ctx level st' with ⟨h1, h2⟩ | h | h
+    · left; refine ⟨h1, _, hk2.workperm, ?_⟩; rw [h2, hk2.canonlab, hk2.lab]
+    · right; left; exact h
+    · right; right; exact h
+  split
+  · right; right; right; right; rfl
+  · split
+    · left; rfl
+    · split
+      · split
+        · right; left; exact ⟨rfl, by rw [scatter_eq]⟩
+        · rcases hc _ (Keeps.scatter _ _) with h | h | h
+          · right; right; left; exact h
+          · right; right; right; left; exact h
+          · right; right; right; right; exact h
+      · rcases hc _ (Keeps.refl _) with h | h | h
+        · right; right; left; exact h
+        · right; right; right; left; exact h
+        · right; right; right; right; exact h
+
+end NautyVerified.Spec
