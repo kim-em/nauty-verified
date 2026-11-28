@@ -198,4 +198,33 @@ theorem scanR_stop (y : Array Nat) (v b : Nat) (x : Array Nat) (c d : Nat) (h : 
   | 0 => rfl
   | f + 1 => by simp [iterF, bodyR, h]
 
+theorem bodyP_inv (y : Array Nat) (v len : Nat) :
+    ∀ (f : Nat) (x : Array Nat) (aa b c d : Nat), 1 ≤ aa → aa ≤ b → b ≤ c + 1 → 1 ≤ c → c ≤ d →
+      b ≤ d → aa ≤ c →
+      let r := iterF (bodyP y v len) f (x, aa, b, c, d)
+      aa ≤ r.2.1 ∧ r.2.1 ≤ r.2.2.1 ∧ r.2.2.1 ≤ r.2.2.2.1 + 1 ∧ 1 ≤ r.2.2.2.1 ∧
+        r.2.2.2.1 ≤ r.2.2.2.2 ∧ r.2.2.1 ≤ r.2.2.2.2 ∧ r.2.2.2.2 ≤ d ∧ aa ≤ r.2.2.2.1
+  | 0, _, _, _, _, _, h0, h1, h2, h3, h4, h5, h6 => by
+    simp only [iterF]; omega
+  | f + 1, x, aa, b, c, d, h0, h1, h2, h3, h4, h5, h6 => by
+    have hL := scanL_inv y v c len x aa b h1 h2
+    generalize hl : iterF (bodyL y v c) len (x, aa, b) = l at hL
+    obtain ⟨x1, aa1, b1⟩ := l
+    simp only at hL
+    have hR := scanR_inv y v b1 len x1 c d (by omega) h4
+    generalize hr : iterF (bodyR y v b1) len (x1, c, d) = r at hR
+    obtain ⟨x2, c2, d2⟩ := r
+    simp only at hR
+    have hB : bodyP y v len (x, aa, b, c, d) = if b1 ≥ c2 then .done (x2, aa1, b1, c2, d2)
+        else .yield (x2.swapIfInBounds b1 (c2 - 1), aa1, b1 + 1, c2 - 1, d2) := by
+      simp only [bodyP, hl, hr]
+    simp only [iterF, hB]
+    by_cases hs : b1 ≥ c2
+    · simp only [hs, ite_true]; omega
+    · simp only [hs, ite_false]
+      have := bodyP_inv y v len f (x2.swapIfInBounds b1 (c2 - 1)) aa1 (b1 + 1) (c2 - 1) d2
+        (by omega) (by omega) (by omega) (by omega) (by omega) (by omega) (by omega)
+      simp only at this
+      omega
+
 end NautyVerified.Spec.SortC
