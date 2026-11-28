@@ -111,7 +111,7 @@ theorem cellLoopN_eq : cellLoopN =
 def cellTemps : List ident :=
   [id.«v1», id.«v2», id.«v3», id.«w1», id.«w2», id.«w3», id.«j», id.«k», id.«l», id.«lj»,
    id.«size», id.«bigpos», id.«bigsize»] ++ (List.range 10).map (fun i => idOf (716 + i)) ++
-  (List.range 12).map (fun i => idOf (750 + i))
+  (List.range 13).map (fun i => idOf (750 + i))
 
 /-! ## Memory changes -/
 
@@ -134,11 +134,18 @@ theorem Frame.trans {L : Loc} {m₁ m₂ m₃ : mem} (h₁ : Frame L m₁ m₂) 
 /-- A store to one written block. -/
 theorem Frame.ofOne {L : Loc} {m m' : mem} {z : block} (hu : Unch m m' (· = z)) (hk : Keep m m' z)
     (hg : ∀ y, Mem.valid_block m y → Mem.valid_block m' y) (hz : L.writes z) : Frame L m m' :=
-  ⟨hu.mono fun y hy => .inl (hy ▸ hz), fun y _ => if h : y = z then h ▸ hk else Keep.unch hu h, hg⟩
+  ⟨hu.mono fun _ hy => .inl (hy ▸ hz), fun y _ => if h : y = z then h ▸ hk else Keep.unch hu h, hg⟩
 
 /-- `numcells` is at most `n` plus the boundaries below `n`. -/
 def Budget {n : Nat} (level : Nat) (s : RefineSt n) : Prop :=
   s.numcells + n ≤ 2 * n + bcount s.ptn level n
+
+/-- A refinement step keeps the budget: every new cell is a new boundary. -/
+theorem Budget.step {n level : Nat} {s t : RefineSt n} (h : RefineSt.Step level s t)
+    (hb : Budget level s) : Budget level t := by
+  have hc := h.cuts.count
+  unfold Budget at hb ⊢
+  omega
 
 variable {xi : ExternalCalls}
 

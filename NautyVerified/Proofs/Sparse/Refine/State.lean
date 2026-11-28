@@ -171,13 +171,15 @@ structure Mem {n : Nat} (m : mem) (L : Loc) (G : Hex.SparseGraph n) (t : RefineS
   bit : BitTable m Block.bit
   left : LeftbitTable m
 
-/-- The scratch holds `t`'s cell starts at every vertex and its queue, and
-`HITS` holds naturals of `int` range below `n`. -/
+/-- The scratch holds `t`'s cell starts at every vertex and its queue,
+`HITS` holds naturals of `int` range below `n`, and `t`'s partition values are
+in `int` range. -/
 structure Rep {n : Nat} (L : Loc) (t : RefineSt n) (S : Scr) : Prop where
   starts : ∀ v < n, S.w1 v = .Vint (ir t.cellstart[v]!)
   queue : ∀ i < t.queue.size, S.w2 i = .Vint (ir t.queue[i]!)
   w3size : S.w3.size = n
   w3small : ∀ i < n, S.w3[i]! < 2147483648
+  ptnSmall : ∀ i < n, t.ptn[i]! < 2147483648
 
 /-- The temporaries hold `refine_sg`'s arguments, the graph's arrays and `t`'s
 code and queue length. -/
