@@ -43,6 +43,9 @@ structure PAt {n : Nat} (m₀ m₁ m : mem) (S : SLoc) (ctx : Ctx n) (bsr : bloc
   work : WorkMono m₁ m
   grow1 : ∀ z, Mem.valid_block m₁ z → Mem.valid_block m z
   srW : Mem.valid_access m .Mint32 bsr (zOfInt 0) .Freeable
+  /-- `userautomproc`'s block has a permission at offset 0, so it compares
+  unequal to `NULL`. -/
+  ua : Mem.valid_access m .Mint8unsigned S.bUA (zOfInt 0) .Nonempty
 
 /-- `∀ z ∈ [b₁, …], ¬ W z`, from `nw : ∀ z ∈ S.blocks, z ≠ x₁ → z ≠ x₂ → z ≠ x₃ → ¬ W z`
 and the distinctness of `S.blocks`. -/
@@ -89,7 +92,14 @@ theorem PAt.next (c : PCtx m₀ m₁ S e bsr) (h : PAt m₀ m₁ m S ctx bsr st 
   refine ⟨h.search.rebuild hu hL hK hsc hst har hinv,
     ⟨h.frame.1.trans (hu.mono fun z hz => .inl (hb z hz)), fun z hz => hv _ (h.frame.2 z hz)⟩,
     fun z hz => ?_, fun z hz => hv _ (h.grow1 z hz),
-    hu.access _ _ _ _ (fun hz => c.ne_blocks (hb _ hz) rfl) h.srW⟩
+    hu.access _ _ _ _ (fun hz => c.ne_blocks (hb _ hz) rfl) h.srW,
+    hu.access _ _ _ _ (fun hz => by
+      have := hL _ hz
+      simp only [SLoc.wr, wrG, SLoc.wrV, List.mem_append, List.mem_cons, List.mem_nil_iff,
+        or_false] at this
+      have hd := h.search.distinct
+      rcases this with (e | e | e | e | e | e | e | e | e | e | e | e | e) |
+        (e | e | e | e | e | e | e | e | e | e | e | e | e | e) <;> exact absurd e (by sep_ne hd)) h.ua⟩
   rcases hwm z hz with h1 | h1
   · exact h.work z h1
   · exact .inr fun hv1 => h1 (h.grow1 _ hv1)
@@ -106,7 +116,8 @@ theorem PAt.sr (c : PCtx m₀ m₁ S e bsr) (h : PAt m₀ m₁ m S ctx bsr st ns
   refine ⟨h.search.unch hu (fun z hz => c.ne_blocks hz) hwk,
     ⟨h.frame.1.trans (hu.mono fun z hz => .inr (.inl (hz ▸ c.fresh))),
       fun z hz => hv _ (h.frame.2 z hz)⟩,
-    fun z hz => ?_, fun z hz => hv _ (h.grow1 z hz), hw⟩
+    fun z hz => ?_, fun z hz => hv _ (h.grow1 z hz), hw,
+    hu.access _ _ _ _ (fun e => c.ne_blocks (by simp [SLoc.blocks]) e) h.ua⟩
   rcases hwm z hz with h1 | h1
   · exact h.work z h1
   · exact .inr fun hv1 => h1 (h.grow1 _ hv1)
@@ -132,7 +143,19 @@ theorem PAt.call (c : PCtx m₀ m₁ S e bsr) (h : PAt m₀ m₁ m S ctx bsr st 
     · exact absurd h1 (c.ne_blocks hz)
   refine ⟨h.search.rebuildW hu hS hK hsc hst har hinv hwk,
     ⟨h.frame.1.trans (hu.mono fun z hz => ?_), fun z hz => hv _ (h.frame.2 z hz)⟩,
-    fun z hz => ?_, fun z hz => hv _ (h.grow1 z hz), hsrw⟩
+    fun z hz => ?_, fun z hz => hv _ (h.grow1 z hz), hsrw, hu.access _ _ _ _ (fun hW' => by
+      rcases hW _ hW' with h1 | h1 | h1 | h1 | h1
+      · simp only [SLoc.wr, wrG, SLoc.wrV, List.mem_append, List.mem_cons, List.mem_nil_iff,
+          or_false] at h1
+        have hd := h.search.distinct
+        rcases h1 with (e | e | e | e | e | e | e | e | e | e | e | e | e) |
+          (e | e | e | e | e | e | e | e | e | e | e | e | e | e) <;> exact absurd e (by sep_ne hd)
+      · have hd := h.search.distinct
+        simp only [workG, List.mem_cons, List.mem_nil_iff, or_false] at h1
+        rcases h1 with e | e | e | e | e | e | e | e <;> exact absurd e (by sep_ne hd)
+      · exact h.search.work_not h1 (by simp [SLoc.blocks])
+      · exact h1 (hvm _ (by simp [SLoc.blocks]))
+      · exact c.ne_blocks (by simp [SLoc.blocks]) h1) h.ua⟩
   · rcases hW z hz with h1 | h1 | h1 | h1 | h1
     · exact .inl (SLoc.wr_sub S _ h1)
     · exact .inl (workG_blocks S h1)

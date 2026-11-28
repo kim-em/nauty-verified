@@ -54,6 +54,7 @@ theorem wp_nodeProcess {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_
     (hP : Satisfies xi ge (.Internal dense.fn.«nauty:processnode») (processnodeSpec xi S ctx st level nc))
     (hcb : AutomCb xi S.bUA) (hl1 : 1 ≤ level) (hln : level ≤ n) (hncl : nc ≤ n)
     (hlok : LeafOk st) (hval : ∀ z ∈ S.blocks, Mem.valid_block m z)
+    (hua : Mem.perm m S.bUA (zOfInt 0) .Cur .Nonempty)
     {bnc : block} (hen : PTree.get dense.id.numcells e = some (bnc, tint))
     (hncv : Mem.load .Mint32 m bnc (zOfInt 0) = some (.Vint (ir nc)))
     (hge : PTree.get dense.id.«nauty:processnode» e = none)
@@ -83,7 +84,7 @@ theorem wp_nodeProcess {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_
     (vargs := [.Vptr S.bl S.lofs, .Vptr S.bp S.pofs, .Vint (ir level), .Vint (ir nc)])
     (.Internal dense.fn.«nauty:processnode») _ hP rfl ?_ ?_
     (by simp [Common.Globalenvs.Genv.find_funct, funct_processnodeFn]) rfl
-    ⟨rfl, h, hcb, hl1, hln, hncl, hlok, hval⟩ ?_
+    ⟨rfl, h, hcb, hl1, hln, hncl, hlok, hval, hua⟩ ?_
   · simp only [Exec.evalExpr, Exec.lvalOfVar, hge, find_processnodeFn, Exec.derefLoc,
       Cfrontend.Ctypes.access_mode]
   · simp only [Exec.evalExprlist, Exec.evalExpr, hlab, hptn, hlev, typeof, cop, Exec.lvalOfVar, hen,

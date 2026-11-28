@@ -169,6 +169,7 @@ import NautyVerified.Proofs.Search.Processnode.Push
 import NautyVerified.Proofs.Search.Processnode.PushPtn
 import NautyVerified.Proofs.Search.Processnode.PushPerm
 import NautyVerified.Proofs.Search.Processnode.Orb
+import NautyVerified.Proofs.Search.Processnode.Callback
 import NautyVerified.Proofs.Refine.Frame
 import NautyVerified.Proofs.Refine.Trivial
 import NautyVerified.Proofs.Refine.Pop

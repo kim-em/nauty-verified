@@ -112,12 +112,15 @@ structure LeafOk {n : Nat} (st : Search n) : Prop where
 `classify` then `leafExit`. nauty calls `userautomproc` exactly when it counts a
 new generator, so the trace writes the leaf's permutation iff `numgenerators`
 went up. (HexGraphIso's `genTrace` also records code-2 permutations that leave
-the orbits unchanged, which nauty does not report.) -/
+the orbits unchanged, which nauty does not report.) The blocks of `S` are
+valid, and `userautomproc`'s has a permission at offset 0: the C compares the
+pointer with `NULL`. -/
 def processnodeSpec {n : Nat} (xi : ExternalCalls) (S : SLoc) (ctx : Ctx n) (st : Search n)
     (level numcells : Nat) : FunSpec where
   pre args m := args = [.Vptr S.bl S.lofs, .Vptr S.bp S.pofs, .Vint (ir level),
       .Vint (ir numcells)] ∧ SearchAt m S ctx st false false ∧ AutomCb xi S.bUA ∧
-    1 ≤ level ∧ level ≤ n ∧ numcells ≤ n ∧ LeafOk st ∧ (∀ z ∈ S.blocks, Mem.valid_block m z)
+    1 ≤ level ∧ level ≤ n ∧ numcells ≤ n ∧ LeafOk st ∧ (∀ z ∈ S.blocks, Mem.valid_block m z) ∧
+    Mem.perm m S.bUA (zOfInt 0) .Cur .Nonempty
   post _ m t v m' :=
     let r := leafExit (classify ctx level numcells st).1 level (classify ctx level numcells st).2
     v = .Vint (ir (exitValue level r.1).1) ∧
