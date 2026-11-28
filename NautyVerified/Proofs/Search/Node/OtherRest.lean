@@ -15,6 +15,49 @@ open NautyVerified.Source
 open NautyVerified.Proofs.Set (sk)
 open NautyVerified.Proofs.Refine (tv)
 
+/-- `othernode0` after `processnode` and the early return: the short prune, the
+cheap test, the child loop and the final return. -/
+abbrev tail : statement :=
+  (.Ssequence
+                                    (sk prune0)
+                                    (.Ssequence
+                                      (.Ssequence
+                                        (sk
+                                          (.Scall
+                                            (some (idOf 713))
+                                            (.Ederef
+                                              (.Efield
+                                                (.Evar dense.id.«nauty:dispatch»
+                                                  (Tstruct dense.id.«_1027» noattr))
+                                                dense.id.«cheapautom»
+                                                (tptr (tfun [(tptr tint), tint, tint, tint] tint)))
+                                              (tfun [(tptr tint), tint, tint, tint] tint))
+                                            [(.Etempvar dense.id.«ptn» (tptr tint)),
+                                             (tv dense.id.«level»),
+                                             (.Evar dense.id.«nauty:digraph» tint),
+                                             (.Evar dense.id.«nauty:n» tint)]))
+                                        cheap)
+                                      (.Ssequence
+                                        (.Ssequence
+                                          (.Ssequence
+                                            (.Ssequence
+                                              (.Ssequence
+                                                (sk
+                                                  (.Scall
+                                                    (some (idOf 714))
+                                                    (.Evar dense.id.«nextelement»
+                                                      (tfun [(tptr tulong), tint, tint] tint))
+                                                    [(.Etempvar dense.id.«tcell» (tptr tulong)),
+                                                     (.Evar dense.id.«nauty:m» tint),
+                                                     (.Eunop .Oneg (ci 1 tint) tint)]))
+                                                (.Sset (idOf 715) (.Ecast (tv (idOf 714)) tint)))
+                                              (.Sset dense.id.«tv» (tv (idOf 715))))
+                                            (.Sset dense.id.«tv1» (tv (idOf 715))))
+                                          childLoop)
+                                        (sk
+                                          (.Sreturn
+                                            (some (.Ebinop .Osub (tv dense.id.«level») (ci 1 tint) tint)))))))
+
 /-- `othernode0` after its prologue. -/
 abbrev rest : statement :=
   (.Ssequence
@@ -406,45 +449,7 @@ abbrev rest : statement :=
                                       (.Ebinop .Olt (tv dense.id.«rtnlevel») (tv dense.id.«level») tint)
                                       (sk (.Sreturn (some (tv dense.id.«rtnlevel»))))
                                       .Sskip))
-                                  (.Ssequence
-                                    (sk prune0)
-                                    (.Ssequence
-                                      (.Ssequence
-                                        (sk
-                                          (.Scall
-                                            (some (idOf 713))
-                                            (.Ederef
-                                              (.Efield
-                                                (.Evar dense.id.«nauty:dispatch»
-                                                  (Tstruct dense.id.«_1027» noattr))
-                                                dense.id.«cheapautom»
-                                                (tptr (tfun [(tptr tint), tint, tint, tint] tint)))
-                                              (tfun [(tptr tint), tint, tint, tint] tint))
-                                            [(.Etempvar dense.id.«ptn» (tptr tint)),
-                                             (tv dense.id.«level»),
-                                             (.Evar dense.id.«nauty:digraph» tint),
-                                             (.Evar dense.id.«nauty:n» tint)]))
-                                        cheap)
-                                      (.Ssequence
-                                        (.Ssequence
-                                          (.Ssequence
-                                            (.Ssequence
-                                              (.Ssequence
-                                                (sk
-                                                  (.Scall
-                                                    (some (idOf 714))
-                                                    (.Evar dense.id.«nextelement»
-                                                      (tfun [(tptr tulong), tint, tint] tint))
-                                                    [(.Etempvar dense.id.«tcell» (tptr tulong)),
-                                                     (.Evar dense.id.«nauty:m» tint),
-                                                     (.Eunop .Oneg (ci 1 tint) tint)]))
-                                                (.Sset (idOf 715) (.Ecast (tv (idOf 714)) tint)))
-                                              (.Sset dense.id.«tv» (tv (idOf 715))))
-                                            (.Sset dense.id.«tv1» (tv (idOf 715))))
-                                          childLoop)
-                                        (sk
-                                          (.Sreturn
-                                            (some (.Ebinop .Osub (tv dense.id.«level») (ci 1 tint) tint)))))))))))))))))))
+                                  tail))))))))))))
 
 theorem body_rest : body = NautyVerified.Proofs.Search.nodePrologue rest := rfl
 

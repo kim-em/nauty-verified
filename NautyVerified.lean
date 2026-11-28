@@ -157,6 +157,7 @@ import NautyVerified.Proofs.Search.Node.OtherBodySteps
 import NautyVerified.Proofs.Search.Node.OtherCarry
 import NautyVerified.Proofs.Search.Node.OtherEntry
 import NautyVerified.Proofs.Search.Node.OtherRest
+import NautyVerified.Proofs.Search.Node.OtherTail
 import NautyVerified.Proofs.Search.Node.FirstLoop
 import NautyVerified.Proofs.Search.Node.FirstEnd
 import NautyVerified.Proofs.Search.Node.FirstBodySteps
