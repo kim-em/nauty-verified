@@ -18,6 +18,7 @@ import NautyVerified.Proofs.Nextelement.Satisfies
 import NautyVerified.Statement.Dense
 import NautyVerified.Statement.Compiler
 import NautyVerified.Statement.Compose
+import NautyVerified.Statement.DenseOf
 import NautyVerified.Logic.Array
 import NautyVerified.Logic.Grow
 import NautyVerified.Logic.Ints

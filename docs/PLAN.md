@@ -405,53 +405,26 @@ Conventions settled while doing these:
   `testcanlabSpec` keeps the block holding `samerows` (`Keep`), so `sr` can
   be freed.
 
-- `densenauty` and `nauty()` (`Proofs/Top/`). `densenauty_satisfies`
-  proves the harness's `densenautySpec` from `nauty` against `nautySpec`
-  (`Top/Spec.lean`: `densenautySpec`'s memory plus the reallocated `dnwork`
-  pair; its post is `densenautySpec`'s, and `options->digraph` stays writable
-  for the write-back). The loop scan is `wp_scanLoop` (HexGraphIso's graphs
-  are loopless). `nauty()`'s body is factored by stage (`Top/NautySyntax.lean`:
-  `tSizes`, `tZero`, `tMain`, `tAlloc`, `tTc`, `tOpts`, `tPtn`, `tInit`,
-  `tOrbits`, `tStats`, `tWork`, `tRoot`, `tPost`, `tFree`); `tAlloc` is done
-  (`wp_tAlloc`, over the generic `Alloc.wp_dynSeq` for a run of `DYNALLOC1`s
-  from capacity 0, with sizes read through `Alloc.wp_dynalloc1G`). Still to
-  prove for `nauty()`: the dispatch struct copy (`dispatch =
-  *options->dispatch`, a byte copy of 11 function pointers) and the `refine1`
-  substitution for `m = 1`; the size checks and the `n == 0` test (false);
-  `nautil_check` and `dispatch.check` (`naugraph_check`) as calls that return;
-  the target-cell list reset (`alloc_m = 0 < m`, empty list); the option
-  copies; ptn normalisation to `NAUTY_INFINITY` and the active set from the
-  cells; orbits, statistics, `fixedpts` and workspace initialisation, giving
-  `SearchAt … (initialC …) true false` for the root call
-  (`firstpathnodeSpecG` with `SearchInf.nodeOk_root`); `updatecan` and the copy
-  of `canonlab` into `lab`; the `n >= 320` release through the three
-  `*_freedyn` functions; `dispatch.cleanup = NULL`.
-
-Open dense pieces (state of main at 70aa43a):
-
-- `processnode_satisfies` (`Proofs/Search/Processnode/`): `classify` part,
-  cases 2-4 and the callback pieces proved; left: case 1 and the case
-  assembly, the `maxlevel` clamp, the `pruneReturn` tail, the switch, the
-  `sr` local, the theorem.
-- `firstpathnode_body` (`Proofs/Search/Node/`): `wp_nodeVisit` (doref and
-  the rebuild), `recordFirst`, the target cell and `firsttc` proved; left:
-  locals and `tcalloc`, the leaf via `firstterminal`, the kill read,
-  `cheapautom`, the child loop against `sweep_true_some`/`firstChild`, the
-  tail, and the chain-freshness conjunct of the post.
-- `othernode_body`: every child-loop step proved (`wp_nodeBreakout`,
-  `wp_fixAdd`/`Del`, `wp_nodeChild`, `wp_prune0`, `wp_nodeLong`,
-  `wp_nodeRecover`, `wp_nodeNext`); left: the loop invariant, the body
-  assembly, then `nodes_satisfies` by induction on `n + 2 - level`. Its
-  output is `Emits t (Em …)` for an abstract `Em` obeying `EmLawOff` /
-  `EmLawFirst` (`Node/Em.lean`), proved for HexGraphIso's `emitted` after the
-  re-pin.
-- Hex facts at the `processnode` call (`LeafOk` of the classified state,
-  `SInv` after `breakout`): in progress (`Spec/NodeProc.lean`).
-- `nauty()` (`Proofs/Top/`): head, sizes, allocations, target-cell reset
-  proved; left: option copies, `ptn`/active, orbits/stats/workspace
-  initialisation, the root call (establishing `SearchAt … (initialC …)`),
-  `updatecan` and the `canonlab` copy, `freedyn`, the composition; then the
-  `Writes`→`Emits` switch in `densenautySpec` together with `main`.
+- `densenauty`, `nauty()` and `main` are proved. `densenauty_satisfies`
+  (`Proofs/Top/Densenauty.lean`) proves the harness's `densenautySpec` from
+  `nauty` against `nautySpec` (`Top/Spec.lean`: `densenautySpec`'s memory plus
+  the reallocated `dnwork` pair; `options->digraph` stays writable for the
+  write-back); the loop scan is `wp_scanLoop` (HexGraphIso's graphs are
+  loopless). `nauty_satisfies` (`Proofs/Top/Nauty.lean`) composes `nauty()`'s
+  stages (`Top/NautySyntax.lean`: `tSizes`, `tZero`, `tMain`, `tAlloc`, `tTc`,
+  `tOpts`, `tPtn`, `tInit`, `tOrbits`, `tStats`, `tWork`, `tRoot`, `tPost`,
+  `tFree`), each proved in its own `Top/` file, with the root call through
+  `nodes_satisfies` (`Proofs/Search/Node/Nodes.lean`: `firstpathnode_body`
+  and `othernode_body` by induction on the level) from `SearchAt …
+  (initialC …)` (`SearchInf.nodeOk_root`). `main_ok` gives `main`'s
+  `mainSpec` (`Proofs/Harness/Main.lean`: reads `ins`, writes `expected G`,
+  returns 0) from `main_satisfies` and `densenauty_ok`.
+- The search's output is stated as `Emits t (Em …)` for an abstract emission
+  function `Em` obeying `EmLawOff` / `EmLawFirst` (`Search/Node/Em.lean`).
+  `main_ok` and everything above it take `Em`, the laws, `Em`'s value at the
+  root (`gensWords gens n`) and `gensWords gens n = autosWords G` as
+  hypotheses. They are discharged for HexGraphIso's `TraceRun.emitted` after
+  the re-pin of hex-graph-iso (Phase 6).
 
 ## Phase 6: dense end-to-end
 
@@ -473,15 +446,33 @@ binary. Decisions taken with Kim on the final statement (2026-11-27):
   regardless. `expected` must write HexGraphIso's emitted sequence
   (`SearchState.emitted`, hex-dev PR #11048); nauty-verified re-pins
   hex-graph-iso to the release containing it and switches `expected` to
-  `TraceRun.emitted`. Until then the C-side specs state the trace directly
-  (`genWords workperm n` exactly when `numgenerators` increases), which holds
-  for both versions.
+  `TraceRun.emitted`. The C-side specs state the trace through an abstract
+  emission function (`processnode`: `genWords workperm n` exactly when
+  `numgenerators` increases; the search: `Em` obeying `EmLawOff` /
+  `EmLawFirst`), which holds for both versions.
 
 Compose Phase 5 with Phase 3 into `densenauty_binary_correct`; derive the
 corollaries from `HexGraphIso` (`canon_iso`, `canon_invariant`,
 `iso_iff_canon_eq`, `Aut.complete`, `autos_sameOrbit`) and, in the
 Corollaries lib, `hex-graph-iso-theory`'s Mathlib-facing forms.
 `#print axioms` must show only `propext`, `Classical.choice`, `Quot.sound`.
+
+Status: `densenauty_binary_correct_of` (`Statement/DenseOf.lean`) proves
+`densenauty_binary_correct`'s statement from `main_ok`'s hypotheses on the
+emitted words (an `Em` obeying `EmLawOff` and `EmLawFirst`, its root value
+`gensWords gens n`, and `gensWords gens n = autosWords G`), axiom-clean.
+`init_mem_some` gives the initial memory (CompCert's `init_mem_exists`, its
+alignment and symbol conditions checked by the kernel as `initOk_prog`),
+`exec_of_main` turns a `Satisfies` of `main` from it into an execution from
+the initial state to `main`'s return, and `binary_of_execution`
+(`Statement/Compose.lean`) carries that execution to every behaviour of the
+binary. `densenauty_binary_correct` stays `sorry` until the emission
+hypotheses are discharged.
+
+Remaining: re-pin hex-graph-iso to the release with `TraceRun.emitted`,
+switch `expected` to it, and prove `EmLawOff`/`EmLawFirst`, the root value
+and `hgens` for it, which closes `densenauty_binary_correct`; then the
+corollaries (`canonWords_eq_iff`, `orbits_correct`) and Phase 7.
 
 Initial memory (`Proofs/Init/Tables.lean`, done): `globals` turns Clight's
 `initial_state` fact `Genv.init_mem prog = some m` into `Globals m`: the four
