@@ -268,10 +268,14 @@ structure NodeLaws (L : PolicyLink O n) (G : O.Gr n) where
   /-- `PartOk.visit`'s partition facts. -/
   visit_part : ∀ {first level nc st}, NodeOk first level nc st →
     PartFactsG n level (P.visit G level nc st).1 (P.visit G level nc st).2.2
-  /-- `PartFacts.target_lt`: the target cell of a refined node with fewer than `n` cells. -/
+  /-- `Bestcell.targetcell_mem`: the target cell of a refined node with fewer than `n`
+  cells is a vertex starting a nontrivial cell (what nautil.c's cell scan in
+  `maketargetcell` needs). -/
   target_lt : ∀ {first level nc st}, NodeOk first level nc st → (P.visit G level nc st).1 < n →
     ∀ hint : Int, hint < n →
-      O.targetcell G (P.visit G level nc st).2.2.lab (P.visit G level nc st).2.2.ptn level 100 hint < n
+      O.targetcell G (P.visit G level nc st).2.2.lab (P.visit G level nc st).2.2.ptn level 100 hint < n ∧
+        level < (P.visit G level nc st).2.2.ptn[O.targetcell G (P.visit G level nc st).2.2.lab
+          (P.visit G level nc st).2.2.ptn level 100 hint]!
   /-- `nodeOk_sweepFirst`. -/
   first_start : ∀ {level nc st}, NodeOk true level nc st →
     let v := P.visit G level nc st
@@ -371,10 +375,11 @@ def denseLaws (G : Colored n k) (ctx : Ctx n) (hn0 : 0 < n) (hn : n + 2 < nautyI
   visit_inv h hs := (SInv.visitSt hn0 hn hs.dense h ctx).toG
   visit_part h := ((PartOk.visit hn0 hn
     (by obtain ⟨⟨_, _, _, h1, _⟩, _⟩ := h; exact h1) (PartOk.of_nodeOk hn h) ctx).facts hn0 hn).toG
-  target_lt h hlt hint hh :=
-    PartFacts.target_lt (ctx := ctx) (tcLevel := 100) ((PartOk.visit hn0 hn
-      (by obtain ⟨⟨_, _, _, h1, _⟩, _⟩ := h; exact h1) (PartOk.of_nodeOk hn h) ctx).facts hn0 hn)
-      (by obtain ⟨⟨_, _, _, h1, _⟩, _⟩ := h; exact h1) hlt hint hh
+  target_lt {_ level _ _} h hlt hint hh := by
+    have h1 : 1 ≤ level := by obtain ⟨⟨_, _, _, h1, _⟩, _⟩ := h; exact h1
+    have hp := (PartOk.visit hn0 hn h1 (PartOk.of_nodeOk hn h) ctx).facts hn0 hn
+    obtain ⟨x, hx, hgt⟩ := exists_gt_of_bcount (hp.count ▸ hlt)
+    exact Bestcell.targetcell_mem ctx _ _ _ 100 hint hp.ptnSize (Nat.le_trans hp.ptnLast h1) hh hx hgt
   first_start h := nodeOk_sweepFirst hn0 hn h ctx 100
   first_child h := sweepOkFirst_child hn0 h ctx 100
   first_next fuel h hd := by
