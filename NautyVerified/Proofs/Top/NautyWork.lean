@@ -67,6 +67,8 @@ theorem wp_tWork {Q : Post} {le : temp_env} {m : mem} {S : SLoc} {M : Nat} {bD :
       FieldAt m' .Mint64 Search.Block.invsuccesses 0 (.Vlong (lr 0)) →
       FieldAt m' .Mint64 Search.Block.invapplics 0 (.Vlong (lr 0)) →
       (∀ c o p, Mem.valid_access m c S.bst o p → Mem.valid_access m' c S.bst o p) →
+      (∀ c (o : _root_.Int) v, o + csize c ≤ S.sb + 20 ∨ S.sb + 24 ≤ o →
+        FieldAt m c S.bst o v → FieldAt m' c S.bst o v) →
       Unch m m' (fun z => z = S.bst ∨ z = Search.Block.workspace ∨ z = Search.Block.worktop ∨
         z = Search.Block.fmptr ∨ z = Search.Block.needshortprune ∨ z = Search.Block.invarsuclevel ∨
         z = Search.Block.invsuccesses ∨ z = Search.Block.invapplics) →
@@ -216,7 +218,9 @@ theorem wp_tWork {Q : Post} {le : temp_env} {m : mem} {S : SLoc} {M : Nat} {bD :
     (((hN5.unch hu6 (by decide)).unch hu7 (by decide)).unch hu8 (by decide))
     ((hI6.unch hu7 (by decide)).unch hu8 (by decide)) (hS7.unch hu8 (by decide)) hA8
     (fun c o p h => ha8 _ _ _ _ (ha7 _ _ _ _ (ha6 _ _ _ _ (ha5 _ _ _ _ (ha4 _ _ _ _
-      (ha3 _ _ _ _ (ha2 _ _ _ _ (ha1 _ _ _ _ h)))))))) hU
+      (ha3 _ _ _ _ (ha2 _ _ _ _ (ha1 _ _ _ _ h))))))))
+    (fun c o v ho h => k48 ((((h.unch hu1 hq1).unch hu2 hq2).unch hu3 hq3).store_other hs4
+      (by have : csize .Mint32 = 4 := rfl; omega)) hq4 hq5 hq6 hq7) hU
     (fun z h => hv8 _ (hv7 _ (hv6 _ (hv5 _ (hv4 _ (hv3 _ (hv2 _ (hv1 _ h))))))))
     (fun x hx => temps_gso _ _ hx)
 

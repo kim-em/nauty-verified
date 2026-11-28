@@ -74,6 +74,7 @@ theorem wp_tStats {Q : Post} {le : temp_env} {m : mem} {S : SLoc} {n M : Nat} {b
       ArrayAt m' .Mint64 bF 0 (Set.longs fun _ => lr 0) M →
       IntAt m' Search.Block.noncheaplevel 1 → IntAt m' Search.Block.eqlevCanon (-1) →
       (∀ c o p, Mem.valid_access m c S.bst o p → Mem.valid_access m' c S.bst o p) →
+      Alloc.Keep m m' bF →
       Unch m m' (fun z => z = S.bst ∨ z = bF ∨ z = Search.Block.noncheaplevel ∨
         z = Search.Block.eqlevCanon) →
       (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
@@ -212,7 +213,7 @@ theorem wp_tStats {Q : Post} {le : temp_env} {m : mem} {S : SLoc} {n M : Nat} {b
   wp_step
   refine Set.wp_emptySetGE (by decide) rfl find_nautyFixedpts hF8 (Ne.symm hf2) (hfw.unch hU8 (Ne.symm hb5))
     hM0 hM (Search.eval_gint (e := nEnv bI) rfl Search.find_m (hMm.unch hU8 (Ne.symm hb3))) rfl ?_
-  intro le9 m9 hfw9 hu9 _ _ hv9 ho9
+  intro le9 m9 hfw9 hu9 _ hk9 hv9 ho9
   simp only [seqPost, Post.after, E0_append]
   wp_step; wp_step; wp_step
   refine wp_gset (v := .Vint (ir 1)) rfl Search.find_noncheaplevel rfl
@@ -234,7 +235,9 @@ theorem wp_tStats {Q : Post} {le : temp_env} {m : mem} {S : SLoc} {n M : Nat} {b
     (ha11 _ _ _ _ (ha10 _ _ _ _ (hu9.access _ _ _ _ hb5
       (hA8 _ _ _ _ (hva _ _ (by decide) (by decide) ⟨zOfInt 10, rfl⟩)))))
     (k F8_48) (k F8_56) ((hfw9.unch hu10 hf3).unch hu11 hf4) (hN10.unch hu11 (by decide)) hE11
-    (fun c o p h => ha11 _ _ _ _ (ha10 _ _ _ _ (hu9.access _ _ _ _ hb5 (hA8 _ _ _ _ h)))) hU
+    (fun c o p h => ha11 _ _ _ _ (ha10 _ _ _ _ (hu9.access _ _ _ _ hb5 (hA8 _ _ _ _ h))))
+    (((Alloc.Keep.unch hU8 hb5.symm).trans hk9).trans
+      ((Alloc.Keep.unch hu10 hf3).trans (Alloc.Keep.unch hu11 hf4))) hU
     (fun z hz => hv11 _ (hv10 _ (hv9 _ (Mem.store_valid_block_1 _ _ _ _ _ _ hs8 _ (Mem.store_valid_block_1 _ _ _ _ _ _ hs7 _ (Mem.store_valid_block_1 _ _ _ _ _ _ hs6 _ (Mem.store_valid_block_1 _ _ _ _ _ _ hs5 _ (Mem.store_valid_block_1 _ _ _ _ _ _ hs4 _ (Mem.store_valid_block_1 _ _ _ _ _ _ hs3 _ (Mem.store_valid_block_1 _ _ _ _ _ _ hs2 _ (Mem.store_valid_block_1 _ _ _ _ _ _ hs1 _ (hz)))))))))))) ho9
 
 

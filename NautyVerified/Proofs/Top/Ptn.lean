@@ -600,6 +600,7 @@ theorem wp_tPtn {Q : Post} {le : temp_env} {m : mem} {bp bA : block} {n M : Nat}
       PTree.get dense.id.«numcells» le' = some (.Vint (ir ends.length)) →
       (∃ aw' : Nat → Lib.Integers.int64, ArrayAt m' .Mint64 bA 0 (Set.longs aw') M ∧
         SetRep (fun w => bv64 (aw' w)) M (initActive n ends)) →
+      Alloc.Keep m m' bA →
       Unch m m' (fun z => z = bp ∨ z = bA) → (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
       (∀ x, x ≠ dense.id.«i» → x ≠ dense.id.«numcells» → x ≠ dense.id.«es___1» → x ≠ idOf 731 →
         PTree.get x le' = PTree.get x le) →
@@ -663,7 +664,7 @@ theorem wp_tPtn {Q : Post} {le : temp_env} {m : mem} {bp bA : block} {n M : Nat}
   wp_step
   refine Set.wp_emptySetGE (by decide) rfl find_nautyActive hA2 (Ne.symm hAa) haw2 hM0 (by omega)
     (Search.eval_gint (e := (nEnv bI)) rfl Search.find_m (hMm.unch hu12 (Ne.symm hpm))) rfl ?_
-  intro le3 m3 haw3 hu3 _ _ hg3 ho3
+  intro le3 m3 haw3 hu3 _ hk3 hg3 ho3
   simp only [seqPost, Post.after, E0_append]
   have hu23 : Unch m m3 (fun z => z = bp ∨ z = bA) :=
     (hu12.mono fun _ h => .inl h).trans (hu3.mono fun _ h => .inr h)
@@ -678,7 +679,7 @@ theorem wp_tPtn {Q : Post} {le : temp_env} {m : mem} {bp bA : block} {n M : Nat}
   intro le4 m4 aw4 haw4 hrep4 hu4 hk4 hg4 ho4
   simp only [E0_append]
   refine hQ le4 m4 ((harr2.unch hu3 hpA).unch hu4 hpA) ?_ ⟨aw4, haw4, hrep4⟩
-    (hu23.trans (hu4.mono fun _ h => .inr h)) (fun z hz => hg4 _ (hg3 z (hg2 z (hg1 z hz)))) ?_
+    (((Alloc.Keep.unch hu12 hpA.symm).trans hk3).trans hk4) (hu23.trans (hu4.mono fun _ h => .inr h)) (fun z hz => hg4 _ (hg3 z (hg2 z (hg1 z hz)))) ?_
   · rw [ho4 _ (by decide), ho3 _ (by decide) (by decide)]; exact hnc2
   · intro x h1 h2 h3 h4
     rw [ho4 _ h1, ho3 _ h3 h4, ho2 _ h1 h2, temps_gso _ _ h2]

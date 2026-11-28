@@ -1,4 +1,5 @@
 import NautyVerified.Proofs.Harness.Phases
+import NautyVerified.Proofs.Harness.Facts
 import NautyVerified.Statement.Dense
 
 /-!
@@ -9,8 +10,8 @@ import NautyVerified.Statement.Dense
 orientation, so the edge count fits in an `int`), `main` returns 0 with a trace whose reads
 are `ins` and whose writes are `Statement.expected G`, given that
 `densenauty` satisfies `densenautySpec` for the generators `gens` whose
-words are `expected`'s first block, and the facts `ResultFacts G` about
-HexGraphIso's result (sizes, and entries that fit in an `int`).
+words are `expected`'s first block. The facts about HexGraphIso's result that
+the output loops need (`ResultFacts G`) are `resultFacts`.
 -/
 
 namespace NautyVerified.Proofs.Harness
@@ -223,7 +224,7 @@ set_option maxRecDepth 100000 in
 theorem main_satisfies {n k : Nat} (G : Colored n k) (gens : List (Array Nat)) (ins : List Int)
     (hins : Statement.Encodes G ins) (hn0 : 0 < n) (hmax : n ≤ Statement.maxN)
     (hkmax : k ≤ Statement.maxN)
-    (hfacts : ResultFacts G) (hgens : gensWords gens n = autosWords G)
+    (hgens : gensWords gens n = autosWords G)
     (hdn : ∀ bg bl bp bo bst bc, Satisfies Statement.xi ge (.Internal dense.fn.densenauty)
       (densenautySpec G gens bg bl bp bo bst bc)) :
     Satisfies Statement.xi ge (.Internal dense.fn.main) (mainSpec G ins) := by
@@ -371,7 +372,7 @@ theorem main_satisfies {n k : Nat} (G : Colored n k) (gens : List (Array Nat)) (
     have hfree6 := Unch.range_perm f6.unch d06 <| Unch.range_perm f5.unch d05 <|
       Unch.range_perm f4.unch d04 <| Unch.range_perm f3.unch d03 <| Unch.range_perm f2.unch d02 <|
       Unch.range_perm f1.unch d01 hfree
-    refine wp_phases G gens es hne hadj hn0 hmax hk hfacts (hdn _ _ _ _ _ _) hm₀ S6.1 S6.2 ?_ ?_ hfree6
+    refine wp_phases G gens es hne hadj hn0 hmax hk (resultFacts G hN) (hdn _ _ _ _ _ _) hm₀ S6.1 S6.2 ?_ ?_ hfree6
       (by simp (config := {decide := true}) only [temps_gso]; exact hn)
       (by simp (config := {decide := true}) only [temps_gso, temps_gss])
       (by simp (config := {decide := true}) only [temps_gso, temps_gss])
