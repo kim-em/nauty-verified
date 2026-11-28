@@ -107,7 +107,7 @@ theorem wp_nodeLong {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_env
       SetRep (fun w => bv64 (tw' w)) S.M
         (if v == v1 then longprune cell st.fixedpts st.autos else cell) →
       Unch m m' (fun z => z = btc) →
-      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) → Q.normal E0 e le m') :
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) → Alloc.Keep m m' btc → Q.normal E0 e le m') :
     Wp xi ge f longIf Q e le m := by
   have hnl := h.nlt
   have hM1 := h.M1
@@ -156,7 +156,7 @@ theorem wp_nodeLong {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_env
         Program.find_nautyFixedpts, find_workspace, find_fmptr, find_m, Exec.derefLoc,
         Cfrontend.Ctypes.access_mode, Mem.loadv, show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl,
         hF1, h.fixed.workspace.load, hfm.load, h.fixed.mm.load, typeof, cop, Alloc.Mptr_eq]
-    rintro t _ m₂ ⟨⟨rfl, tw', harr₂, hr₂, hu₂, -⟩, hg₂⟩
+    rintro t _ m₂ ⟨⟨rfl, tw', harr₂, hr₂, hu₂, hka₂⟩, hg₂⟩
     have h₂ := h.unch hu₂ (fun z hz he => hbS (he ▸ hz)) (fun z hz he => hbW (he ▸ hz))
     simp only [seqPost, Post.after, E0_append]
     wp_step; wp_step
@@ -165,11 +165,11 @@ theorem wp_nodeLong {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_env
     simp only [typeof, cop]
     rw [ite_eq_right (by decide)]
     apply wp_skip
-    refine hQ m₂ tw' h₂ harr₂ ?_ hu₂ hg₂
+    refine hQ m₂ tw' h₂ harr₂ ?_ hu₂ hg₂ (hka₂ btc)
     simpa using hr₂
   · simp only [Int.ofNat_inj, hvv, decide_false, Bool.false_eq_true, ite_false]
     apply wp_skip
     have : (v == v1) = false := by simpa using hvv
-    exact hQ m tw h htw (by rw [this]; exact hrep) (Unch.refl _ _) fun _ h => h
+    exact hQ m tw h htw (by rw [this]; exact hrep) (Unch.refl _ _) (fun _ h => h) (Alloc.Keep.refl _ _)
 
 end NautyVerified.Proofs.Search

@@ -328,7 +328,8 @@ theorem LoopAt.step {L : LCtx n} {m : mem} {st : Search n} {pre nsp : Bool} {cel
     (hg : ∀ z, Mem.valid_block m z → Mem.valid_block m' z)
     (hW : ∀ z, IsWork m' z → IsWork m z ∨ ¬ Mem.valid_block m z)
     (hc : ∃ tw, ArrayAt m' .Mint64 L.btc 0 (longs tw) L.S.M ∧
-      SetRep (fun w => bv64 (tw w)) L.S.M cell') :
+      SetRep (fun w => bv64 (tw w)) L.S.M cell')
+    (hkc : Alloc.Keep m m' L.btc) :
     LoopAt L m' st' pre' nsp' cell' ch := by
   have hloc : ∀ z ∈ L.locals, ¬ stepSet m L.S L.btc z := by
     intro z hz
@@ -383,7 +384,7 @@ theorem LoopAt.step {L : LCtx n} {m : mem} {st : Search n} {pre nsp : Bool} {cel
       k := ⟨vk, hk.unch hu (hloc _ (.inr (.inr (.inl rfl))))⟩
       chain :=
         { hc0 with
-          chain := TcChain.setCell hu (by obtain ⟨tw, ha, -⟩ := hc; exact ⟨_, ha⟩) hc0.chain hT
+          chain := TcChain.setCell hu (by obtain ⟨tw, ha, -⟩ := hc; exact ⟨_, ha⟩) hkc hc0.chain hT
             (fun e => (hok.apart _ hmem).2.1 (e ▸ by simp [SLoc.blocks]))
             (fun p hp e => by
               have ⟨i, hi⟩ := List.mem_iff_getElem?.1 hp

@@ -243,12 +243,15 @@ structure WorkAt (n : Nat) (m : mem) (S : SLoc) (fixedBlocks : List block) : Pro
     (0 < capN → 0 < capS → bN ≠ bS) ∧ (0 < capN → 0 < capB → bN ≠ bB)
 
 /-- The target-cell list from `tcnode0`: node `i` (a `tcnode`, `next` at 0 and
-`tcellptr` at 8) owns the `M`-word target cell of level `i + 1`. -/
+`tcellptr` at 8) owns the `M`-word target cell of level `i + 1`. Both blocks
+are as `malloc` made them (16 and `8 * M` bytes), so nauty's final `free`s
+succeed. -/
 def TcChain (m : mem) (M : Nat) (prev : block) : List (block × block) → Prop
   | [] => FieldAt m .Mint64 prev 0 Vnullptr
   | (nd, tc) :: rest => FieldAt m .Mint64 prev 0 (.Vptr nd Ptrofs.zero) ∧
       FieldAt m .Mint64 nd 8 (.Vptr tc Ptrofs.zero) ∧
-      (∃ vals, ArrayAt m .Mint64 tc 0 vals M) ∧ TcChain m M nd rest
+      (∃ vals, ArrayAt m .Mint64 tc 0 vals M) ∧
+      (Alloc.Malloced m nd 16 ∧ Alloc.Malloced m tc (8 * M)) ∧ TcChain m M nd rest
 
 /-- The blocks the search may not confuse: the caller's, nauty.c's arrays, and
 the globals and tables it reads. -/

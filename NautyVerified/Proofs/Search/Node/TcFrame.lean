@@ -5,7 +5,8 @@ import NautyVerified.Proofs.Search.Node.Prune
 # The target-cell list across a node's own steps
 
 - `TcChain.setCell`: after a change to some blocks outside the list, and to
-  one target cell `c` that still holds `M` words, the list is unchanged;
+  one target cell `c` that still holds `M` words and keeps its `malloc` header
+  and permissions, the list is unchanged;
 - `TcOk.mono`: the list's blocks stay valid and apart from `S` and from the
   work arrays when every new work block was a work block or not valid before.
 -/
@@ -18,22 +19,26 @@ open CompCert4Lean.Foundation.Numbers.Rocq.Coq CompCert4Lean.Lib.Integers
 open NautyVerified NautyVerified.Logic NautyVerified.Program
 
 theorem TcChain.setCell {m m' : mem} {M : Nat} {W : block → Prop} (hu : Unch m m' W) {c : block}
-    (hc : ∃ vals, ArrayAt m' .Mint64 c 0 vals M) :
+    (hc : ∃ vals, ArrayAt m' .Mint64 c 0 vals M) (hk : Alloc.Keep m m' c) :
     ∀ {prev : block} {chain : List (block × block)}, TcChain m M prev chain →
       (∀ z ∈ tcBlocks prev chain, z ≠ c → ¬ W z) → prev ≠ c →
       (∀ p ∈ chain, p.1 ≠ c) → TcChain m' M prev chain
   | _, [], h, hS, hp, _ => h.unch' hu (hS _ (.head _) hp)
   | prev, (nd, tc) :: rest, h, hS, hp, h1 => by
-    obtain ⟨f1, f2, ⟨vals, f3⟩, f4⟩ := h
+    obtain ⟨f1, f2, ⟨vals, f3⟩, ⟨k1, k2⟩, f4⟩ := h
     have hnd : nd ≠ c := h1 (nd, tc) (.head _)
     have mnd : nd ∈ tcBlocks prev ((nd, tc) :: rest) := by simp [tcBlocks]
     have mtc : tc ∈ tcBlocks prev ((nd, tc) :: rest) := by simp [tcBlocks]
     refine ⟨f1.unch' hu (hS _ (.head _) hp), f2.unch' hu (hS nd mnd hnd), ?_,
-      TcChain.setCell hu hc f4 (fun z hz hzc => hS z ?_ hzc) hnd
+      ⟨k1.keep (Alloc.Keep.unch hu (hS nd mnd hnd)), ?_⟩,
+      TcChain.setCell hu hc hk f4 (fun z hz hzc => hS z ?_ hzc) hnd
         (fun p hp' => h1 p (.tail _ hp'))⟩
     · by_cases htc : tc = c
       · subst htc; exact hc
       · exact ⟨vals, f3.unch hu (hS tc mtc htc)⟩
+    · by_cases htc : tc = c
+      · subst htc; exact k2.keep hk
+      · exact k2.keep (Alloc.Keep.unch hu (hS tc mtc htc))
     · simp only [tcBlocks, List.mem_cons, List.flatMap_cons, List.mem_append] at hz ⊢
       rcases hz with rfl | hz
       · exact .inr (.inl (.inl rfl))

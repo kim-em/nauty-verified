@@ -65,7 +65,7 @@ theorem wp_fpnPruneRec {f : function} {Q : Post} {e : env} {le : temp_env} {m : 
   have hl1 := h.chain.lvl
   wp_step; wp_step; wp_step
   refine wp_prune0 h.search g1 g2 g3 g4 htl hta htr hbS hbW hnz ?_
-  intro m₁ tw' hS₁ hta' htr' hu₁ hg₁
+  intro m₁ tw' hS₁ hta' htr' hu₁ hg₁ hk₁
   have hWw : ∀ z ∈ workG8, ¬ (z = Block.needshortprune ∨ z = L.btc) := by
     intro z hz hW
     have hzS : z ∈ L.S.blocks := by
@@ -80,7 +80,7 @@ theorem wp_fpnPruneRec {f : function} {Q : Post} {e : env} {le : temp_env} {m : 
         · exact .inl ⟨by simp [SLoc.blocks], by sep_ne h.search.distinct, by decide⟩
         · exact .inr (.inr (.inr rfl)))
       hg₁ (fun z hz => .inl (IsWork.back h.search hu₁ hWw hz))
-      ⟨tw', hta', htr'⟩
+      ⟨tw', hta', htr'⟩ hk₁
   simp only [seqPost, Post.after, E0_append]
   refine wp_nodeRecover h₁.search g5 hptn hlev hl1 hln ?_
   intro m₂ hS₂ hF₂ hW₂
@@ -95,7 +95,8 @@ theorem wp_fpnPruneRec {f : function} {Q : Post} {e : env} {le : temp_env} {m : 
       rcases hz with hz | hz | hz
       · exact .inl hz
       · exact .inr (.inl hz)
-      · exact .inr (.inr (.inl hz))) hF₂.2 hW₂ ⟨tw₁, hta₁.unch hF₂.1 hbS', htr₁⟩)
+      · exact .inr (.inr (.inl hz))) hF₂.2 hW₂ ⟨tw₁, hta₁.unch hF₂.1 hbS', htr₁⟩
+      (Alloc.Keep.unch hF₂.1 hbS'))
 
 set_option maxHeartbeats 4000000 in
 /-- `DELELEMENT(fixedpts, tv); if (rtnlevel < level) return rtnlevel;` then the prune and

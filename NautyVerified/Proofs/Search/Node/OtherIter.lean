@@ -125,7 +125,7 @@ theorem Carry.unch {m₀ m m' : mem} {S : SLoc} {ctx : Ctx n} {st : Search n} {p
     (c : Carry m₀ m S chain₀ chain level nc tc nd bt L)
     {W : block → Prop} (hu : Unch m m' W) (hg : ∀ z, Mem.valid_block m z → Mem.valid_block m' z)
     (hW : ∀ z, W z → (z ∈ S.blocks ∧ z ≠ S.bUA ∧ z ≠ Block.tcnode0 ∧ z ∉ workG) ∨ z = bt)
-    (hbt : ∃ vals, ArrayAt m' .Mint64 bt 0 vals S.M) :
+    (hbt : ∃ vals, ArrayAt m' .Mint64 bt 0 vals S.M) (hk : Alloc.Keep m m' bt) :
     Carry m₀ m' S chain₀ chain level nc tc nd bt L ∧ WorkMono m m' := by
   obtain ⟨btS, btW, btV, -, -⟩ := c.ntc
   have notW : ∀ z, z ∉ S.blocks → z ≠ bt → ¬ W z := fun z hz hb hw => by
@@ -149,7 +149,7 @@ theorem Carry.unch {m₀ m m' : mem} {S : SLoc} {ctx : Ctx n} {st : Search n} {p
     WorkMono.trans c.wm c.frame.grow wm, hg _ c.uaV, ?_, c.l1⟩, wm⟩
   · rw [hu.load _ _ _ (hbn _ (by simp))]; exact c.ncv
   · rw [hu.load _ _ _ (hbn _ (by simp))]; exact c.tcv
-  · refine TcChain.setCell hu hbt c.tcc ?_ ?_ ?_
+  · refine TcChain.setCell hu hbt hk c.tcc ?_ ?_ ?_
     · intro z hz hzb
       simp only [tcBlocks, List.mem_cons] at hz
       rcases hz with rfl | hz
@@ -427,6 +427,7 @@ theorem wp_otherIter {k : Nat} {G : Colored n k} {Em : Bool → Nat → Nat → 
     rcases hz with h | h | h | h <;> exact btS (h ▸ by simp [SLoc.blocks])
   have htw2 := htw.unch hu12 bt12
   obtain ⟨c2, -⟩ := c.unch hLS hS hu12 (fun z hz => hg2 _ (hg1 _ hz)) (fun z hz => vS z hz) ⟨_, htw2⟩
+    (Alloc.Keep.unch hu12 bt12)
   have hlen : level ≤ chain.length := by
     have := c.own; rw [List.getElem?_eq_some_iff] at this; obtain ⟨hlt, -⟩ := this; omega
   -- the child
@@ -465,7 +466,7 @@ theorem wp_otherIter {k : Nat} {G : Colored n k} {Em : Bool → Nat → Nat → 
   have bt4 : ¬ bt = S.bF := fun h => btS (h ▸ by simp [SLoc.blocks])
   have htw4 := htw3.unch hu4 bt4
   obtain ⟨c4, -⟩ := c3.unch hLS h3 hu4 hg4
-    (fun z hz => vS z (.inr (.inr (.inr hz)))) ⟨_, htw4⟩
+    (fun z hz => vS z (.inr (.inr (.inr hz)))) ⟨_, htw4⟩ (Alloc.Keep.unch hu4 bt4)
   have hcap : 0 < r.2.wsCap := by rw [h3.inv.wsCap]; decide
   have hshort : ∀ tg, r.1 = .unwind tg true → 0 < r.2.autos.size := fun tg he => by
     rw [← hr] at he hcap ⊢; exact node_short_autos _ _ _ _ _ _ _ _ hcap he
@@ -493,17 +494,17 @@ theorem wp_otherIter {k : Nat} {G : Colored n k} {Em : Bool → Nat → Nat → 
     wp_step; wp_step; wp_step
     refine wp_prune0 h4' (hE.glob _ (by decide)) (hE.glob _ (by decide)) (hE.glob _ (by decide))
       (hE.glob _ (by decide)) hI3.tcell htw4 hrep btS btW4 hsa ?_
-    intro m5 tw5 h5 htw5 hrep5 hu5 hg5
+    intro m5 tw5 h5 htw5 hrep5 hu5 hg5 hk5
     obtain ⟨c5, -⟩ := c4.unch hLS h4' hu5 hg5 (fun z hz => by
       rcases hz with rfl | rfl
       · exact .inl ⟨by simp [SLoc.blocks], by sep_ne hd, by decide, by decide⟩
-      · exact .inr rfl) ⟨_, htw5⟩
+      · exact .inr rfl) ⟨_, htw5⟩ hk5
     obtain ⟨-, btW5, -, -, -⟩ := c5.ntc
     simp only [seqPost, Post.after, E0_append]
     wp_step; wp_step; wp_step
     refine wp_nodeLong h5 (hE.gl _) hI3.tcell htw5 hrep5 btS btW5 hI3.tv hI3.tv1 htvn htv1 ?_
-    intro m6 tw6 h6 htw6 hrep6 hu6 hg6
-    obtain ⟨c6, -⟩ := c5.unch hLS h5 hu6 hg6 (fun z hz => .inr hz) ⟨_, htw6⟩
+    intro m6 tw6 h6 htw6 hrep6 hu6 hg6 hk6
+    obtain ⟨c6, -⟩ := c5.unch hLS h5 hu6 hg6 (fun z hz => .inr hz) ⟨_, htw6⟩ hk6
     obtain ⟨-, btW6, btV6, -, -⟩ := c6.ntc
     simp only [seqPost, Post.after, E0_append]
     refine wp_nodeRecover h6 (hE.glob _ (by decide)) hI3.ptn hI3.lev hl1 (by omega) ?_

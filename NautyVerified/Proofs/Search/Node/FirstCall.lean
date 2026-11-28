@@ -109,6 +109,7 @@ theorem LoopAt.small {n : Nat} {L : LCtx n} {m : mem} {st : Search n} {pre nsp :
   have hbt : ¬ W L.btc := fun hw => (h.chain.ok.apart _ hmem).2.1 (hWS _ hw).1
   exact h.step hS (hu.mono fun z hz => .inl (hWS z hz)) hg
     (fun z hz => .inl (IsWork.back h.search hu hWw hz)) ⟨tw, hta.unch hu hbt, htr⟩
+    (Alloc.Keep.unch hu hbt)
 
 /-- `orbits[x]` for `x` holding `c < n`. -/
 theorem eval_orbAt {n : Nat} {e : env} {le : temp_env} {m : mem} {S : SLoc} {ctx : Ctx n}

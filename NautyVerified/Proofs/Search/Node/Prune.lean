@@ -92,7 +92,7 @@ theorem wp_prune0 {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} 
       ArrayAt m' .Mint64 btc 0 (longs tw') S.M →
       SetRep (fun w => bv64 (tw' w)) S.M (if nsp then shortprune cell st else cell) →
       Unch m m' (fun z => z = Block.needshortprune ∨ z = btc) →
-      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) → Q.normal E0 e le m') :
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) → Keep m m' btc → Q.normal E0 e le m') :
     Wp xi ge f Othernode.prune0 Q e le m := by
   have hd := h.distinct
   have hM1 := h.M1
@@ -104,7 +104,7 @@ theorem wp_prune0 {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} 
   · simp only [Bool.false_eq_true, ite_false, typeof, cop]
     rw [ite_eq_right (by decide)]
     apply wp_skip
-    exact hQ m tw h htw (by simpa using hrep) (Unch.refl _ _) fun _ h => h
+    exact hQ m tw h htw (by simpa using hrep) (Unch.refl _ _) (fun _ h => h) (Keep.refl _ _)
   · simp only [ite_true, typeof, cop]
     rw [ite_eq_left (by decide)]
     have hk := hnz rfl
@@ -169,12 +169,13 @@ theorem wp_prune0 {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} 
         show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl, hfm.load, h₁.fixed.mm.load, typeof,
         cop, Alloc.Mptr_eq]
       rw [ho2]
-    rintro t v m₂ ⟨⟨rfl, harr₂, hu₂, -⟩, hg₂⟩
+    rintro t v m₂ ⟨⟨rfl, harr₂, hu₂, hka₂⟩, hg₂⟩
     have hU₂ : Unch m₁ m₂ (fun z => z = btc) := hu₂
     refine hQ m₂ _ (h₁.unch hU₂ (fun z hz he => hbS (he ▸ hz))
         (fun z hz he => hbW (he ▸ IsWork.back h hU₁ (by
           intro z hz hzL; simp at hzL; subst hzL; revert hz; decide) hz)))
-      harr₂ ?_ ?_ fun z hz => hg₂ z (hv₁ z hz)
+      harr₂ ?_ ?_ (fun z hz => hg₂ z (hv₁ z hz))
+      ((Keep.unch hU₁ (by simpa using hbtc)).trans (hka₂ btc))
     · simp only [ite_true]
       rw [shortprune_last hk]
       have e : (fun w => bv64 (ww (j + w))) =

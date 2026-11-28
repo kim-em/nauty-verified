@@ -93,6 +93,7 @@ theorem wp_tcallocNew {f : function} {Q : Post} {e : env} {le : temp_env} {m : m
       (∀ v, FieldAt m .Mint64 par 8 v → FieldAt m' .Mint64 par 8 v) →
       FieldAt m' .Mint64 nd 0 Vnullptr → FieldAt m' .Mint64 nd 8 (.Vptr tc Ptrofs.zero) →
       ArrayAt m' .Mint64 tc 0 (fun _ => .Vlong (lr 0)) M →
+      Alloc.Malloced m' nd 16 → Alloc.Malloced m' tc (8 * M) → Alloc.Keep m m' par →
       PTree.get dense.id.«tcnode_this» le' = some (.Vptr nd Ptrofs.zero) →
       (∀ x, x ≠ dense.id.«tcnode_this» → x ≠ idOf 703 → x ≠ idOf 704 → x ≠ idOf 705 →
         x ≠ idOf 706 → x ≠ idOf 707 → PTree.get x le' = PTree.get x le) →
@@ -206,7 +207,21 @@ theorem wp_tcallocNew {f : function} {Q : Post} {e : env} {le : temp_env} {m : m
   have htcm : ¬ Mem.valid_block m tc := fun h => hfr2.new (hfr1.grow _ h)
   have harr2 := Alloc.zero_longs hz2 (fun o h0 h1 => hfr2.perm o (by omega) h1) (by omega) M (by omega)
   have harr5 := ((harr2.unch hu3 (Ne.symm hndtc)).unch hu4 (Ne.symm hptc)).unch hu5 (Ne.symm hndtc)
-  refine hQ _ m5 nd tc hfr1.new htcm hndtc ?_ hval ?_ ?_ ?_ ?_ harr5 ?_ ?_
+  have hk8 : (0 : Int) ≤ intOfZ (zOfInt ((8 : Nat) : Int)) := by rw [intOfZ_zOfInt]; omega
+  have hk0 : (0 : Int) ≤ intOfZ (zOfInt ((0 : Nat) : Int)) := by rw [intOfZ_zOfInt]; omega
+  have hmnd : Alloc.Malloced m5 nd 16 :=
+    ((((⟨hfr1.hdr, hfr1.perm, by decide⟩ : Alloc.Malloced m1 nd 16).keep
+      (Alloc.Keep.unch hfr2.unch hndtc)).keep (Alloc.Keep.store hst3 hk8)).keep
+      (Alloc.Keep.unch hu4 (Ne.symm hpnd))).keep (Alloc.Keep.store hst5 hk0)
+  have hmtc : Alloc.Malloced m5 tc (8 * M) := by
+    have h2 : Alloc.Malloced m2 tc (8 * M) := by
+      rw [Nat.mul_comm]; exact ⟨hfr2.hdr, hfr2.perm, by omega⟩
+    exact ((h2.keep (Alloc.Keep.unch hu3 (Ne.symm hndtc))).keep
+      (Alloc.Keep.unch hu4 (Ne.symm hptc))).keep (Alloc.Keep.unch hu5 (Ne.symm hndtc))
+  have hkpar : Alloc.Keep m m5 par :=
+    ((((Alloc.Keep.unch hfr1.unch hpnd).trans (Alloc.Keep.unch hfr2.unch hptc)).trans
+      (Alloc.Keep.unch hu3 hpnd)).trans (Alloc.Keep.store hst4 hk0)).trans (Alloc.Keep.unch hu5 hpnd)
+  refine hQ _ m5 nd tc hfr1.new htcm hndtc ?_ hval ?_ ?_ ?_ ?_ harr5 hmnd hmtc hkpar ?_ ?_
   · refine ((((hfr1.unch.mono fun z hz => .inr (hz ▸ hfr1.new)).trans
       (hfr2.unch.mono fun z hz => .inr (hz ▸ htcm))).trans (hu3.mono fun z hz => .inr (hz ▸ hfr1.new))).trans
       (hu4.mono fun z hz => .inl hz)).trans (hu5.mono fun z hz => .inr (hz ▸ hfr1.new))
