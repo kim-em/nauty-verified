@@ -725,6 +725,40 @@ Tools from batch 1, for the batches after it:
   `leafExit_eq`, `leafWords` are over any store, and `Processnode/Set.lean`
   has the `ArraysG` updates (`set`, `setCanong`, `setAutos`, `wp`, `cast`).
 
+Batch 2 group (b), the node leaf steps (generic names next to the dense ones):
+
+- Over `SearchAtG D` with the dense lemma derived: `wp_nodeBreakoutG`,
+  `wp_tctotalG`, `wp_hintG`, `wp_tcResetG`, `wp_prune0G`, `wp_nodeLongG`
+  (`AutosAtG.pairs`), `TcOkG.mono`, `NSetG`/`nset_stepG`/`nset_childG`/
+  `nset_ownG` (with `NodeFrameG.nset`/`grow`/`mk'`). Prologue's
+  `wp_tcallocSkip`/`wp_tcallocNew` take any `NautyEnv`, which records
+  `sizeof_tcnode`. `brokenSt`, `shortprune_last` are over any store.
+- Dispatch calls: `wp_cheapG` (`DispatchC`'s `cheapautom`; hypothesis
+  `O.cheapautom st.ptn level n = cheapautom st.ptn level n`, which the node
+  policy's linking structure should supply), `wp_nodeVisitG` (`doref` with
+  `D.refineAt M`, state `visitStG O G level numcells st`). Their frames are
+  `D`'s (written globals, scratch blocks in use, new blocks), weaker than the
+  dense ones, so the dense `wp_cheap`/`wp_nodeVisit` keep their own proofs.
+- Shared tools: `SInv.toG`/`SInvG.dense`; `SearchAtG.dstep` (a dispatch
+  call whose outputs avoid `S`: state unchanged, `WorkMonoG`);
+  `SearchAtG.lit_globs`, `ChgD`, `SearchAtG.not_chgD` and
+  `SearchAtG.rebuildD` (writes to `S`, a dispatch procedure's scratch and
+  nautil.c's `workperm` pair in one step, the counterpart of `reallocW`);
+  `DispatchRep.doref_refineT`; `dorefSpecR`'s post keeps validity across the
+  `qinvar` store.
+- Dense-only, replaced by the tools above: `LocDistinct`, `Realloc`,
+  `ReallocW.reallocW`, `Doref.wp_nodeDoref` (naugraph.c's slots).
+- Not converted: `Target`, `Choose` (the generic `wp_nodeTarget` is
+  `maketargetcell_satisfiesT`
+  with `D.targetcell`, result `mtcOf n lab ptn level (O.targetcell …)`, then
+  `SearchAtG.dstep`-style rebuild; `chooseTarget_false_eq` needs the
+  policy's `chooseTarget` in terms of `O.targetcell`). The HexGraphIso-side
+  files `InvSteps`, `OkOff`, `OkFirst`, `ProcFacts`, `Em` are about the dense
+  `node`, `Colored` graphs and `SearchInf`; they stay dense. The generic node
+  bodies need `SInvG` of each step's state, which comes from the policy
+  structure (partition facts of `P.visit`, `P.child`, …) rather than from
+  these files; `SRest` itself is store-independent except `canongSize`.
+
 Remaining files (`Proofs/`), in dependency order; the files of one batch
 depend only on earlier batches, so a batch's groups can go to parallel
 agents:
