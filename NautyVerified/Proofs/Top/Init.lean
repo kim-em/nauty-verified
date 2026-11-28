@@ -154,4 +154,31 @@ theorem dispatchGraph_load {m : mem} (hm : Genv.init_mem prog = some m) :
   · exact l9
   · exact l10
 
+kernel_rfl info_allocM : info Search.Block.allocM = some ([ir 0].map .Init_int32, false, false)
+kernel_rfl info_tcnode0 :
+  info Search.Block.tcnode0 = some ([lr 0, lr 0].map .Init_int64, false, false)
+
+/-- `alloc_m` starts at 0. -/
+theorem allocM_init {m : mem} (hm : Genv.init_mem prog = some m) :
+    FieldAt m .Mint32 Search.Block.allocM 0 (.Vint (ir 0)) := by
+  refine ⟨by simpa using Init.table32 hm info_allocM 0 (by decide), fun o ho => ?_, ⟨zOfInt 0, rfl⟩⟩
+  refine globWritable hm info_allocM o ⟨ho.1, ?_⟩
+  have := ho.2
+  exact this
+
+/-- `tcnode0.next` starts at `NULL`. -/
+theorem tcnode0_init {m : mem} (hm : Genv.init_mem prog = some m) :
+    FieldAt m .Mint64 Search.Block.tcnode0 0 Vnullptr := by
+  have hl := Init.table64 hm info_tcnode0 0 (by decide)
+  have hn : (Vnullptr : val) = .Vlong (lr 0) := by
+    unfold Vnullptr; rw [if_pos (by decide)]; rfl
+  refine ⟨by rw [hn]; simpa using hl, fun o ho => ?_, ⟨zOfInt 0, rfl⟩⟩
+  refine globWritable hm info_tcnode0 o ⟨ho.1, ?_⟩
+  have := ho.2
+  change intOfZ o < intOfZ _ at this ⊢
+  simp only [intOfZ_add, intOfZ_zOfInt] at this
+  have h8 : intOfZ (size_chunk .Mint64) = 8 := rfl
+  have h16 : intOfZ (init_data_list_size ([lr 0, lr 0].map .Init_int64)) = 16 := rfl
+  rw [h16]; omega
+
 end NautyVerified.Proofs.Top

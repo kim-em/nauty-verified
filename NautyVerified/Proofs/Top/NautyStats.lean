@@ -3,7 +3,8 @@ import NautyVerified.Proofs.Top.NautyOrbits
 /-!
 # `nauty()`'s statistics and level counters (`tStats`)
 
-`stats->grpsize1 = 1.0; stats->grpsize2 = 0;` and the counters zeroed,
+`stats->grpsize1 = 1.0; stats->grpsize2 = 0;` (reported, as `firstpathnode0`'s
+`MULTIPLY` reads them) and the counters zeroed,
 `stats->numorbits = n`, `EMPTYSET(fixedpts, m)`, `noncheaplevel = 1`,
 `eqlev_canon = -1`.
 -/
@@ -60,7 +61,10 @@ theorem wp_tStats {Q : Post} {le : temp_env} {m : mem} {S : SLoc} {n M : Nat} {b
       S.bst ≠ Search.Block.eqlevCanon)
     (hsepF : bF ≠ Search.Block.m ∧ bF ≠ Block.nautyFixedpts ∧ bF ≠ Search.Block.noncheaplevel ∧
       bF ≠ Search.Block.eqlevCanon)
-    (hQ : ∀ le' m', FieldAt m' .Mint32 S.bst (S.sb + 12) (.Vint (ir n)) →
+    (hQ : ∀ le' m', FieldAt m' .Mfloat64 S.bst (S.sb + 0)
+        (.Vfloat (CompCert4Lean.Lib.Floats.Float.of_bits (lr 4607182418800017408))) →
+      FieldAt m' .Mint32 S.bst (S.sb + 8) (.Vint (ir 0)) →
+      FieldAt m' .Mint32 S.bst (S.sb + 12) (.Vint (ir n)) →
       FieldAt m' .Mint32 S.bst (S.sb + 16) (.Vint (ir 0)) →
       FieldAt m' .Mint64 S.bst (S.sb + 24) (.Vlong (lr 0)) →
       FieldAt m' .Mint64 S.bst (S.sb + 32) (.Vlong (lr 0)) →
@@ -90,6 +94,7 @@ theorem wp_tStats {Q : Post} {le : temp_env} {m : mem} {S : SLoc} {n M : Nat} {b
     (hA0 _ _ _ _ (hva _ _ (by decide) (by decide) ⟨zOfInt 0, rfl⟩))
     rfl rfl ?_
   intro m1 hs1
+  have G1_0 := FieldAt.store_same hs1 (hA0 _ _ _ _ (hva _ _ (by decide) (by decide) ⟨zOfInt 0, rfl⟩))
   have hU1 : Unch m m1 (· = S.bst) := (Unch.refl _ _).trans (Unch.store hs1 rfl)
   have hA1 : ∀ c b o p, Mem.valid_access m c b o p → Mem.valid_access m1 c b o p :=
     fun c b o p h => Mem.store_valid_access_1 _ _ _ _ _ _ hs1 _ _ _ _ (hA0 c b o p h)
@@ -100,6 +105,8 @@ theorem wp_tStats {Q : Post} {le : temp_env} {m : mem} {S : SLoc} {n M : Nat} {b
     (hA1 _ _ _ _ (hva _ _ (by decide) (by decide) ⟨zOfInt 2, rfl⟩))
     rfl rfl ?_
   intro m2 hs2
+  have G2_0 := G1_0.store_other hs2 (by rw [hsb]; decide)
+  have G2_8 := FieldAt.store_same hs2 (hA1 _ _ _ _ (hva _ _ (by decide) (by decide) ⟨zOfInt 2, rfl⟩))
   have hU2 : Unch m m2 (· = S.bst) := hU1.trans (Unch.store hs2 rfl)
   have hA2 : ∀ c b o p, Mem.valid_access m c b o p → Mem.valid_access m2 c b o p :=
     fun c b o p h => Mem.store_valid_access_1 _ _ _ _ _ _ hs2 _ _ _ _ (hA1 c b o p h)
@@ -110,6 +117,8 @@ theorem wp_tStats {Q : Post} {le : temp_env} {m : mem} {S : SLoc} {n M : Nat} {b
     (hA2 _ _ _ _ (hva _ _ (by decide) (by decide) ⟨zOfInt 4, rfl⟩))
     rfl rfl ?_
   intro m3 hs3
+  have G3_0 := G2_0.store_other hs3 (by rw [hsb]; decide)
+  have G3_8 := G2_8.store_other hs3 (by rw [hsb]; decide)
   have hU3 : Unch m m3 (· = S.bst) := hU2.trans (Unch.store hs3 rfl)
   have hA3 : ∀ c b o p, Mem.valid_access m c b o p → Mem.valid_access m3 c b o p :=
     fun c b o p h => Mem.store_valid_access_1 _ _ _ _ _ _ hs3 _ _ _ _ (hA2 c b o p h)
@@ -121,6 +130,8 @@ theorem wp_tStats {Q : Post} {le : temp_env} {m : mem} {S : SLoc} {n M : Nat} {b
     (hA3 _ _ _ _ (hva _ _ (by decide) (by decide) ⟨zOfInt 3, rfl⟩))
     rfl rfl ?_
   intro m4 hs4
+  have G4_0 := G3_0.store_other hs4 (by rw [hsb]; decide)
+  have G4_8 := G3_8.store_other hs4 (by rw [hsb]; decide)
   have hU4 : Unch m m4 (· = S.bst) := hU3.trans (Unch.store hs4 rfl)
   have hA4 : ∀ c b o p, Mem.valid_access m c b o p → Mem.valid_access m4 c b o p :=
     fun c b o p h => Mem.store_valid_access_1 _ _ _ _ _ _ hs4 _ _ _ _ (hA3 c b o p h)
@@ -133,6 +144,8 @@ theorem wp_tStats {Q : Post} {le : temp_env} {m : mem} {S : SLoc} {n M : Nat} {b
     (hA4 _ _ _ _ (hva _ _ (by decide) (by decide) ⟨zOfInt 4, rfl⟩))
     rfl rfl ?_
   intro m5 hs5
+  have G5_0 := G4_0.store_other hs5 (by rw [hsb]; decide)
+  have G5_8 := G4_8.store_other hs5 (by rw [hsb]; decide)
   have hU5 : Unch m m5 (· = S.bst) := hU4.trans (Unch.store hs5 rfl)
   have hA5 : ∀ c b o p, Mem.valid_access m c b o p → Mem.valid_access m5 c b o p :=
     fun c b o p h => Mem.store_valid_access_1 _ _ _ _ _ _ hs5 _ _ _ _ (hA4 c b o p h)
@@ -146,6 +159,8 @@ theorem wp_tStats {Q : Post} {le : temp_env} {m : mem} {S : SLoc} {n M : Nat} {b
     (hA5 _ _ _ _ (hva _ _ (by decide) (by decide) ⟨zOfInt 6, rfl⟩))
     rfl rfl ?_
   intro m6 hs6
+  have G6_0 := G5_0.store_other hs6 (by rw [hsb]; decide)
+  have G6_8 := G5_8.store_other hs6 (by rw [hsb]; decide)
   have hU6 : Unch m m6 (· = S.bst) := hU5.trans (Unch.store hs6 rfl)
   have hA6 : ∀ c b o p, Mem.valid_access m c b o p → Mem.valid_access m6 c b o p :=
     fun c b o p h => Mem.store_valid_access_1 _ _ _ _ _ _ hs6 _ _ _ _ (hA5 c b o p h)
@@ -160,6 +175,8 @@ theorem wp_tStats {Q : Post} {le : temp_env} {m : mem} {S : SLoc} {n M : Nat} {b
     (hA6 _ _ _ _ (hva _ _ (by decide) (by decide) ⟨zOfInt 7, rfl⟩))
     rfl rfl ?_
   intro m7 hs7
+  have G7_0 := G6_0.store_other hs7 (by rw [hsb]; decide)
+  have G7_8 := G6_8.store_other hs7 (by rw [hsb]; decide)
   have hU7 : Unch m m7 (· = S.bst) := hU6.trans (Unch.store hs7 rfl)
   have hA7 : ∀ c b o p, Mem.valid_access m c b o p → Mem.valid_access m7 c b o p :=
     fun c b o p h => Mem.store_valid_access_1 _ _ _ _ _ _ hs7 _ _ _ _ (hA6 c b o p h)
@@ -175,6 +192,8 @@ theorem wp_tStats {Q : Post} {le : temp_env} {m : mem} {S : SLoc} {n M : Nat} {b
     (hA7 _ _ _ _ (hva _ _ (by decide) (by decide) ⟨zOfInt 3, rfl⟩))
     (Search.eval_gint (e := nEnv bI) rfl Search.find_n (hN.unch (hu.trans hU7) (Ne.symm hsep.1))) rfl ?_
   intro m8 hs8
+  have G8_0 := G7_0.store_other hs8 (by rw [hsb]; decide)
+  have G8_8 := G7_8.store_other hs8 (by rw [hsb]; decide)
   have hU8 : Unch m m8 (· = S.bst) := hU7.trans (Unch.store hs8 rfl)
   have hA8 : ∀ c b o p, Mem.valid_access m c b o p → Mem.valid_access m8 c b o p :=
     fun c b o p h => Mem.store_valid_access_1 _ _ _ _ _ _ hs8 _ _ _ _ (hA7 c b o p h)
@@ -210,7 +229,7 @@ theorem wp_tStats {Q : Post} {le : temp_env} {m : mem} {S : SLoc} {n M : Nat} {b
       z = Search.Block.eqlevCanon) :=
     (((hU8.mono fun _ h => .inl h).trans (hu9.mono fun _ h => .inr (.inl h))).trans
       (hu10.mono fun _ h => .inr (.inr (.inl h)))).trans (hu11.mono fun _ h => .inr (.inr (.inr h)))
-  refine hQ le9 m11 (k F8_12) (k F8_16) (k F8_24) (k F8_32)
+  refine hQ le9 m11 (k G8_0) (k G8_8) (k F8_12) (k F8_16) (k F8_24) (k F8_32)
     (ha11 _ _ _ _ (ha10 _ _ _ _ (hu9.access _ _ _ _ hb5
       (hA8 _ _ _ _ (hva _ _ (by decide) (by decide) ⟨zOfInt 10, rfl⟩)))))
     (k F8_48) (k F8_56) ((hfw9.unch hu10 hf3).unch hu11 hf4) (hN10.unch hu11 (by decide)) hE11 hU
