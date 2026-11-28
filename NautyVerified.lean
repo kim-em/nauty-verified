@@ -330,3 +330,5 @@ import NautyVerified.Proofs.Sparse.Refine.Syntax
 import NautyVerified.Proofs.Sparse.Refine.Blocks
 import NautyVerified.Proofs.Sparse.Refine.Marks2
 import NautyVerified.Proofs.Sparse.Refine.Model
+import NautyVerified.Proofs.Sparse.Refine.State
+import NautyVerified.Proofs.Sparse.Refine.Access
