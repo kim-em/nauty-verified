@@ -379,3 +379,4 @@ import NautyVerified.Proofs.Sparse.Refine.Nontrivial.ResetK
 import NautyVerified.Proofs.Sparse.Refine.Nontrivial.Pass
 import NautyVerified.Proofs.Sparse.Refine.Spec
 import NautyVerified.Proofs.Sparse.Refine.Prologue
+import NautyVerified.Proofs.Search.Node.Policy
