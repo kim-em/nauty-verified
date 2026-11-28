@@ -5,8 +5,10 @@ import NautyVerified.Proofs.Search.Spec
 # The harness's automorphism callback
 
 `emit_generator(count, perm, orbits, numorbits, stabvertex, n)` writes `1`
-and then `perm[0..n)`: `automCb_emit` is `AutomCb` for its block, in the
-end-to-end environment.
+and then `perm[0..n)`: `automCb_emitAt` is `AutomCb` for its block in any
+`NautyEnv` environment where `nv_write` is the harness's output call and the
+block holds `emit_generator` (the dense and the sparse harness have the same
+Clight for it); `automCb_emit` is the dense instance.
 -/
 
 namespace NautyVerified.Proofs.Search
@@ -24,18 +26,25 @@ set_option linter.unusedSimpArgs false
 kernel_rfl funct_emitGenerator : Genv.find_funct_ptr ge.genv_genv Harness.Block.emitGenerator =
   some (.Internal dense.fn.«dense_main:emit_generator»)
 
+section
+variable {ge : genv} [NautyEnv ge] {bW : block}
+  (hsW : Genv.find_symbol ge.genv_genv dense.id.nv_write = some bW)
+  (hfW : Genv.find_funct_ptr ge.genv_genv bW = some (.External
+    (.EF_external Statement.nameWrite Statement.sigWrite) [tlong] .Tvoid cc_default))
+
+include hsW hfW in
 /-- `nv_write(a)` in any function, for a `long` value. -/
-theorem wp_write {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {a : expr}
+theorem wp_writeAt {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {a : expr}
     {x : Lib.Integers.int64} (he : PTree.get dense.id.nv_write e = none)
     (ha : Exec.evalExprlist ge e le m [a] [tlong] = some [.Vlong x])
     (hQ : ∀ t, Writes t [intOfZ (Lib.Integers.Int64.signed x)] → Q.normal t e le m) :
     Wp Statement.xi ge f (.Scall none (.Evar dense.id.nv_write (tfun [tlong] .Tvoid)) [a])
       Q e le m := by
-  refine wp_call (vf := .Vptr Harness.Block.nvWrite Ptrofs.zero) (targs := [tlong]) (tres := .Tvoid)
+  refine wp_call (vf := .Vptr bW Ptrofs.zero) (targs := [tlong]) (tres := .Tvoid)
     (cc := cc_default) _ (writeSpec x) (write_satisfies x) rfl
-    (by simp only [Exec.evalExpr, Exec.lvalOfVar, he, find_nvWrite, Exec.derefLoc,
+    (by simp only [Exec.evalExpr, Exec.lvalOfVar, he, hsW, Exec.derefLoc,
       Cfrontend.Ctypes.access_mode])
-    ha (by simp [Genv.find_funct, funct_nvWrite]) rfl rfl ?_
+    ha (by simp [Genv.find_funct, hfW]) rfl rfl ?_
   rintro t' v m' ⟨hw, rfl⟩
   exact hQ t' hw
 
@@ -56,8 +65,10 @@ def emitTemps (count : Lib.Integers.int) (bp : block) (pofs : ptrofs) (bo : bloc
       (PTree.set dense.id.perm (.Vptr bp pofs) (PTree.set dense.id.count (.Vint count)
         (create_undef_temps dense.fn.«dense_main:emit_generator».fn_temps))))))
 
-theorem automCb_emit : AutomCb Statement.xi Harness.Block.emitGenerator := by
-  refine ⟨.Internal dense.fn.«dense_main:emit_generator», by simp [Genv.find_funct, funct_emitGenerator], rfl, ?_⟩
+include hsW hfW in
+theorem automCb_emitAt {bE : block} (hfE : Genv.find_funct_ptr ge.genv_genv bE =
+    some (.Internal dense.fn.«dense_main:emit_generator»)) : AutomCb Statement.xi bE := by
+  refine ⟨.Internal dense.fn.«dense_main:emit_generator», by simp [Genv.find_funct, hfE], rfl, ?_⟩
   intro count bp pofs p n bo oofs no sv
   refine satisfies_internal (Entry := fun _ m₀ e le m =>
     e = empty_env ∧ le = emitTemps count bp pofs bo oofs no sv n ∧ m = m₀) ?_ ?_
@@ -79,7 +90,7 @@ theorem automCb_emit : AutomCb Statement.xi Harness.Block.emitGenerator := by
       simp (config := {decide := true}) only [emitTemps, temps_gss]
     simp only [emitBody, Set.sk]
     wp_step; wp_step; wp_step
-    refine wp_write (x := lr 1) rfl
+    refine wp_writeAt hsW hfW (x := lr 1) rfl
       (by simp only [Exec.evalExprlist, Exec.evalExpr, typeof, cop,
         cast_int_long_ir (a := 1) ⟨by decide, by decide⟩]) ?_
     intro t1 ht1
@@ -118,7 +129,7 @@ theorem automCb_emit : AutomCb Statement.xi Harness.Block.emitGenerator := by
         wp_step; wp_step
         have hpe := eval_at (ge := ge) (e := empty_env) harr hn dense.id.perm hp' (Refine.tv dense.id.i)
           k hlt hi rfl
-        refine wp_write (x := lr (p[k]! : Int)) rfl
+        refine wp_writeAt hsW hfW (x := lr (p[k]! : Int)) rfl
           (by simp only [Exec.evalExprlist, hpe]
               simp only [ints, typeof, cop,
                 cast_int_long_ir (a := (p[k]! : Int)) ⟨by omega, by have := hps k hlt; omega⟩]) ?_
@@ -144,5 +155,19 @@ theorem automCb_emit : AutomCb Statement.xi Harness.Block.emitGenerator := by
         fun x hx => by rw [temps_gso _ _ hx, ho x hx]⟩
       have e : t ++ E0 = t := List.append_nil t
       rw [e]; exact hwk
+
+end
+
+/-- `nv_write(a)` in the dense program. -/
+theorem wp_write {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {a : expr}
+    {x : Lib.Integers.int64} (he : PTree.get dense.id.nv_write e = none)
+    (ha : Exec.evalExprlist ge e le m [a] [tlong] = some [.Vlong x])
+    (hQ : ∀ t, Writes t [intOfZ (Lib.Integers.Int64.signed x)] → Q.normal t e le m) :
+    Wp Statement.xi ge f (.Scall none (.Evar dense.id.nv_write (tfun [tlong] .Tvoid)) [a])
+      Q e le m :=
+  wp_writeAt find_nvWrite funct_nvWrite he ha hQ
+
+theorem automCb_emit : AutomCb Statement.xi Harness.Block.emitGenerator :=
+  automCb_emitAt find_nvWrite funct_nvWrite funct_emitGenerator
 
 end NautyVerified.Proofs.Search

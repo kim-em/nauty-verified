@@ -200,6 +200,7 @@ import NautyVerified.Proofs.Search.Node.Doref
 import NautyVerified.Proofs.Search.Firstterminal.Satisfies
 import NautyVerified.Proofs.Search.Recover.Satisfies
 import NautyVerified.Proofs.Search.Emit
+import NautyVerified.Proofs.Search.EmitSparse
 import NautyVerified.Proofs.Search.Processnode.Syntax
 import NautyVerified.Proofs.Search.Processnode.Scatter
 import NautyVerified.Proofs.Search.Processnode.State

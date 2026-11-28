@@ -125,7 +125,7 @@ theorem read_satisfies (x : Lib.Integers.int64) :
     simp only [Statement.extSem, and_self, ite_true]
     exact .intro _ m (.EVlong x) (.Vlong x) (.ev_match_long x)
 
-theorem write_satisfies (x : Lib.Integers.int64) :
+theorem write_satisfies {ge : genv} (x : Lib.Integers.int64) :
     Satisfies Statement.xi ge
       (.External (.EF_external Statement.nameWrite Statement.sigWrite) [tlong] .Tvoid cc_default)
       (writeSpec x) :=

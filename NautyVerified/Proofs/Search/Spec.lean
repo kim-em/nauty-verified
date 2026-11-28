@@ -51,8 +51,9 @@ def gensWords (gs : List (Array Nat)) (n : Nat) : List Int :=
 
 /-- Block `b` holds the harness's automorphism callback: called as
 `(*userautomproc)(count, perm, orbits, numorbits, stabvertex, n)` with `perm`
-holding `p` (entries below `2^31`), it writes `genWords p n` and changes no memory. -/
-def AutomCb (xi : ExternalCalls) (b : block) : Prop :=
+holding `p` (entries below `2^31`), it writes `genWords p n` and changes no memory.
+The environment `ge` is the one `NautyEnv` fixes. -/
+def AutomCb {ge : genv} [NautyEnv ge] (xi : ExternalCalls) (b : block) : Prop :=
   ∃ fd, Genv.find_funct ge.genv_genv (.Vptr b Ptrofs.zero) = some fd ∧
     type_of_fundef fd = tfun [tint, tptr tint, tptr tint, tint, tint, tint] .Tvoid ∧
     ∀ (count : Lib.Integers.int) (bp : block) (pofs : ptrofs) (p : Array Nat) (n : Nat)
