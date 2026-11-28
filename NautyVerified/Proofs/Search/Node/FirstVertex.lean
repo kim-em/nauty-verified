@@ -1,4 +1,5 @@
 import NautyVerified.Proofs.Search.Node.FirstTail
+import NautyVerified.Proofs.Search.Node.Laws
 
 /-!
 # One vertex of `firstpathnode0`'s sweep
@@ -261,5 +262,237 @@ theorem wp_fpnChild {k : Nat} {G : Colored n k} {Em : Bool → Nat → Nat → S
     refine hQd E0 le m ch (by rw [hfc]) (by rw [hfc]; exact h) ?_ hT htv rfl
     simp only [vertexEm, hb, Bool.false_eq_true, ite_false]
     exact Emits.nil
+
+/-! ### For any dispatch representation and search policy -/
+
+section Generic
+
+open NautyVerified.Proofs.Dispatch (Ops DispatchRep)
+
+variable {ge : genv} [E : NautyEnv ge] {O : Ops} {D : DispatchRep ge O}
+
+/-- `FEnv` for `D`. -/
+structure FEnvG (e : env) (L : LCtxG D n) : Prop where
+  enc : PTree.get dense.id.numcells e = some (L.bnc, tint)
+  ek : PTree.get dense.id.refcode e = some (L.bk, tint)
+  ez : PTree.get dense.id.tcellsize e = some (L.bz, tint)
+  ec : PTree.get dense.id.tc e = some (L.bc, tint)
+  eq : PTree.get dense.id.qinvar e = some (L.bq, tint)
+  glob : ∀ x, x ∉ [dense.id.numcells, dense.id.refcode, dense.id.tcellsize, dense.id.tc,
+    dense.id.qinvar] → PTree.get x e = none
+
+theorem FEnvG.gl {e : env} {L : LCtxG D n} (hE : FEnvG e L) (l : List ident)
+    (h : ∀ x ∈ l, x ∉ [dense.id.numcells, dense.id.refcode, dense.id.tcellsize, dense.id.tc,
+      dense.id.qinvar] := by decide) : ∀ x ∈ l, PTree.get x e = none :=
+  fun x hx => hE.glob x (h x hx)
+
+/-- `FTemps` for `D`. -/
+structure FTempsG (le : temp_env) (L : LCtxG D n) (tv1 : Nat) : Prop where
+  lab : PTree.get dense.id.«lab» le = some (.Vptr L.S.bl L.S.lofs)
+  ptn : PTree.get dense.id.«ptn» le = some (.Vptr L.S.bp L.S.pofs)
+  lev : PTree.get dense.id.«level» le = some (.Vint (ir L.level))
+  tcell : PTree.get dense.id.tcell le = some (.Vptr L.btc Ptrofs.zero)
+  this : PTree.get dense.id.«tcnode_this» le = some (.Vptr L.bnd Ptrofs.zero)
+  tv1 : PTree.get dense.id.«tv1» le = some (.Vint (ir tv1))
+  cc : ∃ c, PTree.get dense.id.«childcount» le = some (.Vint c)
+
+theorem FTempsG.of {le le' : temp_env} {L : LCtxG D n} {tv1 : Nat} (h : FTempsG le L tv1)
+    (he : ∀ x ∈ [dense.id.«lab», dense.id.«ptn», dense.id.«level», dense.id.tcell,
+      dense.id.«tcnode_this», dense.id.«tv1»], PTree.get x le' = PTree.get x le)
+    (hc : ∃ c, PTree.get dense.id.«childcount» le' = some (.Vint c)) : FTempsG le' L tv1 := by
+  simp only [List.forall_mem_cons, List.mem_nil_iff, false_implies, implies_true, and_true] at he
+  obtain ⟨e1, e2, e3, e4, e5, e6⟩ := he
+  exact ⟨e1 ▸ h.lab, e2 ▸ h.ptn, e3 ▸ h.lev, e4 ▸ h.tcell, e5 ▸ h.this, e6 ▸ h.tv1, hc⟩
+
+/-- A step changing only some of `S`'s own scalars and arrays keeps `LoopAtG`. -/
+theorem LoopAtG.smallL {L : LCtxG D n} {m : mem} {st : SearchState n (O.Canon n)}
+    {pre nsp : Bool} {cell : VSet n} {ch : List (block × block)}
+    (h : LoopAtG L m st pre nsp cell ch)
+    {m' : mem} {st' : SearchState n (O.Canon n)} {pre' nsp' : Bool} {Ws : List block}
+    (hS : SearchAtG D m' L.S L.gl L.cl L.G st' pre' nsp') (hu : Unch m m' (· ∈ Ws))
+    (hg : ∀ z, Mem.valid_block m z → Mem.valid_block m' z)
+    (hW : ∀ z ∈ Ws, z ∈ L.S.litG ∧ z ≠ L.S.bUA ∧ z ≠ E.tcnode0 ∧ z ≠ E.nautilWorkperm ∧
+      z ≠ E.nautilWorkpermSz) :
+    LoopAtG L m' st' pre' nsp' cell ch :=
+  h.small hS hu hg (fun z hz => ⟨SLoc.mem_litG (hW z hz).1, (hW z hz).2.1, (hW z hz).2.2.1⟩)
+    (fun z hz hz' => h.search.lit_globs z (hW z hz').1 (D.wglobs_sub _ hz))
+    ⟨fun hz => (hW _ hz).2.2.2.1 rfl, fun hz => (hW _ hz).2.2.2.2 rfl⟩
+
+/-- `LoopAtG` reads no field `Same` may change but the store's rows. -/
+theorem LoopAtG.same {L : LCtxG D n} {m : mem} {s t : SearchState n (O.Canon n)}
+    {pre nsp : Bool} {cell : VSet n} {ch : List (block × block)}
+    (h : LoopAtG L m s pre nsp cell ch) (hs : Same O s t) : LoopAtG L m t pre nsp cell ch :=
+  { h with search := h.search.same hs }
+
+theorem child_true_eqG {κ : Type} (level tc tv : Nat) (st : SearchState n κ) :
+    child true level tc tv st =
+      { { brokenSt level tc tv st with fixedpts := st.fixedpts.insert tv } with cosetindex := tv } := by
+  simp [child]
+
+variable [P : Generic.Policy (SearchState n (O.Canon n)) n (γ := O.Gr n)]
+
+/-- `vertexEm` for the policy `P`. -/
+abbrev vertexEmG (Em : Bool → Nat → Nat → SearchState n (O.Canon n) → List Int)
+    (level nc tc tv1 tv : Nat) (st : SearchState n (O.Canon n)) : List Int :=
+  if P.orbit st tv == tv then Em (tv == tv1) (level + 1) (nc + 1) (P.child true level tc tv st)
+  else []
+
+/-- `fChild` for the policy `P`. -/
+abbrev fChildG (L : LCtxG D n) (tv1 tv : Nat) (cell : VSet n) (st : SearchState n (O.Canon n)) :
+    Exit × VSet n × SearchState n (O.Canon n) :=
+  firstChildG L.G nautyInf 100 (nodeFuel n (L.level + 1)) L.level L.nc L.tc tv1 tv cell st
+
+set_option maxHeartbeats 8000000 in
+/-- `wp_fpnChild` for `D` and the policy `P` with the laws `Lw`. -/
+theorem wp_fpnChildG (Lk : PolicyLink O n) {Em : Bool → Nat → Nat → SearchState n (O.Canon n) → List Int}
+    {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
+    (L : LCtxG D n) (Lw : NodeLaws Lk L.G) {st : SearchState n (O.Canon n)} {pre : Bool}
+    {cell : VSet n} {ch : List (block × block)}
+    {tv tv1 : Nat} (hE : FEnvG e L) (hT : FTempsG le L tv1)
+    (htv : PTree.get dense.id.«tv» le = some (.Vint (ir tv)))
+    (h : LoopAtG L m st pre false cell ch)
+    (hpre : pre = true → tv = tv1) (hok : Lw.SweepFirst L.level L.nc L.tc tv1 cell (some tv) st)
+    (hRecF : ∀ st' ch', Satisfies xi ge (.Internal dense.fn.«nauty:firstpathnode0»)
+      (nodeSpecG D xi Lw.NodeOk Em true L.S L.gl L.cl L.G st' (L.level + 1) (L.nc + 1) ch'))
+    (hRecO : ∀ st' ch', Satisfies xi ge (.Internal dense.fn.«nauty:othernode0»)
+      (nodeSpecG D xi Lw.NodeOk Em false L.S L.gl L.cl L.G st' (L.level + 1) (L.nc + 1) ch'))
+    (hcb : AutomCb xi L.S.bUA) (hln : L.level + 1 ≤ n) (hncl : L.nc + 1 ≤ n) (htv1n : tv1 < n)
+    (hfr : f.fn_return = tint)
+    (hQd : ∀ t le' m' ch', (fChildG L tv1 tv cell st).1 = .done →
+      LoopAtG L m' (fChildG L tv1 tv cell st).2.2 false false (fChildG L tv1 tv cell st).2.1 ch' →
+      Emits t (vertexEmG Em L.level L.nc L.tc tv1 tv st) → FTempsG le' L tv1 →
+      PTree.get dense.id.«tv» le' = some (.Vint (ir tv)) →
+      PTree.get dense.id.«index» le' = PTree.get dense.id.«index» le →
+      Q.normal t e le' m')
+    (hQr : ∀ t m' ch' target short, (fChildG L tv1 tv cell st).1 = .unwind target short →
+      target < L.level →
+      LoopAtG L m' (fChildG L tv1 tv cell st).2.2 false short (fChildG L tv1 tv cell st).2.1 ch' →
+      Emits t (vertexEmG Em L.level L.nc L.tc tv1 tv st) →
+      match Mem.free_list m' (blocks_of_env ge e) with
+      | some m'' => Q.ret t (.Vint (ir target)) m''
+      | none => False) :
+    Wp xi ge f fpnChild Q e le m := by
+  have hnl := h.search.nlt
+  have hd := h.search.lit
+  have hl1 := h.chain.lvl
+  obtain ⟨htvn, htcn, hj⟩ := Lw.first_args hok
+  have horb : P.orbit st tv = st.orbits[tv]! := Lk.orbit_eq st tv
+  apply wp_if_eval
+  rw [Processnode.eval_eqI (x := (st.orbits[tv]! : Int)) (y := (tv : Int))
+    (eval_orbAtG h.search (hE.glob _ (by decide)) htv htvn)
+    (by simp [Exec.evalExpr, Refine.tv, htv]) rfl rfl
+    ⟨by omega, by have := h.search.inv.orbitsSmall tv htvn; omega⟩ ⟨by omega, by omega⟩]
+  by_cases ho : st.orbits[tv]! = tv
+  · have hb : (P.orbit st tv == tv) = true := by rw [horb]; simpa using ho
+    rw [decide_eq_true (by omega)]
+    simp only [show Cfrontend.Cop.bool_val (Val.of_bool true) tint m = some true from rfl, ite_true]
+    -- breakout
+    wp_step
+    refine wp_nodeBreakoutG h.search hE.ec (h.tc.load 0 (by decide)) (hE.gl _) hT.lab hT.ptn
+      hT.lev htv (by omega) htcn hj (Lw.first_broken h.search.inv hok) ?_
+    intro m₁ hS₁ hu₁ hg₁
+    have h₁ := h.smallL (Ws := [L.S.bl, L.S.bp, L.S.bA]) hS₁ (hu₁.mono fun z hz => by simpa using hz)
+      hg₁ (fun z hz => by
+        simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
+        rcases hz with rfl | rfl | rfl <;>
+          exact ⟨by simp [SLoc.litG], by sep_ne hd, by sep_ne hd, by sep_ne hd, by sep_ne hd⟩)
+    simp only [seqPost, Post.after, E0_append]
+    -- ADDELEMENT
+    wp_step
+    refine wp_fixAddG hS₁ (hE.glob _ (by decide)) (hE.glob _ (by decide)) htv htvn ?_
+    intro m₂ hS₂ hu₂ hg₂
+    have h₂ := h₁.smallL (Ws := [L.S.bF]) hS₂ (hu₂.mono fun z hz => by simpa using hz) hg₂
+      (fun z hz => by
+        simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
+        subst hz; exact ⟨by simp [SLoc.litG], by sep_ne hd, by sep_ne hd, by sep_ne hd, by sep_ne hd⟩)
+    simp only [seqPost, Post.after, E0_append]
+    -- cosetindex
+    wp_step; wp_step; wp_step
+    refine wp_setCosetG hS₂ (hE.glob _ (by decide)) htv htvn ?_
+    intro m₃ hS₃ hu₃ hg₃
+    have h₃ := h₂.smallL hS₃ hu₃ hg₃ (fun z hz => by
+        simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
+        subst hz; exact ⟨by simp [SLoc.litG], by sep_ne hd, by sep_ne hd, by sep_ne hd, by sep_ne hd⟩)
+    have h₃' : LoopAtG L m₃ (P.child true L.level L.tc tv st) pre false cell ch :=
+      h₃.same (by rw [← child_true_eqG]; exact Lk.child_same _ _ _ _ _)
+    simp only [seqPost, Post.after, E0_append]
+    have hNok := Lw.first_child hok
+    have hpre' : tv ≠ tv1 → pre = false := fun hne => by
+      cases pre
+      · rfl
+      · exact absurd (hpre rfl) hne
+    -- the recursive call
+    wp_step
+    obtain ⟨cc, hcc⟩ := hT.cc
+    refine wp_fpnCallIfG Lk L h₃' (hRecF _ _) (hRecO _ _) hNok hpre' hcb hln hncl htv1n htvn hE.enc
+      (hE.gl _) hT.lab hT.ptn hT.lev htv hT.tv1 hT.this hcc ?_
+    intro t le₄ m₄ ch₄ h₄ hEm hrt hle hcc4 htg
+    simp only [seqPost, Post.after]
+    have hle4 : ∀ x ∈ [dense.id.«lab», dense.id.«ptn», dense.id.«level», dense.id.tcell,
+        dense.id.«tcnode_this», dense.id.«tv1», dense.id.«tv», dense.id.«index»],
+        PTree.get x le₄ = PTree.get x le := fun x hx =>
+      hle x (by revert x; decide) (by revert x; decide) (by revert x; decide) (by revert x; decide)
+    simp only [List.forall_mem_cons, List.mem_nil_iff, false_implies, implies_true, and_true] at hle4
+    obtain ⟨l1, l2, l3, l4, l5, l6, l7, l8⟩ := hle4
+    have hT4 : FTempsG le₄ L tv1 := hT.of (by
+      simp only [List.forall_mem_cons, List.mem_nil_iff, false_implies, implies_true, and_true]
+      exact ⟨l1, l2, l3, l4, l5, l6⟩) hcc4
+    have hnf := Lw.noFuel hNok (by omega)
+    have eA : (childAfterG L.G L.level L.nc L.tc tv tv1 st).wsCap =
+          (childResG L.G L.level L.nc L.tc tv tv1 st).2.wsCap ∧
+        (childAfterG L.G L.level L.nc L.tc tv tv1 st).autos =
+          (childResG L.G L.level L.nc L.tc tv tv1 st).2.autos := by
+      unfold childAfterG; split <;> simp [Lk.afterChildFirst_eq, afterChildFirst]
+    have hcap : 0 < (childResG L.G L.level L.nc L.tc tv tv1 st).2.wsCap := by
+      have := h₄.search.inv.wsCap
+      rw [← eA.1, this]; decide
+    have hnz : (exitValue (L.level + 1) (childResG L.G L.level L.nc L.tc tv tv1 st).1).2 = true →
+        0 < (childAfterG L.G L.level L.nc L.tc tv tv1 st).autos.size := by
+      intro hs
+      rw [eA.2]
+      generalize hr : (childResG L.G L.level L.nc L.tc tv tv1 st).1 = r at hs
+      rcases r with _ | ⟨tg, sh⟩ | _
+      · simp [exitValue] at hs
+      · simp only [exitValue] at hs
+        subst hs
+        exact Lw.short_autos _ _ _ _ _ hcap hr
+      · simp [exitValue] at hs
+    have hfc : fChildG L tv1 tv cell st = tailResG L.level (childResG L.G L.level L.nc L.tc tv tv1 st).1
+        cell (P.leaveChild tv (childAfterG L.G L.level L.nc L.tc tv tv1 st)) :=
+      firstChildG_orb _ _ _ _ _ _ _ _ _ _ hb
+    have hEm' : Emits t (vertexEmG Em L.level L.nc L.tc tv1 tv st) := by
+      simp only [vertexEmG, hb, ite_true]; exact hEm
+    refine wp_fpnTailG Lk L h₄ hnf htg hnz hfr (hE.gl _) (by rw [l7]; exact htv) htvn hrt hT4.tcell
+      hT4.ptn hT4.lev (by omega) ?_ ?_
+    · intro m' hd' h'
+      rw [← hfc] at hd' h'
+      simp only [append_E0]
+      exact hQd t le₄ m' ch₄ hd' h' hEm' hT4 (by rw [l7]; exact htv) l8
+    · intro m' target short hr hlt h'
+      have hfr' : (fChildG L tv1 tv cell st).1 = .unwind target short := by
+        rw [hfc, hr]; simp [tailResG, hlt]
+      have hst : (fChildG L tv1 tv cell st).2 =
+          (cell, P.leaveChild tv (childAfterG L.G L.level L.nc L.tc tv tv1 st)) := by
+        rw [hfc, hr]; simp [tailResG, hlt]
+      have := hQr t m' ch₄ target short hfr' hlt (by rw [hst]; exact h') hEm'
+      revert this
+      cases Mem.free_list m' (blocks_of_env ge e) <;> simp [append_E0]
+  · -- the vertex is skipped
+    have hb : (P.orbit st tv == tv) = false := by rw [horb]; simpa using ho
+    rw [decide_eq_false (by omega)]
+    simp only [show Cfrontend.Cop.bool_val (Val.of_bool false) tint m = some false from rfl,
+      Bool.false_eq_true, ite_false]
+    apply wp_skip
+    have hfc : fChildG L tv1 tv cell st = (.done, cell, st) := by simp [fChildG, firstChildG, hb]
+    have hp : pre = false := by
+      cases pre
+      · rfl
+      · have := hpre rfl; subst this; rw [Lw.first_orb hok] at hb; cases hb
+    subst hp
+    refine hQd E0 le m ch (by rw [hfc]) (by rw [hfc]; exact h) ?_ hT htv rfl
+    simp only [vertexEmG, hb, Bool.false_eq_true, ite_false]
+    exact Emits.nil
+
+end Generic
 
 end NautyVerified.Proofs.Search
