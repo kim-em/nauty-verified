@@ -46,5 +46,8 @@ variable (ce : composite_env) (m : mem) (a b : attr) (x y : Lib.Integers.int) (u
 @[simp, cop] theorem ne_nn (v : Lib.Integers.int64) (t1 t2 : type) :
     sem_binary_operation ce .One (.Vlong u) (Tpointer t1 a) (.Vlong v) (Tpointer t2 b) m =
       some (Val.of_bool (!Lib.Integers.Int64.eq u v)) := rfl
+omit binary64_certificate binary32_certificate in
+@[simp, cop] theorem bool_lp (t : type) : bool_val (.Vlong u) (Tpointer t a) m =
+    some (!Lib.Integers.Int64.eq u Lib.Integers.Int64.zero) := rfl
 
 end NautyVerified.Proofs.Sparse

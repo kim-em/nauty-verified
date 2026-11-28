@@ -71,7 +71,7 @@ theorem eval_work1 {le : temp_env} {m : mem} {bW : block}
   exact h
 
 /-- The scatter loop. -/
-theorem wp_scatter {n : Nat} {Q : Post} {le : temp_env} {m : mem} {bl : block} {lofs : ptrofs}
+theorem wp_scatter {f : function} {n : Nat} {Q : Post} {le : temp_env} {m : mem} {bl : block} {lofs : ptrofs}
     {bW : block} {lab : Array Nat} {vals : Nat → val}
     (hl : PTree.get id.lab le = some (.Vptr bl lofs))
     (hlarr : ArrayAt m .Mint32 bl (intOfZ (Ptrofs.unsigned lofs)) (ints lab) n)
@@ -84,7 +84,7 @@ theorem wp_scatter {n : Nat} {Q : Post} {le : temp_env} {m : mem} {bl : block} {
     (hQ : ∀ le' m', ArrayAt m' .Mint32 bW 0 (fun p => .Vint (ir (((inverse n lab)[p]! : Nat) : Int))) n →
       Unch m m' (· = bW) → Alloc.Keep m m' bW → (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
       (∀ x, x ≠ id.i → PTree.get x le' = PTree.get x le) → Q.normal E0 empty_env le' m') :
-    Wp xi sge F (iloop scatter) Q empty_env le m := by
+    Wp xi sge f (iloop scatter) Q empty_env le m := by
   let Inv := fun (k : Nat) (le' : temp_env) (m' : mem) => k ≤ n ∧
     PTree.get id.i le' = some (.Vint (ir k)) ∧ PTree.get id.n le' = some (.Vint (ir n)) ∧
     ArrayAt m' .Mint32 bW 0 (written lab n vals k) n ∧ Unch m m' (· = bW) ∧
