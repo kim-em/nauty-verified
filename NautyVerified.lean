@@ -321,3 +321,5 @@ import NautyVerified.Proofs.Sparse.Sort.Satisfies
 import NautyVerified.Proofs.Dispatch.Spec
 import NautyVerified.Proofs.Dispatch.Dense
 import NautyVerified.Proofs.Dispatch.Doref
+import NautyVerified.Spec.SparseInts
+import NautyVerified.Proofs.Sparse.Ints.Satisfies
