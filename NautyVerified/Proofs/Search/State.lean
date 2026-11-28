@@ -155,7 +155,9 @@ structure Fixed (n : Nat) (m : mem) (S : SLoc) : Prop where
   dRefine1 : FieldAt m .Mint64 Block.dispatch 32 (.Vptr Refine.Block.refine1 Ptrofs.zero)
   dCheapautom : FieldAt m .Mint64 Block.dispatch 40 (.Vptr Block.cheapautomFn Ptrofs.zero)
   dTargetcell : FieldAt m .Mint64 Block.dispatch 48 (.Vptr Block.targetcellFn Ptrofs.zero)
-  kill : IntAt m Block.killRequest 0
+  /-- `nauty_kill_request` is a volatile global: nauty's reads of it are volatile
+  loads (trace events), so only its block's existence matters here. -/
+  kill : Mem.valid_access m .Mint32 Block.killRequest (zOfInt 0) .Nonempty
   allocM : IntAt m Block.allocM S.M
   /-- `mininvarlevel`, `maxinvarlevel`, `invararg`: some `int`s, passed to
   `doref` and unused there since `invarproc` is `NULL`. -/

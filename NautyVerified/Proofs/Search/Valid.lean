@@ -105,7 +105,7 @@ theorem SearchAt.valid_blocks {n : Nat} {m : mem} {S : SLoc} {ctx : Ctx n} {st :
   · exact hF.workspace.valid
   · exact hF.worktop.valid
   · exact hA.autos.fmptr.valid
-  · exact hF.kill.valid
+  · exact Alloc.valid_of_access hF.kill
   · exact dyn_valid_p hD.active
   · exact dyn_valid_s hD.active
   · exact dyn_valid_p hD.fixedpts

@@ -33,7 +33,9 @@ theorem wp_lset {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {g
     (hr : Exec.evalExpr ge e le m rhs = some v) (hrt : typeof rhs = ty)
     (hc : Cfrontend.Cop.sem_cast v ty ty m = some v) (hlr : Val.load_result chunk v = v)
     (hQ : ∀ m', FieldAt m' chunk b 0 v → Unch m m' (· = b) →
-      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) → Q.normal E0 e le m') :
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
+      (∀ p, Mem.valid_access m chunk b (zOfInt 0) p → Mem.valid_access m' chunk b (zOfInt 0) p) →
+      Q.normal E0 e le m') :
     Wp xi ge f (.Sassign (.Evar g ty) rhs) Q e le m := by
   obtain ⟨m', hst⟩ := Mem.valid_access_store _ _ _ _ v hw
   apply wp_assign_eval
@@ -46,6 +48,7 @@ theorem wp_lset {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {g
   exact hQ m' ⟨by rw [Mem.load_store_same _ _ _ _ _ _ hst, hlr],
     Mem.store_valid_access_1 _ _ _ _ _ _ hst _ _ _ _ hw⟩ (Unch.store hst rfl)
     (fun z hz => Mem.store_valid_block_1 _ _ _ _ _ _ hst _ hz)
+    (fun p hp => Mem.store_valid_access_1 _ _ _ _ _ _ hst _ _ _ _ hp)
 
 /-- `g`, `canong`, `initstatus` and `dispatch.init` (`tInit`). -/
 theorem wp_tInit {Q : Post} {le : temp_env} {m : mem} {bg bc : block} {M : Nat}
@@ -54,17 +57,20 @@ theorem wp_tInit {Q : Post} {le : temp_env} {m : mem} {bg bc : block} {M : Nat}
     (hD : DispatchAt m M)
     (hwg : Mem.valid_access m .Mint64 Search.Block.g (zOfInt 0) .Writable)
     (hwc : Mem.valid_access m .Mint64 Search.Block.canong (zOfInt 0) .Writable)
-    (hwi : Mem.valid_access m .Mint32 bI (zOfInt 0) .Writable)
+    (hfi : Mem.valid_access m .Mint32 bI (zOfInt 0) .Freeable)
     (hds : IntAt m Search.Block.doschreier 0)
     (hsep : bI ≠ Search.Block.g ∧ bI ≠ Search.Block.canong ∧ bI ≠ Search.Block.doschreier ∧
       bI ≠ Search.Block.dispatch)
     (hQ : ∀ le' m', FieldAt m' .Mint64 Search.Block.g 0 (.Vptr bg Ptrofs.zero) →
       FieldAt m' .Mint64 Search.Block.canong 0 (.Vptr bc Ptrofs.zero) → IntAt m' bI 0 →
+      Mem.valid_access m' .Mint32 bI (zOfInt 0) .Freeable →
       Unch m m' (fun z => z = Search.Block.g ∨ z = Search.Block.canong ∨ z = bI) →
       (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
       (∀ x, x ≠ idOf 732 → PTree.get x le' = PTree.get x le) →
       Wp xi ge dense.fn.nauty Nauty.tOrbits Q (nEnv bI) le' m') :
     Wp xi ge dense.fn.nauty Nauty.tInit Q (nEnv bI) le m := by
+  have hwi : Mem.valid_access m .Mint32 bI (zOfInt 0) .Writable :=
+    Mem.valid_access_implies _ _ _ _ _ _ hfi (.perm_F_any _)
   simp only [Nauty.tInit, Set.sk]
   wp_step; wp_step; wp_step; wp_step; wp_step
   apply wp_set_eval
@@ -87,7 +93,8 @@ theorem wp_tInit {Q : Post} {le : temp_env} {m : mem} {bg bc : block} {M : Nat}
   simp only [seqPost, Post.after, E0_append]
   wp_step; wp_step; wp_step
   refine wp_lset rfl rfl (ha2 _ _ _ _ (ha1 _ _ _ _ hwi)) (v := .Vint (ir 0)) rfl rfl rfl rfl ?_
-  intro m3 hi3 hu3 hv3
+  intro m3 hi3 hu3 hv3 hf3
+  have hfi3 := hf3 _ (ha2 _ _ _ _ (ha1 _ _ _ _ hfi))
   simp only [seqPost, Post.after, E0_append]
   have hu123 : Unch m m3 (fun z => z = Search.Block.g ∨ z = Search.Block.canong ∨ z = bI) :=
     ((hu1.mono fun _ h => .inr (.inl h)).trans (hu2.mono fun _ h => .inl h)).trans
@@ -171,7 +178,8 @@ theorem wp_tInit {Q : Post} {le : temp_env} {m : mem} {bg bc : block} {M : Nat}
   simp only [Bool.false_eq_true, ite_false]
   apply wp_skip
   simp only [seqPost, Post.after, E0_append]
-  exact hQ _ m5 (hg4.unch hu5 (by decide)) hc5 ((hi3.unch hu4 hgi).unch hu5 hgc) hu15
+  exact hQ _ m5 (hg4.unch hu5 (by decide)) hc5 ((hi3.unch hu4 hgi).unch hu5 hgc)
+    (hu5.access _ _ _ _ hgc (hu4.access _ _ _ _ hgi hfi3)) hu15
     (fun z h => hv5 _ (hv4 _ (hv123 z h))) (fun x hx => temps_gso _ _ hx)
 
 end NautyVerified.Proofs.Top

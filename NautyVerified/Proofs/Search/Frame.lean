@@ -123,7 +123,7 @@ theorem Fixed.unch {n : Nat} {m m' : mem} {S : SLoc} {W : block → Prop} (h : F
     h.usercanonproc.unch hu h18, h.userautomproc.unch hu h19, h.dIsautom.unch hu h20,
     h.dTestcanlab.unch hu h20, h.dUpdatecan.unch hu h20, h.dRefine.unch hu h20,
     h.dRefine1.unch hu h20, h.dCheapautom.unch hu h20, h.dTargetcell.unch hu h20,
-    h.kill.unch hu h21, h.allocM.unch hu h22, ⟨v1, f1.unch hu h23⟩, ⟨v2, f2.unch hu h24⟩,
+    hu.access _ _ _ _ h21 h.kill, h.allocM.unch hu h22, ⟨v1, f1.unch hu h23⟩, ⟨v2, f2.unch hu h24⟩,
     ⟨v3, f3.unch hu h25⟩, h.dFreedyn.unch hu h20, h.dCleanup.unch hu h20⟩
 
 theorem Tables.unch {m m' : mem} {W : block → Prop} (h : Tables m) (hu : Unch m m' W)
