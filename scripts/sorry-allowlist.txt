@@ -1,1 +1,0 @@
-NautyVerified/Statement/Final.lean

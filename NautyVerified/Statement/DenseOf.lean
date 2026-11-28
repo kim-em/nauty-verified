@@ -2,11 +2,10 @@ import NautyVerified.Statement.Compose
 import NautyVerified.Proofs.Top.Nauty
 
 /-!
-# The end-to-end theorem for dense nauty, from the emission laws
+# The end-to-end theorem for dense nauty, from `main_ok`
 
-`densenauty_binary_correct_of` proves `densenauty_binary_correct`'s statement.
-It lives here rather than in `Statement/Dense.lean` because `main_ok` imports
-the harness proofs, which import `Statement/Dense.lean`.
+`densenauty_binary_correct_of` proves `densenauty_binary_correct`'s statement
+(`Statement/Final.lean`).
 
 - `init_mem_some`: the linked program has an initial memory. CompCert's
   `init_mem_exists` asks for every global's initialiser to be aligned and to
