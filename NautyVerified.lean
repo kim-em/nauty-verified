@@ -338,3 +338,7 @@ import NautyVerified.Proofs.Sparse.Distvals.Loops
 import NautyVerified.Proofs.Sparse.Distvals.Search
 import NautyVerified.Proofs.Sparse.Distvals.Satisfies
 import NautyVerified.Proofs.Sparse.Refine.Pieces
+import NautyVerified.Proofs.Sparse.Targetcell.Syntax
+import NautyVerified.Proofs.Sparse.Bestcell.Spec
+import NautyVerified.Proofs.Sparse.Bestcell.Syntax
+import NautyVerified.Proofs.Sparse.Targetcell.Satisfies

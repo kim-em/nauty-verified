@@ -52,8 +52,8 @@ theorem cast_bool (b : Bool) (m : mem) {a a' : Cfrontend.Ctypes.attr} :
 abbrev HintOK (ptn : Array Nat) (level : Nat) (hint : Int) : Prop :=
   hint ≥ 0 ∧ ptn[hint.toNat]! > level ∧ ((hint == 0) = true ∨ ptn[hint.toNat - 1]! ≤ level)
 
-theorem wp_hintTest {xi : ExternalCalls} {Q : Post} {le : temp_env} {m : mem} {s : statement}
-    {bp : block} {pofs : ptrofs} {ptn : Array Nat} {n level : Nat} {hint : Int}
+theorem wp_hintTest {xi : ExternalCalls} {ge : genv} {f : function} {Q : Post} {le : temp_env}
+    {m : mem} {s : statement} {bp : block} {pofs : ptrofs} {ptn : Array Nat} {n level : Nat} {hint : Int}
     (hptn : PTree.get id.ptn le = some (.Vptr bp pofs))
     (harr : ArrayAt m .Mint32 bp (intOfZ (Ptrofs.unsigned pofs)) (ints ptn) n)
     (hn : n < 2147483648) (hlev : PTree.get id.level le = some (.Vint (ir level)))
@@ -62,8 +62,8 @@ theorem wp_hintTest {xi : ExternalCalls} {Q : Post} {le : temp_env} {m : mem} {s
     (hh0 : -2147483648 ≤ hint)
     (hQ : ∀ le', PTree.get id.t7 le' = some (Val.of_bool (decide (HintOK ptn level hint))) →
       (∀ x, x ≠ id.t6 → x ≠ id.t7 → PTree.get x le' = PTree.get x le) →
-      Wp xi ge Source.dense.fn.targetcell s Q empty_env le' m) :
-    Wp xi ge Source.dense.fn.targetcell (.Ssequence hintTest s) Q empty_env le m := by
+      Wp xi ge f s Q empty_env le' m) :
+    Wp xi ge f (.Ssequence hintTest s) Q empty_env le m := by
   have hpe : ∀ (le' : temp_env) (a : expr) (c : Nat), c < n →
       Exec.evalExpr ge empty_env le' m a = some (.Vint (ir c)) → typeof a = tint →
       PTree.get id.ptn le' = some (.Vptr bp pofs) →
@@ -164,8 +164,8 @@ theorem wp_hintTest {xi : ExternalCalls} {Q : Post} {le : temp_env} {m : mem} {s
     refine hQ _ ?_ fun x h6 h7 => by rw [temps_gso _ _ h7, temps_gso _ _ h6]
     rw [temps_gss, decide_eq_false (fun hc => hs hc.1)]; rfl
 
-theorem wp_scan {xi : ExternalCalls} {Q : Post} {le : temp_env} {m : mem}
-    {bp : block} {pofs : ptrofs} {ptn : Array Nat} {n level : Nat}
+theorem wp_scan {xi : ExternalCalls} {ge : genv} {f : function} {Q : Post} {le : temp_env}
+    {m : mem} {bp : block} {pofs : ptrofs} {ptn : Array Nat} {n level : Nat}
     (hptn : PTree.get id.ptn le = some (.Vptr bp pofs))
     (harr : ArrayAt m .Mint32 bp (intOfZ (Ptrofs.unsigned pofs)) (ints ptn) n)
     (hn : n < 2147483648) (hlev : PTree.get id.level le = some (.Vint (ir level)))
@@ -174,7 +174,7 @@ theorem wp_scan {xi : ExternalCalls} {Q : Post} {le : temp_env} {m : mem}
     (hQ : ∀ le' k, k ≤ n → PTree.get id.i le' = some (.Vint (ir k)) →
       (∀ y < k, ptn[y]! ≤ level) → (k < n → level < ptn[k]!) →
       (∀ x, x ≠ id.i → x ≠ id.t4 → PTree.get x le' = PTree.get x le) → Q.normal E0 empty_env le' m) :
-    Wp xi ge Source.dense.fn.targetcell scan Q empty_env le m := by
+    Wp xi ge f scan Q empty_env le m := by
   wp_step; wp_step; wp_step
   apply wp_set_eval
   simp only [Exec.evalExpr, E0_append]
