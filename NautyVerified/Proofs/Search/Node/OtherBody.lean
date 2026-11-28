@@ -5,23 +5,23 @@ import NautyVerified.Proofs.Search.Processnode.Satisfies
 /-!
 # `othernode0` meets its specification
 
-`othernode_body`: nauty.c's `othernode0` satisfies `othernodeSpecG` at
-`level`, given `othernode0`'s specification at `level + 1` for its children,
-the emission law `EmLawOff`, and `refine`'s specification.
+`othernode_bodyG`: nauty.c's `othernode0` satisfies the off-path node
+specification `nodeSpecG` at `level` for any `DispatchC`, `Classifier` and
+search policy with its `PolicyLink` and `NodeLaws`, given the specification at
+`level + 1` for its children and the emission law `EmLawOffG`.
 
-The body: the locals are allocated on entry (`alloc_ints`), the prologue finds
-this level's target-cell entry (`wp_nodePrologue`), then the kill check, the
-node count, the refinement (`wp_nodeVisit`), the code comparisons, the target
-cell (`wp_chooseOff`), `processnode` (`wp_nodeProcess`) and, when the node
-continues, `wp_otherTail`; HexGraphIso's side is `node_false_succ`.
-`oPost`: freeing the locals at a return gives the specification's
-postcondition.
+The body: the locals are allocated on entry (`oEntry_existsG`, `alloc_ints`),
+the prologue finds this level's target-cell entry (`wp_nodePrologueG`), then
+the kill check, the node count, the refinement (`wp_nodeVisitG`, the policy's
+`visit` by `PolicyLink.visit_same`), the code comparisons, the target cell
+(`wp_chooseOffG`, `PolicyLink.target_eq`/`target_same`), `processnode`
+(`wp_nodeProcessG`) and, when the node continues, `wp_otherTailG`;
+HexGraphIso's side is `node_false_succG`. `oPostG`: freeing the locals at a
+return gives the specification's postcondition.
 
-`othernode_bodyG` is the same for any `DispatchC` and `Classifier`, and a
-search policy with its `PolicyLink` and `NodeLaws`, against `nodeSpecG`
-(`oPostG`, `oEntry_existsG`); the dense `othernode_body` is its instance at
-`Dispatch.dense`, `denseClassifier`, `denseLink` and `denseLaws`
-(`nodeSpec_ofG`, `nodeSpec_toG`, `EmLawOff.toG`).
+The dense `othernode_body` is the instance at `Dispatch.dense`,
+`denseClassifier`, `denseLink` and `denseLaws` (`nodeSpec_ofG`,
+`nodeSpec_toG`, `EmLawOff.toG`).
 -/
 
 namespace NautyVerified.Proofs.Search
@@ -41,41 +41,12 @@ set_option linter.unusedSimpArgs false
 
 variable {xi : ExternalCalls} {n : Nat}
 
-/-- The specification's postcondition at a return, once the locals are freed. -/
-theorem oPost {k : Nat} {G : Colored n k} {Em : Bool → Nat → Nat → Search n → List Int}
-    {S : SLoc} {st : Search n} {level nc : Nat} {chain : List (block × block)} {args : List val}
-    {m₀ m : mem} {chain' : List (block × block)} {ncw tcw : val} {nd bt : block} {L : OLocs}
-    {s : Search n} {ns : Bool} {v : Int} {t : trace}
-    (hLS : ∀ z ∈ L.list, z ∉ S.blocks) (hLF : ∀ z ∈ L.list, ¬ Mem.valid_block m₀ z)
-    (hLd : L.list.Pairwise (· ≠ ·)) (hS : SearchAt m S ⟨rowsOf G⟩ s false ns)
-    (c : Carry m₀ m S chain chain' level ncw tcw nd bt L)
-    (hok : SearchInf.NodeOk G false level nc st)
-    (hr2 : (hexNode false ⟨rowsOf G⟩ level nc st).2 = s)
-    (hrv : exitValue level (hexNode false ⟨rowsOf G⟩ level nc st).1 = (v, ns))
-    (hEm : Emits t (Em false level nc st)) :
-    match Mem.free_list m (blocks_of_env ge (oEnv L)) with
-    | some m'' => (othernodeSpecG xi G Em S st level nc chain).post args m₀ t (.Vint (ir v)) m''
-    | none => False := by
-  obtain ⟨m', hfree, hS', hTc', hTo', hF', hW'⟩ := c.finish hLS hLF hLd hS
-  rw [hfree]
-  have hlt : level - 1 < chain'.length := by
-    have := c.own; rw [List.getElem?_eq_some_iff] at this; obtain ⟨h1, -⟩ := this; exact h1
-  have hl1 := c.l1
-  refine ⟨by rw [hrv], by rw [hr2, hrv]; exact hS', hEm,
-    ⟨chain', hTc', hTo', by omega, c.take, c.old⟩, hF', hW', ?_⟩
-  exact SearchInf.nodeOk_unwind_lt hok _ _ _ _
-
 theorem vars_notWork {S : SLoc} (hd : S.blocks.Pairwise (· ≠ ·)) {z : block} (hz : z ∈ S.vars) :
     z ∉ workG := fun h => SLoc.vars_ne hd z hz z (workG_globs z h) rfl
 
 theorem vars_chg {S : SLoc} (hd : S.blocks.Pairwise (· ≠ ·)) {z : block} (hz : z ∈ S.vars)
     (hu : z ≠ S.bUA) : S.Chg z :=
   ⟨SLoc.vars_blocks hz, hu, fun e => SLoc.vars_ne hd z hz _ tcnode0_globs e⟩
-
-theorem compareCodes_ptn' (level code : Nat) (st : Search n) :
-    (compareCodes level code st).ptn = st.ptn := by
-  rw [compareCodes]
-  simp only [Id.run_bind, Id.run_pure, apply_ite Id.run, apply_ite SearchState.ptn, ite_self]
 
 /-- `othernode0`'s temporaries on entry. -/
 abbrev oTemps (a b c d e : val) : temp_env :=
@@ -88,69 +59,6 @@ def OEntry (m₀ : mem) (e : env) (m : mem) (L : OLocs) : Prop :=
   e = oEnv L ∧ (∀ z ∈ L.list, ¬ Mem.valid_block m₀ z ∧ Mem.valid_access m .Mint32 z (zOfInt 0) .Freeable) ∧
     L.list.Pairwise (· ≠ ·) ∧ Unch m₀ m (fun z => ¬ Mem.valid_block m₀ z) ∧
     (∀ z, Mem.valid_block m₀ z → Mem.valid_block m z)
-
-theorem oEntry_exists (m₀ : mem) (args : List val) (a b c d e : val)
-    (ha : args = [a, b, c, d, e]) :
-    ∃ en le m, function_entry2 ge dense.fn.«nauty:othernode0» args m₀ en le m ∧
-      le = oTemps a b c d e ∧ ∃ L, OEntry m₀ en m L := by
-  subst ha
-  have hids : [dense.id.numcells, dense.id.refcode, dense.id.tcellsize, dense.id.tc,
-      dense.id.qinvar].Nodup := by decide
-  obtain ⟨en, m, hav, hout, hin, hdist, hu, hg⟩ := alloc_ints _ empty_env m₀ hids
-  obtain ⟨b1, e1, f1, -, a1⟩ := hin dense.id.numcells (by simp)
-  obtain ⟨b2, e2, f2, -, a2⟩ := hin dense.id.refcode (by simp)
-  obtain ⟨b3, e3, f3, -, a3⟩ := hin dense.id.tcellsize (by simp)
-  obtain ⟨b4, e4, f4, -, a4⟩ := hin dense.id.tc (by simp)
-  obtain ⟨b5, e5, f5, -, a5⟩ := hin dense.id.qinvar (by simp)
-  let L : OLocs := ⟨b1, b2, b3, b4, b5⟩
-  have hd : ∀ x y, x ∈ [dense.id.numcells, dense.id.refcode, dense.id.tcellsize, dense.id.tc,
-      dense.id.qinvar] → y ∈ [dense.id.numcells, dense.id.refcode, dense.id.tcellsize, dense.id.tc,
-      dense.id.qinvar] → x ≠ y → ∀ bx by_, Bound en x bx → Bound en y by_ → bx ≠ by_ :=
-    fun x y hx hy => hdist x hx y hy
-  have he : en = oEnv L := by
-    apply PTree.extensionality
-    intro i
-    by_cases h1 : i = dense.id.qinvar
-    · subst h1; rw [e5]; exact (PTree.gss _ _ _).symm
-    by_cases h2 : i = dense.id.tc
-    · subst h2; rw [e4, PTree.gso _ _ (by decide)]; exact (PTree.gss _ _ _).symm
-    by_cases h3 : i = dense.id.tcellsize
-    · subst h3; rw [e3, PTree.gso _ _ (by decide), PTree.gso _ _ (by decide)]
-      exact (PTree.gss _ _ _).symm
-    by_cases h4 : i = dense.id.refcode
-    · subst h4; rw [e2, PTree.gso _ _ (by decide), PTree.gso _ _ (by decide),
-        PTree.gso _ _ (by decide)]; exact (PTree.gss _ _ _).symm
-    by_cases h5 : i = dense.id.numcells
-    · subst h5; rw [e1, PTree.gso _ _ (by decide), PTree.gso _ _ (by decide),
-        PTree.gso _ _ (by decide), PTree.gso _ _ (by decide)]; exact (PTree.gss _ _ _).symm
-    rw [hout i (by simp [h1, h2, h3, h4, h5]), PTree.gso _ _ h1, PTree.gso _ _ h2,
-      PTree.gso _ _ h3, PTree.gso _ _ h4, PTree.gso _ _ h5]
-  refine ⟨en, _, m, ⟨?_, ?_, ?_, hav, rfl⟩, rfl, L, he, ?_, ?_, hu, hg⟩
-  · exact Nextelement.norepet_of_nodup (by decide)
-  · exact Nextelement.norepet_of_nodup (by decide)
-  · exact Nextelement.disjoint_of (by decide)
-  · intro z hz
-    simp only [OLocs.list, List.mem_cons, List.mem_nil_iff, or_false] at hz
-    rcases hz with rfl | rfl | rfl | rfl | rfl
-    · exact ⟨f1, a1⟩
-    · exact ⟨f2, a2⟩
-    · exact ⟨f3, a3⟩
-    · exact ⟨f4, a4⟩
-    · exact ⟨f5, a5⟩
-  · simp only [OLocs.list, List.pairwise_cons, List.mem_cons, List.mem_nil_iff, or_false,
-      forall_eq_or_imp, forall_eq, List.Pairwise.nil, and_true, false_implies, implies_true]
-    refine ⟨⟨?_, ?_, ?_, ?_⟩, ⟨?_, ?_, ?_⟩, ⟨?_, ?_⟩, ?_⟩
-    all_goals first
-      | exact hd _ _ (by simp) (by simp) (by decide) _ _ e1 e2
-      | exact hd _ _ (by simp) (by simp) (by decide) _ _ e1 e3
-      | exact hd _ _ (by simp) (by simp) (by decide) _ _ e1 e4
-      | exact hd _ _ (by simp) (by simp) (by decide) _ _ e1 e5
-      | exact hd _ _ (by simp) (by simp) (by decide) _ _ e2 e3
-      | exact hd _ _ (by simp) (by simp) (by decide) _ _ e2 e4
-      | exact hd _ _ (by simp) (by simp) (by decide) _ _ e2 e5
-      | exact hd _ _ (by simp) (by simp) (by decide) _ _ e3 e4
-      | exact hd _ _ (by simp) (by simp) (by decide) _ _ e3 e5
-      | exact hd _ _ (by simp) (by simp) (by decide) _ _ e4 e5
 
 /-! ### For any dispatch and search policy -/
 
@@ -240,7 +148,7 @@ theorem oEntry_existsG (m₀ : mem) (args : List val) (a b c d e : val)
 
 variable [P : Generic.Policy (SearchState n (O.Canon n)) n (γ := O.Gr n)]
 
-/-- `oPost` for `D` and the policy `P`. -/
+/-- The specification's postcondition at a return, once the locals are freed. -/
 theorem oPostG {D : DispatchRep ge O} {K : PolicyLink O n} {G : O.Gr n} (Lw : NodeLaws K G)
     {Em : Bool → Nat → Nat → SearchState n (O.Canon n) → List Int}
     {S : SLoc} {gl : D.GLoc} {cl : D.CLoc} {st : SearchState n (O.Canon n)} {level nc : Nat}

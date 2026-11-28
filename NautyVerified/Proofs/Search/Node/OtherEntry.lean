@@ -6,10 +6,10 @@ import NautyVerified.Proofs.Search.Node.Env
 
 `oEnv L`: the local environment binding `numcells`, `refcode`, `tcellsize`,
 `tc` and `qinvar` to the blocks of `L`, as `alloc_variables` builds it;
-`blocks_oEnv`: the blocks `return` frees. `Carry.finish`: freeing the locals
-succeeds and keeps `SearchAt`, the target-cell list, the frame since entry
-and `WorkMono`. `blocks_oEnvG`, `CarryG.finish`, `oAllocG`, `nset_parentG`,
-`tcParent_tcBlocks` and `CarryG.init` are the same over `SearchAtG D`.
+`blocks_oEnvG`: the blocks `return` frees. `CarryG.finish`: freeing the locals
+succeeds and keeps `SearchAtG`, the target-cell list, the frame since entry
+and `WorkMonoG`. `oAllocG` (and the dense `oAlloc`): the pre-state after the
+locals are allocated; `CarryG.init`: `CarryG` after the prologue.
 -/
 
 namespace NautyVerified.Proofs.Search
@@ -28,55 +28,6 @@ abbrev oEnv (L : OLocs) : env :=
   PTree.set dense.id.qinvar (L.bq, tint) (PTree.set dense.id.tc (L.bc, tint)
     (PTree.set dense.id.tcellsize (L.bz, tint) (PTree.set dense.id.refcode (L.bk, tint)
       (PTree.set dense.id.numcells (L.bnc, tint) empty_env))))
-
-theorem blocks_oEnv (L : OLocs) :
-    blocks_of_env ge (oEnv L) = [L.bq, L.bnc, L.bc, L.bz, L.bk].map
-      fun b => (b, zOfInt 0, sizeof ge.genv_cenv tint) := rfl
-
-theorem Carry.finish {m₀ m : mem} {S : SLoc} {ctx : Ctx n} {st : Search n} {pre nsp : Bool}
-    {chain₀ chain : List (block × block)} {level : Nat} {ncw tcw : val} {nd bt : block} {L : OLocs}
-    (hLS : ∀ z ∈ L.list, z ∉ S.blocks) (hLF : ∀ z ∈ L.list, ¬ Mem.valid_block m₀ z)
-    (hLd : L.list.Pairwise (· ≠ ·))
-    (h : SearchAt m S ctx st pre nsp) (c : Carry m₀ m S chain₀ chain level ncw tcw nd bt L) :
-    ∃ m', Mem.free_list m (blocks_of_env ge (oEnv L)) = some m' ∧ SearchAt m' S ctx st pre nsp ∧
-      TcChain m' S.M Block.tcnode0 chain ∧ TcOk m' S chain ∧ NodeFrame m₀ m' S chain₀ level ∧
-      WorkMono m₀ m' := by
-  have hmem : ∀ z, z ∈ [L.bq, L.bnc, L.bc, L.bz, L.bk] → z ∈ L.list := by
-    intro z hz
-    simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz ⊢
-    rcases hz with h | h | h | h | h <;> simp [h]
-  have hnd : [L.bq, L.bnc, L.bc, L.bz, L.bk].Nodup := by
-    simp only [List.pairwise_cons, List.mem_cons, List.mem_nil_iff, or_false, forall_eq_or_imp,
-      forall_eq, List.Pairwise.nil, and_true, false_implies, implies_true] at hLd
-    obtain ⟨⟨a1, a2, a3, a4⟩, ⟨b2, b3, b4⟩, ⟨c3, c4⟩, d4⟩ := hLd
-    simp only [List.nodup_cons, List.mem_cons, List.mem_nil_iff, or_false, not_or,
-      List.not_mem_nil, not_false_eq_true, List.nodup_nil, and_true]
-    refine ⟨⟨?_, ?_, ?_, ?_⟩, ⟨?_, ?_, ?_⟩, ⟨?_, ?_⟩, ?_⟩ <;> intro e <;>
-      first
-        | exact a1 e | exact a1 e.symm | exact a2 e | exact a2 e.symm | exact a3 e | exact a3 e.symm
-        | exact a4 e | exact a4 e.symm | exact b2 e | exact b2 e.symm | exact b3 e | exact b3 e.symm
-        | exact b4 e | exact b4 e.symm | exact c3 e | exact c3 e.symm | exact c4 e | exact c4 e.symm
-        | exact d4 e | exact d4 e.symm
-  obtain ⟨m', hfree, hu⟩ := free_ints [L.bq, L.bnc, L.bc, L.bz, L.bk] m hnd
-    (fun b hb => (c.locs b (hmem b hb)).1)
-  have hu' : Unch m m' (· ∈ L.list) := hu.mono fun z hz => hmem z hz
-  have hv : ∀ z, Mem.valid_block m z → Mem.valid_block m' z := free_list_valid hfree
-  have hwk : ∀ z, IsWork m z → z ∉ L.list := fun z hz hl => (c.locs z hl).2.1 hz
-  have wm : WorkMono m m' := WorkMono.of_unch h.work hu'
-    (fun z hz hl => hLS z hl (by revert z; simp [workG, SLoc.blocks])) hwk
-  refine ⟨m', by rw [blocks_oEnv]; exact hfree, h.unch hu' (fun z hz hl => hLS z hl hz) hwk, ?_,
-    TcOk.mono c.tco hv wm,
-    NodeFrame.mk' (c.frame.nset.trans (hu'.mono fun z hz => .inr (.inl (hLF z hz))))
-      (fun z hz => hv _ (c.frame.grow _ hz)), WorkMono.trans c.wm c.frame.grow wm⟩
-  refine TcChain.unch hu' c.tcc fun z hz hl => ?_
-  simp only [tcBlocks, List.mem_cons] at hz
-  rcases hz with rfl | hz
-  · exact hLS _ hl (by simp [SLoc.blocks])
-  · obtain ⟨p, hp, hz⟩ := List.mem_flatMap.1 hz
-    simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
-    rcases hz with rfl | rfl
-    · exact ((c.locs _ hl).2.2 p hp).1 rfl
-    · exact ((c.locs _ hl).2.2 p hp).2 rfl
 
 /-- A freeable `int` local holds some value. -/
 theorem arrayAt_of_access {m : mem} {b : block}
@@ -137,91 +88,6 @@ theorem nset_parent {m : mem} {S : SLoc} {chain : List (block × block)} {level 
 theorem tcParent_mem {chain : List (block × block)} {level : Nat} (hl1 : 1 ≤ level)
     (hlen : level - 1 ≤ chain.length) : tcParent chain level ∈ tcBlocks Block.tcnode0 chain :=
   (tcParent_eq hl1 hlen) ▸ prevAt_mem _ _ _
-
-/-- `Carry` after the prologue. -/
-theorem Carry.init {m₀ mA m₁ : mem} {S : SLoc} {ctx : Ctx n} {st : Search n} {pre : Bool}
-    {chain chain' : List (block × block)} {level nc : Nat} {nd bt : block} {L : OLocs}
-    (h0 : SearchAt m₀ S ctx st pre false) (hTo0 : TcOk m₀ S chain)
-    (hl1 : 1 ≤ level) (hlen : level - 1 ≤ chain.length)
-    (huaV : Mem.valid_block m₀ S.bUA) (huaP : Mem.perm m₀ S.bUA (zOfInt 0) .Cur .Nonempty)
-    (hLF : ∀ z ∈ L.list, ¬ Mem.valid_block m₀ z) (hLS : ∀ z ∈ L.list, z ∉ S.blocks)
-    (hLd : L.list.Pairwise (· ≠ ·))
-    (huA : Unch m₀ mA (fun z => ¬ Mem.valid_block m₀ z))
-    (hgA : ∀ z, Mem.valid_block m₀ z → Mem.valid_block mA z) (hwmA : WorkMono m₀ mA)
-    (haccA : ∀ z ∈ L.list, Mem.valid_access mA .Mint32 z (zOfInt 0) .Freeable)
-    (hwkA : ∀ z ∈ L.list, ¬ IsWork mA z) (hcA : ∀ z ∈ L.list, ∀ p ∈ chain, p.1 ≠ z ∧ p.2 ≠ z)
-    (hA1 : ArrayAt m₁ .Mint32 L.bnc 0 (fun _ => .Vint (ir nc)) 1)
-    (hTc1 : TcChain m₁ S.M Block.tcnode0 chain') (hTo1 : TcOk m₁ S chain')
-    (hown : chain'[level - 1]? = some (nd, bt))
-    (htake : chain'.take (level - 1) = chain.take (level - 1))
-    (hold : ∀ p ∈ chain', p ∈ chain ∨ (¬ Mem.valid_block mA p.1 ∧ ¬ Mem.valid_block mA p.2))
-    (hU1 : Unch mA m₁ (fun z => z = L.bnc ∨ z = tcParent chain level ∨ ¬ Mem.valid_block mA z))
-    (hg1 : ∀ z, Mem.valid_block mA z → Mem.valid_block m₁ z) (hwm1 : WorkMono mA m₁)
-    (hK1 : Keep mA m₁ L.bnc) :
-    ∃ tcw, Carry m₀ m₁ S chain chain' level (.Vint (ir nc)) tcw nd bt L := by
-  have hd := h0.distinct
-  have hpT := tcParent_mem hl1 hlen
-  have hpar : ∀ z, z ∈ S.blocks → z ≠ Block.tcnode0 → z ≠ tcParent chain level := by
-    intro z hz h0' e
-    rw [tcParent_eq hl1 hlen] at e
-    rcases prevAt_mem_nodes Block.tcnode0 chain (level - 1) with h' | ⟨p, hp, h'⟩
-    · exact h0' (e.trans h')
-    · exact (hTo0.apart p hp).1 (h' ▸ e ▸ hz)
-  have hlocP : ∀ z ∈ L.list, z ≠ tcParent chain level := by
-    intro z hz e
-    have := hpT; rw [← e] at this
-    simp only [tcBlocks, List.mem_cons] at this
-    rcases this with e' | hz'
-    · exact hLS z hz (e' ▸ by simp [SLoc.blocks])
-    · obtain ⟨p, hp, hz'⟩ := List.mem_flatMap.1 hz'
-      simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz'
-      rcases hz' with e' | e'
-      · exact (hcA z hz p hp).1 e'.symm
-      · exact (hcA z hz p hp).2 e'.symm
-  simp only [List.pairwise_cons, List.mem_cons, List.mem_nil_iff, or_false, forall_eq_or_imp,
-    forall_eq, List.Pairwise.nil, and_true, false_implies, implies_true] at hLd
-  have hout : ∀ z ∈ L.list, z ≠ L.bnc →
-      ¬ (z = L.bnc ∨ z = tcParent chain level ∨ ¬ Mem.valid_block mA z) := by
-    intro z hz hb
-    rintro (e | e | e)
-    · exact hb e
-    · exact hlocP z hz e
-    · exact e (Alloc.valid_of_access (haccA z hz))
-  obtain ⟨tcw, htcw, -⟩ := arrayAt_of_access (haccA L.bc (by simp))
-  refine ⟨tcw, ⟨?_, ?_, hTc1, hTo1, hown, htake, ?_, ?_, ?_, WorkMono.trans hwmA hgA hwm1,
-    hg1 _ (hgA _ huaV), ?_, hl1⟩⟩
-  · simpa [elemOfs] using hA1.load 0 (by decide)
-  · rw [hU1.load _ _ _ (hout _ (by simp) (fun e => hLd.1.2.2.1 e.symm))]; exact htcw
-  · intro p hp
-    rcases hold p hp with hp' | ⟨h1, h2⟩
-    · exact .inl hp'
-    · exact .inr ⟨fun hv => h1 (hgA _ hv), fun hv => h2 (hgA _ hv)⟩
-  · intro z hz
-    have hzv := Alloc.valid_of_access (haccA z hz)
-    refine ⟨?_, fun hw => ?_, fun p hp => ?_⟩
-    · by_cases hb : z = L.bnc
-      · subst hb; exact Keep.access' hK1 (haccA _ hz)
-      · exact hU1.access _ _ _ _ (hout z hz hb) (haccA z hz)
-    · rcases hwm1 z hw with h1 | h1
-      · exact hwkA z hz h1
-      · exact h1 hzv
-    · rcases hold p hp with hp' | ⟨h1, h2⟩
-      · exact hcA z hz p hp'
-      · exact ⟨fun e => h1 (e ▸ hzv), fun e => h2 (e ▸ hzv)⟩
-  · refine NodeFrame.mk' ((huA.mono fun z hz => .inr (.inl hz)).trans (hU1.mono fun z hz => ?_))
-      fun z hz => hg1 _ (hgA _ hz)
-    rcases hz with rfl | rfl | hz
-    · exact .inr (.inl (hLF _ (by simp)))
-    · exact nset_parent hlen
-    · exact .inr (.inl fun hv => hz (hgA _ hv))
-  · have hbU : S.bUA ∈ S.blocks := by simp [SLoc.blocks]
-    have k1 : Keep m₀ mA S.bUA := Keep.unch huA (fun hn => hn huaV)
-    have k2 : Keep mA m₁ S.bUA := Keep.unch hU1 (by
-      rintro (e | e | e)
-      · exact hLS _ (by simp) (e ▸ hbU)
-      · exact hpar _ hbU (by sep_ne hd) e
-      · exact e (hgA _ huaV))
-    exact k2.perm _ _ (k1.perm _ _ huaP)
 
 /-! ### For any dispatch representation -/
 
