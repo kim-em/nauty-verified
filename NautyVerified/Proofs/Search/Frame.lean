@@ -1,4 +1,5 @@
 import NautyVerified.Proofs.Search.Spec
+import NautyVerified.Proofs.Alloc.Slots
 
 /-!
 # Moving `SearchAt` across memory changes
@@ -224,33 +225,6 @@ theorem WorkAt.unch {n : Nat} {m m' : mem} {S : SLoc} {L : List block} {W : bloc
     dS.keep hu g3 g4 fun hc => Keep.unch hu (hwk _ (.inr (.inl ⟨cS, hc, dS⟩))),
     dB.keep hu g5 g6 fun hc => Keep.unch hu (hwk _ (.inr (.inr (.inl ⟨cB, hc, dB⟩)))),
     dN.keep hu g7 g8 fun hc => Keep.unch hu (hwk _ (.inr (.inr (.inr ⟨cN, hc, dN⟩)))), rest⟩⟩
-
-theorem lr_nat_inj {a b : Nat} (ha : a < 2147483648) (hb : b < 2147483648)
-    (h : lr (a : Int) = lr (b : Int)) : a = b := by
-  have := congrArg (fun x => (bv64 x).toNat) h
-  simp only [bv64_repr, intOfZ_zOfInt, BitVec.toNat_ofInt] at this
-  have e : ∀ x : Nat, x < 2147483648 → ((x : Int) % ((2 ^ 64 : Nat) : Int)).toNat = x := by
-    intro x hx; rw [Int.emod_eq_of_lt (by omega) (by omega)]; simp
-  rw [e a ha, e b hb] at this
-  exact this
-
-/-- Two `DynAt`s of one pair agree on the block when the capacity is positive. -/
-theorem _root_.NautyVerified.Proofs.Alloc.DynAt.same_cap {m : mem} {bp bs : block}
-    {c c' cap cap' : Nat} {b b' : block} (h : DynAt m bp bs c cap b) (h' : DynAt m bp bs c' cap' b') :
-    cap' = cap := by
-  have e := h'.capLd.symm.trans h.capLd
-  simp only [Option.some.injEq, val.Vlong.injEq] at e
-  exact lr_nat_inj h'.capLt h.capLt e
-
-theorem _root_.NautyVerified.Proofs.Alloc.DynAt.same_block {m : mem} {bp bs : block} {c c' cap cap' : Nat} {b b' : block}
-    (h : DynAt m bp bs c cap b) (h' : DynAt m bp bs c' cap' b') (hc : 0 < cap) : b' = b := by
-  have hcc : cap' = cap := by
-    have := h.capLd.symm.trans h'.capLd
-    simp only [Option.some.injEq, val.Vlong.injEq] at this
-    exact (lr_nat_inj h.capLt h'.capLt this).symm
-  have := (h.ptr hc).symm.trans (h'.ptr (hcc ▸ hc))
-  simp only [Option.some.injEq, val.Vptr.injEq] at this
-  exact this.1.symm
 
 /-- A work block in use is none of the blocks of `S`. -/
 theorem SearchAt.work_not {n : Nat} {m : mem} {S : SLoc} {ctx : Ctx n} {st : Search n}

@@ -1,3 +1,4 @@
+import NautyVerified.Program.Env
 import NautyVerified.Proofs.Maketargetcell.Syntax
 import NautyVerified.Proofs.Bestcell.Rows
 
@@ -10,6 +11,9 @@ ADDELEMENT(tcell, lab[k])` adds the cell `lab[c..j]` (HexGraphIso's `worksetOf`)
 -/
 
 namespace NautyVerified.Proofs.Maketargetcell
+
+variable {ge : CompCert4Lean.Cfrontend.Clight.genv} [E : NautyVerified.Program.NautyEnv ge]
+set_option linter.unusedSectionVars false
 
 open CompCert4Lean CompCert4Lean.Cfrontend.Clight CompCert4Lean.Common.Globalenvs
 open CompCert4Lean.Common.Values CompCert4Lean.Common.ExternalCalls CompCert4Lean.Common.Events
@@ -91,7 +95,7 @@ theorem wp_kloop {Q : Post} {le : temp_env} {m : mem} {bl bt : block} {lofs tofs
     (htc : PTree.get id.tcell le = some (.Vptr bt tofs))
     (htarr : ArrayAt m .Mint64 bt (intOfZ (Ptrofs.unsigned tofs)) (longs ws) M)
     (hW : SetRep (fun w => bv64 (ws w)) M (VSet.empty : VSet n))
-    (hbit : BitTable m Block.nautilBit) (hbt : Block.nautilBit ≠ bt)
+    (hbit : BitTable m E.nautilBit) (hbt : E.nautilBit ≠ bt)
     (hce : c ≤ e) (hen : e < n) (hi : PTree.get id.i le = some (.Vint (ir c)))
     (hj : PTree.get id.j le = some (.Vint (ir e)))
     (hQ : ∀ le' m' ws', ArrayAt m' .Mint64 bt (intOfZ (Ptrofs.unsigned tofs)) (longs ws') M →

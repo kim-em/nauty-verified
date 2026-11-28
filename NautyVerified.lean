@@ -28,6 +28,7 @@ import NautyVerified.Statement.Sparse
 import NautyVerified.Statement.SparseFinal
 import NautyVerified.Logic.Array
 import NautyVerified.Logic.Grow
+import NautyVerified.Logic.OfPre
 import NautyVerified.Logic.Ints
 import NautyVerified.Proofs.Orbjoin.Chase
 import NautyVerified.Proofs.Orbjoin.Join
@@ -62,6 +63,7 @@ import NautyVerified.Proofs.Alloc.Dyn3
 import NautyVerified.Proofs.Alloc.DynG
 import NautyVerified.Proofs.Alloc.Dynfree
 import NautyVerified.Proofs.Alloc.DynSeq
+import NautyVerified.Proofs.Alloc.Slots
 import NautyVerified.Proofs.Alloc.Dyn2
 import NautyVerified.Proofs.Fmperm.Syntax
 import NautyVerified.Proofs.Alloc.Global
@@ -312,3 +314,5 @@ import NautyVerified.Proofs.Sparse.Sort.Pivot
 import NautyVerified.Proofs.Sparse.Sort.Finish
 import NautyVerified.Proofs.Sparse.Sort.Main
 import NautyVerified.Proofs.Sparse.Sort.Satisfies
+import NautyVerified.Proofs.Dispatch.Spec
+import NautyVerified.Proofs.Dispatch.Dense
