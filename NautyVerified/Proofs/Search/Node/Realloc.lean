@@ -1,4 +1,5 @@
 import NautyVerified.Proofs.Search.Frame
+import NautyVerified.Proofs.Search.Valid
 import NautyVerified.Proofs.Alloc.Dyn3
 
 /-!
@@ -31,7 +32,8 @@ abbrev G6 (z : block) : Prop :=
 set_option maxHeartbeats 2000000 in
 theorem SearchAt.realloc {n : Nat} {m m' : mem} {S : SLoc} {ctx : Ctx n} {st : Search n}
     {pre nsp : Bool} (h : SearchAt m S ctx st pre nsp)
-    (hv : ∀ z ∈ S.blocks, Mem.valid_block m z)
+    (hvU : Mem.valid_block m S.bUA)
+    (hvT : Mem.valid_block m Block.tcnode0)
     {cW cS cB cN : Nat} {bW bS bB bN : block}
     (dN : DynAt m Block.nautilWorkperm Block.nautilWorkpermSz 4 cN bN)
     (nW : 0 < cW → bW ∉ S.blocks) (nS : 0 < cS → bS ∉ S.blocks) (nB : 0 < cB → bB ∉ S.blocks)
@@ -50,6 +52,7 @@ theorem SearchAt.realloc {n : Nat} {m m' : mem} {S : SLoc} {ctx : Ctx n} {st : S
     (pWS : 0 < cW' → 0 < cS' → bW' ≠ bS') (pWB : 0 < cW' → 0 < cB' → bW' ≠ bB')
     (pSB : 0 < cS' → 0 < cB' → bS' ≠ bB') :
     SearchAt m' S ctx st pre nsp := by
+  have hv := h.valid_all hvU hvT
   have hd := h.distinct
   -- blocks of `S` other than the six globals are untouched
   have key : ∀ z ∈ S.blocks, ¬ G6 z → ¬ (dyn3Set m cW bW cS bS cB bB z ∨ X z) := by

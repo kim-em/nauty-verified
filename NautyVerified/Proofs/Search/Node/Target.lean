@@ -52,7 +52,8 @@ abbrev mtcCall (hintE : expr) : statement :=
 set_option maxHeartbeats 4000000 in
 theorem wp_nodeTarget {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
     {S : SLoc} {ctx : Ctx n} {st : Search n} {pre nsp : Bool} {level : Nat}
-    (h : SearchAt m S ctx st pre nsp) (hv : ∀ z ∈ S.blocks, Mem.valid_block m z)
+    (h : SearchAt m S ctx st pre nsp) (hvU : Mem.valid_block m S.bUA)
+    (hvT : Mem.valid_block m Block.tcnode0)
     {bt bz bc : block}
     (hloc : [bt, bz, bc].Pairwise (· ≠ ·))
     (hlocS : ∀ z ∈ [bt, bz, bc], z ∉ S.blocks ∧ Mem.valid_block m z ∧ ¬ IsWork m z)
@@ -83,6 +84,7 @@ theorem wp_nodeTarget {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_e
       (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
       Q.normal E0 e le m') :
     Wp xi ge f (mtcCall hintE) Q e le m := by
+  have hv := h.valid_all hvU hvT
   have hd := h.distinct
   have hI := h.inv
   have hnl := h.nlt
@@ -208,7 +210,7 @@ theorem wp_nodeTarget {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_e
       · exact tW (e ▸ hw)
       · exact zW (e ▸ hw)
       · exact cWn (e ▸ hw)
-    have hS' := h.realloc hv dN nW nS nB nN pNW pNS pNB (X := fun z => z = bt ∨ z = bz ∨ z = bc) hU
+    have hS' := h.realloc hvU hvT dN nW nS nB nN pNW pNS pNB (X := fun z => z = bt ∨ z = bz ∨ z = bc) hU
       hX hXN dW' dS' dB' fW fS fB pWS' pWB' pSB'
     refine hQ m' hS' hT hZ hC (hU.mono fun z hz => ?_) hgrow
     rcases hz with h6 | hx

@@ -128,7 +128,8 @@ theorem chooseTarget_false_eq {n : Nat} (ctx : Ctx n) (tl level nc : Nat) (st : 
 set_option maxHeartbeats 2000000 in
 theorem wp_chooseOff {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
     {S : SLoc} {ctx : Ctx n} {st : Search n} {pre nsp : Bool} {level nc : Nat}
-    (h : SearchAt m S ctx st pre nsp) (hv : ∀ z ∈ S.blocks, Mem.valid_block m z)
+    (h : SearchAt m S ctx st pre nsp) (hvU : Mem.valid_block m S.bUA)
+    (hvT : Mem.valid_block m Block.tcnode0)
     {bnc bt bz bc : block}
     (hloc : [bt, bz, bc].Pairwise (· ≠ ·))
     (hlocS : ∀ z ∈ [bt, bz, bc], z ∉ S.blocks ∧ Mem.valid_block m z ∧ ¬ IsWork m z)
@@ -255,7 +256,7 @@ theorem wp_chooseOff {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_en
           (h.dyns.firsttc.ptr (by have := h.dyns.capTC; omega))
           h.arrays.firsttc (by omega) (Refine.tv dense.id.level) level (by omega) hlev2 rfl
       wp_step; wp_step; wp_step
-      refine wp_nodeTarget h hv hloc hlocS htc2 hez hec hgeT ht hz ⟨_, hc⟩ hlab2 hptn2 hlev2 hl1 hln
+      refine wp_nodeTarget h hvU hvT hloc hlocS htc2 hez hec hgeT ht hz ⟨_, hc⟩ hlab2 hptn2 hlev2 hl1 hln
         hhint rfl hft.1 hft.2 ⟨x, hx, hgt⟩ ?_
       intro m₁ h₁ hT hZ hC hU₁ hg₁
       obtain ⟨hpos, -⟩ := mtc_bounds ctx st.lab st.ptn level 100 st.firsttc[level]! hI.ptnSize hlast
@@ -280,7 +281,7 @@ theorem wp_chooseOff {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_en
     · rw [decide_eq_false hcc]
       simp only [Bool.false_eq_true, ite_false]
       wp_step; wp_step
-      refine wp_nodeTarget (hint := -1) h hv hloc hlocS htc2 hez hec hgeT ht hz ⟨_, hc⟩ hlab2 hptn2
+      refine wp_nodeTarget (hint := -1) h hvU hvT hloc hlocS htc2 hez hec hgeT ht hz ⟨_, hc⟩ hlab2 hptn2
         hlev2 hl1 hln (by simp [Exec.evalExpr, typeof, cop]) rfl (by decide) (by omega)
         ⟨x, hx, hgt⟩ ?_
       intro m₁ h₁ hT hZ hC hU₁ hg₁

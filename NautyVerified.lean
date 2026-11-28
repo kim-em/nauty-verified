@@ -108,6 +108,7 @@ import NautyVerified.Proofs.Search.Node.Spec
 import NautyVerified.Proofs.Search.Node.OtherHex
 import NautyVerified.Proofs.Search.Node.Rebuild
 import NautyVerified.Proofs.Search.Step
+import NautyVerified.Proofs.Search.Valid
 import NautyVerified.Proofs.Search.Node.OkOff
 import NautyVerified.Proofs.Search.Node.Compare
 import NautyVerified.Proofs.Search.Node.OtherSteps
