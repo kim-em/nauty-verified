@@ -377,3 +377,5 @@ import NautyVerified.Proofs.Sparse.Refine.Nontrivial.Sort
 import NautyVerified.Proofs.Sparse.Refine.Nontrivial.Cells
 import NautyVerified.Proofs.Sparse.Refine.Nontrivial.ResetK
 import NautyVerified.Proofs.Sparse.Refine.Nontrivial.Pass
+import NautyVerified.Proofs.Sparse.Refine.Spec
+import NautyVerified.Proofs.Sparse.Refine.Prologue
