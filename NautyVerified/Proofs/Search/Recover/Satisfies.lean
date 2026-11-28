@@ -236,7 +236,11 @@ theorem recover_satisfies {n : Nat} (S : SLoc) (ctx : Ctx n) (st : Search n) (le
               fun hp => (h.stats.maxlevel hp).unch hUf (by sep_notin hd),
               hUf.access _ _ _ _ (by sep_notin hd) h.stats.maxlevelW,
               h.stats.tctotal.unch hUf (by sep_notin hd),
-              h.stats.canupdates.unch hUf (by sep_notin hd), h.stats.fits⟩
+              h.stats.canupdates.unch hUf (by sep_notin hd), h.stats.fits,
+              (h.stats.fix.unch hUf (by sep_notin hd)).perm,
+              (h.stats.fix.unch hUf (by sep_notin hd)).errstatus,
+              (h.stats.fix.unch hUf (by sep_notin hd)).grpsize1,
+              (h.stats.fix.unch hUf (by sep_notin hd)).grpsize2⟩
             arrays :=
               { lab := h.arrays.lab.unch hUf (by sep_notin hd)
                 ptn := aP'

@@ -83,7 +83,8 @@ theorem Stats.cast {st' : Search n} (h : Stats m S st pre) (e : statView st' = s
   simp only [statView, Prod.mk.injEq] at e
   obtain ⟨e1, e2, e3, e4, e5, e6, e7⟩ := e
   exact ⟨e1 ▸ h.numorbits, e2 ▸ h.numgenerators, e3 ▸ h.numnodes, e4 ▸ h.numbadleaves,
-    e5 ▸ h.maxlevel, h.maxlevelW, e6 ▸ h.tctotal, e7 ▸ h.canupdates, h.fits⟩
+    e5 ▸ h.maxlevel, h.maxlevelW, e6 ▸ h.tctotal, e7 ▸ h.canupdates, h.fits, h.perm, h.errstatus,
+    h.grpsize1, h.grpsize2⟩
 
 /-- `Arrays` after a change confined to `workperm`'s block. -/
 theorem Arrays.wp {st' : Search n} (h : Arrays m S ctx st) (hd : S.blocks.Pairwise (· ≠ ·))

@@ -189,6 +189,25 @@ structure Stats {n : Nat} (m : mem) (S : SLoc) (st : Search n) (pre : Bool) : Pr
   canupdates : FieldAt m .Mint64 S.bst (S.sb + 56) (.Vlong (lr st.canupdates))
   /-- The `statsblk` (88 bytes) lies inside the address space. -/
   fits : S.sb + 88 < 2 ^ 64
+  /-- The members no search function writes, and the block's permissions
+  (`StatsFix`). -/
+  perm : Mem.range_perm m S.bst (zOfInt S.sb) (zOfInt (S.sb + 88)) .Cur .Freeable
+  errstatus : FieldAt m .Mint32 S.bst (S.sb + 20) (.Vint (ir 0))
+  grpsize1 : ∃ x, FieldAt m .Mfloat64 S.bst S.sb (.Vfloat x)
+  grpsize2 : ∃ i, FieldAt m .Mint32 S.bst (S.sb + 8) (.Vint i)
+
+/-- The part of `Stats` that the search's own stores to `statsblk` (all at
+offsets from 12 to 20 or from 24 on) leave alone: the block's permissions,
+`errstatus = 0`, and some `grpsize1`/`grpsize2`. -/
+structure StatsFix (m : mem) (S : SLoc) : Prop where
+  perm : Mem.range_perm m S.bst (zOfInt S.sb) (zOfInt (S.sb + 88)) .Cur .Freeable
+  errstatus : FieldAt m .Mint32 S.bst (S.sb + 20) (.Vint (ir 0))
+  grpsize1 : ∃ x, FieldAt m .Mfloat64 S.bst S.sb (.Vfloat x)
+  grpsize2 : ∃ i, FieldAt m .Mint32 S.bst (S.sb + 8) (.Vint i)
+
+theorem Stats.fix {n : Nat} {m : mem} {S : SLoc} {st : Search n} {pre : Bool}
+    (h : Stats m S st pre) : StatsFix m S :=
+  ⟨h.perm, h.errstatus, h.grpsize1, h.grpsize2⟩
 
 /-- `canong`'s first `samerows` rows represent `st.canong`. -/
 structure CanongAt {n : Nat} (m : mem) (S : SLoc) (rows : Array (VSet n)) (samerows : Nat) :

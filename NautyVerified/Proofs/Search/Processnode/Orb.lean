@@ -90,7 +90,8 @@ theorem wp_orbjoin {f : function} {Q : Post} {le : temp_env} {t : ident} {w : Ar
   have sS := hs.stats.unch hu1 (by sep_ne hd)
   refine hQ m2 (PAt.next c h hu (by simp [SLoc.wr, SLoc.wrV]) ?_ hv
       ((hs.scalars.unch hu (by sep_all hd)).cast rfl)
-      { numorbits := FieldAt.store_same hst sS.numorbits.writable
+      { (sS.fix.store hst (by first | omega | (simp only [csize32, csize64]; omega))) with
+        numorbits := FieldAt.store_same hst sS.numorbits.writable
         numgenerators := sS.numgenerators.store_other hst (by simp only [csize32]; omega)
         numnodes := sS.numnodes.store_other hst (by simp only [csize32, csize64]; omega)
         numbadleaves := sS.numbadleaves.store_other hst (by simp only [csize32, csize64]; omega)

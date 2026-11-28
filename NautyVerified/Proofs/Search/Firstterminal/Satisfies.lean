@@ -72,6 +72,7 @@ theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx :
     have sBad := h.stats.numbadleaves.store_other hst1 (.inl (by rw [c8]; omega))
     have sTct := h.stats.tctotal.store_other hst1 (.inr (by rw [c4]; omega))
     have sCan := h.stats.canupdates.store_other hst1 (.inr (by rw [c4]; omega))
+    have sFix := h.stats.fix.store hst1 (.inl (by omega))
     -- `eqlev_first = allsamelevel = gca_first = level`
     simp only [seqPost, Post.after, E0_append]
     wp_step; wp_step; wp_step; wp_step; wp_step; wp_step; wp_step
@@ -82,7 +83,7 @@ theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx :
       (by simp only [Exec.evalExpr, Refine.tv, temps_gss]) rfl ?_
     intro m2 iEF hu2 hv2
     have hU2 := hU1.snoc hu2
-    fwd hd hu2 [sMax sOrb sGen sNod sBad sTct sCan]
+    fwd hd hu2 [sFix sMax sOrb sGen sNod sBad sTct sCan]
     simp only [seqPost, Post.after, E0_append]
     apply wp_set_eval
     simp only [Exec.evalExpr, Refine.tv, temps_gss, typeof, cop]
@@ -91,14 +92,14 @@ theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx :
       (by simp only [Exec.evalExpr, Refine.tv, temps_gss]) rfl ?_
     intro m3 iAS hu3 hv3
     have hU3 := hU2.snoc hu3
-    fwd hd hu3 [sMax sOrb sGen sNod sBad sTct sCan iEF]
+    fwd hd hu3 [sFix sMax sOrb sGen sNod sBad sTct sCan iEF]
     simp only [seqPost, Post.after, E0_append]
     refine wp_gint (x := level) rfl find_gcaFirst
       (h.scalars.gcaFirst.unch hU3 (by sep_notin hd)).writable
       (by simp only [Exec.evalExpr, Refine.tv, temps_gss]) rfl ?_
     intro m4 iGF hu4 hv4
     have hU4 := hU3.snoc hu4
-    fwd hd hu4 [sMax sOrb sGen sNod sBad sTct sCan iEF iAS]
+    fwd hd hu4 [sFix sMax sOrb sGen sNod sBad sTct sCan iEF iAS]
     have hcFC : 0 < S.capFC := by have := h.dyns.capFC; omega
     have hcTC : 0 < S.capTC := by have := h.dyns.capTC; omega
     have hcFL : 0 < S.capFL := by have := h.dyns.capFL; have := h.n0; omega
@@ -122,7 +123,7 @@ theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx :
       (ci 32767 tint) 32767 (by decide) rfl (.inl rfl) ?_
     intro m5 aFC hu5 kFC hv5
     have hU5 := hU4.snoc hu5
-    fwd hd hu5 [sMax sOrb sGen sNod sBad sTct sCan iEF iAS iGF]
+    fwd hd hu5 [sFix sMax sOrb sGen sNod sBad sTct sCan iEF iAS iGF]
     -- `firsttc[level+1] = -1`
     simp only [seqPost, Post.after, E0_append]
     wp_step; wp_step; wp_step
@@ -132,7 +133,7 @@ theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx :
       (.Eunop .Oneg (ci 1 tint) tint) (-1) (by simp only [Exec.evalExpr, typeof, cop]; rfl) rfl ?_
     intro m6 aTC hu6 kTC hv6
     have hU6 := hU5.snoc hu6
-    fwd hd hu6 [sMax sOrb sGen sNod sBad sTct sCan iEF iAS iGF aFC]
+    fwd hd hu6 [sFix sMax sOrb sGen sNod sBad sTct sCan iEF iAS iGF aFC]
     fwdK hd hu6 [kFC]
     -- `for (i = 0; i < n; ++i) firstlab[i] = lab[i]`
     simp only [seqPost, Post.after, E0_append]
@@ -144,7 +145,7 @@ theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx :
       (by sep_ne hd) (by sep_ne hd) (by sep_ne hd) ?_
     intro le7 m7 aFL hu7 kFL hv7 ho7
     have hU7 := hU6.snoc hu7
-    fwd hd hu7 [sMax sOrb sGen sNod sBad sTct sCan iEF iAS iGF aFC aTC]
+    fwd hd hu7 [sFix sMax sOrb sGen sNod sBad sTct sCan iEF iAS iGF aFC aTC]
     fwdK hd hu7 [kFC kTC]
     have hlev7 : PTree.get dense.id.level le7 = some (.Vint (ir level)) := by
       rw [ho7 _ (by decide)]; exact hlev4
@@ -166,7 +167,7 @@ theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx :
       (by simp only [Exec.evalExpr, Refine.tv, temps_gss]) rfl ?_
     intro m8 iGC hu8 hv8
     have hU8 := hU7.snoc hu8
-    fwd hd hu8 [sMax sOrb sGen sNod sBad sTct sCan iEF iAS iGF aFC aTC aFL]
+    fwd hd hu8 [sFix sMax sOrb sGen sNod sBad sTct sCan iEF iAS iGF aFC aTC aFL]
     fwdK hd hu8 [kFC kTC kFL]
     simp only [seqPost, Post.after, E0_append]
     apply wp_set_eval
@@ -176,7 +177,7 @@ theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx :
       (by simp only [Exec.evalExpr, Refine.tv, temps_gss]) rfl ?_
     intro m9 iEC hu9 hv9
     have hU9 := hU8.snoc hu9
-    fwd hd hu9 [sMax sOrb sGen sNod sBad sTct sCan iEF iAS iGF aFC aTC aFL iGC]
+    fwd hd hu9 [sFix sMax sOrb sGen sNod sBad sTct sCan iEF iAS iGF aFC aTC aFL iGC]
     fwdK hd hu9 [kFC kTC kFL]
     simp only [seqPost, Post.after, E0_append]
     refine wp_gint (x := level) rfl find_canonlevel
@@ -184,7 +185,7 @@ theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx :
       (by simp only [Exec.evalExpr, Refine.tv, temps_gss]) rfl ?_
     intro m10 iCL hu10 hv10
     have hU10 := hU9.snoc hu10
-    fwd hd hu10 [sMax sOrb sGen sNod sBad sTct sCan iEF iAS iGF aFC aTC aFL iGC iEC]
+    fwd hd hu10 [sFix sMax sOrb sGen sNod sBad sTct sCan iEF iAS iGF aFC aTC aFL iGC iEC]
     fwdK hd hu10 [kFC kTC kFL]
     -- `comp_canon = 0; samerows = 0`
     simp only [seqPost, Post.after, E0_append]
@@ -194,7 +195,7 @@ theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx :
       (by simp only [Exec.evalExpr]) rfl ?_
     intro m11 iCC0 hu11 hv11
     have hU11 := hU10.snoc hu11
-    fwd hd hu11 [sMax sOrb sGen sNod sBad sTct sCan iEF iAS iGF aFC aTC aFL iGC iEC iCL]
+    fwd hd hu11 [sFix sMax sOrb sGen sNod sBad sTct sCan iEF iAS iGF aFC aTC aFL iGC iEC iCL]
     fwdK hd hu11 [kFC kTC kFL]
     simp only [seqPost, Post.after, E0_append]
     wp_step; wp_step; wp_step
@@ -203,7 +204,7 @@ theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx :
       (by simp only [Exec.evalExpr]) rfl ?_
     intro m12 iSR hu12 hv12
     have hU12 := hU11.snoc hu12
-    fwd hd hu12 [sMax sOrb sGen sNod sBad sTct sCan iEF iAS iGF aFC aTC aFL iGC iEC iCL iCC0]
+    fwd hd hu12 [sFix sMax sOrb sGen sNod sBad sTct sCan iEF iAS iGF aFC aTC aFL iGC iEC iCL iCC0]
     fwdK hd hu12 [kFC kTC kFL]
     let le12 := PTree.set (idOf 706) (.Vint (ir level)) (PTree.set (idOf 705) (.Vint (ir level)) le7)
     have hlev12 : PTree.get dense.id.level le12 = some (.Vint (ir level)) := by
@@ -220,7 +221,7 @@ theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx :
       (by sep_ne hd) (by sep_ne hd) (by sep_ne hd) ?_
     intro le13 m13 aCL hu13 kCL hv13 ho13
     have hU13 := hU12.snoc hu13
-    fwd hd hu13 [sMax sOrb sGen sNod sBad sTct sCan iEF iAS iGF aFC aTC aFL iGC iEC iCL iCC0 iSR]
+    fwd hd hu13 [sFix sMax sOrb sGen sNod sBad sTct sCan iEF iAS iGF aFC aTC aFL iGC iEC iCL iCC0 iSR]
     fwdK hd hu13 [kFC kTC kFL]
     have hlev13 : PTree.get dense.id.level le13 = some (.Vint (ir level)) := by
       rw [ho13 _ (by decide)]; exact hlev12
@@ -243,7 +244,7 @@ theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx :
       hlev13 (by sep_ne hd) (by sep_ne hd) (by sep_ne hd) ?_
     intro le14 m14 aCC hu14 kCC hv14 ho14
     have hU14 := hU13.snoc hu14
-    fwd hd hu14 [sMax sOrb sGen sNod sBad sTct sCan iEF iAS iGF aFC aTC aFL iGC iEC iCL iCC0 iSR aCL]
+    fwd hd hu14 [sFix sMax sOrb sGen sNod sBad sTct sCan iEF iAS iGF aFC aTC aFL iGC iEC iCL iCC0 iSR aCL]
     fwdK hd hu14 [kFC kTC kFL kCL]
     have hlev14 : PTree.get dense.id.level le14 = some (.Vint (ir level)) := by
       rw [ho14 _ (by decide)]; exact hlev13
@@ -257,7 +258,7 @@ theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx :
       (ci 32767 tint) 32767 (by decide) rfl (.inl rfl) ?_
     intro m15 aCC2 hu15 kCC2 hv15
     have hU15 := hU14.snoc hu15
-    fwd hd hu15 [sMax sOrb sGen sNod sBad sTct sCan iEF iAS iGF aFC aTC aFL iGC iEC iCL iCC0 iSR aCL]
+    fwd hd hu15 [sFix sMax sOrb sGen sNod sBad sTct sCan iEF iAS iGF aFC aTC aFL iGC iEC iCL iCC0 iSR aCL]
     fwdK hd hu15 [kFC kTC kFL kCL]
     replace kCC := kCC.trans kCC2
     -- `stats->canupdates = 1`
@@ -273,6 +274,7 @@ theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx :
     have sCan16 : FieldAt m16 .Mint64 S.bst (S.sb + 56) (.Vlong (lr ((1 : Nat) : Int))) :=
       FieldAt.store_same hst16 sCan.writable
     replace sMax := sMax.store_other hst16 (.inl (by rw [c4]; omega))
+    replace sFix := sFix.store hst16 (.inl (by omega))
     replace sOrb := sOrb.store_other hst16 (.inl (by rw [c4]; omega))
     replace sGen := sGen.store_other hst16 (.inl (by rw [c4]; omega))
     replace sNod := sNod.store_other hst16 (.inl (by rw [c8]; omega))
@@ -303,7 +305,7 @@ theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx :
             h.scalars.cosetindex.unch hU16 (by sep_notin hd),
             h.scalars.needshortprune.unch hU16 (by sep_notin hd)⟩
           stats := ⟨sOrb, sGen, sNod, sBad, fun _ => sMax, sMax.writable, sTct, sCan16,
-            h.stats.fits⟩
+            h.stats.fits, sFix.perm, sFix.errstatus, sFix.grpsize1, sFix.grpsize2⟩
           arrays :=
             { lab := h.arrays.lab.unch hU16 (by sep_notin hd)
               ptn := h.arrays.ptn.unch hU16 (by sep_notin hd)

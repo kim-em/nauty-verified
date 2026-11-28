@@ -61,7 +61,8 @@ theorem wp_maxlevel {f : function} {Q : Post} {le : temp_env} {level : Nat}
   intro m' hst
   have sS := hs.stats
   obtain ⟨hP, hS, hU⟩ := PAt.stat (st' := { st with maxlevel := level }) c h hst
-    { numorbits := sS.numorbits.store_other hst (by simp only [csize32]; omega)
+    { (sS.fix.store hst (by first | omega | (simp only [csize32, csize64]; omega))) with
+      numorbits := sS.numorbits.store_other hst (by simp only [csize32]; omega)
       numgenerators := sS.numgenerators.store_other hst (by simp only [csize32]; omega)
       numnodes := sS.numnodes.store_other hst (by simp only [csize32, csize64]; omega)
       numbadleaves := sS.numbadleaves.store_other hst (by simp only [csize32, csize64]; omega)
@@ -93,7 +94,8 @@ theorem wp_numgenerators {f : function} {Q : Post} {le : temp_env}
   intro m' hst
   have sS := hs.stats
   obtain ⟨hP, hS, hU⟩ := PAt.stat (st' := { st with numgenerators := st.numgenerators + 1 }) c h hst
-    { numorbits := sS.numorbits.store_other hst (by simp only [csize32]; omega)
+    { (sS.fix.store hst (by first | omega | (simp only [csize32, csize64]; omega))) with
+      numorbits := sS.numorbits.store_other hst (by simp only [csize32]; omega)
       numgenerators := FieldAt.store_same hst sS.numgenerators.writable
       numnodes := sS.numnodes.store_other hst (by simp only [csize32, csize64]; omega)
       numbadleaves := sS.numbadleaves.store_other hst (by simp only [csize32, csize64]; omega)
@@ -124,7 +126,8 @@ theorem wp_canupdates {f : function} {Q : Post} {le : temp_env}
   intro m' hst
   have sS := hs.stats
   obtain ⟨hP, hS, hU⟩ := PAt.stat (st' := { st with canupdates := st.canupdates + 1 }) c h hst
-    { numorbits := sS.numorbits.store_other hst (by simp only [csize32, csize64]; omega)
+    { (sS.fix.store hst (by first | omega | (simp only [csize32, csize64]; omega))) with
+      numorbits := sS.numorbits.store_other hst (by simp only [csize32, csize64]; omega)
       numgenerators := sS.numgenerators.store_other hst (by simp only [csize32, csize64]; omega)
       numnodes := sS.numnodes.store_other hst (by simp only [csize64]; omega)
       numbadleaves := sS.numbadleaves.store_other hst (by simp only [csize64]; omega)
@@ -155,7 +158,8 @@ theorem wp_numbadleaves {f : function} {Q : Post} {le : temp_env}
   intro m' hst
   have sS := hs.stats
   obtain ⟨hP, hS, hU⟩ := PAt.stat (st' := { st with numbadleaves := st.numbadleaves + 1 }) c h hst
-    { numorbits := sS.numorbits.store_other hst (by simp only [csize32, csize64]; omega)
+    { (sS.fix.store hst (by first | omega | (simp only [csize32, csize64]; omega))) with
+      numorbits := sS.numorbits.store_other hst (by simp only [csize32, csize64]; omega)
       numgenerators := sS.numgenerators.store_other hst (by simp only [csize32, csize64]; omega)
       numnodes := sS.numnodes.store_other hst (by simp only [csize64]; omega)
       numbadleaves := FieldAt.store_same hst sS.numbadleaves.writable

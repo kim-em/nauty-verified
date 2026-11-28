@@ -67,7 +67,8 @@ theorem wp_numnodes {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_env
     { fixed := h.fixed.unch hu (by sep_all hd)
       scalars := { h.scalars.unch hu (by sep_all hd) with }
       stats :=
-        { numorbits := hs.numorbits.store_other hst (by simp only [csize32, csize64]; omega)
+        { (hs.fix.store hst (by first | omega | (simp only [csize32, csize64]; omega))) with
+          numorbits := hs.numorbits.store_other hst (by simp only [csize32, csize64]; omega)
           numgenerators := hs.numgenerators.store_other hst (by simp only [csize32, csize64]; omega)
           numnodes := FieldAt.store_same hst hs.numnodes.writable
           numbadleaves := hs.numbadleaves.store_other hst (by simp only [csize32, csize64]; omega)

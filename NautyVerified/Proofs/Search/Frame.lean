@@ -150,7 +150,14 @@ theorem Stats.unch {n : Nat} {m m' : mem} {S : SLoc} {st : Search n} {pre : Bool
     Stats m' S st pre :=
   ⟨h.numorbits.unch hu hW, h.numgenerators.unch hu hW, h.numnodes.unch hu hW,
     h.numbadleaves.unch hu hW, fun hp => (h.maxlevel hp).unch hu hW,
-    hu.access _ _ _ _ hW h.maxlevelW, h.tctotal.unch hu hW, h.canupdates.unch hu hW, h.fits⟩
+    hu.access _ _ _ _ hW h.maxlevelW, h.tctotal.unch hu hW, h.canupdates.unch hu hW, h.fits,
+    fun o ho => (Keep.unch hu hW).perm _ _ (h.perm o ho), h.errstatus.unch hu hW,
+    let ⟨x, hx⟩ := h.grpsize1; ⟨x, hx.unch hu hW⟩, let ⟨i, hi⟩ := h.grpsize2; ⟨i, hi.unch hu hW⟩⟩
+
+theorem StatsFix.unch {m m' : mem} {S : SLoc} {W : block → Prop} (h : StatsFix m S)
+    (hu : Unch m m' W) (hW : ¬ W S.bst) : StatsFix m' S :=
+  ⟨fun o ho => (Keep.unch hu hW).perm _ _ (h.perm o ho), h.errstatus.unch hu hW,
+    let ⟨x, hx⟩ := h.grpsize1; ⟨x, hx.unch hu hW⟩, let ⟨i, hi⟩ := h.grpsize2; ⟨i, hi.unch hu hW⟩⟩
 
 theorem CanongAt.unch {n : Nat} {m m' : mem} {S : SLoc} {rows : Array (VSet n)} {sr : Nat}
     {W : block → Prop} (h : CanongAt m S rows sr) (hu : Unch m m' W) (hW : ¬ W S.bc) :

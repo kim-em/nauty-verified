@@ -77,7 +77,8 @@ theorem wp_tctotal {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
     { fixed := h.fixed.unch hu (by sep_all hd)
       scalars := { h.scalars.unch hu (by sep_all hd) with }
       stats :=
-        { numorbits := hs.numorbits.store_other hst (by simp only [csize32, csize64]; omega)
+        { (hs.fix.store hst (by first | omega | (simp only [csize32, csize64]; omega))) with
+          numorbits := hs.numorbits.store_other hst (by simp only [csize32, csize64]; omega)
           numgenerators := hs.numgenerators.store_other hst (by simp only [csize32, csize64]; omega)
           numnodes := hs.numnodes.store_other hst (by simp only [csize32, csize64]; omega)
           numbadleaves := hs.numbadleaves.store_other hst (by simp only [csize32, csize64]; omega)

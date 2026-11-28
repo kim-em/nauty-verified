@@ -264,6 +264,18 @@ theorem FieldAt.store_other {m m' : mem} {chunk c' : memory_chunk} {b : block} {
       exact hd))]
   exact h.load
 
+/-- `StatsFix` survives a store to a `statsblk` member at offsets 12 to 20 or
+from 24 on. -/
+theorem StatsFix.store {m m' : mem} {S : SLoc} (h : StatsFix m S) {c : memory_chunk} {off : Int}
+    {w : val} (hst : Mem.store c m S.bst (zOfInt off) w = some m')
+    (hd : S.sb + 24 ≤ off ∨ (S.sb + 12 ≤ off ∧ off + csize c ≤ S.sb + 20)) : StatsFix m' S := by
+  have c4 : csize .Mint32 = 4 := rfl
+  have c8 : csize .Mfloat64 = 8 := rfl
+  refine ⟨fun o ho => Mem.perm_store_1 _ _ _ _ _ _ hst _ _ _ _ (h.perm o ho),
+    h.errstatus.store_other hst (by omega), ?_, ?_⟩
+  · obtain ⟨x, hx⟩ := h.grpsize1; exact ⟨x, hx.store_other hst (by omega)⟩
+  · obtain ⟨i, hi⟩ := h.grpsize2; exact ⟨i, hi.store_other hst (by omega)⟩
+
 /-! ## `statsblk` members -/
 
 /-- `stats->fld`. -/
