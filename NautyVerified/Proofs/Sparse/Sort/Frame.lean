@@ -216,17 +216,15 @@ theorem eval_pcmp {e : env} {le : temp_env} {m : mem} {a : Array Nat} (h : Arr m
     cmpu_gt_pt hb (by omega) (by omega)]
   exact ⟨rfl, rfl, rfl⟩
 
-theorem eval_pdiff {e : env} {le : temp_env} {m : mem} {a : Array Nat} (h : Arr m C a) (hC : C.Ok)
+theorem eval_pdiff {e : env} {le : temp_env} {m : mem} (hC : C.Ok)
     {p q : ident} {k1 k2 : Nat}
     (hp : PTree.get p le = some (.Vptr C.bx (pt C.base k1)))
-    (hq : PTree.get q le = some (.Vptr C.bx (pt C.base k2))) (hk1 : k1 ≤ C.N) (h12 : k2 ≤ k1) :
+    (hq : PTree.get q le = some (.Vptr C.bx (pt C.base k2))) (hk1 : k1 ≤ C.N) (hk2 : k2 ≤ C.N) :
     Exec.evalExpr ge e le m (.Ecast (.Ebinop .Osub (pv p) (pv q) tlong) tint) =
-      some (.Vint (ir ((k1 - k2 : Nat) : Int))) := by
-  have hf := h.fits
-  have hb := h.base0
+      some (.Vint (ir ((k1 : Int) - k2))) := by
   have := hC.nN
   simp only [pv, Exec.evalExpr, hp, hq]
   simp only [typeof, cop]
-  rw [diff_pt hb (by omega) h12 (by omega)]
+  rw [diff_pt C.base (by omega) (by omega)]
 
 end NautyVerified.Proofs.Sparse.Sort

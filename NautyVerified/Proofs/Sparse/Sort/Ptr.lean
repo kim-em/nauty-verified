@@ -113,45 +113,38 @@ theorem cmpu_gt_pt {base : Int} {k1 k2 : Nat} (h0 : 0 ≤ base) (h1 : base + 4 *
     Ptrofs.cmpu .Cgt (pt base k1) (pt base k2) = decide (k2 < k1) :=
   ltu_pt h0 h2 h1
 
-/-- `(int)(p - q)` for cursors at elements `k1 ≥ k2`. -/
-theorem diff_pt {base : Int} {k1 k2 : Nat} (h0 : 0 ≤ base) (h1 : base + 4 * k1 < 2 ^ 64)
-    (h12 : k2 ≤ k1) (hd : k1 - k2 < 2147483648) :
+/-- `(int)(p - q)` for cursors at elements `k1` and `k2`. -/
+theorem diff_pt (base : Int) {k1 k2 : Nat} (hk1 : k1 < 2147483648) (hk2 : k2 < 2147483648) :
     Lib.Integers.Int.repr (Int64.unsigned (Ptrofs.to_int64
       (Ptrofs.divs (Ptrofs.sub (pt base k1) (pt base k2)) (Ptrofs.repr (zOfInt 4))))) =
-      ir ((k1 - k2 : Nat) : Int) := by
-  have e1 := toNat_pt h0 h1
-  have e2 := toNat_pt (k := k2) h0 (by omega)
-  have hsub : (bvp (Ptrofs.sub (pt base k1) (pt base k2))).toNat = 4 * (k1 - k2) := by
-    have n1 : (bvp (pt base k1)).toNat = (bvp (pt base k2)).toNat + 4 * (k1 - k2) := by omega
-    rw [bvp_sub, BitVec.toNat_sub_of_le (by rw [BitVec.le_def]; omega), n1]
-    omega
-  -- the quotient, as a machine word
+      ir ((k1 : Int) - k2) := by
+  have hb : ∀ k : Nat, bvp (pt base k) = BitVec.ofInt 64 (base + 4 * k) := by
+    intro k; show bvp (Ptrofs.repr _) = _; rw [bvp_repr, intOfZ_zOfInt]
+  have hsub : bvp (Ptrofs.sub (pt base k1) (pt base k2)) = BitVec.ofInt 64 (4 * ((k1 : Int) - k2)) := by
+    rw [bvp_sub, hb, hb, BitVec.sub_eq_add_neg, ← BitVec.ofInt_neg, ← BitVec.ofInt_add]
+    congr 1; omega
   have hq : Ptrofs.divs (Ptrofs.sub (pt base k1) (pt base k2)) (Ptrofs.repr (zOfInt 4)) =
-      Ptrofs.repr (zOfInt ((k1 - k2 : Nat) : Int)) := by
+      Ptrofs.repr (zOfInt ((k1 : Int) - k2)) := by
     show WordCore.repr 64 (ZArith.BinInt.Z.quot (WordCore.signed _) (WordCore.signed _)) = _
     congr 1
     apply intOfZ_injective
     simp only [ZArith.BinInt.Z.quot, intOfZ_zOfInt]
     rw [intOfZ_signed (by decide), intOfZ_signed (by decide)]
-    have hs1 : (toBV (Ptrofs.sub (pt base k1) (pt base k2))).toInt = 4 * (k1 - k2 : Nat) := by
-      rw [BitVec.toInt_eq_toNat_of_lt (by
-        change 2 * (bvp _).toNat < _
-        rw [hsub]; show _ < 2 ^ 64; omega)]
-      show ((bvp _).toNat : Int) = _
-      rw [hsub]; push_cast; rfl
+    have hs1 : (toBV (Ptrofs.sub (pt base k1) (pt base k2))).toInt = 4 * ((k1 : Int) - k2) := by
+      show (bvp _).toInt = _
+      rw [hsub, BitVec.toInt_ofInt, Int.bmod_eq_of_le (by omega) (by omega)]
     have hs2 : (toBV (Ptrofs.repr (zOfInt 4))).toInt = 4 := by
       show (bvp _).toInt = _
       rw [bvp_repr, intOfZ_zOfInt]; decide
-    rw [hs1, hs2, Int.tdiv_eq_ediv_of_nonneg (by omega)]
-    omega
+    rw [hs1, hs2, Int.mul_tdiv_cancel_left _ (by decide)]
   rw [hq]
   apply bv32_inj.1
   show bv32 (Lib.Integers.Int.repr _) = bv32 (Lib.Integers.Int.repr _)
   rw [bv32_repr, bv32_repr, intOfZ_Int64_unsigned]
   show BitVec.ofInt 32 ((bv64 (Int64.repr (Ptrofs.unsigned _))).toNat : Int) = _
-  rw [bv64_repr, intOfZ_Ptrofs_unsigned, bvp_repr, intOfZ_zOfInt, ofInt_toNat,
-    BitVec.toNat_ofInt]
-  congr 1
+  rw [bv64_repr, intOfZ_Ptrofs_unsigned, bvp_repr, intOfZ_zOfInt, ofInt_toNat]
+  apply BitVec.eq_of_toNat_eq
+  rw [BitVec.toNat_ofInt, BitVec.toNat_ofInt, BitVec.toNat_ofInt]
   omega
 
 end
