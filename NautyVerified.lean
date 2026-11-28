@@ -151,6 +151,7 @@ import NautyVerified.Proofs.Search.Node.NodePrologue
 import NautyVerified.Proofs.Search.Node.OtherFrame
 import NautyVerified.Proofs.Search.Node.OtherIter
 import NautyVerified.Proofs.Search.Node.OtherLoop
+import NautyVerified.Proofs.Search.Node.OtherBodySteps
 import NautyVerified.Proofs.Search.Node.FirstLoop
 import NautyVerified.Proofs.Search.Node.TcFrame
 import NautyVerified.Proofs.Search.Node.UaFrame
