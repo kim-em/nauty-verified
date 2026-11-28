@@ -332,3 +332,8 @@ import NautyVerified.Proofs.Sparse.Refine.Marks2
 import NautyVerified.Proofs.Sparse.Refine.Model
 import NautyVerified.Proofs.Sparse.Refine.State
 import NautyVerified.Proofs.Sparse.Refine.Access
+import NautyVerified.Proofs.Sparse.Distvals.Model
+import NautyVerified.Proofs.Sparse.Distvals.Syntax
+import NautyVerified.Proofs.Sparse.Distvals.Loops
+import NautyVerified.Proofs.Sparse.Distvals.Search
+import NautyVerified.Proofs.Sparse.Distvals.Satisfies
