@@ -249,6 +249,8 @@ structure NodeLaws (L : PolicyLink O n) (G : O.Gr n) where
   /-- `level numcells tc cell cursor st`. -/
   SweepOff : Nat → Nat → Nat → VSet n → Option Nat → SearchState n (O.Canon n) → Prop
   level_pos : ∀ {first level nc st}, NodeOk first level nc st → 1 ≤ level
+  /-- `level_le_of_ok`: a node's level is at most `n`. -/
+  level_le : ∀ {first level nc st}, NodeOk first level nc st → level ≤ n
   /-- The policy's invariant holds at a node and along its sweeps. -/
   inv : ∀ {first level nc st}, NodeOk first level nc st → L.Inv G st.canong
   inv_first : ∀ {level nc tc tv1 cell cursor st}, SweepFirst level nc tc tv1 cell cursor st →
@@ -262,6 +264,8 @@ structure NodeLaws (L : PolicyLink O n) (G : O.Gr n) where
     L.TargetOk G level (P.visit G level nc st).1
       (if first then P.recordFirst level (P.visit G level nc st).2.1 (P.visit G level nc st).2.2
        else P.compareCodes level (P.visit G level nc st).2.1 (P.visit G level nc st).2.2)
+  /-- `visit_code_lt`: the refinement's code fits nauty.c's `short code`. -/
+  code_lt : ∀ {first level nc st}, NodeOk first level nc st → (P.visit G level nc st).2.1 < 32768
   /-- `SInv.visitSt`. -/
   visit_inv : ∀ {first level nc st}, NodeOk first level nc st → SInvG O G st →
     SInvG O G (visitStG O G level nc st)
@@ -374,11 +378,13 @@ def denseLaws (G : Colored n k) (ctx : Ctx n) (hn0 : 0 < n) (hn : n + 2 < nautyI
   SweepFirst := SweepOkFirst G
   SweepOff := SweepOkOff G
   level_pos h := by obtain ⟨⟨_, _, _, h1, _⟩, _⟩ := h; exact h1
+  level_le h := by obtain ⟨⟨_, _, _, _, hso, _⟩, _⟩ := h; exact SearchInf.level_le_of_ok hso
   inv _ := trivial
   inv_first _ := trivial
   inv_off _ := trivial
   visitOk _ := trivial
   targetOk _ := trivial
+  code_lt {_ level nc st} _ := Nat.lt_trans (visit_code_lt ctx level nc st) (by decide)
   visit_inv h hs := (SInv.visitSt hn0 hn hs.dense h ctx).toG
   visit_part h := ((PartOk.visit hn0 hn
     (by obtain ⟨⟨_, _, _, h1, _⟩, _⟩ := h; exact h1) (PartOk.of_nodeOk hn h) ctx).facts hn0 hn).toG
