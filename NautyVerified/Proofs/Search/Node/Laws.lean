@@ -346,6 +346,13 @@ structure NodeLaws (L : PolicyLink O n) (G : O.Gr n) where
     let st₁ := P.compareCodes level v.2.1 v.2.2
     let ct := P.chooseTarget false G 100 level v.1 st₁
     LeafOkG ct.2.2.2
+  /-- At a leaf with `compCanon = 0` the canonical rows below `samerows` are `G`
+  relabelled by `canonlab`, so `updatecan` fits the store (`processnodeSpecG`). -/
+  leafFits : ∀ {level nc st}, NodeOk false level nc st →
+    let v := P.visit G level nc st
+    let st₁ := P.compareCodes level v.2.1 v.2.2
+    let ct := P.chooseTarget false G 100 level v.1 st₁
+    ct.2.2.2.compCanon = 0 → O.Fits G (O.rows ct.2.2.2.canong) ct.2.2.2.canonlab ct.2.2.2.samerows
   /-- `node_short_autos`. -/
   short_autos : ∀ first fuel level nc (st : SearchState n (O.Canon n)) {tg},
     0 < (Generic.node first G nautyInf 100 fuel level nc st).2.wsCap →
@@ -413,6 +420,7 @@ def denseLaws (G : Colored n k) (ctx : Ctx n) (hn0 : 0 < n) (hn : n + 2 < nautyI
   leaf_lt h := node_hlt h ctx 100
   leaf_done h := node_hDone hn0 hn h ctx 100
   leafOk h := (proc_leafOk h ctx 100).toG
+  leafFits _ _ := trivial
   short_autos first fuel level nc st _ hcap he := by
     rw [← node_eq_generic] at hcap he ⊢
     exact node_short_autos first ctx nautyInf 100 fuel level nc st hcap he

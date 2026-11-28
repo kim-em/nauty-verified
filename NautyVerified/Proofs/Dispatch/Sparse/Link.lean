@@ -64,6 +64,16 @@ theorem maketargetcell_mtc (G : Hex.SparseGraph n) (lab ptn : Array Nat) (level 
   unfold Sparse.maketargetcell mtcOf
   rw [← cellEnd_succ (by omega) ho]
 
+/-- `NodeLaws.target_lt`'s conclusion for `Sparse.targetcell`, on a partition with
+fewer than `n` cells. -/
+theorem sparse_targetcell_lt (G : Hex.SparseGraph n) (lab ptn : Array Nat) (level tcLevel : Nat)
+    (hint : Int) (hp : lab.toList.Perm (List.range n)) (hs : ptn.size = n)
+    (hend : ptn[n - 1]! ≤ level) (hc : bcount ptn level n < n) :
+    Sparse.targetcell (.ofGraph G) lab ptn level tcLevel hint < n ∧
+      level < ptn[Sparse.targetcell (.ofGraph G) lab ptn level tcLevel hint]! := by
+  have hm := Sparse.targetcell_nontrivial G lab ptn level tcLevel hint hp hs hend hc
+  exact ⟨Sparse.Target.bound hs hend hm, (Sparse.Target.open_of_mem hs hend hm).1⟩
+
 /-- What `Sparse.visit` needs: the node's partition facts `refineWith_refine` reads. -/
 def SparseVisitOk (G : Sparse.Graph n) (level : Nat) (st : Sparse.State n) : Prop :=
   (∃ H : Hex.SparseGraph n, G = .ofGraph H) ∧ st.lab.toList.Perm (List.range n) ∧
