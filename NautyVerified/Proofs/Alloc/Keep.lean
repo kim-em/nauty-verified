@@ -57,6 +57,27 @@ theorem Keep.unch {m m' : mem} {S : block → Prop} {b : block} (hu : Unch m m' 
       change intOfZ _ < intOfZ _
       simp only [intOfZ_add, show intOfZ (size_chunk .Mint8unsigned) = 1 from rfl]; omega⟩⟩
 
+/-- `b`'s bytes below offset 0 are as before and every access to `b` survives. -/
+theorem Keep.of_access {m m' : mem} {b : block}
+    (hl : ∀ chunk (ofs : Int), ofs + csize chunk ≤ 0 →
+      Mem.load chunk m' b (zOfInt ofs) = Mem.load chunk m b (zOfInt ofs))
+    (ha : ∀ chunk ofs p, Mem.valid_access m chunk b ofs p → Mem.valid_access m' chunk b ofs p) :
+    Keep m m' b :=
+  ⟨hl, fun ofs p hp => by
+    have hva : Mem.valid_access m .Mint8unsigned b ofs p := by
+      refine ⟨fun o ho => ?_, ⟨ofs, by
+        apply intOfZ_injective
+        simp [show intOfZ (align_chunk .Mint8unsigned) = 1 from rfl]⟩⟩
+      have h1 : intOfZ ofs ≤ intOfZ o := ho.1
+      have h2 : intOfZ o < intOfZ ofs + 1 := by
+        have := ho.2; change intOfZ _ < intOfZ _ at this
+        simpa [intOfZ_add, show intOfZ (size_chunk .Mint8unsigned) = 1 from rfl] using this
+      rw [show o = ofs by apply intOfZ_injective; omega]
+      exact hp
+    exact (ha _ _ _ hva).1 ofs ⟨by change intOfZ _ ≤ intOfZ _; exact Int.le_refl _, by
+      change intOfZ _ < intOfZ _
+      simp only [intOfZ_add, show intOfZ (size_chunk .Mint8unsigned) = 1 from rfl]; omega⟩⟩
+
 /-- A change confined to offsets `≥ 0` of `b` keeps it. -/
 theorem Keep.of_outside {m m' : mem} {b : block} {hi : Int} (ho : Outside m m' b 0 hi) :
     Keep m m' b :=

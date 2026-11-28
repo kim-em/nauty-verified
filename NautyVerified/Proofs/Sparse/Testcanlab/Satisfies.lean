@@ -68,7 +68,7 @@ def testcanlabSpec {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sofs : ptrof
       MarksAt m' cap' b' st' marks' ∧ n ≤ cap' ∧ ((cap' = cap ∧ b' = b) ∨ ¬ Mem.valid_block m b') ∧
       Unch m m' (fun z => z = bs ∨ z = Block.work1 ∨ z = Block.work1Sz ∨ (0 < capW ∧ z = bW) ∨
         (¬ Mem.valid_block m bW' ∧ z = bW') ∨ MarksS m cap b b' z) ∧
-      (∀ z, Mem.valid_block m z → Mem.valid_block m' z)
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) ∧ b' ≠ bW'
 
 def entryTemps (bsg : block) (sofs : ptrofs) (bc : block) (cofs : ptrofs) (bl : block) (lofs : ptrofs)
     (bs : block) (so : ptrofs) (M n : Nat) : temp_env :=
@@ -338,7 +338,7 @@ theorem testcanlab_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (so
         hDW3.keep hu' hWS' hWSS' (fun _ => Alloc.Keep.unch hu' hbW1S)
       refine ⟨rfl, by rw [hrc], by rw [hrc]; exact harr', capW1, bW1, cap2, b2, st', marks', hDW', hnW,
         hor1, hM', hnc2, hor2.imp_right (fun h hv => h (hg1 _ hv)), ?_,
-        fun z h => hg' _ (hg3 _ (hg2 _ (hg1 _ h)))⟩
+        fun z h => hg' _ (hg3 _ (hg2 _ (hg1 _ h))), hb2W1⟩
       refine (((hu1.mono fun z hz => ?_).trans (hu2.mono fun z hz => ?_)).trans
         (hu3.mono fun z hz => ?_)).trans (hu'.mono fun z hz => ?_)
       · rcases hz with h | h | h | h

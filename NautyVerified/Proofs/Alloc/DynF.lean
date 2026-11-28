@@ -99,6 +99,12 @@ theorem FieldFrame.trans {m₁ m₂ m₃ : mem} {bc : block} {po so : ptrofs}
   ⟨fun c o a1 a2 => (h₂.load c o a1 a2).trans (h₁.load c o a1 a2),
    fun c o p h => h₂.access c o p (h₁.access c o p h)⟩
 
+/-- A frame of `bc` keeps it: the fields are at offsets `≥ 0`. -/
+theorem FieldFrame.keep {m m' : mem} {bc : block} {po so : ptrofs} (h : FieldFrame m m' bc po so) :
+    Keep m m' bc :=
+  Keep.of_access (fun c o ho => h.load c _ (.inl (by simp only [intOfZ_zOfInt, intOfZ_Ptrofs_unsigned]; omega))
+    (.inl (by simp only [intOfZ_zOfInt, intOfZ_Ptrofs_unsigned]; omega))) h.access
+
 /-- A change outside `bc` is a frame of `bc`. -/
 theorem FieldFrame.of_unch {m m' : mem} {S : block → Prop} {bc : block} (hu : Unch m m' S)
     (hb : ¬ S bc) (po so : ptrofs) : FieldFrame m m' bc po so :=

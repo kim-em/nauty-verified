@@ -85,7 +85,7 @@ def initSpec {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sofs : ptrofs) (bv
     Mem.load .Mint32 m' bst (Ptrofs.unsigned stofs) = some (.Vint (ir 0)) ∧
     Mem.valid_access m' .Mint32 bst (Ptrofs.unsigned stofs) .Writable ∧
     Unch m m' (fun z => z = bc ∨ z = bst ∨ ¬ Mem.valid_block m z) ∧
-    (∀ z, Mem.valid_block m z → Mem.valid_block m' z)
+    (∀ z, Mem.valid_block m z → Mem.valid_block m' z) ∧ Alloc.Keep m m' bc ∧ Alloc.Keep m m' bst
 
 def entryTemps (bsg : block) (sofs : ptrofs) (gout : val) (bc : block) (cofs : ptrofs)
     (hout lab ptn active : val) (bo : block) (oofs : ptrofs) (bst : block) (stofs : ptrofs)
@@ -368,7 +368,7 @@ theorem init_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sofs : p
       hVnew, fun h => hDnew (hg1 _ h), fun h => hEnew (hg2 _ (hg1 _ h)),
       fun h => hDnew (h ▸ hbV1), fun h => hEnew (h ▸ hg2 _ hbV1), fun h => hEnew (h ▸ hbD2),
       ?_, ?_, ?_, Mem.load_store_same _ _ _ _ _ _ hst6,
-      Mem.store_valid_access_1 _ _ _ _ _ _ hst6 _ _ _ _ hstW5, ?_, ?_⟩
+      Mem.store_valid_access_1 _ _ _ _ _ _ hst6 _ _ _ _ hstW5, ?_, ?_, ?_, ?_⟩
     · exact
         { ndeW := hu6.access _ _ _ _ hcs' (Mem.store_valid_access_1 _ _ _ _ _ _ hst5 _ _ _ _ hndeW4)
           v := hV6.ptr hVp
@@ -393,5 +393,14 @@ theorem init_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sofs : p
     · intro z h
       exact Mem.store_valid_block_1 _ _ _ _ _ _ hst6 _ (Mem.store_valid_block_1 _ _ _ _ _ _ hst5 _
         (Mem.store_valid_block_1 _ _ _ _ _ _ hst4 _ (hg3 _ (hg2 _ (hg1 _ h)))))
+    · exact ((((hf1.keep.trans hf2.keep).trans hf3.keep).trans
+        (Alloc.Keep.store hst4 (by simp only [fofs, intOfZ_Ptrofs_unsigned]; omega))).trans
+        (Alloc.Keep.store hst5 (by simp only [fofs, intOfZ_Ptrofs_unsigned]; omega))).trans
+        (Alloc.Keep.unch hu6 hcs')
+    · exact (((((Alloc.Keep.unch hu1 (nS hst0 hcs.symm)).trans (Alloc.Keep.unch hu2 (nS hbst1 hcs.symm))).trans
+        (Alloc.Keep.unch hu3 (nS hbst2 hcs.symm))).trans
+        (Alloc.Keep.unch (Unch.store (S := (· = bc)) hst4 rfl) (fun h => hcs h.symm))).trans
+        (Alloc.Keep.unch (Unch.store (S := (· = bc)) hst5 rfl) (fun h => hcs h.symm))).trans
+        (Alloc.Keep.store hst6 (by simp only [intOfZ_Ptrofs_unsigned]; omega))
 
 end NautyVerified.Proofs.Sparse.Init
