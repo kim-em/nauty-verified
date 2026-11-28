@@ -254,7 +254,8 @@ theorem refine1_satisfies_of {xi : ExternalCalls} (hN : NontrivialPass1 xi)
       · exact .inl ⟨hc, rfl⟩
       · exact .inr hnv
     refine ⟨m6, Nextelement.free_empty m6, by simp, capW, bW, L.capS, bS, capB, bB, aw5,
-      (hm5.unchCode hok hu6).congr rfl rfl rfl rfl, harr6, hcW, hcB, hbW, hbS, hbB, ?_,
+      (hm5.unchCode hok hu6).congr rfl rfl rfl rfl, harr6, hcW, hcB, hbW, hbS, hbB,
+      hWS', hWB (by omega) (by omega), hSB', ?_,
       fun z hz => ((Keep.unch hu3 (hp.notDyn (.inl (List.mem_cons_of_mem _ hz))
         (hv z (List.mem_cons_of_mem _ hz))) : Keep m m3 z).trans (hkA5 z)).trans (hkA6 z)⟩
     refine ((hu3.mono fun z hz => .inr (.inr hz)).trans (hu5.mono fun z hz => ?_)).trans

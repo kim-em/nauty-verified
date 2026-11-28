@@ -65,6 +65,7 @@ def refineSpec {n : Nat} (L : Loc) (ctx : Ctx n) (lab ptn : Array Nat) (active :
     ((capW = L.capW ∧ bW = L.bW) ∨ ¬ Mem.valid_block m bW) ∧
     ((capS = L.capS ∧ bS = L.bS) ∨ ¬ Mem.valid_block m bS) ∧
     ((capB = L.capB ∧ bB = L.bB) ∨ ¬ Mem.valid_block m bB) ∧
+    bW ≠ bS ∧ bW ≠ bB ∧ bS ≠ bB ∧
     Unch m m' (fun z => (z = L.bl ∨ z = L.bp ∨ z = L.bn ∨ z = L.bc ∨ z = L.ba) ∨ z = L.bk ∨
       dyn3Set m L.capW L.bW L.capS L.bS L.capB L.bB z) ∧
     ∀ z ∈ [L.bl, L.bp, L.bn, L.bc, L.ba, L.bk], Keep m m' z
@@ -411,7 +412,8 @@ theorem refine_satisfies_of {xi : ExternalCalls} (hT : TrivialPass xi) (hN : Non
       · exact .inl ⟨hc, rfl⟩
       · exact .inr hnv
     refine ⟨m6, Nextelement.free_empty m6, by simp, capW, bW, capS, bS, capB, bB, aw5,
-      (hm5.unchCode hok hu6).congr rfl rfl rfl rfl, harr6, hcW, hcB, hbW, hbS, hbB, ?_,
+      (hm5.unchCode hok hu6).congr rfl rfl rfl rfl, harr6, hcW, hcB, hbW, hbS, hbB,
+      hWS hpos.1 hpos.2.1, hWB hpos.1 hpos.2.2, hSB hpos.2.1 hpos.2.2, ?_,
       fun z hz => ((Keep.unch hu3 (hp.notDyn (.inl (List.mem_cons_of_mem _ hz))
         (hv z (List.mem_cons_of_mem _ hz))) : Keep m m3 z).trans (hkA5 z)).trans (hkA6 z)⟩
     refine ((hu3.mono fun z hz => .inr (.inr hz)).trans (hu5.mono fun z hz => ?_)).trans
