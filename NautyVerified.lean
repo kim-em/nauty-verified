@@ -161,6 +161,7 @@ import NautyVerified.Proofs.Search.Node.OtherTail
 import NautyVerified.Proofs.Search.Node.FirstLoop
 import NautyVerified.Proofs.Search.Node.FirstEnd
 import NautyVerified.Proofs.Search.Node.FirstBodySteps
+import NautyVerified.Proofs.Search.Node.FirstHead
 import NautyVerified.Proofs.Search.Node.TcFrame
 import NautyVerified.Proofs.Search.Node.UaFrame
 import NautyVerified.Proofs.Search.Node.InvSteps
