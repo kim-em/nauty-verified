@@ -347,3 +347,4 @@ import NautyVerified.Proofs.Sparse.Refine.Ops
 import NautyVerified.Proofs.Sparse.Refine.Nontrivial.Model
 import NautyVerified.Proofs.Sparse.Refine.Select
 import NautyVerified.Proofs.Sparse.Refine.Trivial.Model
+import NautyVerified.Proofs.Sparse.Refine.Count.Model
