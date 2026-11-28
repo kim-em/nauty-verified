@@ -21,7 +21,8 @@ pinned `inf = nautyInf`, `tcLevel = 100`:
   volatile reads return 0, as the end-to-end theorem assumes (`VloadsZero`);
 - the target-cell list keeps its first `level - 1` nodes, and has at least
   `level` nodes afterwards (node `level - 1`, allocated if missing, owns
-  this level's target cell).
+  this level's target cell); every node of the new list was in the old one or
+  is newly allocated, so the caller's locals never join the list.
 
 `TcOk m S chain` says the list's blocks are valid, pairwise distinct, and
 none of them is a block of `S` or a work block. The precondition also asks
@@ -119,7 +120,8 @@ def nodeSpec {n : Nat} (xi : ExternalCalls) (NodeOk : Bool → Nat → Nat → S
     SearchAt m' S ctx r.2 false (exitValue level r.1).2 ∧
     Emits t (Em first level numcells st) ∧
     (∃ chain', TcChain m' S.M Block.tcnode0 chain' ∧ TcOk m' S chain' ∧ level ≤ chain'.length ∧
-      chain'.take (level - 1) = chain.take (level - 1)) ∧
+      chain'.take (level - 1) = chain.take (level - 1) ∧
+      ∀ p ∈ chain', p ∈ chain ∨ (¬ Mem.valid_block m p.1 ∧ ¬ Mem.valid_block m p.2)) ∧
     NodeFrame m m' S chain level
 
 /-- `firstpathnode0`. -/
