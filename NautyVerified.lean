@@ -293,3 +293,4 @@ import NautyVerified.Proofs.Harness.Phases
 import NautyVerified.Proofs.Harness.Main
 import NautyVerified.Proofs.Harness.Facts
 import NautyVerified.Proofs.Search.Node.ProcFacts
+import NautyVerified.Spec.SparseRefine
