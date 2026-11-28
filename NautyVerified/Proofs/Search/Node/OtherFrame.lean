@@ -18,6 +18,10 @@ entry memory `m₀` and list `chain₀`:
 
 `chain_inj`: in a list whose blocks are pairwise distinct, an entry's node or
 cell determines its index.
+
+`NSetG`, `nset_stepG`, `nset_childG`, `nset_ownG`: the same for any dispatch
+representation (`NodeFrameG`). `sweepOkOff_breakArgs` is about HexGraphIso's
+dense search and stays dense.
 -/
 
 namespace NautyVerified.Proofs.Search
@@ -144,6 +148,86 @@ theorem nset_own (hpw : (chain.flatMap fun p => [p.1, p.2]).Pairwise (· ≠ ·)
     have := entry_late hpw ht hown (Nat.le_refl _) hj
     exact .inr (.inr (.inr (.inr (.inr ⟨j, _, hj, by omega, rfl⟩))))
   · exact .inr (.inl hn)
+
+
+/-! ### For any dispatch representation -/
+
+section Generic
+
+open NautyVerified.Proofs.Dispatch (Ops DispatchRep)
+
+variable {ge : Cfrontend.Clight.genv} [E : NautyEnv ge] {O : Ops} {D : DispatchRep ge O}
+
+/-- `NSet` for `D`. -/
+abbrev NSetG (D : DispatchRep ge O) (m : mem) (S : SLoc) (gl : D.GLoc) (cl : D.CLoc)
+    (chain : List (block × block)) (level : Nat) (z : block) : Prop :=
+  S.ChgG D gl cl z ∨ ¬ Mem.valid_block m z ∨ IsWorkG D m z ∨ z = E.tcnode0 ∨
+    (∃ i p, chain[i]? = some p ∧ level ≤ i + 2 ∧ z = p.1) ∨
+    (∃ i p, chain[i]? = some p ∧ level ≤ i + 1 ∧ z = p.2)
+
+variable {gl : D.GLoc} {cl : D.CLoc}
+
+theorem NodeFrameG.nset {m' : mem} (h : NodeFrameG D m m' S gl cl chain level) :
+    Unch m m' (NSetG D m S gl cl chain level) := h.1
+
+theorem NodeFrameG.grow {m' : mem} (h : NodeFrameG D m m' S gl cl chain level) :
+    ∀ z, Mem.valid_block m z → Mem.valid_block m' z := h.2
+
+theorem NodeFrameG.mk' {m' : mem} (hu : Unch m m' (NSetG D m S gl cl chain level))
+    (hg : ∀ z, Mem.valid_block m z → Mem.valid_block m' z) :
+    NodeFrameG D m m' S gl cl chain level := ⟨hu, hg⟩
+
+/-- A step's blocks are among those the node may change. -/
+theorem nset_stepG (hg : ∀ z, Mem.valid_block m₀ z → Mem.valid_block m z)
+    (hw : WorkMonoG D m₀ m) {z : block}
+    (hz : S.ChgG D gl cl z ∨ ¬ Mem.valid_block m z ∨ IsWorkG D m z) :
+    NSetG D m₀ S gl cl chain₀ level z := by
+  rcases hz with h | h | h
+  · exact .inl h
+  · exact .inr (.inl fun hv => h (hg _ hv))
+  · rcases hw z h with h' | h'
+    · exact .inr (.inr (.inl h'))
+    · exact .inr (.inl h')
+
+/-- A child's blocks are among those the node may change. -/
+theorem nset_childG (hg : ∀ z, Mem.valid_block m₀ z → Mem.valid_block m z)
+    (hw : WorkMonoG D m₀ m)
+    (hpw : (chain.flatMap fun p => [p.1, p.2]).Pairwise (· ≠ ·))
+    (ht : chain.take (level - 1) = chain₀.take (level - 1))
+    (hmem : ∀ p ∈ chain, p ∈ chain₀ ∨ (¬ Mem.valid_block m₀ p.1 ∧ ¬ Mem.valid_block m₀ p.2))
+    {z : block} (hz : NSetG D m S gl cl chain (level + 1) z) :
+    NSetG D m₀ S gl cl chain₀ level z := by
+  rcases hz with h | h | h | h | ⟨i, p, hi, hil, rfl⟩ | ⟨i, p, hi, hil, rfl⟩
+  · exact .inl h
+  · exact .inr (.inl fun hv => h (hg _ hv))
+  · rcases hw z h with h' | h'
+    · exact .inr (.inr (.inl h'))
+    · exact .inr (.inl h')
+  · exact .inr (.inr (.inr (.inl h)))
+  · rcases hmem p (List.mem_of_getElem? hi) with hp | ⟨hn, -⟩
+    · obtain ⟨j, hj⟩ := idx_of_mem hp
+      have := entry_late hpw ht hi (by omega) hj
+      exact .inr (.inr (.inr (.inr (.inl ⟨j, p, hj, by omega, rfl⟩))))
+    · exact .inr (.inl hn)
+  · rcases hmem p (List.mem_of_getElem? hi) with hp | ⟨-, hn⟩
+    · obtain ⟨j, hj⟩ := idx_of_mem hp
+      have := entry_late hpw ht hi (by omega) hj
+      exact .inr (.inr (.inr (.inr (.inr ⟨j, p, hj, by omega, rfl⟩))))
+    · exact .inr (.inl hn)
+
+/-- The node's own target cell is among the blocks it may change. -/
+theorem nset_ownG (hpw : (chain.flatMap fun p => [p.1, p.2]).Pairwise (· ≠ ·))
+    (ht : chain.take (level - 1) = chain₀.take (level - 1))
+    (hmem : ∀ p ∈ chain, p ∈ chain₀ ∨ (¬ Mem.valid_block m₀ p.1 ∧ ¬ Mem.valid_block m₀ p.2))
+    {nd bt : block} (hown : chain[level - 1]? = some (nd, bt)) :
+    NSetG D m₀ S gl cl chain₀ level bt := by
+  rcases hmem _ (List.mem_of_getElem? hown) with hp | ⟨-, hn⟩
+  · obtain ⟨j, hj⟩ := idx_of_mem hp
+    have := entry_late hpw ht hown (Nat.le_refl _) hj
+    exact .inr (.inr (.inr (.inr (.inr ⟨j, _, hj, by omega, rfl⟩))))
+  · exact .inr (.inl hn)
+
+end Generic
 
 end NautyVerified.Proofs.Search
 

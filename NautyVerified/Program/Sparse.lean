@@ -557,6 +557,10 @@ kernel_rfl field_dTargetcell : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
     Exec.lvalOfField sparseGe (Cfrontend.Ctypes.Tstruct dense.id.«_1027» Cfrontend.Ctypes.noattr) dense.id.«targetcell» (.Vptr b ofs) =
       some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 48)), .Full)
 
+kernel_rfl sizeof_tcnode : Cfrontend.Ctypes.sizeof sparseGe.genv_cenv
+    (Cfrontend.Ctypes.Tstruct dense.id.«tcnode_struct» Cfrontend.Ctypes.noattr) =
+      Foundation.Numbers.Rocq.Coq.zOfInt 16
+
 end SparseEnv
 
 /-- The sparse program's blocks. -/
@@ -851,5 +855,6 @@ end SparseEnv
   field_dRefine1 := SparseEnv.field_dRefine1
   field_dCheapautom := SparseEnv.field_dCheapautom
   field_dTargetcell := SparseEnv.field_dTargetcell
+  sizeof_tcnode := SparseEnv.sizeof_tcnode
 
 end NautyVerified.Program

@@ -11,7 +11,8 @@ scratch blocks in use or the shared tables.
 `DispatchRep.doref_refine`: with `refproc` a dispatch refinement procedure,
 the two conditions `dorefSpecR` places on it hold: `refineSpec`'s
 precondition after nautil.c's `DYNALLOC1` of `workperm`, and a call leaving
-`*qinvar` and nautil.c's `workperm` pair alone.
+`*qinvar` and nautil.c's `workperm` pair alone. `doref_refineT` is the same with
+nautil.c's `workperm` block only apart from the shared tables.
 -/
 
 namespace NautyVerified.Proofs.Dispatch
@@ -59,13 +60,15 @@ theorem refinePre_unch {n : Nat} {G : O.Gr n} {gl : R.GLoc} {bg : block} {gofs :
 local notation "NWP" => E.nautilWorkperm
 local notation "NWPS" => E.nautilWorkpermSz
 
-/-- The conditions `dorefSpecR` places on a dispatch refinement procedure. -/
-theorem doref_refine {n : Nat} (G : O.Gr n) (gl : R.GLoc) (L : Refine.Loc) (lab ptn : Array Nat) (numcells : Nat)
+/-- The conditions `dorefSpecR` places on a dispatch refinement procedure, with nautil.c's
+`workperm` block apart from the shared tables. -/
+theorem doref_refineT {n : Nat} (G : O.Gr n) (gl : R.GLoc) (L : Refine.Loc) (lab ptn : Array Nat) (numcells : Nat)
     (active : VSet n) {m : mem} {bq : block} {capN : Nat} {bN : block}
     (h : (R.refineSpec G gl L.bg L.gofs L.bl L.lofs lab L.bp L.pofs ptn L.level L.bn L.nofs numcells
       L.bc L.cofs L.ba L.aofs active L.bk L.kofs L.M).pre (Doref.refArgs L n) m)
     (hN : ∀ z ∈ (R.graphBlocks gl L.bg ++ [L.bl, L.bp, L.bn, L.bc, L.ba, L.bk]), z ≠ NWP ∧ z ≠ NWPS ∧ (0 < capN → z ≠ bN))
-    (hbN : 0 < capN → bN ∉ R.globs ∧ ¬ R.IsWork m bN ∧ bN ∉ E.blocks)
+    (hbN : 0 < capN → bN ∉ R.globs ∧ ¬ R.IsWork m bN ∧ bN ≠ E.nautyBit ∧ bN ≠ E.nautilBit ∧
+      bN ≠ E.leftbit)
     (hgv : ∀ z ∈ R.globs, Mem.valid_block m z)
     (hEv : ∀ z ∈ [E.nautyBit, E.nautilBit, E.leftbit], Mem.valid_block m z)
     (hq : bq ∉ (R.graphBlocks gl L.bg ++ [L.bl, L.bp, L.bn, L.bc, L.ba, L.bk]) ∧ bq ∉ R.globs ∧ ¬ R.IsWork m bq ∧
@@ -93,8 +96,7 @@ theorem doref_refine {n : Nat} (G : O.Gr n) (gl : R.GLoc) (L : Refine.Loc) (lab 
     · refine ⟨fun hz => (hN _ hz).1 rfl, fun hz => R.globs_env _ hz eB.1,
         fun hw => (R.isWork_globs hc.work hw).2 eA.1, by env_ne, by env_ne, by env_ne⟩
     · have hb := hbN hc'
-      refine ⟨fun hz => (hN _ hz).2.2 hc' rfl, hb.1, hb.2.1, fun e => hb.2.2 (e ▸ ?_),
-        fun e => hb.2.2 (e ▸ ?_), fun e => hb.2.2 (e ▸ ?_)⟩ <;> simp [NautyEnv.blocks]
+      exact ⟨fun hz => (hN _ hz).2.2 hc' rfl, hb.1, hb.2.1, hb.2.2.1, hb.2.2.2.1, hb.2.2.2.2⟩
     · refine ⟨fun hz => hnv (hsep.valid z hz), fun hz => hnv (hgv z hz),
         fun hw => hnv (R.isWork_valid hw), fun e => hnv (e ▸ hEv _ (by simp)),
         fun e => hnv (e ▸ hEv _ (by simp)), fun e => hnv (e ▸ hEv _ (by simp))⟩
@@ -134,6 +136,32 @@ theorem doref_refine {n : Nat} (G : O.Gr n) (gl : R.GLoc) (L : Refine.Loc) (lab 
       · exact hnv (hgv _ (R.wglobs_sub _ h1))
       · exact hnv (R.isWork_valid (hwk.2 _ h1))
       · exact h1 hvb
+
+/-- The conditions `dorefSpecR` places on a dispatch refinement procedure. -/
+theorem doref_refine {n : Nat} (G : O.Gr n) (gl : R.GLoc) (L : Refine.Loc) (lab ptn : Array Nat) (numcells : Nat)
+    (active : VSet n) {m : mem} {bq : block} {capN : Nat} {bN : block}
+    (h : (R.refineSpec G gl L.bg L.gofs L.bl L.lofs lab L.bp L.pofs ptn L.level L.bn L.nofs numcells
+      L.bc L.cofs L.ba L.aofs active L.bk L.kofs L.M).pre (Doref.refArgs L n) m)
+    (hN : ∀ z ∈ (R.graphBlocks gl L.bg ++ [L.bl, L.bp, L.bn, L.bc, L.ba, L.bk]), z ≠ NWP ∧ z ≠ NWPS ∧ (0 < capN → z ≠ bN))
+    (hbN : 0 < capN → bN ∉ R.globs ∧ ¬ R.IsWork m bN ∧ bN ∉ E.blocks)
+    (hgv : ∀ z ∈ R.globs, Mem.valid_block m z)
+    (hEv : ∀ z ∈ [E.nautyBit, E.nautilBit, E.leftbit], Mem.valid_block m z)
+    (hq : bq ∉ (R.graphBlocks gl L.bg ++ [L.bl, L.bp, L.bn, L.bc, L.ba, L.bk]) ∧ bq ∉ R.globs ∧ ¬ R.IsWork m bq ∧
+      Mem.valid_block m bq) :
+    (∀ m₁, Unch m m₁ (Doref.NSet m capN bN) → (∀ z, Mem.valid_block m z → Mem.valid_block m₁ z) →
+      (R.refineSpec G gl L.bg L.gofs L.bl L.lofs lab L.bp L.pofs ptn L.level L.bn L.nofs numcells
+        L.bc L.cofs L.ba L.aofs active L.bk L.kofs L.M).pre (Doref.refArgs L n) m₁) ∧
+    (∀ m₁ c' b', Unch m m₁ (Doref.NSet m capN bN) →
+      (∀ z, Mem.valid_block m z → Mem.valid_block m₁ z) →
+      DynAt m₁ NWP NWPS 4 c' b' → ((c' = capN ∧ b' = bN) ∨ ¬ Mem.valid_block m b') →
+      ∀ t v m₂, (R.refineSpec G gl L.bg L.gofs L.bl L.lofs lab L.bp L.pofs ptn L.level L.bn L.nofs
+        numcells L.bc L.cofs L.ba L.aofs active L.bk L.kofs L.M).post (Doref.refArgs L n) m₁ t v m₂ →
+        t = E0 ∧ ∃ W : block → Prop, Unch m₁ m₂ W ∧ ¬ W bq ∧ ¬ W NWP ∧ ¬ W NWPS ∧
+          (0 < c' → ¬ W b')) :=
+  R.doref_refineT G gl L lab ptn numcells active h hN (fun hc =>
+    let ⟨h1, h2, h3⟩ := hbN hc
+    ⟨h1, h2, fun e => h3 (e ▸ by simp [NautyEnv.blocks]), fun e => h3 (e ▸ by simp [NautyEnv.blocks]),
+      fun e => h3 (e ▸ by simp [NautyEnv.blocks])⟩) hgv hEv hq
 
 end DispatchRep
 

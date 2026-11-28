@@ -130,7 +130,7 @@ def dorefSpecR {n : Nat} (xi : ExternalCalls) (RS : FunSpec) (L : Loc) (aw : Nat
     ArrayAt m' .Mint32 bq (intOfZ (Ptrofs.unsigned qofs)) (fun _ => .Vint (ir 0)) 1 ∧
     DynAt m' NWP NWPS 4 capN' bN' ∧ n ≤ capN' ∧
     ((capN' = capN ∧ bN' = bN) ∨ ¬ Mem.valid_block m bN') ∧
-    (0 < capN' → Mem.valid_block m₁ bN')
+    (0 < capN' → Mem.valid_block m₁ bN') ∧ (∀ z, Mem.valid_block m₂ z → Mem.valid_block m' z)
 
 /-- The temporaries on entry. -/
 def entryTemps (L : Loc) (n : Nat) (bq : block) (qofs : ptrofs) (bf : block)
@@ -318,7 +318,8 @@ theorem doref_satisfiesR {xi : ExternalCalls} {n : Nat} (RS : FunSpec) (L : Loc)
         huN.mono fun z hz => ?_, hgN, ⟨v, hpost'⟩, hu3, Alloc.KeepA.storeArr hq2 hst,
         harr3.congr fun i hi => by simp [upd, show i = 0 by omega],
         hDN2.keep hu3 (Ne.symm hqN) (Ne.symm hqNS) (fun hc => Keep.unch hu3 (hbNq hc)), hcN, hbN',
-        fun hc => Alloc.Malloced.valid (hDN1.mal hc)⟩
+        fun hc => Alloc.Malloced.valid (hDN1.mal hc),
+        fun z hz => Mem.store_valid_block_1 _ _ _ _ _ _ hst _ hz⟩
       rcases hz with h | h | h | ⟨hnv, rfl⟩
       · exact .inl h
       · exact .inr (.inl h)
@@ -386,7 +387,8 @@ theorem doref_satisfies {xi : ExternalCalls} {n : Nat} (L : Loc) (ctx : Ctx n)
     ia dg capN bN, doref_satisfiesR _ _ _ _ _ _ _ _ _ _ _ _, ⟨hargs, ⟨fd, hfd, hfty,
       hsat L rfl ctx lab ptn active numcells aw⟩, ?_, ?_, hm.act, hm.left, ?_, hp.M1, hp.Mlt,
       hp.n0, hp.nlt, hDN, hq, hvq, hqN, hqNS, hqbN⟩,
-    fun t v m' ⟨h1, m₁, m₂, c, b, a1, a2, ⟨_, a3⟩, rest⟩ => ⟨h1, m₁, m₂, c, b, a1, a2, a3, rest⟩⟩
+    fun t v m' ⟨h1, m₁, m₂, c, b, a1, a2, ⟨_, a3⟩, r1, r2, r3, r4, r5, r6, r7, _⟩ =>
+      ⟨h1, m₁, m₂, c, b, a1, a2, a3, r1, r2, r3, r4, r5, r6, r7⟩⟩
   · intro m₁ hu hg
     have hm1 := hm.unch hu (fun z hz => nS z (hfix z hz) (hvF z hz))
       (fun hc => nS _ hLW (Alloc.Malloced.valid (hm.dW.mal hc)))

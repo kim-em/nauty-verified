@@ -451,6 +451,10 @@ class NautyEnv (ge : outParam genv) where
   field_dTargetcell : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
     Exec.lvalOfField ge (Cfrontend.Ctypes.Tstruct dense.id.«_1027» Cfrontend.Ctypes.noattr) dense.id.«targetcell» (.Vptr b ofs) =
       some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 48)), .Full)
+  /-- `sizeof(struct tcnode_struct)`, which a node's `malloc` of a new list entry asks for. -/
+  sizeof_tcnode : Cfrontend.Ctypes.sizeof ge.genv_cenv
+    (Cfrontend.Ctypes.Tstruct dense.id.«tcnode_struct» Cfrontend.Ctypes.noattr) =
+      Foundation.Numbers.Rocq.Coq.zOfInt 16
 
 namespace NautyEnv
 
@@ -614,6 +618,10 @@ kernel_rfl field_dCheapautom : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
 kernel_rfl field_dTargetcell : ∀ (b : block) (ofs : Lib.Integers.ptrofs),
     Exec.lvalOfField Program.ge (Cfrontend.Ctypes.Tstruct dense.id.«_1027» Cfrontend.Ctypes.noattr) dense.id.«targetcell» (.Vptr b ofs) =
       some (b, Lib.Integers.Ptrofs.add ofs (Lib.Integers.Ptrofs.repr (Foundation.Numbers.Rocq.Coq.zOfInt 48)), .Full)
+
+kernel_rfl sizeof_tcnode : Cfrontend.Ctypes.sizeof Program.ge.genv_cenv
+    (Cfrontend.Ctypes.Tstruct dense.id.«tcnode_struct» Cfrontend.Ctypes.noattr) =
+      Foundation.Numbers.Rocq.Coq.zOfInt 16
 
 end DenseLayout
 
@@ -910,6 +918,7 @@ reducible transparency). -/
   field_dRefine1 := DenseLayout.field_dRefine1
   field_dCheapautom := DenseLayout.field_dCheapautom
   field_dTargetcell := DenseLayout.field_dTargetcell
+  sizeof_tcnode := DenseLayout.sizeof_tcnode
 
 /-! The dense instance's blocks are the dense `Block` constants. -/
 

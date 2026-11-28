@@ -10,7 +10,8 @@ offset 0, the form `longpruneSpec` takes.
 
 `wp_nodeLong`: `if (tv == tv1) { longprune(tcell, fixedpts, workspace, fmptr, M);
 if (doschreier) pruneset(…); }` is HexGraphIso's `longprune` when `tv == tv1`
-(`doschreier` is 0).
+(`doschreier` is 0). `AutosAtG.pairs` and `wp_nodeLongG` are the same over
+`SearchAtG D`.
 -/
 
 namespace NautyVerified.Proofs.Search
@@ -60,6 +61,20 @@ theorem AutosAt.pairs {n : Nat} {m : mem} {S : SLoc} {autos : Array (VSet n × V
   simp only [Nat.zero_add]
   exact ⟨h1, h2⟩
 
+theorem AutosAtG.pairs {ge : genv} [E : NautyEnv ge] {n : Nat} {m : mem} {S : SLoc} {autos : Array (VSet n × VSet n)}
+    (h : AutosAtG m S autos) :
+    ∃ ww, ArrayAt m .Mint64 S.bws S.wb (longs ww) (2 * wsPairs * S.M) ∧
+      PairsAt ww S.M 0 autos.toList := by
+  obtain ⟨ww, ha, hr⟩ := h.arr
+  refine ⟨ww, ha, pairsAt_of _ 0 fun i hi => ?_⟩
+  have hi' : i < autos.size := by simpa using hi
+  obtain ⟨h1, h2⟩ := hr i hi'
+  have e : autos.toList[i]! = autos[i]! := by
+    simp [getElem!_pos autos.toList i (by simpa using hi), getElem!_pos autos i hi']
+  rw [e]
+  simp only [Nat.zero_add]
+  exact ⟨h1, h2⟩
+
 variable {xi : ExternalCalls}
 
 /-- `pruneset(fixedpts, gp, &gens, tcell, M, n)`, never reached (`doschreier` is 0). -/
@@ -91,18 +106,24 @@ abbrev longIf : statement :=
       (Set.sk (.Sifthenelse (.Evar dense.id.«nauty:doschreier» tint) (Set.sk prunesetCall) .Sskip)))
     .Sskip
 
-theorem wp_nodeLong {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
-    {S : SLoc} {ctx : Ctx n} {st : Search n} {pre nsp : Bool}
-    (h : SearchAt m S ctx st pre nsp)
+section Generic
+
+open NautyVerified.Proofs.Dispatch (Ops DispatchRep)
+
+variable {ge : genv} [E : NautyEnv ge] {O : Ops} {D : DispatchRep ge O}
+
+theorem wp_nodeLongG {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
+    {S : SLoc} {gl : D.GLoc} {cl : D.CLoc} {G : O.Gr n} {st : SearchState n (O.Canon n)}
+    {pre nsp : Bool} (h : SearchAtG D m S gl cl G st pre nsp)
     (hge : ∀ x ∈ [dense.id.«longprune», dense.id.«nauty:fixedpts», dense.id.«nauty:workspace»,
       dense.id.«nauty:fmptr», dense.id.«nauty:m», dense.id.«nauty:doschreier»], PTree.get x e = none)
     {btc : block} (htl : PTree.get dense.id.tcell le = some (.Vptr btc Ptrofs.zero))
     {tw : Nat → Lib.Integers.int64} (htw : ArrayAt m .Mint64 btc 0 (longs tw) S.M)
     {cell : VSet n} (hrep : SetRep (fun w => bv64 (tw w)) S.M cell)
-    (hbS : btc ∉ S.blocks) (hbW : ¬ IsWork m btc)
+    (hbS : btc ∉ S.blocksG D gl cl) (hbW : ¬ IsWorkG D m btc)
     {v v1 : Nat} (htv : PTree.get dense.id.«tv» le = some (.Vint (ir v)))
     (htv1 : PTree.get dense.id.«tv1» le = some (.Vint (ir v1))) (hv : v < n) (hv1 : v1 < n)
-    (hQ : ∀ m' (tw' : Nat → Lib.Integers.int64), SearchAt m' S ctx st pre nsp →
+    (hQ : ∀ m' (tw' : Nat → Lib.Integers.int64), SearchAtG D m' S gl cl G st pre nsp →
       ArrayAt m' .Mint64 btc 0 (longs tw') S.M →
       SetRep (fun w => bv64 (tw' w)) S.M
         (if v == v1 then longprune cell st.fixedpts st.autos else cell) →
@@ -140,28 +161,29 @@ theorem wp_nodeLong {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_env
       simp only [ptrTo, Array.length_toList, Nat.zero_add, show S.M + S.M = 2 * S.M by omega]
       push_cast; rfl
     have hfm := h.arrays.autos.fmptr
-    refine wp_call (vf := .Vptr Block.longpruneFn Ptrofs.zero)
+    refine wp_call (vf := .Vptr E.longpruneFn Ptrofs.zero)
       (targs := [tptr tulong, tptr tulong, tptr tulong, tptr tulong, tint])
       (tres := .Tvoid) (cc := Common.AST.cc_default) (.Internal dense.fn.longprune) _
       (Prune.Long.longprune_satisfies btc Ptrofs.zero S.bF Ptrofs.zero S.bws S.wb ww
         (2 * wsPairs * S.M) S.M 0 fw tw st.fixedpts cell st.autos.toList).grow rfl ?_ ?_
-      (by simp [Common.Globalenvs.Genv.find_funct, funct_longpruneFn]) rfl
+      (by simp [Common.Globalenvs.Genv.find_funct, E.funct_longpruneFn]) rfl
       ⟨by rw [hbot, ← htop], htw, hf, hww, hrep, hfr, hpairs,
-        fun he => hbS (he ▸ by simp [SLoc.blocks]), fun he => hbS (he ▸ by simp [SLoc.blocks]),
+        fun he => hbS (he ▸ SLoc.mem_blocksG_of D (.inr (.inr (.inr (.inl (by simp)))))),
+        fun he => hbS (he ▸ SLoc.mem_blocksG_of D (.inr (.inr (.inr (.inl (by simp)))))),
         hM1, by omega, Nat.mul_pos (by decide) hM1, by omega⟩ ?_
-    · simp only [Exec.evalExpr, Exec.lvalOfVar, g1, find_longpruneFn, Exec.derefLoc,
+    · simp only [Exec.evalExpr, Exec.lvalOfVar, g1, E.find_longpruneFn, Exec.derefLoc,
         Cfrontend.Ctypes.access_mode]
     · have hF1 := h.dyns.fixedpts.ptr (by have := h.dyns.capF; omega)
       simp only [Exec.evalExprlist, Exec.evalExpr, htl, Exec.lvalOfVar, g2, g3, g4, g5,
-        Program.find_nautyFixedpts, find_workspace, find_fmptr, find_m, Exec.derefLoc,
+        E.find_nautyFixedpts, E.find_workspace, E.find_fmptr, E.find_m, Exec.derefLoc,
         Cfrontend.Ctypes.access_mode, Mem.loadv, show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl,
         hF1, h.fixed.workspace.load, hfm.load, h.fixed.mm.load, typeof, cop, Alloc.Mptr_eq]
     rintro t _ m₂ ⟨⟨rfl, tw', harr₂, hr₂, hu₂, hka₂⟩, hg₂⟩
-    have h₂ := h.unch hu₂ (fun z hz he => hbS (he ▸ hz)) (fun z hz he => hbW (he ▸ hz))
+    have h₂ := h.unch hu₂ (fun z hz he => hbS (he ▸ hz)) (fun z hz he => hbW (he ▸ hz)) hg₂
     simp only [seqPost, Post.after, E0_append]
     wp_step; wp_step
     apply wp_if_eval
-    rw [eval_gint g6 find_doschreier h₂.fixed.doschreier]
+    rw [eval_gint g6 E.find_doschreier h₂.fixed.doschreier]
     simp only [typeof, cop]
     rw [ite_eq_right (by decide)]
     apply wp_skip
@@ -171,5 +193,29 @@ theorem wp_nodeLong {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_env
     apply wp_skip
     have : (v == v1) = false := by simpa using hvv
     exact hQ m tw h htw (by rw [this]; exact hrep) (Unch.refl _ _) (fun _ h => h) (Alloc.Keep.refl _ _)
+
+end Generic
+
+theorem wp_nodeLong {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
+    {S : SLoc} {ctx : Ctx n} {st : Search n} {pre nsp : Bool}
+    (h : SearchAt m S ctx st pre nsp)
+    (hge : ∀ x ∈ [dense.id.«longprune», dense.id.«nauty:fixedpts», dense.id.«nauty:workspace»,
+      dense.id.«nauty:fmptr», dense.id.«nauty:m», dense.id.«nauty:doschreier»], PTree.get x e = none)
+    {btc : block} (htl : PTree.get dense.id.tcell le = some (.Vptr btc Ptrofs.zero))
+    {tw : Nat → Lib.Integers.int64} (htw : ArrayAt m .Mint64 btc 0 (longs tw) S.M)
+    {cell : VSet n} (hrep : SetRep (fun w => bv64 (tw w)) S.M cell)
+    (hbS : btc ∉ S.blocks) (hbW : ¬ IsWork m btc)
+    {v v1 : Nat} (htv : PTree.get dense.id.«tv» le = some (.Vint (ir v)))
+    (htv1 : PTree.get dense.id.«tv1» le = some (.Vint (ir v1))) (hv : v < n) (hv1 : v1 < n)
+    (hQ : ∀ m' (tw' : Nat → Lib.Integers.int64), SearchAt m' S ctx st pre nsp →
+      ArrayAt m' .Mint64 btc 0 (longs tw') S.M →
+      SetRep (fun w => bv64 (tw' w)) S.M
+        (if v == v1 then longprune cell st.fixedpts st.autos else cell) →
+      Unch m m' (fun z => z = btc) →
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) → Alloc.Keep m m' btc → Q.normal E0 e le m') :
+    Wp xi ge f longIf Q e le m :=
+  wp_nodeLongG h.toG hge htl htw hrep (fun e => hbS (SLoc.mem_blocksG.1 e))
+    (fun e => hbW (isWork_dense.1 e)) htv htv1 hv hv1 fun m' tw' h' ha hr hu hg hk =>
+    hQ m' tw' (h'.dense h.gw) ha hr hu hg hk
 
 end NautyVerified.Proofs.Search

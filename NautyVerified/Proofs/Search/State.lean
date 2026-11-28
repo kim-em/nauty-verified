@@ -824,6 +824,13 @@ theorem WorkG.dense {n : Nat} {m : mem} {S : SLoc} {L : List block} (h : WorkG d
     fun h1 h2 e => uN h1 (e ▸ uW h2), fun h1 h2 e => uN h1 (e ▸ uS h2),
     fun h1 h2 e => uN h1 (e ▸ uB h2)⟩⟩
 
+/-- `SInv` as `SInvG` for dense nauty's operations. -/
+theorem SInv.toG {n : Nat} {ctx : Ctx n} {st : Search n} (h : SInv st) : SInvG denseOps ctx st :=
+  { h with canong := h.canongSize }
+
+theorem SInvG.dense {n : Nat} {ctx : Ctx n} {st : Search n} (h : SInvG denseOps ctx st) : SInv st :=
+  { h with canongSize := h.canong }
+
 /-- The dense search state as the generic one. -/
 theorem SearchAt.toG {n : Nat} {m : mem} {S : SLoc} {ctx : Ctx n} {st : Search n}
     {pre nsp : Bool} (h : SearchAt m S ctx st pre nsp) :

@@ -159,6 +159,74 @@ theorem SearchAtG.valid_all {n : Nat} {m : mem} {S : SLoc} {gl : D.GLoc} {cl : D
   · exact ht ▸ hvT
   exact h.valid_blocks z hz hu ht
 
+/-- `SearchAtG` across a call of one of `D`'s procedures whose outputs `out`
+are none of the blocks of `S` and no scratch block in use: the state is unchanged,
+and the scratch blocks in use afterwards were in use or are new. -/
+theorem SearchAtG.dstep {n : Nat} {m m' : mem} {S : SLoc} {gl : D.GLoc} {cl : D.CLoc}
+    {G : O.Gr n} {st : SearchState n (O.Canon n)} {pre nsp : Bool}
+    (h : SearchAtG D m S gl cl G st pre nsp) (hvU : Mem.valid_block m S.bUA)
+    (hvT : Mem.valid_block m E.tcnode0) {out : block → Prop} (hs : D.Step m m' out)
+    (hout : ∀ z, out z → z ∉ S.blocksG D gl cl ∧ ¬ IsWorkG D m z) :
+    SearchAtG D m' S gl cl G st pre nsp ∧ WorkMonoG D m m' := by
+  have hv := h.valid_all hvU hvT
+  have hu := hs.unch
+  have key : ∀ z ∈ S.blocksG D gl cl, z ∉ D.globs →
+      ¬ (out z ∨ z ∈ D.wglobs ∨ D.IsWork m z ∨ ¬ Mem.valid_block m z) := by
+    rintro z hz hg (ho | hw | hi | hn)
+    · exact (hout z ho).1 hz
+    · exact hg (D.wglobs_sub z hw)
+    · exact h.work_not (.inl hi) hz
+    · exact hn (hv z hz)
+  have kg : ∀ z ∈ D.globs, z ∉ D.wglobs →
+      ¬ (out z ∨ z ∈ D.wglobs ∨ D.IsWork m z ∨ ¬ Mem.valid_block m z) := by
+    rintro z hz hnw (ho | hw | hi | hn)
+    · exact (hout z ho).1 (SLoc.mem_blocksG_of D (.inr (.inr (.inr (.inr (.inr hz))))))
+    · exact hnw hw
+    · exact (D.isWork_globs h.work.disp hi).1 hz
+    · exact hn (D.globs_valid h.work.disp z hz)
+  have hE : ∀ z ∈ envSearch, ¬ (out z ∨ z ∈ D.wglobs ∨ D.IsWork m z ∨ ¬ Mem.valid_block m z) :=
+    fun z hz => key z (SLoc.mem_blocksG_of D (.inr (.inr (.inr (.inr (.inl hz))))))
+      fun hg => h.globs_ne hg (.inr (.inr (.inr (.inr hz)))) rfl
+  have hV : ∀ z ∈ [S.bl, S.bp, S.bo, S.bst],
+      ¬ (out z ∨ z ∈ D.wglobs ∨ D.IsWork m z ∨ ¬ Mem.valid_block m z) :=
+    fun z hz => key z (SLoc.mem_blocksG_of D (.inr (.inl hz)))
+      fun hg => h.globs_ne hg (.inr (.inl hz)) rfl
+  have hV' : ∀ z ∈ [S.bws, S.bA, S.bF, S.bWP, S.bFL, S.bCL, S.bFC, S.bCC, S.bTC, S.bUA],
+      ¬ (out z ∨ z ∈ D.wglobs ∨ D.IsWork m z ∨ ¬ Mem.valid_block m z) :=
+    fun z hz => key z (SLoc.mem_blocksG_of D (.inr (.inr (.inr (.inl hz)))))
+      fun hg => h.globs_ne hg (.inr (.inr (.inr (.inl hz)))) rfl
+  have mN : E.nautilWorkperm ∈ S.blocksG D gl cl ∧ E.nautilWorkpermSz ∈ S.blocksG D gl cl :=
+    ⟨SLoc.mem_blocksG_of D (.inr (.inr (.inr (.inr (.inl (by simp)))))),
+      SLoc.mem_blocksG_of D (.inr (.inr (.inr (.inr (.inl (by simp))))))⟩
+  obtain ⟨hw', hmono⟩ := h.work.step hs hv
+    (fun z hz => SLoc.mem_blocksG_of D (.inr (.inr (.inr (.inr (.inr hz))))))
+    (fun z ho => ⟨fun e => (hout z ho).1 (e ▸ mN.1), fun e => (hout z ho).1 (e ▸ mN.2),
+      fun c b d hc e => (hout z ho).2 (e ▸ .inr ⟨c, hc, d⟩)⟩) mN
+  refine ⟨{ h with
+    fixed := h.fixed.unch hu fun z hz => hE z (by revert z; simp)
+    scalars := h.scalars.unch hu fun z hz => hE z (by revert z; simp)
+    stats := h.stats.unch hu (hV _ (by simp))
+    arrays := h.arrays.unch hu (fun z hz => by
+        simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
+        rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
+        iterate 3 exact hV _ (by simp)
+        iterate 9 exact hV' _ (by simp)
+        exact hE _ (by simp))
+      (fun z hz => key z (SLoc.mem_blocksG_of D (.inl hz)) fun hg => h.globs_ne hg (.inl hz) rfl)
+      (fun z hz => key z (SLoc.mem_blocksG_of D (.inr (.inr (.inl hz))))
+        fun hg => h.globs_ne hg (.inr (.inr (.inl hz))) rfl)
+    dyns := h.dyns.unch hu fun z hz => by
+      simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
+      rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
+        rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
+      iterate 16 exact hE _ (by simp)
+      iterate 8 exact hV' _ (by simp)
+      exact kg _ D.wsP_mem D.wsP_nw
+      exact kg _ D.wsS_mem D.wsS_nw
+      exact hV' _ (by simp)
+    work := hw'
+    tables := h.tables.unch hu (hE _ (by simp)) (hE _ (by simp)) (hE _ (by simp)) kg }, hmono⟩
+
 end Generic
 
 theorem SearchAt.valid_blocks {n : Nat} {m : mem} {S : SLoc} {ctx : Ctx n} {st : Search n}

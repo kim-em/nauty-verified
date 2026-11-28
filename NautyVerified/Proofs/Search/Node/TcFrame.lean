@@ -8,7 +8,8 @@ import NautyVerified.Proofs.Search.Node.Prune
   one target cell `c` that still holds `M` words and keeps its `malloc` header
   and permissions, the list is unchanged;
 - `TcOk.mono`: the list's blocks stay valid and apart from `S` and from the
-  work arrays when every new work block was a work block or not valid before.
+  work arrays when every new work block was a work block or not valid before
+  (`TcOkG.mono` for any dispatch representation).
 -/
 
 namespace NautyVerified.Proofs.Search
@@ -59,5 +60,31 @@ theorem TcOk.mono {m m' : mem} {S : SLoc} {chain : List (block × block)} (h : T
     · rcases hw _ hz with hz' | hz'
       · exact a4 hz'
       · exact hz' v2
+
+section Generic
+
+open NautyVerified.Proofs.Dispatch (Ops DispatchRep)
+
+variable {ge : genv} [E : NautyEnv ge] {O : Ops} {D : DispatchRep ge O}
+
+theorem TcOkG.mono {m m' : mem} {S : SLoc} {gl : D.GLoc} {cl : D.CLoc}
+    {chain : List (block × block)} (h : TcOkG D m S gl cl chain)
+    (hg : ∀ z, Mem.valid_block m z → Mem.valid_block m' z)
+    (hw : ∀ z, IsWorkG D m' z → IsWorkG D m z ∨ ¬ Mem.valid_block m z) :
+    TcOkG D m' S gl cl chain where
+  pairwise := h.pairwise
+  valid := fun p hp => ⟨hg _ (h.valid p hp).1, hg _ (h.valid p hp).2⟩
+  apart := fun p hp => by
+    obtain ⟨a1, a2, a3, a4⟩ := h.apart p hp
+    obtain ⟨v1, v2⟩ := h.valid p hp
+    refine ⟨a1, a2, fun hz => ?_, fun hz => ?_⟩
+    · rcases hw _ hz with hz' | hz'
+      · exact a3 hz'
+      · exact hz' v1
+    · rcases hw _ hz with hz' | hz'
+      · exact a4 hz'
+      · exact hz' v2
+
+end Generic
 
 end NautyVerified.Proofs.Search

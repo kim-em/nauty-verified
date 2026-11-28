@@ -13,6 +13,7 @@ Both search nodes start by finding their entry of the target-cell list,
 `wp_tcallocNew`: when it is missing, `tcalloc` allocates a node and a
 zero-filled target cell of `alloc_m = M` words and links the node from the
 parent, which `TcChain.snoc` turns into the list with one more entry.
+Both hold in any program with the shared globals `E : NautyEnv ge`.
 -/
 
 namespace NautyVerified.Proofs.Search
@@ -22,6 +23,9 @@ open CompCert4Lean.Common.Values CompCert4Lean.Common.Memory CompCert4Lean.Commo
 open CompCert4Lean.Common.ExternalCalls
 open CompCert4Lean.Foundation.Numbers.Rocq.Coq CompCert4Lean.Lib.Maps CompCert4Lean.Lib.Integers
 open NautyVerified NautyVerified.Logic NautyVerified.Program NautyVerified.Source NautyVerified.Word
+
+variable {ge : genv} [E : NautyEnv ge]
+set_option linter.unusedSectionVars false
 
 variable {xi : ExternalCalls}
 
@@ -84,7 +88,7 @@ theorem wp_tcallocNew {f : function} {Q : Post} {e : env} {le : temp_env} {m : m
     (hthis : PTree.get dense.id.«tcnode_this» le = some Vnullptr)
     (hpar : PTree.get dense.id.«tcnode_parent» le = some (.Vptr par Ptrofs.zero))
     (hparW : Mem.valid_access m .Mint64 par (zOfInt 0) .Writable)
-    (hge : PTree.get dense.id.«nauty:alloc_m» e = none) (hal : IntAt m Block.allocM M)
+    (hge : PTree.get dense.id.«nauty:alloc_m» e = none) (hal : IntAt m E.allocM M)
     (hM : 8 * M < 2 ^ 62) (hM31 : M < 2147483648) (hM0 : 0 < M) (hgz : PTree.get dense.id.nauty_zalloc e = none)
     (hQ : ∀ le' m' nd tc, ¬ Mem.valid_block m nd → ¬ Mem.valid_block m tc → nd ≠ tc →
       Unch m m' (fun z => z = par ∨ ¬ Mem.valid_block m z) →
@@ -103,13 +107,14 @@ theorem wp_tcallocNew {f : function} {Q : Post} {e : env} {le : temp_env} {m : m
   simp only [Exec.evalExpr, hthis, typeof, cop, eq_null]
   simp only [cop, ite_true]
   wp_step; wp_step; wp_step; wp_step; wp_step; wp_step; wp_step
-  refine wp_call (vf := .Vptr Block.zalloc Ptrofs.zero) (targs := [tulong]) (tres := tptr .Tvoid)
+  refine wp_call (vf := .Vptr E.zalloc Ptrofs.zero) (targs := [tulong]) (tres := tptr .Tvoid)
     (cc := Common.AST.cc_default) _ (Alloc.zallocSpec 16) (Alloc.zalloc_satisfies _) ?_ ?_ ?_
-    (by simp [Common.Globalenvs.Genv.find_funct, funct_zalloc]) rfl ⟨rfl, by decide⟩ ?_
+    (by simp [Common.Globalenvs.Genv.find_funct, E.funct_zalloc]) rfl ⟨rfl, by decide⟩ ?_
   · rfl
-  · simp [Exec.evalExpr, Exec.lvalOfVar, hgz, find_zalloc, Exec.derefLoc,
+  · simp [Exec.evalExpr, Exec.lvalOfVar, hgz, E.find_zalloc, Exec.derefLoc,
       Cfrontend.Ctypes.access_mode]
-  · rfl
+  · simp only [Exec.evalExprlist, Exec.evalExpr, E.sizeof_tcnode]
+    rfl
   rintro t v m1 ⟨rfl, nd, rfl, hfr1, hz1⟩
   have hp0 : Mem.perm m1 nd (zOfInt 0) .Cur .Nonempty :=
     Mem.perm_implies _ _ _ _ _ _ (hfr1.perm 0 (by decide) (by decide)) (.perm_F_any _)
@@ -122,20 +127,20 @@ theorem wp_tcallocNew {f : function} {Q : Post} {e : env} {le : temp_env} {m : m
   simp (config := {decide := true}) only [Exec.evalExpr, temps_gss, temps_gso, typeof, cop,
     cmp_null_ptr hp0, Option.map]
   simp only [ite_false]
-  have hvA : Mem.valid_block m Block.allocM := Alloc.valid_of_access hal.writable
-  have hal1 : IntAt m1 Block.allocM M :=
+  have hvA : Mem.valid_block m E.allocM := Alloc.valid_of_access hal.writable
+  have hal1 : IntAt m1 E.allocM M :=
     ⟨by rw [hfr1.unch.load _ _ _ (fun h => hfr1.new (h ▸ hvA))]; exact hal.load,
       hfr1.unch.access _ _ _ _ (fun h => hfr1.new (h ▸ hvA)) hal.writable⟩
   have hsz8 : Vptrofs (Ptrofs.repr (Cfrontend.Ctypes.sizeof ge.genv_cenv tulong)) = .Vlong (lr ((8 : Nat) : Int)) := by
     rw [show Cfrontend.Ctypes.sizeof ge.genv_cenv tulong = zOfInt (8 : Nat) from rfl, Alloc.vptrofs_lr]
   wp_step; wp_step; wp_step; wp_step; wp_step
-  refine wp_call (vf := .Vptr Block.zalloc Ptrofs.zero) (targs := [tulong]) (tres := tptr .Tvoid)
+  refine wp_call (vf := .Vptr E.zalloc Ptrofs.zero) (targs := [tulong]) (tres := tptr .Tvoid)
     (cc := Common.AST.cc_default) _ (Alloc.zallocSpec (M * 8)) (Alloc.zalloc_satisfies _) ?_ ?_ ?_
-    (by simp [Common.Globalenvs.Genv.find_funct, funct_zalloc]) rfl ⟨rfl, by omega⟩ ?_
+    (by simp [Common.Globalenvs.Genv.find_funct, E.funct_zalloc]) rfl ⟨rfl, by omega⟩ ?_
   · rfl
-  · simp [Exec.evalExpr, Exec.lvalOfVar, hgz, find_zalloc, Exec.derefLoc,
+  · simp [Exec.evalExpr, Exec.lvalOfVar, hgz, E.find_zalloc, Exec.derefLoc,
       Cfrontend.Ctypes.access_mode]
-  · simp only [Exec.evalExprlist, Exec.evalExpr, Exec.lvalOfVar, hge, find_allocM, Exec.derefLoc,
+  · simp only [Exec.evalExprlist, Exec.evalExpr, Exec.lvalOfVar, hge, E.find_allocM, Exec.derefLoc,
       Cfrontend.Ctypes.access_mode, Mem.loadv, show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl,
       hal1.load, typeof, cop, hsz8]
     simp [cop, cast_int_long_ir (a := M) ⟨by omega, by omega⟩]

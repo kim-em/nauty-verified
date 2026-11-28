@@ -9,6 +9,7 @@ import NautyVerified.Logic.Grow
 `wp_prune0`: `if (needshortprune) { needshortprune = FALSE; shortprune(tcell,
 fmptr - M, M); }` intersects the target cell with the `mcr` of the last stored
 automorphism pair (HexGraphIso's `shortprune`), and clears the request.
+`wp_prune0G` is the same over `SearchAtG D`.
 -/
 
 namespace NautyVerified.Proofs.Search
@@ -42,7 +43,7 @@ theorem sub_ptrTo_n (base : Int) (sz : Z) (k j : Nat) (hj : (j : Int) < 21474836
   omega
 
 /-- The last stored pair's `mcr`. -/
-theorem shortprune_last {cell : VSet n} {st : Search n} (h : 0 < st.autos.size) :
+theorem shortprune_last {κ : Type} {cell : VSet n} {st : SearchState n κ} (h : 0 < st.autos.size) :
     shortprune cell st = cell.inter st.autos[st.autos.size - 1]!.2 := by
   unfold shortprune
   rw [Array.back?_eq_getElem?, getElem?_pos st.autos (st.autos.size - 1) (by omega)]
@@ -75,11 +76,20 @@ theorem IsWork.back {m m₁ : mem} {S : SLoc} {ctx : Ctx n} {st : Search n} {pre
   · obtain ⟨rfl, rfl⟩ := back g5 g6 dB d hc; exact .inr (.inr (.inl ⟨_, hc, dB⟩))
   · obtain ⟨rfl, rfl⟩ := back g7 g8 dN d hc; exact .inr (.inr (.inr ⟨_, hc, dN⟩))
 
-theorem sizeof_tulong8 : intOfZ (Cfrontend.Ctypes.sizeof ge.genv_cenv tulong) = 8 := rfl
+theorem sizeof_tulong8 {ge : genv} : intOfZ (Cfrontend.Ctypes.sizeof ge.genv_cenv tulong) = 8 := rfl
 
-/-- `if (needshortprune) { needshortprune = FALSE; shortprune(tcell, fmptr - M, M); }` -/
-theorem wp_prune0 {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {S : SLoc}
-    {ctx : Ctx n} {st : Search n} {pre nsp : Bool} (h : SearchAt m S ctx st pre nsp)
+/-! ### For any dispatch representation -/
+
+section Generic
+
+open NautyVerified.Proofs.Dispatch (Ops DispatchRep)
+
+variable {ge : genv} [E : NautyEnv ge] {O : Ops} {D : DispatchRep ge O}
+
+/-- `wp_prune0`, for `D`. -/
+theorem wp_prune0G {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {S : SLoc}
+    {gl : D.GLoc} {cl : D.CLoc} {G : O.Gr n} {st : SearchState n (O.Canon n)} {pre nsp : Bool}
+    (h : SearchAtG D m S gl cl G st pre nsp)
     (hE1 : PTree.get dense.id.«nauty:needshortprune» e = none)
     (hE2 : PTree.get dense.id.«nauty:fmptr» e = none)
     (hE3 : PTree.get dense.id.«nauty:m» e = none)
@@ -87,19 +97,19 @@ theorem wp_prune0 {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} 
     {btc : block} (htl : PTree.get dense.id.tcell le = some (.Vptr btc Ptrofs.zero))
     {tw : Nat → Lib.Integers.int64} (htw : ArrayAt m .Mint64 btc 0 (longs tw) S.M)
     {cell : VSet n} (hrep : SetRep (fun w => bv64 (tw w)) S.M cell)
-    (hbS : btc ∉ S.blocks) (hbW : ¬ IsWork m btc) (hnz : nsp = true → 0 < st.autos.size)
-    (hQ : ∀ m' (tw' : Nat → Lib.Integers.int64), SearchAt m' S ctx st pre false →
+    (hbS : btc ∉ S.blocksG D gl cl) (hbW : ¬ IsWorkG D m btc) (hnz : nsp = true → 0 < st.autos.size)
+    (hQ : ∀ m' (tw' : Nat → Lib.Integers.int64), SearchAtG D m' S gl cl G st pre false →
       ArrayAt m' .Mint64 btc 0 (longs tw') S.M →
       SetRep (fun w => bv64 (tw' w)) S.M (if nsp then shortprune cell st else cell) →
-      Unch m m' (fun z => z = Block.needshortprune ∨ z = btc) →
+      Unch m m' (fun z => z = E.needshortprune ∨ z = btc) →
       (∀ z, Mem.valid_block m z → Mem.valid_block m' z) → Keep m m' btc → Q.normal E0 e le m') :
     Wp xi ge f Othernode.prune0 Q e le m := by
-  have hd := h.distinct
+  have hd := h.lit
   have hM1 := h.M1
   have hMl := h.Mlt
   simp only [Othernode.prune0, sk]
   apply wp_if_eval
-  rw [eval_gint hE1 find_needshortprune h.scalars.needshortprune]
+  rw [eval_gint hE1 E.find_needshortprune h.scalars.needshortprune]
   cases nsp
   · simp only [Bool.false_eq_true, ite_false, typeof, cop]
     rw [ite_eq_right (by decide)]
@@ -109,21 +119,22 @@ theorem wp_prune0 {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} 
     rw [ite_eq_left (by decide)]
     have hk := hnz rfl
     wp_step; wp_step; wp_step
-    refine wp_gint hE1 find_needshortprune h.scalars.needshortprune.writable (x := 0)
+    refine wp_gint hE1 E.find_needshortprune h.scalars.needshortprune.writable (x := 0)
       (by simp [Exec.evalExpr]) rfl ?_
     intro m₁ iN hu₁ hv₁
-    have hU₁ : Unch m m₁ (· ∈ [Block.needshortprune]) := hu₁.mono fun z hz => by simp [hz]
+    have hU₁ : Unch m m₁ (· ∈ [E.needshortprune]) := hu₁.mono fun z hz => by simp [hz]
     have sc := h.scalars
-    have h₁ : SearchAt m₁ S ctx st pre false :=
-      h.setScalars hU₁ (fun z hz => by simp at hz; subst hz; decide)
-        ⟨sc.gcaFirst.unch hU₁ (by decide), sc.gcaCanon.unch hU₁ (by decide),
-          sc.noncheaplevel.unch hU₁ (by decide), sc.allsamelevel.unch hU₁ (by decide),
-          sc.eqlevFirst.unch hU₁ (by decide), sc.eqlevCanon.unch hU₁ (by decide),
-          sc.compCanon.unch hU₁ (by decide), sc.samerows.unch hU₁ (by decide),
-          sc.canonlevel.unch hU₁ (by decide), sc.stabvertex.unch hU₁ (by decide),
-          sc.cosetindex.unch hU₁ (by decide), iN⟩
+    have h₁ : SearchAtG D m₁ S gl cl G st pre false :=
+      h.setScalars hU₁ (fun z hz => by simp at hz; subst hz; simp) hv₁
+        ⟨sc.gcaFirst.unch hU₁ (by sep_notin h.lit), sc.gcaCanon.unch hU₁ (by sep_notin h.lit),
+          sc.noncheaplevel.unch hU₁ (by sep_notin h.lit), sc.allsamelevel.unch hU₁ (by sep_notin h.lit),
+          sc.eqlevFirst.unch hU₁ (by sep_notin h.lit), sc.eqlevCanon.unch hU₁ (by sep_notin h.lit),
+          sc.compCanon.unch hU₁ (by sep_notin h.lit), sc.samerows.unch hU₁ (by sep_notin h.lit),
+          sc.canonlevel.unch hU₁ (by sep_notin h.lit), sc.stabvertex.unch hU₁ (by sep_notin h.lit),
+          sc.cosetindex.unch hU₁ (by sep_notin h.lit), iN⟩
         h.arrays h.stats h.inv
-    have hbtc : btc ≠ Block.needshortprune := fun he => hbS (by rw [he]; simp [SLoc.blocks])
+    have hbtc : btc ≠ E.needshortprune := fun he =>
+      hbS (by rw [he]; exact SLoc.mem_blocksG_of D (.inr (.inr (.inr (.inr (.inl (by simp)))))))
     have htw₁ := htw.unch hU₁ (by simpa using hbtc)
     simp only [seqPost, Post.after, E0_append]
     wp_step; wp_step
@@ -156,24 +167,30 @@ theorem wp_prune0 {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} 
         (by have : csize .Mint64 = 8 := rfl; rw [this] at hfits
             have := Nat.mul_le_mul_left 8 hjb; omega)]
       rfl
-    refine wp_call (vf := .Vptr Block.shortpruneFn Ptrofs.zero) (targs := [tptr tulong, tptr tulong, tint])
+    refine wp_call (vf := .Vptr E.shortpruneFn Ptrofs.zero) (targs := [tptr tulong, tptr tulong, tint])
       (tres := .Tvoid) (cc := Common.AST.cc_default) (.Internal dense.fn.shortprune)
       _
       (Prune.shortprune_satisfies btc Ptrofs.zero S.bws (ptrTo S.wb 8 j) S.M tw (fun i => ww (j + i))).grow rfl ?_ ?_
-      (by simp [Common.Globalenvs.Genv.find_funct, funct_shortpruneFn]) rfl
-      ⟨rfl, htw₁, by rw [hu2]; exact hslice, fun he => hbS (he ▸ by simp [SLoc.blocks]), by omega⟩ ?_
-    · simp only [Exec.evalExpr, Exec.lvalOfVar, hE4, find_shortpruneFn, Exec.derefLoc,
+      (by simp [Common.Globalenvs.Genv.find_funct, E.funct_shortpruneFn]) rfl
+      ⟨rfl, htw₁, by rw [hu2]; exact hslice, fun he => hbS (he ▸ SLoc.mem_blocksG_of D (.inr (.inr (.inr (.inl (by simp)))))), by omega⟩ ?_
+    · simp only [Exec.evalExpr, Exec.lvalOfVar, hE4, E.find_shortpruneFn, Exec.derefLoc,
         Cfrontend.Ctypes.access_mode]
-    · simp only [Exec.evalExprlist, Exec.evalExpr, htl, Exec.lvalOfVar, hE2, hE3, find_fmptr,
-        find_m, Exec.derefLoc, Cfrontend.Ctypes.access_mode, Mem.loadv,
+    · simp only [Exec.evalExprlist, Exec.evalExpr, htl, Exec.lvalOfVar, hE2, hE3, E.find_fmptr,
+        E.find_m, Exec.derefLoc, Cfrontend.Ctypes.access_mode, Mem.loadv,
         show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl, hfm.load, h₁.fixed.mm.load, typeof,
         cop, Alloc.Mptr_eq]
       rw [ho2]
     rintro t v m₂ ⟨⟨rfl, harr₂, hu₂, hka₂⟩, hg₂⟩
     have hU₂ : Unch m₁ m₂ (fun z => z = btc) := hu₂
     refine hQ m₂ _ (h₁.unch hU₂ (fun z hz he => hbS (he ▸ hz))
-        (fun z hz he => hbW (he ▸ IsWork.back h hU₁ (by
-          intro z hz hzL; simp at hzL; subst hzL; revert hz; decide) hz)))
+        (fun z hz he => hbW (he ▸ (h.work.unch hU₁
+          (fun y hy e => h.globs_ne (y := E.needshortprune) (D.wglobs_sub _ hy)
+            (.inr (.inr (.inr (.inr (by simp))))) (by simpa using e))
+          ⟨by sep_notin h.lit, by sep_notin h.lit⟩
+          (fun y hy e => h.work_not hy (by
+            simp at e; subst e
+            exact SLoc.mem_blocksG_of D (.inr (.inr (.inr (.inr (.inl (by simp))))))))
+          hv₁).2 z hz)) (fun z hz => hg₂ z hz))
       harr₂ ?_ ?_ (fun z hz => hg₂ z (hv₁ z hz))
       ((Keep.unch hU₁ (by simpa using hbtc)).trans (hka₂ btc))
     · simp only [ite_true]
@@ -183,5 +200,27 @@ theorem wp_prune0 {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} 
       exact setRep_andW hrep (by rw [e]; exact hlast)
     · exact (hU₁.mono fun z hz => by simp at hz; exact .inl hz).trans
         (hU₂.mono fun z hz => .inr hz)
+
+end Generic
+
+/-- `if (needshortprune) { needshortprune = FALSE; shortprune(tcell, fmptr - M, M); }` -/
+theorem wp_prune0 {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {S : SLoc}
+    {ctx : Ctx n} {st : Search n} {pre nsp : Bool} (h : SearchAt m S ctx st pre nsp)
+    (hE1 : PTree.get dense.id.«nauty:needshortprune» e = none)
+    (hE2 : PTree.get dense.id.«nauty:fmptr» e = none)
+    (hE3 : PTree.get dense.id.«nauty:m» e = none)
+    (hE4 : PTree.get dense.id.«shortprune» e = none)
+    {btc : block} (htl : PTree.get dense.id.tcell le = some (.Vptr btc Ptrofs.zero))
+    {tw : Nat → Lib.Integers.int64} (htw : ArrayAt m .Mint64 btc 0 (longs tw) S.M)
+    {cell : VSet n} (hrep : SetRep (fun w => bv64 (tw w)) S.M cell)
+    (hbS : btc ∉ S.blocks) (hbW : ¬ IsWork m btc) (hnz : nsp = true → 0 < st.autos.size)
+    (hQ : ∀ m' (tw' : Nat → Lib.Integers.int64), SearchAt m' S ctx st pre false →
+      ArrayAt m' .Mint64 btc 0 (longs tw') S.M →
+      SetRep (fun w => bv64 (tw' w)) S.M (if nsp then shortprune cell st else cell) →
+      Unch m m' (fun z => z = Block.needshortprune ∨ z = btc) →
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) → Keep m m' btc → Q.normal E0 e le m') :
+    Wp xi ge f Othernode.prune0 Q e le m :=
+  wp_prune0G h.toG hE1 hE2 hE3 hE4 htl htw hrep (fun e => hbS (SLoc.mem_blocksG.1 e))
+    (fun e => hbW (isWork_dense.1 e)) hnz fun m' tw' h' ha hr hu hv hk => hQ m' tw' (h'.dense h.gw) ha hr hu hv hk
 
 end NautyVerified.Proofs.Search

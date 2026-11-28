@@ -11,6 +11,13 @@ naugraph.c's and nautil.c's work arrays, `SearchAt` holds for the new state. It
 combines `SearchAt.rebuild` (writes) and `SearchAt.realloc` (work arrays), as
 `doref` needs: nautil.c's `workperm`, then refinement's writes and naugraph.c's
 work arrays, then the `qinvar` cell.
+
+`SearchAtG.rebuildD` is the counterpart over `SearchAtG D`: after a change
+confined to some of `S`'s written blocks `L`, `D`'s written globals and scratch
+blocks, nautil.c's `workperm` pair, blocks new since `m` and blocks `X` apart
+from `S` and the scratch blocks, with `D`'s scratch state holding afterwards and
+nautil.c's pair moved to an old or new block. `SearchAtG.not_chgD` gives the
+untouched blocks of `S`.
 -/
 
 namespace NautyVerified.Proofs.Search
@@ -144,5 +151,151 @@ theorem SearchAt.reallocW {n : Nat} {m m' : mem} {S : SLoc} {ctx : Ctx n} {st st
       work := ⟨⟨cW', bW', cS', bS', cB', bB', cN', bN', dW', dS', dB', dN',
         notIn nW fW, notIn nS fS, notIn nB fB, notIn nN fN, pWS, pWB, pSB, pNW, pNS, pNB⟩⟩
       inv := hinv }
+
+/-! ### For any dispatch representation -/
+
+section Generic
+
+open NautyVerified.Proofs.Dispatch (Ops DispatchRep)
+
+variable {ge : genv} [E : NautyEnv ge] {O : Ops} {D : DispatchRep ge O}
+
+/-- What a step that runs one of `D`'s procedures and nautil.c's `DYNALLOC1` of
+`workperm` may change, besides some blocks `L` of `S` and blocks `X` outside it. -/
+abbrev ChgD (D : DispatchRep ge O) (m : mem) (L : List block) (cN : Nat) (bN : block)
+    (X : block → Prop) (z : block) : Prop :=
+  z ∈ L ∨ z ∈ D.wglobs ∨ D.IsWork m z ∨ z = E.nautilWorkperm ∨ z = E.nautilWorkpermSz ∨
+    (0 < cN ∧ z = bN) ∨ ¬ Mem.valid_block m z ∨ X z
+
+/-- No list entry of `S.blocksG` is one of `D`'s globals. -/
+theorem SearchAtG.lit_globs {n : Nat} {m : mem} {S : SLoc} {gl : D.GLoc} {cl : D.CLoc}
+    {G : O.Gr n} {st : SearchState n (O.Canon n)} {pre nsp : Bool}
+    (h : SearchAtG D m S gl cl G st pre nsp) : ∀ z ∈ S.litG, z ∉ D.globs := by
+  intro z hz hg
+  simp only [SLoc.litG, List.mem_append, List.cons_append, List.mem_cons, List.mem_nil_iff,
+    or_false, List.nil_append] at hz
+  rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
+    rfl | rfl | rfl | hz
+  · exact h.globs_ne hg (.inl (D.graphBlocks_head gl _)) rfl
+  iterate 4 exact h.globs_ne hg (.inr (.inl (by simp))) rfl
+  · exact h.globs_ne hg (.inr (.inr (.inl (D.canonBlocks_head cl _)))) rfl
+  iterate 10 exact h.globs_ne hg (.inr (.inr (.inr (.inl (by simp))))) rfl
+  · exact h.globs_ne hg (.inr (.inr (.inr (.inr (by simpa using hz))))) rfl
+
+/-- The blocks of `S` outside `L`, `D`'s globals and nautil.c's pair are untouched. -/
+theorem SearchAtG.not_chgD {n : Nat} {m : mem} {S : SLoc} {gl : D.GLoc} {cl : D.CLoc}
+    {G : O.Gr n} {st : SearchState n (O.Canon n)} {pre nsp : Bool}
+    (h : SearchAtG D m S gl cl G st pre nsp) (hvU : Mem.valid_block m S.bUA)
+    (hvT : Mem.valid_block m E.tcnode0) {L : List block} {X : block → Prop}
+    (hX : ∀ z ∈ S.blocksG D gl cl, ¬ X z) {cN : Nat} {bN : block}
+    (dN : DynAt m E.nautilWorkperm E.nautilWorkpermSz 4 cN bN) :
+    ∀ z ∈ S.blocksG D gl cl, z ∉ L → z ∉ D.globs → z ≠ E.nautilWorkperm →
+      z ≠ E.nautilWorkpermSz → ¬ ChgD D m L cN bN X z := by
+  intro z hz hL hg h1 h2
+  rintro (e | e | e | e | e | ⟨hc, e⟩ | e | e)
+  · exact hL e
+  · exact hg (D.wglobs_sub _ e)
+  · exact h.work_not (.inl e) hz
+  · exact h1 e
+  · exact h2 e
+  · subst e; exact h.work_not (.inr ⟨cN, hc, dN⟩) hz
+  · exact e (h.valid_all hvU hvT z hz)
+  · exact hX z hz e
+
+set_option maxHeartbeats 4000000 in
+theorem SearchAtG.rebuildD {n : Nat} {m m' : mem} {S : SLoc} {gl : D.GLoc} {cl : D.CLoc}
+    {G : O.Gr n} {st st' : SearchState n (O.Canon n)} {pre nsp pre' nsp' : Bool}
+    (h : SearchAtG D m S gl cl G st pre nsp) (hvU : Mem.valid_block m S.bUA)
+    (hvT : Mem.valid_block m E.tcnode0) {L : List block}
+    (hL : ∀ z ∈ L, z ∈ wrEnv ∨ z ∈ S.wrVG ∨ z ∈ D.canonBlocks cl S.bc)
+    {X : block → Prop} (hX : ∀ z ∈ S.blocksG D gl cl, ¬ X z)
+    (hXw : ∀ z, IsWorkG D m z → ¬ X z) {cN : Nat} {bN : block}
+    (dN : DynAt m E.nautilWorkperm E.nautilWorkpermSz 4 cN bN)
+    (hu : Unch m m' (ChgD D m L cN bN X)) (hv : ∀ z, Mem.valid_block m z → Mem.valid_block m' z)
+    (hK : ∀ z ∈ [S.bA, S.bF, S.bWP, S.bFL, S.bCL, S.bFC, S.bCC, S.bTC, S.bws], Keep m m' z)
+    (hw : D.Work m') (hmono : ∀ z, D.IsWork m' z → D.IsWork m z ∨ ¬ Mem.valid_block m z)
+    {cN' : Nat} {bN' : block} (dN' : DynAt m' E.nautilWorkperm E.nautilWorkpermSz 4 cN' bN')
+    (fN : (cN' = cN ∧ bN' = bN) ∨ ¬ Mem.valid_block m bN')
+    (hNw : 0 < cN' → ¬ D.IsWork m' bN')
+    (hsc : ScalarsG m' st' nsp') (hst : StatsG m' S st' pre') (har : ArraysG D m' S gl cl G st')
+    (hinv : SInvG O G st') :
+    SearchAtG D m' S gl cl G st' pre' nsp' ∧ WorkMonoG D m m' := by
+  obtain ⟨nK, nG, -⟩ := h.not_wr hL
+  have key := h.not_chgD hvU hvT (L := L) hX dN
+  have hvA := h.valid_all hvU hvT
+  have hp := (S.keepG_perm.pairwise_iff (fun h => Ne.symm h)).2 h.lit
+  have hk := (List.pairwise_append.1 (List.pairwise_append.1 hp).1).1
+  have hkN := (List.pairwise_append.1 hk).2.2
+  have lK : ∀ z ∈ S.keepG, z ∈ S.litG := fun z hz =>
+    S.keepG_perm.subset (List.mem_append_left _ (List.mem_append_left _ hz))
+  have mK : ∀ z ∈ S.keepG, z ∈ S.blocksG D gl cl := fun z hz =>
+    (S.litG_sub D gl cl).subset (lK z hz)
+  have gK : ∀ z ∈ S.keepG, z ∉ D.globs := fun z hz hg => h.lit_globs z (lK z hz) hg
+  have kF : ∀ z ∈ (fixedBlocks : List block) ++ dynPairs, ¬ ChgD D m L cN bN X z := fun z hz =>
+    have hzK : z ∈ S.keepG := List.mem_append_left _ hz
+    key z (mK z hzK) (nK z hzK) (gK z hzK) (hkN z hz _ (by simp)) (hkN z hz _ (by simp))
+  have nbN : 0 < cN → bN ∉ S.blocksG D gl cl := fun hc => h.work_not (.inr ⟨cN, hc, dN⟩)
+  have kg : ∀ z ∈ D.globs, z ∉ D.wglobs → ¬ ChgD D m L cN bN X z := by
+    have eB : E.nautilWorkperm ∈ E.blocks ∧ E.nautilWorkpermSz ∈ E.blocks := by
+      simp [NautyEnv.blocks]
+    have mG : ∀ z ∈ D.globs, z ∈ S.blocksG D gl cl := fun z hz =>
+      SLoc.mem_blocksG_of D (.inr (.inr (.inr (.inr (.inr hz)))))
+    rintro z hz hnw (e | e | e | e | e | ⟨hc, e⟩ | e | e)
+    · exact nG z hz e
+    · exact hnw e
+    · exact (D.isWork_globs h.work.disp e).1 hz
+    · subst e; exact D.globs_env _ hz eB.1
+    · subst e; exact D.globs_env _ hz eB.2
+    · subst e; exact nbN hc (mG _ hz)
+    · exact e (D.globs_valid h.work.disp z hz)
+    · exact hX z (mG z hz) e
+  have kT : ∀ z ∈ [E.nautyBit, E.nautilBit, E.leftbit], ¬ ChgD D m L cN bN X z := by
+    intro z hz
+    have hzK : z ∈ S.keepG := by revert z hz; simp
+    simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
+    rcases hz with rfl | rfl | rfl <;>
+      exact key _ (mK _ hzK) (nK _ hzK) (gK _ hzK) (by sep_ne h.lit) (by sep_ne h.lit)
+  simp only [List.forall_mem_cons] at hK kT
+  obtain ⟨k1, k2, k3, k4, k5, k6, k7, k8, k9, -⟩ := hK
+  obtain ⟨t1, t2, t3, -⟩ := kT
+  have hD := h.dyns
+  have g := fun z (hz : z ∈ (dynPairs : List block)) => kF z (List.mem_append_right _ hz)
+  have hdy : DynsG D n m' S := { hD with
+    workspace := hD.workspace.keep hu (kg _ D.wsP_mem D.wsP_nw) (kg _ D.wsS_mem D.wsS_nw)
+      fun _ => k9
+    active := hD.active.keep hu (g _ (by simp)) (g _ (by simp)) fun _ => k1
+    fixedpts := hD.fixedpts.keep hu (g _ (by simp)) (g _ (by simp)) fun _ => k2
+    workperm := hD.workperm.keep hu (g _ (by simp)) (g _ (by simp)) fun _ => k3
+    firstlab := hD.firstlab.keep hu (g _ (by simp)) (g _ (by simp)) fun _ => k4
+    canonlab := hD.canonlab.keep hu (g _ (by simp)) (g _ (by simp)) fun _ => k5
+    firstcode := hD.firstcode.keep hu (g _ (by simp)) (g _ (by simp)) fun _ => k6
+    canoncode := hD.canoncode.keep hu (g _ (by simp)) (g _ (by simp)) fun _ => k7
+    firsttc := hD.firsttc.keep hu (g _ (by simp)) (g _ (by simp)) fun _ => k8 }
+  have nbN' : 0 < cN' → bN' ∉ S.blocksG D gl cl := fun hc hm => by
+    rcases fN with ⟨rfl, rfl⟩ | hnv
+    · exact nbN hc hm
+    · exact hnv (hvA _ hm)
+  refine ⟨{ h with
+    fixed := h.fixed.unch hu fun z hz => kF z (List.mem_append_left _ hz)
+    scalars := hsc
+    stats := hst
+    arrays := har
+    dyns := hdy
+    work := ⟨hw, ⟨cN', bN', dN', nbN', hNw⟩, fun z hz hm => by
+      rcases hmono z hz with h1 | h1
+      · exact h.work.notin z h1 hm
+      · exact h1 (hvA z hm)⟩
+    tables := ⟨h.tables.env.unch hu t1 t2 t3, D.tables_unch h.tables.disp hu kg⟩
+    inv := hinv }, ?_⟩
+  rintro z (hz | ⟨c, hc, d⟩)
+  · exact (hmono z hz).imp .inl id
+  · have e := d.same_block dN' hc
+    have hcc := d.same_cap dN'
+    subst e; subst hcc
+    rcases fN with ⟨rfl, rfl⟩ | hnv
+    · exact .inl (.inr ⟨_, hc, dN⟩)
+    · exact .inr hnv
+
+end Generic
 
 end NautyVerified.Proofs.Search
