@@ -19,6 +19,7 @@ import NautyVerified.Statement.Dense
 import NautyVerified.Statement.Compiler
 import NautyVerified.Statement.Compose
 import NautyVerified.Statement.DenseOf
+import NautyVerified.Statement.Final
 import NautyVerified.Logic.Array
 import NautyVerified.Logic.Grow
 import NautyVerified.Logic.Ints

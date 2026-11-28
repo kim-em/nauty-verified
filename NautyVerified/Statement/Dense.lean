@@ -1,20 +1,17 @@
 import NautyVerified.Statement.Corollaries
 
 /-!
-# The end-to-end theorem for dense nauty (statement)
+# The end-to-end theorem for dense nauty: bounds, the binary, the output
 
-`densenauty_binary_correct`: the x86-64 program that CompCert4Lean compiles
-from the linked C sources (`dense_main.c`, nauty 2.9.3's dense code and
-`zalloc.c`; the binary `scripts/build_binary.sh` produces), run on any input
-encoding a coloured graph `G`, terminates, and writes exactly what
-HexGraphIso's search computes on `G` (`expected G`): the same generators in
-the same order, canonical labelling, orbits, canonical graph and statistics.
+`maxN` (the vertex bound), `Compiled` (the binary CompCert4Lean compiles from
+the linked dense program) and the parts of `expected G` with HexGraphIso's
+theorems about them. The end-to-end theorem `densenauty_binary_correct` is
+stated in `Statement/Final.lean`, above the proofs about `main` that import
+this file.
 
 The corollaries restate HexGraphIso's correctness theorems for what the binary
 writes: the canonical graph is a complete isomorphism invariant, the written
 generators generate the automorphism group, and the orbits are its orbits.
-
-The proofs are not done yet (Phases 5 and 6 of docs/PLAN.md).
 -/
 
 namespace NautyVerified.Statement
@@ -31,12 +28,6 @@ def maxN : Nat := 65536
 /-- The binary compiled from the linked dense program. -/
 abbrev Compiled (tp : X86.Asm.program) : Prop :=
   Build.compile Source.dense.fresh Source.dense.program = .ok tp
-
-theorem densenauty_binary_correct {n k : Nat} (G : Colored n k) (hn : 0 < n) (hmax : n ≤ maxN)
-    (hk : k ≤ maxN) {ins : List Int} (hins : Encodes G ins) {tp : X86.Asm.program} (hc : Compiled tp) :
-    ∀ beh, program_behaves (X86.Asm.semantics Build.config xi tp) beh → Consistent ins beh →
-      ∃ t, beh = .Terminates t (Lib.Integers.Int.repr .Z0) ∧ writes t = expected G := by
-  sorry
 
 /-! ## What the output means
 

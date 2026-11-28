@@ -212,9 +212,10 @@ Before bulk proofs, commit the final statements with `sorry`:
 Review these with Kim before Phase 5.
 
 Written: `Statement/Harness.lean` (the environment `xi`, `Encodes`,
-`Consistent`, `reads`/`writes`, `expected`) and `Statement/Dense.lean`
-(`densenauty_binary_correct`, `canonWords_eq_iff`, `generators_correct`,
-`orbits_correct`, `maxN = 65536`), with `sorry` proofs on the allowlist.
+`Consistent`, `reads`/`writes`, `expected`), `Statement/Dense.lean`
+(`canonWords_eq_iff`, `generators_correct`, `orbits_correct`,
+`maxN = 65536`) and `Statement/Final.lean` (`densenauty_binary_correct`,
+above `main_ok` in the import graph).
 `expected G`, evaluated in Lean, equals the native binary's output on the
 fixtures checked (Petersen, coloured Petersen, an edgeless graph, five random
 graphs). The representation predicates are written per function during Phase
@@ -466,13 +467,13 @@ alignment and symbol conditions checked by the kernel as `initOk_prog`),
 `exec_of_main` turns a `Satisfies` of `main` from it into an execution from
 the initial state to `main`'s return, and `binary_of_execution`
 (`Statement/Compose.lean`) carries that execution to every behaviour of the
-binary. `densenauty_binary_correct` stays `sorry` until the emission
-hypotheses are discharged.
+binary. `densenauty_binary_correct` (`Statement/Final.lean`) is
+`densenauty_binary_correct_of` with the emission hypotheses `sorry` until they are
+discharged.
 
 Remaining: re-pin hex-graph-iso to the release with `TraceRun.emitted`,
 switch `expected` to it, and prove `EmLawOff`/`EmLawFirst`, the root value
-and `hgens` for it, which closes `densenauty_binary_correct`; then the
-corollaries (`canonWords_eq_iff`, `orbits_correct`) and Phase 7.
+and `hgens` for it, which closes `densenauty_binary_correct`; then Phase 7.
 
 Initial memory (`Proofs/Init/Tables.lean`, done): `globals` turns Clight's
 `initial_state` fact `Genv.init_mem prog = some m` into `Globals m`: the four

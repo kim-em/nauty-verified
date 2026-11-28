@@ -1,1 +1,1 @@
-NautyVerified/Statement/Dense.lean
+NautyVerified/Statement/Final.lean
