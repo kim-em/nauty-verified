@@ -308,3 +308,4 @@ import NautyVerified.Proofs.Alloc.DynL
 import NautyVerified.Proofs.Sparse.Sort.Ins
 import NautyVerified.Proofs.Sparse.Sort.Pivot
 import NautyVerified.Proofs.Sparse.Sort.Finish
+import NautyVerified.Proofs.Sparse.Sort.Main
