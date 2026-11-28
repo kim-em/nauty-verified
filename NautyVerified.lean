@@ -372,3 +372,6 @@ import NautyVerified.Proofs.Sparse.Refine.Code
 import NautyVerified.Proofs.Sparse.Refine.Nontrivial.Count
 import NautyVerified.Proofs.Sparse.Refine.Nontrivial.Call
 import NautyVerified.Proofs.Sparse.Refine.Nontrivial.Sort
+import NautyVerified.Proofs.Sparse.Refine.Nontrivial.Cells
+import NautyVerified.Proofs.Sparse.Refine.Nontrivial.ResetK
+import NautyVerified.Proofs.Sparse.Refine.Nontrivial.Pass
