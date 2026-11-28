@@ -5,10 +5,11 @@ import NautyVerified.Proofs.Top.Fields
 /-!
 # `nauty()`'s release stage (`tFree`)
 
-For `n >= 320`, `nautil_freedyn()`, `(*dispatch.freedyn)()` (naugraph.c's
-`naugraph_freedyn`) and `nauty_freedyn()` free every `DYNALLSTAT` array and
-the target-cell list; `dispatch.cleanup` is `NULL` and `doschreier` is 0.
-Afterwards only the blocks of `FreeSet` have changed.
+For `n >= 320`, `nautil_freedyn()`, `(*dispatch.freedyn)()` and
+`nauty_freedyn()` free every `DYNALLSTAT` array and the target-cell list;
+`dispatch.cleanup` is `NULL` and `doschreier` is 0. `wp_tFreeG D` is the
+stage over `SearchAtG D` (only the blocks of `FreeSetG` change); the dense
+`wp_tFree` (`FreeSet`, naugraph.c's `naugraph_freedyn`) is its instance.
 -/
 
 namespace NautyVerified.Proofs.Top
@@ -32,27 +33,6 @@ kernel_rfl type_nautilFreedyn : type_of_fundef (.Internal dense.fn.nautil_freedy
 kernel_rfl type_naugraphFreedyn : type_of_fundef (.Internal dense.fn.naugraph_freedyn) = tfun [] .Tvoid
 kernel_rfl type_nautyFreedyn : type_of_fundef (.Internal dense.fn.nauty_freedyn) = tfun [] .Tvoid
 
-/-- nauty.c's nine pairs, with the capacities and blocks the search left. -/
-def nautyDs (S : SLoc) (cDW : Nat) (bDW : block) : List FreeD :=
-  [⟨dense.id.«nauty:firsttc», dense.id.«nauty:firsttc_sz», Block.nautyFirsttc, Block.nautyFirsttcSz,
-     tint, 4, S.capTC, S.bTC⟩,
-   ⟨dense.id.«nauty:canoncode», dense.id.«nauty:canoncode_sz», Block.nautyCanoncode,
-     Block.nautyCanoncodeSz, tshort, 2, S.capCC, S.bCC⟩,
-   ⟨dense.id.«nauty:firstcode», dense.id.«nauty:firstcode_sz», Block.nautyFirstcode,
-     Block.nautyFirstcodeSz, tshort, 2, S.capFC, S.bFC⟩,
-   ⟨dense.id.«nauty:workperm», dense.id.«nauty:workperm_sz», Block.nautyWorkperm,
-     Block.nautyWorkpermSz, tint, 4, S.capWP, S.bWP⟩,
-   ⟨dense.id.«nauty:canonlab», dense.id.«nauty:canonlab_sz», Block.nautyCanonlab,
-     Block.nautyCanonlabSz, tint, 4, S.capCL, S.bCL⟩,
-   ⟨dense.id.«nauty:firstlab», dense.id.«nauty:firstlab_sz», Block.nautyFirstlab,
-     Block.nautyFirstlabSz, tint, 4, S.capFL, S.bFL⟩,
-   ⟨dense.id.«nauty:defltwork», dense.id.«nauty:defltwork_sz», Block.nautyDefltwork,
-     Block.nautyDefltworkSz, tulong, 8, cDW, bDW⟩,
-   ⟨dense.id.«nauty:fixedpts», dense.id.«nauty:fixedpts_sz», Block.nautyFixedpts,
-     Block.nautyFixedptsSz, tulong, 8, S.capF, S.bF⟩,
-   ⟨dense.id.«nauty:active», dense.id.«nauty:active_sz», Block.nautyActive, Block.nautyActiveSz,
-     tulong, 8, S.capA, S.bA⟩]
-
 /-- The `DYNALLSTAT` globals the release resets, `alloc_m` and `tcnode0`. -/
 def freeGlobals : List block :=
   [Block.nautilWorkperm, Block.nautilWorkpermSz, Block.naugraphWorkset, Block.naugraphWorksetSz,
@@ -63,20 +43,6 @@ def freeGlobals : List block :=
    Block.nautyFirstlab, Block.nautyFirstlabSz, Block.nautyDefltwork, Block.nautyDefltworkSz,
    Block.nautyFixedpts, Block.nautyFixedptsSz, Block.nautyActive, Block.nautyActiveSz,
    Search.Block.allocM, Search.Block.tcnode0]
-
-theorem freeGlobals_sub {S : SLoc} {z : block} (h : z ∈ freeGlobals) :
-    z ∈ S.blocks ∨ z = Block.nautyDefltwork ∨ z = Block.nautyDefltworkSz := by
-  simp only [freeGlobals, List.mem_cons, List.mem_nil_iff, or_false] at h
-  rcases h with h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h <;> subst h <;>
-    simp [SLoc.blocks]
-
-/-- A block outside `S.blocks` and not one of `defltwork`'s globals is none of `freeGlobals`. -/
-theorem not_freeGlobals {S : SLoc} {z : block} (hz : z ∉ S.blocks) (h1 : z ≠ Block.nautyDefltwork)
-    (h2 : z ≠ Block.nautyDefltworkSz) : z ∉ freeGlobals := fun h => by
-  rcases freeGlobals_sub (S := S) h with h | h | h
-  · exact hz h
-  · exact h1 h
-  · exact h2 h
 
 /-- What the release may change: those globals, the arrays' blocks, the work
 blocks and the list. -/
@@ -109,21 +75,7 @@ abbrev freeBody : statement :=
           .Sskip))
       (Set.sk (.Scall none (.Evar dense.id.«nauty_freedyn» (tfun [] .Tvoid)) [])))
 
-theorem nautilOk {m : mem} {cN : Nat} {bN : block}
-    (dN : DynAt m Block.nautilWorkperm Block.nautilWorkpermSz 4 cN bN)
-    (hap : 0 < cN → bN ∉ freeGlobals) : FreeD.Ok m (nautilDs cN bN) := by
-  refine ⟨fun d hd => ?_, fun d hd => ?_, by simp [FreeD.globals, nautilDs]; decide, fun d hd hc => ?_,
-    by simp [nautilDs]⟩
-  · simp only [nautilDs, List.mem_singleton] at hd; subst hd
-    exact ⟨Program.find_nautilWorkpermSz, Program.find_nautilWorkperm⟩
-  · simp only [nautilDs, List.mem_singleton] at hd; subst hd; exact dN
-  · simp only [nautilDs, List.mem_singleton] at hd; subst hd
-    intro h
-    simp only [FreeD.globals, nautilDs, List.flatMap_cons, List.flatMap_nil, List.append_nil,
-      List.mem_cons, List.mem_nil_iff, or_false] at h
-    exact hap hc (by rcases h with h | h <;> simp [freeGlobals, h])
-
-theorem ne_ptr_null0 {m : mem} {b : block} (t : type) (hp : Mem.perm m b (zOfInt 0) .Cur .Nonempty) :
+theorem ne_ptr_null0 {ge : genv} {m : mem} {b : block} (t : type) (hp : Mem.perm m b (zOfInt 0) .Cur .Nonempty) :
     Cfrontend.Cop.sem_binary_operation ge.genv_cenv .One (.Vptr b Ptrofs.zero) (tptr t)
       (.Vlong (Lib.Integers.Int64.repr (Lib.Integers.Int.signed (Lib.Integers.Int.repr (zOfInt 0)))))
       (tptr .Tvoid) m = some (Val.of_bool true) := by
@@ -139,405 +91,6 @@ theorem ne_ptr_null0 {m : mem} {b : block} (t : type) (hp : Mem.perm m b (zOfInt
     then _ else _) = _
   rw [show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl, hvp, Bool.true_or]
   rfl
-
-theorem naugraphOk {m : mem} {S : SLoc} {cS cW cB cD : Nat} {bS bW bB bD : block}
-    (hd : S.blocks.Pairwise (· ≠ ·)) (hbD : bD = S.bws)
-    (dS : DynAt m Block.naugraphWorkset Block.naugraphWorksetSz 8 cS bS)
-    (dW : DynAt m Block.naugraphWorkperm Block.naugraphWorkpermSz 4 cW bW)
-    (dB : DynAt m Block.naugraphBucket Block.naugraphBucketSz 4 cB bB)
-    (dD : DynAt m Block.naugraphDnwork Block.naugraphDnworkSz 8 cD bD)
-    (nS : 0 < cS → bS ∉ S.blocks) (nW : 0 < cW → bW ∉ S.blocks) (nB : 0 < cB → bB ∉ S.blocks)
-    (pWS : 0 < cW → 0 < cS → bW ≠ bS) (pWB : 0 < cW → 0 < cB → bW ≠ bB)
-    (pSB : 0 < cS → 0 < cB → bS ≠ bB) :
-    FreeD.Ok m (naugraphDs cS bS cW bW cB bB cD bD) := by
-  subst hbD
-  have hG : ∀ z ∈ FreeD.globals (naugraphDs cS bS cW bW cB bB cD S.bws), z ∈ S.blocks := by
-    intro z hz
-    simp only [FreeD.globals, naugraphDs, List.flatMap_cons, List.flatMap_nil, List.append_nil,
-      List.cons_append, List.nil_append, List.mem_cons, List.mem_nil_iff, or_false] at hz
-    rcases hz with h|h|h|h|h|h|h|h <;> subst h <;> simp [SLoc.blocks]
-  have hwsS : S.bws ∈ S.blocks := by simp [SLoc.blocks]
-  refine ⟨fun d hd => ?_, fun d hd => ?_, by simp [FreeD.globals, naugraphDs]; decide,
-    fun d hd hc => ?_, ?_⟩
-  · simp only [naugraphDs, List.mem_cons, List.mem_nil_iff, or_false] at hd
-    rcases hd with rfl | rfl | rfl | rfl
-    · exact ⟨Program.find_naugraphWorksetSz, Program.find_naugraphWorkset⟩
-    · exact ⟨Program.find_naugraphWorkpermSz, Program.find_naugraphWorkperm⟩
-    · exact ⟨Program.find_naugraphBucketSz, Program.find_naugraphBucket⟩
-    · exact ⟨Program.find_naugraphDnworkSz, Program.find_naugraphDnwork⟩
-  · simp only [naugraphDs, List.mem_cons, List.mem_nil_iff, or_false] at hd
-    rcases hd with rfl | rfl | rfl | rfl
-    · exact dS
-    · exact dW
-    · exact dB
-    · exact dD
-  · simp only [naugraphDs, List.mem_cons, List.mem_nil_iff, or_false] at hd
-    rcases hd with rfl | rfl | rfl | rfl
-    · exact fun h => nS hc (hG _ h)
-    · exact fun h => nW hc (hG _ h)
-    · exact fun h => nB hc (hG _ h)
-    · simp only [FreeD.globals, naugraphDs, List.flatMap_cons, List.flatMap_nil, List.append_nil,
-        List.cons_append, List.nil_append]
-      sep_notin hd
-  · simp only [naugraphDs, List.pairwise_cons, List.mem_cons, List.mem_nil_iff, or_false,
-      forall_eq_or_imp, forall_eq, List.Pairwise.nil, and_true, false_implies, implies_true]
-    refine ⟨⟨fun h1 h2 => (pWS h2 h1).symm, pSB, fun h1 _ e => nS h1 (e ▸ hwsS)⟩,
-      ⟨pWB, fun h1 _ e => nW h1 (e ▸ hwsS)⟩, fun h1 _ e => nB h1 (e ▸ hwsS)⟩
-
-theorem eval_dField {e : env} {le : temp_env} {m : mem} {fld : ident} {fty : type}
-    {off : Int} {v : val} (hge : PTree.get dense.id.«nauty:dispatch» e = none)
-    (hfld : ∀ b o, Exec.lvalOfField ge (Tstruct dense.id.«_1027» noattr) fld (.Vptr b o) =
-      some (b, Ptrofs.add o (Ptrofs.repr (zOfInt off)), .Full))
-    (h0 : 0 ≤ off) (h1 : off < 2 ^ 32)
-    (hf : FieldAt m .Mint64 Proofs.Search.Block.dispatch off v) :
-    Exec.evalExpr ge e le m
-      (.Efield (.Evar dense.id.«nauty:dispatch» (Tstruct dense.id.«_1027» noattr)) fld (tptr fty)) =
-      some v := by
-  simp only [Exec.evalExpr, Exec.lvalOfVar, hge, find_dispatch, Exec.derefLoc, typeof, hfld,
-    Mem.loadv, Alloc.Mptr_eq, show access_mode (tptr fty) = .By_value .Mint64 from rfl,
-    show access_mode (Tstruct dense.id.«_1027» noattr) = .By_copy from rfl]
-  rw [unsigned_add_off Ptrofs.zero h0 (by
-    rw [show intOfZ (Ptrofs.unsigned Ptrofs.zero) = 0 from rfl]; omega)]
-  rw [show intOfZ (Ptrofs.unsigned Ptrofs.zero) = 0 from rfl, Int.zero_add, hf.load]
-
-theorem nautyDs_globals {S : SLoc} {cDW : Nat} {bDW : block} {z : block}
-    (hz : z ∈ FreeD.globals (nautyDs S cDW bDW)) : z ∈ freeGlobals := by
-  simp only [FreeD.globals, nautyDs, List.flatMap_cons, List.flatMap_nil, List.append_nil,
-    List.cons_append, List.nil_append, List.mem_cons, List.mem_nil_iff, or_false] at hz
-  rcases hz with h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h <;> subst h <;> simp [freeGlobals]
-
-theorem nautyOk {m : mem} {S : SLoc} {n : Nat} {cDW : Nat} {bDW : block}
-    (hd : S.blocks.Pairwise (· ≠ ·)) (hD : Dyns n m S)
-    (hDW : DynAt m Block.nautyDefltwork Block.nautyDefltworkSz 8 cDW bDW)
-    (hDWs : 0 < cDW → bDW ∉ S.blocks ∧ bDW ≠ Block.nautyDefltwork ∧ bDW ≠ Block.nautyDefltworkSz)
-    (hgS : ∀ z ∈ S.blocks, z ≠ Block.nautyDefltwork ∧ z ≠ Block.nautyDefltworkSz) :
-    FreeD.Ok m (nautyDs S cDW bDW) := by
-  have gS := fun z (hz : z ∈ S.blocks) => hgS z hz
-  refine ⟨fun d hd => ?_, fun d hd => ?_, by
-      simp only [FreeD.globals, nautyDs, List.flatMap_cons, List.flatMap_nil, List.append_nil,
-        List.cons_append, List.nil_append]
-      decide,
-    fun d hd hc => ?_, ?_⟩
-  · simp only [nautyDs, List.mem_cons, List.mem_nil_iff, or_false] at hd
-    rcases hd with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
-    · exact ⟨Program.find_nautyFirsttcSz, Program.find_nautyFirsttc⟩
-    · exact ⟨Program.find_nautyCanoncodeSz, Program.find_nautyCanoncode⟩
-    · exact ⟨Program.find_nautyFirstcodeSz, Program.find_nautyFirstcode⟩
-    · exact ⟨Program.find_nautyWorkpermSz, Program.find_nautyWorkperm⟩
-    · exact ⟨Program.find_nautyCanonlabSz, Program.find_nautyCanonlab⟩
-    · exact ⟨Program.find_nautyFirstlabSz, Program.find_nautyFirstlab⟩
-    · exact ⟨Program.find_nautyDefltworkSz, Program.find_nautyDefltwork⟩
-    · exact ⟨Program.find_nautyFixedptsSz, Program.find_nautyFixedpts⟩
-    · exact ⟨Program.find_nautyActiveSz, Program.find_nautyActive⟩
-  · simp only [nautyDs, List.mem_cons, List.mem_nil_iff, or_false] at hd
-    rcases hd with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
-    · exact hD.firsttc
-    · exact hD.canoncode
-    · exact hD.firstcode
-    · exact hD.workperm
-    · exact hD.canonlab
-    · exact hD.firstlab
-    · exact hDW
-    · exact hD.fixedpts
-    · exact hD.active
-  · have hsub : ∀ z ∈ FreeD.globals (nautyDs S cDW bDW), z ∈ freeGlobals := by
-      intro z hz
-      simp only [FreeD.globals, nautyDs, List.flatMap_cons, List.flatMap_nil, List.append_nil,
-        List.cons_append, List.nil_append, List.mem_cons, List.mem_nil_iff, or_false] at hz
-      rcases hz with h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h <;> subst h <;> simp [freeGlobals]
-    simp only [nautyDs, List.mem_cons, List.mem_nil_iff, or_false] at hd
-    rcases hd with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
-    all_goals first
-      | (intro h
-         rcases freeGlobals_sub (S := S) (hsub _ h) with h' | h' | h' <;>
-           first | exact (hDWs hc).1 h' | exact (hDWs hc).2.1 h' | exact (hDWs hc).2.2 h')
-      | (simp only [FreeD.globals, nautyDs, List.flatMap_cons, List.flatMap_nil, List.append_nil,
-           List.cons_append, List.nil_append, List.mem_cons, List.mem_nil_iff, or_false, not_or]
-         refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-           first | sep_ne hd | exact (gS _ (by simp [SLoc.blocks])).1 |
-             exact (gS _ (by simp [SLoc.blocks])).2)
-  · simp only [nautyDs, List.pairwise_cons, List.mem_cons, List.mem_nil_iff, or_false,
-      forall_eq_or_imp, forall_eq, List.Pairwise.nil, and_true]
-    refine ⟨⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩, ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩, ⟨?_, ?_, ?_, ?_, ?_, ?_⟩,
-      ⟨?_, ?_, ?_, ?_, ?_⟩, ⟨?_, ?_, ?_, ?_⟩, ⟨?_, ?_, ?_⟩, ⟨?_, ?_⟩, ?_⟩
-    all_goals first
-      | (intro _ _; sep_ne hd)
-      | (intro h1 _ e; exact (hDWs h1).1 (by rw [e]; simp [SLoc.blocks]))
-      | (intro _ h1 e; exact (hDWs h1).1 (by rw [← e]; simp [SLoc.blocks]))
-      | exact ⟨fun _ _ => by sep_ne hd, fun _ h => h.elim⟩
-
-set_option maxHeartbeats 4000000 in
-/-- `n >= 320`'s release. -/
-theorem wp_freeBody {Q : Post} {le : temp_env} {m : mem} {S : SLoc} {n : Nat} {ctx : Ctx n}
-    {st : Hex.GraphIso.Nauty.Search n} {pre nsp : Bool} {chain : List (block × block)} {cDW : Nat} {bDW : block}
-    (hs : SearchAt m S ctx st pre nsp) (hvm : ∀ z ∈ S.blocks, Mem.valid_block m z)
-    (hTc : TcChain m S.M Proofs.Search.Block.tcnode0 chain) (hTo : TcOk m S chain)
-    (hDW : DynAt m Block.nautyDefltwork Block.nautyDefltworkSz 8 cDW bDW)
-    (hpF : Mem.perm m Proofs.Search.Block.naugraphFreedyn (zOfInt 0) .Cur .Nonempty)
-    (hgW : ∀ z, IsWork m z → z ≠ Block.nautyDefltwork ∧ z ≠ Block.nautyDefltworkSz ∧
-      z ≠ Proofs.Search.Block.naugraphFreedyn)
-    (hDWs : 0 < cDW → bDW ∉ S.blocks ∧ ¬ IsWork m bDW ∧ bDW ∉ flat chain ∧
-      bDW ≠ Block.nautyDefltwork ∧ bDW ≠ Block.nautyDefltworkSz)
-    (hgS : ∀ z ∈ S.blocks, z ≠ Block.nautyDefltwork ∧ z ≠ Block.nautyDefltworkSz)
-    (hgC : ∀ z ∈ flat chain, z ≠ Block.nautyDefltwork ∧ z ≠ Block.nautyDefltworkSz)
-    (hQ : ∀ m', Unch m m' (FreeSet m S chain cDW bDW) → (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
-      Q.normal E0 (nEnv bI) le m') :
-    Wp xi ge dense.fn.nauty freeBody Q (nEnv bI) le m := by
-  have hd := hs.distinct
-  obtain ⟨cW, bW, cS, bS, cB, bB, cN, bN, dW, dS, dB, dN, nW, nS, nB, nN, pWS, pWB, pSB, pNW,
-    pNS, pNB⟩ := hs.work.arr
-  wp_step; wp_step; wp_step
-  refine wp_call (vf := .Vptr Block.nautilFreedyn Ptrofs.zero) (targs := []) (tres := .Tvoid)
-    (cc := cc_default) (vargs := []) _ _ (Satisfies.grow (nautilFreedyn_satisfies cN bN)) rfl ?_ rfl
-    (by simp [Genv.find_funct, funct_nautilFreedyn]) type_nautilFreedyn ⟨rfl, nautilOk dN ?_⟩ ?_
-  · simp only [Exec.evalExpr, Exec.lvalOfVar,
-      show PTree.get dense.id.«nautil_freedyn» (nEnv bI) = none from rfl, find_nautilFreedyn,
-      Exec.derefLoc, Cfrontend.Ctypes.access_mode]
-  · intro hc
-    exact not_freeGlobals (nN hc) (hgW _ (.inr (.inr (.inr ⟨cN, hc, dN⟩)))).1
-      (hgW _ (.inr (.inr (.inr ⟨cN, hc, dN⟩)))).2.1
-  · rintro t1 v1 m1 ⟨⟨rfl, hD1, hu1, hnb1⟩, hg1⟩
-    simp only [seqPost, Post.after, E0_append, set_opttemp]
-    have hu1' : Unch m m1 (fun z => z = Block.nautilWorkpermSz ∨ z = Block.nautilWorkperm ∨
-        (0 < cN ∧ z = bN)) := hu1.mono fun z h => by
-      simp only [FreeD.globals, nautilDs, List.flatMap_cons, List.flatMap_nil, List.append_nil,
-        List.mem_cons, List.mem_nil_iff, or_false, exists_eq_left] at h
-      rcases h with (h | h) | ⟨hc, h⟩
-      · exact .inl h
-      · exact .inr (.inl h)
-      · exact .inr (.inr ⟨hc, h⟩)
-    have nW1 : ∀ z ∈ S.blocks, z ≠ Block.nautilWorkpermSz → z ≠ Block.nautilWorkperm →
-        ¬ (z = Block.nautilWorkpermSz ∨ z = Block.nautilWorkperm ∨ (0 < cN ∧ z = bN)) := by
-      rintro z hz h1 h2 (h | h | ⟨hc, rfl⟩)
-      · exact h1 h
-      · exact h2 h
-      · exact nN hc hz
-    have hF1 := hs.fixed.dFreedyn.unch hu1' (nW1 _ (by simp [SLoc.blocks]) (by sep_ne hd) (by sep_ne hd))
-    wp_step; wp_step; wp_step
-    apply wp_if_eval
-    rw [Exec.evalExpr, eval_dField rfl field_dFreedyn (by decide) (by decide) hF1]
-    simp only [Exec.evalExpr, typeof]
-    rw [show Cfrontend.Cop.sem_cast (Vint (Lib.Integers.Int.repr (zOfInt 0))) tint (tptr .Tvoid) m1 =
-      some (.Vlong (Lib.Integers.Int64.repr (Lib.Integers.Int.signed (Lib.Integers.Int.repr (zOfInt 0)))))
-      from rfl]
-    simp only []
-    have hpF1 : Mem.perm m1 Proofs.Search.Block.naugraphFreedyn (zOfInt 0) .Cur .Nonempty :=
-      (Alloc.Keep.unch hu1' (by
-        rintro (h | h | ⟨hc, h⟩)
-        · exact absurd h (by decide)
-        · exact absurd h (by decide)
-        · exact (hgW _ (.inr (.inr (.inr ⟨cN, hc, dN⟩)))).2.2 h.symm)).perm _ _ hpF
-    rw [ne_ptr_null0 _ hpF1]
-    simp only []
-    rw [show Cfrontend.Cop.bool_val (Val.of_bool true) tint m1 = some true from rfl]
-    simp only [ite_true]
-    have k1 : ∀ z, z ∉ S.blocks → (0 < cN → z ≠ bN) →
-        ¬ (z = Block.nautilWorkpermSz ∨ z = Block.nautilWorkperm ∨ (0 < cN ∧ z = bN)) := by
-      rintro z hz hn (h | h | ⟨hc, h⟩)
-      · exact hz (h ▸ by simp [SLoc.blocks])
-      · exact hz (h ▸ by simp [SLoc.blocks])
-      · exact hn hc h
-    have gS : ∀ z ∈ S.blocks, z ≠ Block.nautilWorkpermSz → z ≠ Block.nautilWorkperm → _ :=
-      fun z hz h1 h2 => nW1 z hz h1 h2
-    have dS1 := dS.keep hu1' (gS _ (by simp [SLoc.blocks]) (by decide) (by decide))
-      (gS _ (by simp [SLoc.blocks]) (by decide) (by decide))
-      (fun hc => Alloc.Keep.unch hu1' (k1 _ (nS hc) (fun hcN e => pNS hcN hc e.symm)))
-    have dW1 := dW.keep hu1' (gS _ (by simp [SLoc.blocks]) (by decide) (by decide))
-      (gS _ (by simp [SLoc.blocks]) (by decide) (by decide))
-      (fun hc => Alloc.Keep.unch hu1' (k1 _ (nW hc) (fun hcN e => pNW hcN hc e.symm)))
-    have dB1 := dB.keep hu1' (gS _ (by simp [SLoc.blocks]) (by decide) (by decide))
-      (gS _ (by simp [SLoc.blocks]) (by decide) (by decide))
-      (fun hc => Alloc.Keep.unch hu1' (k1 _ (nB hc) (fun hcN e => pNB hcN hc e.symm)))
-    have dD1 := hs.dyns.workspace.keep hu1' (gS _ (by simp [SLoc.blocks]) (by decide) (by decide))
-      (gS _ (by simp [SLoc.blocks]) (by decide) (by decide))
-      (fun _ => Alloc.Keep.unch hu1' (gS _ (by simp [SLoc.blocks]) (by sep_ne hd) (by sep_ne hd)))
-    wp_step; wp_step
-    refine wp_call (vf := .Vptr Proofs.Search.Block.naugraphFreedyn Ptrofs.zero) (targs := [])
-      (tres := .Tvoid) (cc := cc_default) (vargs := []) _ _
-      (Satisfies.grow (naugraphFreedyn_satisfies cS bS cW bW cB bB S.capD S.bws)) rfl
-      (Processnode.eval_dispatch rfl field_dFreedyn rfl (by decide) (by decide) hF1) rfl
-      (by simp [Genv.find_funct, funct_naugraphFreedyn]) type_naugraphFreedyn
-      ⟨rfl, naugraphOk hd rfl dS1 dW1 dB1 dD1 nS nW nB pWS pWB pSB⟩ ?_
-    rintro t2 v2 m2 ⟨⟨rfl, hD2, hu2, hnb2⟩, hg2⟩
-    simp only [seqPost, Post.after, E0_append, set_opttemp]
-    have hG2 : ∀ z ∈ FreeD.globals (naugraphDs cS bS cW bW cB bB S.capD S.bws),
-        z ∈ S.blocks ∧ z ∈ freeGlobals := by
-      intro z hz
-      simp only [FreeD.globals, naugraphDs, List.flatMap_cons, List.flatMap_nil, List.append_nil,
-        List.cons_append, List.nil_append, List.mem_cons, List.mem_nil_iff, or_false] at hz
-      rcases hz with h|h|h|h|h|h|h|h <;> subst h <;> simp [SLoc.blocks, freeGlobals]
-    -- what the naugraph call changed
-    have k2 : ∀ z, (z ∈ S.blocks → z ∉ FreeD.globals (naugraphDs cS bS cW bW cB bB S.capD S.bws) ∧
-        z ≠ S.bws) → (z ∉ S.blocks → (0 < cS → z ≠ bS) ∧ (0 < cW → z ≠ bW) ∧ (0 < cB → z ≠ bB)) →
-        ¬ (z ∈ FreeD.globals (naugraphDs cS bS cW bW cB bB S.capD S.bws) ∨
-          ∃ d ∈ naugraphDs cS bS cW bW cB bB S.capD S.bws, 0 < d.cap ∧ z = d.blk) := by
-      intro z h1 h2 h
-      by_cases hz : z ∈ S.blocks
-      · obtain ⟨g1, g2⟩ := h1 hz
-        rcases h with h | ⟨d, hd', hc, rfl⟩
-        · exact g1 h
-        · simp only [naugraphDs, List.mem_cons, List.mem_nil_iff, or_false] at hd'
-          rcases hd' with rfl | rfl | rfl | rfl
-          · exact nS hc hz
-          · exact nW hc hz
-          · exact nB hc hz
-          · exact g2 rfl
-      · obtain ⟨g1, g2, g3⟩ := h2 hz
-        rcases h with h | ⟨d, hd', hc, rfl⟩
-        · exact hz (hG2 _ h).1
-        · simp only [naugraphDs, List.mem_cons, List.mem_nil_iff, or_false] at hd'
-          rcases hd' with rfl | rfl | rfl | rfl
-          · exact g1 hc rfl
-          · exact g2 hc rfl
-          · exact g3 hc rfl
-          · exact hz (by simp [SLoc.blocks])
-    have hfm : ∀ z ∈ flat chain, z ∉ S.blocks ∧ ¬ IsWork m z := by
-      intro z hz
-      simp only [flat, List.mem_flatMap, List.mem_cons, List.mem_nil_iff, or_false] at hz
-      obtain ⟨p, hp, h | h⟩ := hz <;> subst h
-      · exact ⟨(hTo.apart p hp).1, (hTo.apart p hp).2.2.1⟩
-      · exact ⟨(hTo.apart p hp).2.1, (hTo.apart p hp).2.2.2⟩
-    have hwk : ∀ {c : Nat} {b : block}, 0 < c → (DynAt m Block.naugraphWorkperm
-        Block.naugraphWorkpermSz 4 c b ∨ DynAt m Block.naugraphWorkset Block.naugraphWorksetSz 8 c b ∨
-        DynAt m Block.naugraphBucket Block.naugraphBucketSz 4 c b ∨
-        DynAt m Block.nautilWorkperm Block.nautilWorkpermSz 4 c b) → IsWork m b := by
-      intro c b hc h
-      rcases h with h | h | h | h
-      · exact .inl ⟨c, hc, h⟩
-      · exact .inr (.inl ⟨c, hc, h⟩)
-      · exact .inr (.inr (.inl ⟨c, hc, h⟩))
-      · exact .inr (.inr (.inr ⟨c, hc, h⟩))
-    -- a block apart from S, the work blocks and `defltwork`'s globals survives both calls
-    have out12 : ∀ z, z ∉ S.blocks → ¬ IsWork m z →
-        ¬ (z = Block.nautilWorkpermSz ∨ z = Block.nautilWorkperm ∨ (0 < cN ∧ z = bN)) ∧
-        ¬ (z ∈ FreeD.globals (naugraphDs cS bS cW bW cB bB S.capD S.bws) ∨
-          ∃ d ∈ naugraphDs cS bS cW bW cB bB S.capD S.bws, 0 < d.cap ∧ z = d.blk) := by
-      intro z hz hw
-      refine ⟨k1 z hz (fun hc e => hw (e ▸ hwk hc (.inr (.inr (.inr dN))))), k2 z (fun h => absurd h hz)
-        (fun _ => ⟨fun hc e => hw (e ▸ hwk hc (.inr (.inl dS))),
-          fun hc e => hw (e ▸ hwk hc (.inl dW)), fun hc e => hw (e ▸ hwk hc (.inr (.inr (.inl dB))))⟩)⟩
-    -- a block of S other than the work globals and `bws` survives both calls
-    have in12 : ∀ z ∈ S.blocks, z ≠ Block.nautilWorkpermSz → z ≠ Block.nautilWorkperm →
-        z ∉ FreeD.globals (naugraphDs cS bS cW bW cB bB S.capD S.bws) → z ≠ S.bws →
-        ¬ (z = Block.nautilWorkpermSz ∨ z = Block.nautilWorkperm ∨ (0 < cN ∧ z = bN)) ∧
-        ¬ (z ∈ FreeD.globals (naugraphDs cS bS cW bW cB bB S.capD S.bws) ∨
-          ∃ d ∈ naugraphDs cS bS cW bW cB bB S.capD S.bws, 0 < d.cap ∧ z = d.blk) := by
-      intro z hz h1 h2 hg hb
-      exact ⟨nW1 z hz h1 h2, k2 z (fun _ => ⟨hg, hb⟩) (fun h => absurd hz h)⟩
-    -- the globals `nauty_freedyn` resets survive the first two calls
-    have glob12 : ∀ z ∈ FreeD.globals (nautyDs S cDW bDW),
-        ¬ (z = Block.nautilWorkpermSz ∨ z = Block.nautilWorkperm ∨ (0 < cN ∧ z = bN)) ∧
-        ¬ (z ∈ FreeD.globals (naugraphDs cS bS cW bW cB bB S.capD S.bws) ∨
-          ∃ d ∈ naugraphDs cS bS cW bW cB bB S.capD S.bws, 0 < d.cap ∧ z = d.blk) := by
-      intro z hz
-      simp only [FreeD.globals, nautyDs, List.flatMap_cons, List.flatMap_nil, List.append_nil,
-        List.cons_append, List.nil_append, List.mem_cons, List.mem_nil_iff, or_false] at hz
-      have hDWo : ∀ z, (z = Block.nautyDefltwork ∨ z = Block.nautyDefltworkSz) → z ∉ S.blocks :=
-        fun z hz' h => by rcases hz' with rfl | rfl; exact (hgS _ h).1 rfl; exact (hgS _ h).2 rfl
-      have hDWw : ∀ z, (z = Block.nautyDefltwork ∨ z = Block.nautyDefltworkSz) → ¬ IsWork m z :=
-        fun z hz' h => by
-          rcases hz' with rfl | rfl
-          · exact (hgW _ h).1 rfl
-          · exact (hgW _ h).2.1 rfl
-      rcases hz with h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h <;> subst h <;>
-        first
-        | exact out12 _ (hDWo _ (by simp)) (hDWw _ (by simp))
-        | exact in12 _ (by simp [SLoc.blocks]) (by sep_ne hd) (by sep_ne hd)
-            (by simp only [FreeD.globals, naugraphDs, List.flatMap_cons, List.flatMap_nil,
-              List.append_nil, List.cons_append, List.nil_append]; sep_notin hd) (by sep_ne hd)
-    -- the blocks `nauty_freedyn` frees survive the first two calls
-    have blk12 : ∀ d ∈ nautyDs S cDW bDW, 0 < d.cap →
-        ¬ (d.blk = Block.nautilWorkpermSz ∨ d.blk = Block.nautilWorkperm ∨ (0 < cN ∧ d.blk = bN)) ∧
-        ¬ (d.blk ∈ FreeD.globals (naugraphDs cS bS cW bW cB bB S.capD S.bws) ∨
-          ∃ d' ∈ naugraphDs cS bS cW bW cB bB S.capD S.bws, 0 < d'.cap ∧ d.blk = d'.blk) := by
-      intro d hd' hc
-      simp only [nautyDs, List.mem_cons, List.mem_nil_iff, or_false] at hd'
-      rcases hd' with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;>
-        first
-        | exact out12 _ (hDWs hc).1 (hDWs hc).2.1
-        | exact in12 _ (by simp [SLoc.blocks]) (by sep_ne hd) (by sep_ne hd)
-            (by simp only [FreeD.globals, naugraphDs, List.flatMap_cons, List.flatMap_nil,
-              List.append_nil, List.cons_append, List.nil_append]; sep_notin hd) (by sep_ne hd)
-    have ok0 := nautyOk hd hs.dyns hDW (fun hc => ⟨(hDWs hc).1, (hDWs hc).2.2.2.1, (hDWs hc).2.2.2.2⟩) hgS
-    have ok2 := FreeD.Ok.unch' (FreeD.Ok.unch' ok0 hu1' (fun z hz => (glob12 z hz).1)
-      (fun d hd' hc => (blk12 d hd' hc).1)) hu2 (fun z hz => (glob12 z hz).2)
-      (fun d hd' hc => (blk12 d hd' hc).2)
-    have hT2 : TcChain m2 S.M Proofs.Search.Block.tcnode0 chain := by
-      have hT1 := TcChain.unch hu1' hTc fun z hz => by
-        simp only [Search.tcBlocks, List.mem_cons] at hz
-        rcases hz with rfl | hz
-        · exact (in12 _ (by simp [SLoc.blocks]) (by decide) (by decide) (by
-            simp only [FreeD.globals, naugraphDs, List.flatMap_cons, List.flatMap_nil,
-              List.append_nil, List.cons_append, List.nil_append]; sep_notin hd) (by sep_ne hd)).1
-        · exact (out12 z (hfm z hz).1 (hfm z hz).2).1
-      exact TcChain.unch hu2 hT1 fun z hz => by
-        simp only [Search.tcBlocks, List.mem_cons] at hz
-        rcases hz with rfl | hz
-        · exact (in12 _ (by simp [SLoc.blocks]) (by decide) (by decide) (by
-            simp only [FreeD.globals, naugraphDs, List.flatMap_cons, List.flatMap_nil,
-              List.append_nil, List.cons_append, List.nil_append]; sep_notin hd) (by sep_ne hd)).2
-        · exact (out12 z (hfm z hz).1 (hfm z hz).2).2
-    have hA2 : Mem.valid_access m2 .Mint32 Proofs.Search.Block.allocM (zOfInt 0) .Writable := by
-      have h := in12 Proofs.Search.Block.allocM (by simp [SLoc.blocks]) (by decide) (by decide) (by
-            simp only [FreeD.globals, naugraphDs, List.flatMap_cons, List.flatMap_nil,
-              List.append_nil, List.cons_append, List.nil_append]; sep_notin hd) (by sep_ne hd)
-      exact hu2.access _ _ _ _ h.2 (hu1'.access _ _ _ _ h.1 hs.fixed.allocM.writable)
-    wp_step; wp_step
-    refine wp_call (vf := .Vptr Block.nautyFreedyn Ptrofs.zero) (targs := []) (tres := .Tvoid)
-      (cc := cc_default) (vargs := []) _ _
-      (Satisfies.grow (nautyFreedyn_satisfies S.M chain (nautyDs S cDW bDW))) rfl ?_ rfl
-      (by simp [Genv.find_funct, funct_nautyFreedyn]) type_nautyFreedyn
-      ⟨rfl, rfl, hT2, hTo.pairwise, ?_, ok2, hA2, by simp [FreeD.globals, nautyDs]; decide,
-        by simp [FreeD.globals, nautyDs]; decide, ?_⟩ ?_
-    · simp only [Exec.evalExpr, Exec.lvalOfVar,
-        show PTree.get dense.id.«nauty_freedyn» (nEnv bI) = none from rfl, find_nautyFreedyn,
-        Exec.derefLoc, Cfrontend.Ctypes.access_mode]
-    · intro z hz
-      obtain ⟨hzS, -⟩ := hfm z hz
-      refine ⟨fun e => hzS (by rw [e]; simp [SLoc.blocks]), fun e => hzS (by rw [e]; simp [SLoc.blocks]),
-        fun h => ?_, fun d hd' hc e => ?_⟩
-      · rcases freeGlobals_sub (S := S) (nautyDs_globals h) with h' | h' | h'
-        · exact hzS h'
-        · exact (hgC z hz).1 h'
-        · exact (hgC z hz).2 h'
-      · simp only [nautyDs, List.mem_cons, List.mem_nil_iff, or_false] at hd'
-        rcases hd' with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;>
-          first
-          | (dsimp only at e hc; exact (hDWs hc).2.2.1 (by rw [← e]; exact hz))
-          | exact hzS (by rw [e]; simp [SLoc.blocks])
-    · intro d hd' hc
-      simp only [nautyDs, List.mem_cons, List.mem_nil_iff, or_false] at hd'
-      rcases hd' with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;>
-        first
-        | exact ⟨by sep_ne hd, by sep_ne hd⟩
-        | exact ⟨fun e => (hDWs hc).1 (by dsimp only at e; rw [e]; simp [SLoc.blocks]),
-            fun e => (hDWs hc).1 (by dsimp only at e; rw [e]; simp [SLoc.blocks])⟩
-    · rintro t3 v3 m3 ⟨⟨rfl, -, -, -, hu3, -⟩, hg3⟩
-      simp only [seqPost, Post.after, E0_append, set_opttemp]
-      refine hQ m3 (((hu1'.mono fun z h => ?_).trans (hu2.mono fun z h => ?_)).trans
-        (hu3.mono fun z h => ?_)) (fun z hz => hg3 _ (hg2 _ (hg1 _ hz)))
-      · rcases h with rfl | rfl | ⟨hc, rfl⟩
-        · exact .inl (by simp [freeGlobals])
-        · exact .inl (by simp [freeGlobals])
-        · exact .inr (.inr (.inr (.inl (hwk hc (.inr (.inr (.inr dN)))))))
-      · rcases h with h | ⟨d, hd', hc, rfl⟩
-        · exact .inl (hG2 _ h).2
-        · simp only [naugraphDs, List.mem_cons, List.mem_nil_iff, or_false] at hd'
-          rcases hd' with rfl | rfl | rfl | rfl
-          · exact .inr (.inr (.inr (.inl (hwk hc (.inr (.inl dS))))))
-          · exact .inr (.inr (.inr (.inl (hwk hc (.inl dW)))))
-          · exact .inr (.inr (.inr (.inl (hwk hc (.inr (.inr (.inl dB)))))))
-          · exact .inr (.inl (by simp))
-      · rcases h with h | rfl | rfl | h | ⟨d, hd', hc, rfl⟩
-        · exact .inr (.inr (.inr (.inr h)))
-        · exact .inl (by simp [freeGlobals])
-        · exact .inl (by simp [freeGlobals])
-        · exact .inl (nautyDs_globals h)
-        · simp only [nautyDs, List.mem_cons, List.mem_nil_iff, or_false] at hd'
-          rcases hd' with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;>
-            first
-            | exact .inr (.inr (.inl ⟨hc, rfl⟩))
-            | exact .inr (.inl (by simp))
 
 open NautyVerified.Proofs.Set (sk pv) in
 open NautyVerified.Proofs.Refine (tv pi) in
@@ -633,14 +186,441 @@ abbrev freeTail : statement :=
 
 theorem tFree_eq : Nauty.tFree = .Ssequence (Set.sk Nauty.freeIf) freeTail := rfl
 
+/-! ### For any dispatch procedures
+
+`wp_tFreeG D`: the release over `SearchAtG D`. `nautil_freedyn` and
+`nauty_freedyn` are shared (`nautilFreedyn_satisfiesG`,
+`nautyFreedyn_satisfies`), `(*dispatch.freedyn)()` runs through `D`'s
+`freedynSpec`, releasing the workspace pair `D.wsP`/`D.wsS`; afterwards only
+the blocks of `FreeSetG` have changed (nauty.c's and nautil.c's pairs,
+`alloc_m`, `tcnode0`, the arrays, the list, `D`'s written globals, workspace
+pair and scratch blocks). The dense `wp_tFree` is its instance at
+`Dispatch.dense`. -/
+
+section Generic
+
+open NautyVerified.Proofs.Dispatch (Ops DispatchRep DispatchC)
+
+variable {ge : genv} [E : NautyEnv ge] {O : Ops}
+
+/-- nauty.c's nine pairs, with the capacities and blocks the search left. -/
+def nautyDsG (S : SLoc) (cDW : Nat) (bDW : block) : List FreeD :=
+  [⟨dense.id.«nauty:firsttc», dense.id.«nauty:firsttc_sz», E.nautyFirsttc, E.nautyFirsttcSz,
+     tint, 4, S.capTC, S.bTC⟩,
+   ⟨dense.id.«nauty:canoncode», dense.id.«nauty:canoncode_sz», E.nautyCanoncode,
+     E.nautyCanoncodeSz, tshort, 2, S.capCC, S.bCC⟩,
+   ⟨dense.id.«nauty:firstcode», dense.id.«nauty:firstcode_sz», E.nautyFirstcode,
+     E.nautyFirstcodeSz, tshort, 2, S.capFC, S.bFC⟩,
+   ⟨dense.id.«nauty:workperm», dense.id.«nauty:workperm_sz», E.nautyWorkperm,
+     E.nautyWorkpermSz, tint, 4, S.capWP, S.bWP⟩,
+   ⟨dense.id.«nauty:canonlab», dense.id.«nauty:canonlab_sz», E.nautyCanonlab,
+     E.nautyCanonlabSz, tint, 4, S.capCL, S.bCL⟩,
+   ⟨dense.id.«nauty:firstlab», dense.id.«nauty:firstlab_sz», E.nautyFirstlab,
+     E.nautyFirstlabSz, tint, 4, S.capFL, S.bFL⟩,
+   ⟨dense.id.«nauty:defltwork», dense.id.«nauty:defltwork_sz», E.nautyDefltwork,
+     E.nautyDefltworkSz, tulong, 8, cDW, bDW⟩,
+   ⟨dense.id.«nauty:fixedpts», dense.id.«nauty:fixedpts_sz», E.nautyFixedpts,
+     E.nautyFixedptsSz, tulong, 8, S.capF, S.bF⟩,
+   ⟨dense.id.«nauty:active», dense.id.«nauty:active_sz», E.nautyActive, E.nautyActiveSz,
+     tulong, 8, S.capA, S.bA⟩]
+
+/-- nauty.c's and nautil.c's `DYNALLSTAT` globals the release resets, `alloc_m` and `tcnode0`. -/
+def freeGlobalsG : List block :=
+  [E.nautilWorkperm, E.nautilWorkpermSz, E.nautyFirsttc, E.nautyFirsttcSz,
+   E.nautyCanoncode, E.nautyCanoncodeSz, E.nautyFirstcode, E.nautyFirstcodeSz,
+   E.nautyWorkperm, E.nautyWorkpermSz, E.nautyCanonlab, E.nautyCanonlabSz,
+   E.nautyFirstlab, E.nautyFirstlabSz, E.nautyDefltwork, E.nautyDefltworkSz,
+   E.nautyFixedpts, E.nautyFixedptsSz, E.nautyActive, E.nautyActiveSz, E.allocM, E.tcnode0]
+
+/-- What the release may change: those globals, the arrays' blocks, `defltwork`'s
+block, the scratch blocks in use, the list, and `D`'s written globals and
+workspace pair. -/
+def FreeSetG (D : DispatchRep ge O) (m : mem) (S : SLoc) (chain : List (block × block))
+    (cDW : Nat) (bDW : block) (z : block) : Prop :=
+  z ∈ (freeGlobalsG : List block) ∨ z ∈ [S.bA, S.bF, S.bWP, S.bFL, S.bCL, S.bFC, S.bCC, S.bTC, S.bws] ∨
+    (0 < cDW ∧ z = bDW) ∨ IsWorkG D m z ∨ z ∈ flat chain ∨ z ∈ D.wglobs ∨ z = D.wsP ∨ z = D.wsS
+
+theorem nautilOkG {m : mem} {cN : Nat} {bN : block}
+    (dN : DynAt m E.nautilWorkperm E.nautilWorkpermSz 4 cN bN) : FreeD.Ok m (nautilDsG cN bN) := by
+  refine ⟨fun d hd => ?_, fun d hd => ?_, ?_, fun d hd hc => ?_, by simp [nautilDsG]⟩
+  · simp only [nautilDsG, List.mem_singleton] at hd; subst hd
+    exact ⟨E.find_nautilWorkpermSz, E.find_nautilWorkperm⟩
+  · simp only [nautilDsG, List.mem_singleton] at hd; subst hd; exact dN
+  · simp only [FreeD.globals, nautilDsG, List.flatMap_cons, List.flatMap_nil, List.append_nil,
+      List.pairwise_cons, List.mem_cons, List.mem_nil_iff, or_false, forall_eq, List.Pairwise.nil,
+      and_true, false_implies, implies_true]
+    env_ne
+  · simp only [nautilDsG, List.mem_singleton] at hd; subst hd
+    simp only [FreeD.globals, nautilDsG, List.flatMap_cons, List.flatMap_nil, List.append_nil,
+      List.mem_cons, List.mem_nil_iff, or_false, not_or]
+    exact ⟨(dN.bne hc).1, (dN.bne hc).2⟩
+
+theorem eval_dFieldG {e : env} {le : temp_env} {m : mem} {fld : ident} {fty : type}
+    {off : Int} {v : val} (hge : PTree.get dense.id.«nauty:dispatch» e = none)
+    (hfld : ∀ b o, Exec.lvalOfField ge (Tstruct dense.id.«_1027» noattr) fld (.Vptr b o) =
+      some (b, Ptrofs.add o (Ptrofs.repr (zOfInt off)), .Full))
+    (h0 : 0 ≤ off) (h1 : off < 2 ^ 32)
+    (hf : FieldAt m .Mint64 E.dispatch off v) :
+    Exec.evalExpr ge e le m
+      (.Efield (.Evar dense.id.«nauty:dispatch» (Tstruct dense.id.«_1027» noattr)) fld (tptr fty)) =
+      some v := by
+  simp only [Exec.evalExpr, Exec.lvalOfVar, hge, E.find_dispatch, Exec.derefLoc, typeof, hfld,
+    Mem.loadv, Alloc.Mptr_eq, show access_mode (tptr fty) = .By_value .Mint64 from rfl,
+    show access_mode (Tstruct dense.id.«_1027» noattr) = .By_copy from rfl]
+  rw [unsigned_add_off Ptrofs.zero h0 (by
+    rw [show intOfZ (Ptrofs.unsigned Ptrofs.zero) = 0 from rfl]; omega)]
+  rw [show intOfZ (Ptrofs.unsigned Ptrofs.zero) = 0 from rfl, Int.zero_add, hf.load]
+
+section Release
+
+variable {D : DispatchRep ge O} {m : mem} {S : SLoc} {gl : D.GLoc} {cl : D.CLoc} {G : O.Gr n}
+  {st : SearchState n (O.Canon n)} {pre nsp : Bool}
+
+/-- The globals of `nautyDsG`: list entries of `S.litG` other than nautil.c's
+pair and the workspace, or `defltwork`'s pair. -/
+theorem nautyDsG_globals (h : SearchAtG D m S gl cl G st pre nsp) {cDW : Nat} {bDW : block}
+    {z : block} (hz : z ∈ FreeD.globals (nautyDsG S cDW bDW)) :
+    (z ∈ envSearch ∧ z ≠ E.nautilWorkperm ∧ z ≠ E.nautilWorkpermSz ∧ z ≠ S.bws) ∨
+      z = E.nautyDefltwork ∨ z = E.nautyDefltworkSz := by
+  have hd := h.lit
+  simp only [FreeD.globals, nautyDsG, List.flatMap_cons, List.flatMap_nil, List.append_nil,
+    List.cons_append, List.nil_append, List.mem_cons, List.mem_nil_iff, or_false] at hz
+  rcases hz with h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h <;> subst h <;>
+    first
+    | exact .inr (.inl rfl)
+    | exact .inr (.inr rfl)
+    | exact .inl ⟨by simp, by sep_ne hd, by sep_ne hd, by sep_ne hd⟩
+
+theorem nautyDsG_free {cDW : Nat} {bDW : block} {z : block}
+    (hz : z ∈ FreeD.globals (nautyDsG S cDW bDW)) : z ∈ (freeGlobalsG : List block) := by
+  simp only [FreeD.globals, nautyDsG, List.flatMap_cons, List.flatMap_nil, List.append_nil,
+    List.cons_append, List.nil_append, List.mem_cons, List.mem_nil_iff, or_false] at hz
+  rcases hz with h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h <;> subst h <;> simp [freeGlobalsG]
+
+/-- The blocks of `nautyDsG` in use: the arrays (list entries of `S.litG`) or
+`defltwork`'s block. -/
+theorem nautyDsG_blks (h : SearchAtG D m S gl cl G st pre nsp) {cDW : Nat} {bDW : block}
+    {d : FreeD} (hd' : d ∈ nautyDsG S cDW bDW) (hc : 0 < d.cap) :
+    (d.blk ∈ [S.bA, S.bF, S.bWP, S.bFL, S.bCL, S.bFC, S.bCC, S.bTC] ∧ d.blk ∈ S.litG ∧
+      d.blk ≠ E.nautilWorkperm ∧ d.blk ≠ E.nautilWorkpermSz ∧ d.blk ≠ S.bws ∧
+      d.blk ≠ E.allocM ∧ d.blk ≠ E.tcnode0) ∨ (0 < cDW ∧ d.blk = bDW) := by
+  have hd := h.lit
+  simp only [nautyDsG, List.mem_cons, List.mem_nil_iff, or_false] at hd'
+  rcases hd' with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;>
+    first
+    | exact .inr ⟨hc, rfl⟩
+    | exact .inl ⟨by simp, by simp [SLoc.litG], by sep_ne hd, by sep_ne hd, by sep_ne hd,
+        by sep_ne hd, by sep_ne hd⟩
+
+theorem nautyOkG (hs : SearchAtG D m S gl cl G st pre nsp) {cDW : Nat} {bDW : block}
+    (hDW : DynAt m E.nautyDefltwork E.nautyDefltworkSz 8 cDW bDW)
+    (hDWs : 0 < cDW → bDW ∉ S.blocksG D gl cl ∧ bDW ≠ E.nautyDefltwork ∧
+      bDW ≠ E.nautyDefltworkSz)
+    (hgS : ∀ z ∈ S.blocksG D gl cl, z ≠ E.nautyDefltwork ∧ z ≠ E.nautyDefltworkSz) :
+    FreeD.Ok m (nautyDsG S cDW bDW) := by
+  have hd := hs.lit
+  have hD := hs.dyns
+  have mB : ∀ z ∈ S.litG, z ∈ S.blocksG D gl cl := fun z hz => (S.litG_sub D gl cl).subset hz
+  refine ⟨fun d hd' => ?_, fun d hd' => ?_, ?_, fun d hd' hc => ?_, ?_⟩
+  · simp only [nautyDsG, List.mem_cons, List.mem_nil_iff, or_false] at hd'
+    rcases hd' with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
+    · exact ⟨E.find_nautyFirsttcSz, E.find_nautyFirsttc⟩
+    · exact ⟨E.find_nautyCanoncodeSz, E.find_nautyCanoncode⟩
+    · exact ⟨E.find_nautyFirstcodeSz, E.find_nautyFirstcode⟩
+    · exact ⟨E.find_nautyWorkpermSz, E.find_nautyWorkperm⟩
+    · exact ⟨E.find_nautyCanonlabSz, E.find_nautyCanonlab⟩
+    · exact ⟨E.find_nautyFirstlabSz, E.find_nautyFirstlab⟩
+    · exact ⟨E.find_nautyDefltworkSz, E.find_nautyDefltwork⟩
+    · exact ⟨E.find_nautyFixedptsSz, E.find_nautyFixedpts⟩
+    · exact ⟨E.find_nautyActiveSz, E.find_nautyActive⟩
+  · simp only [nautyDsG, List.mem_cons, List.mem_nil_iff, or_false] at hd'
+    rcases hd' with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
+    · exact hD.firsttc
+    · exact hD.canoncode
+    · exact hD.firstcode
+    · exact hD.workperm
+    · exact hD.canonlab
+    · exact hD.firstlab
+    · exact hDW
+    · exact hD.fixedpts
+    · exact hD.active
+  · simp only [FreeD.globals, nautyDsG, List.flatMap_cons, List.flatMap_nil, List.append_nil,
+      List.cons_append, List.nil_append, List.pairwise_cons, List.mem_cons, List.mem_nil_iff,
+      or_false, forall_eq_or_imp, forall_eq, List.Pairwise.nil, and_true]
+    (repeat' constructor) <;> first | env_ne | exact fun _ h => h.elim
+  · intro hg
+    rcases nautyDsG_blks hs hd' hc with ⟨hl, hlit, -⟩ | ⟨hc', e⟩
+    · rcases nautyDsG_globals hs hg with ⟨hg', -⟩ | e | e
+      · have hown : d.blk ∈ ([S.bg, S.bl, S.bp, S.bo, S.bst, S.bc, S.bws, S.bA, S.bF, S.bWP, S.bFL,
+            S.bCL, S.bFC, S.bCC, S.bTC, S.bUA] : List block) := by
+          simp only [List.mem_cons, List.mem_nil_iff, or_false] at hl ⊢
+          rcases hl with h | h | h | h | h | h | h | h <;> simp [h]
+        exact (List.pairwise_append.1 hd).2.2 _ hown _ hg' rfl
+      · exact (hgS _ (mB _ hlit)).1 e
+      · exact (hgS _ (mB _ hlit)).2 e
+    · rw [e] at hg
+      rcases nautyDsG_globals hs hg with ⟨hg', -⟩ | e' | e'
+      · exact (hDWs hc').1 (SLoc.mem_blocksG_of D (.inr (.inr (.inr (.inr (.inl hg'))))))
+      · exact (hDWs hc').2.1 e'
+      · exact (hDWs hc').2.2 e'
+  · simp only [nautyDsG, List.pairwise_cons, List.mem_cons, List.mem_nil_iff, or_false,
+      forall_eq_or_imp, forall_eq, List.Pairwise.nil, and_true]
+    refine ⟨⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩, ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩, ⟨?_, ?_, ?_, ?_, ?_, ?_⟩,
+      ⟨?_, ?_, ?_, ?_, ?_⟩, ⟨?_, ?_, ?_, ?_⟩, ⟨?_, ?_, ?_⟩, ⟨?_, ?_⟩, ?_⟩
+    all_goals first
+      | (intro h1 _ e; exact (hDWs h1).1 (by rw [e]; exact mB _ (by simp [SLoc.litG])))
+      | (intro _ h1 e; exact (hDWs h1).1 (by rw [← e]; exact mB _ (by simp [SLoc.litG])))
+      | (intro _ _; sep_ne hd)
+      | exact ⟨fun _ _ => by sep_ne hd, fun _ h => h.elim⟩
+
+end Release
+
+variable {xi : ExternalCalls}
+
+set_option maxHeartbeats 4000000 in
+/-- `n >= 320`'s release, for any dispatch procedures. -/
+theorem wp_freeBodyG [T : TopEnv ge] (D : DispatchC ge O) {Q : Post} {le : temp_env} {m : mem}
+    {S : SLoc} {gl : D.GLoc} {cl : D.CLoc} {G : O.Gr n} {st : SearchState n (O.Canon n)}
+    {pre nsp : Bool} {chain : List (block × block)} {cDW : Nat} {bDW : block}
+    (hs : SearchAtG D.toDispatchRep m S gl cl G st pre nsp)
+    (hTc : TcChain m S.M E.tcnode0 chain) (hTo : TcOkG D.toDispatchRep m S gl cl chain)
+    (hDW : DynAt m E.nautyDefltwork E.nautyDefltworkSz 8 cDW bDW)
+    (hpF : Mem.perm m D.freedyn (zOfInt 0) .Cur .Nonempty)
+    (hFN : D.freedyn ≠ E.nautilWorkperm ∧ D.freedyn ≠ E.nautilWorkpermSz)
+    (hgW : ∀ z, IsWorkG D.toDispatchRep m z → z ≠ E.nautyDefltwork ∧ z ≠ E.nautyDefltworkSz ∧
+      z ≠ D.freedyn)
+    (hDWs : 0 < cDW → bDW ∉ S.blocksG D.toDispatchRep gl cl ∧ ¬ IsWorkG D.toDispatchRep m bDW ∧
+      bDW ∉ flat chain ∧ bDW ≠ E.nautyDefltwork ∧ bDW ≠ E.nautyDefltworkSz)
+    (hgS : ∀ z ∈ S.blocksG D.toDispatchRep gl cl, z ≠ E.nautyDefltwork ∧ z ≠ E.nautyDefltworkSz)
+    (hgC : ∀ z ∈ flat chain, z ≠ E.nautyDefltwork ∧ z ≠ E.nautyDefltworkSz)
+    (hQ : ∀ m', Unch m m' (FreeSetG D.toDispatchRep m S chain cDW bDW) →
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) → Q.normal E0 (nEnv bI) le m') :
+    Wp xi ge dense.fn.nauty freeBody Q (nEnv bI) le m := by
+  have hd := hs.lit
+  obtain ⟨cN, bN, dN, nN, uN⟩ := hs.work.nautil
+  have mB : ∀ z ∈ S.litG, z ∈ S.blocksG D.toDispatchRep gl cl := fun z hz =>
+    (S.litG_sub D.toDispatchRep gl cl).subset hz
+  have mGl : ∀ z ∈ D.globs, z ∈ S.blocksG D.toDispatchRep gl cl := fun z hz =>
+    SLoc.mem_blocksG_of D.toDispatchRep (.inr (.inr (.inr (.inr (.inr hz)))))
+  have hPin : E.nautilWorkperm ∈ S.blocksG D.toDispatchRep gl cl := mB _ (by simp [SLoc.litG])
+  have hSin : E.nautilWorkpermSz ∈ S.blocksG D.toDispatchRep gl cl := mB _ (by simp [SLoc.litG])
+  have hwsS : S.bws ∈ S.blocksG D.toDispatchRep gl cl := mB _ (by simp [SLoc.litG])
+  have eB : E.nautilWorkperm ∈ E.blocks ∧ E.nautilWorkpermSz ∈ E.blocks := by
+    simp [NautyEnv.blocks]
+  have eD : E.nautyDefltwork ∈ E.blocks ∧ E.nautyDefltworkSz ∈ E.blocks := by
+    simp [NautyEnv.blocks]
+  wp_step; wp_step; wp_step
+  refine wp_call (vf := .Vptr E.nautilFreedyn Ptrofs.zero) (targs := []) (tres := .Tvoid)
+    (cc := cc_default) (vargs := []) _ _ (Satisfies.grow (nautilFreedyn_satisfiesG cN bN)) rfl ?_ rfl
+    (by simp [Genv.find_funct, E.funct_nautilFreedyn]) type_nautilFreedyn ⟨rfl, nautilOkG dN⟩ ?_
+  · simp only [Exec.evalExpr, Exec.lvalOfVar,
+      show PTree.get dense.id.«nautil_freedyn» (nEnv bI) = none from rfl, E.find_nautilFreedyn,
+      Exec.derefLoc, Cfrontend.Ctypes.access_mode]
+  rintro t1 v1 m1 ⟨⟨rfl, -, hu1, -⟩, hg1⟩
+  simp only [seqPost, Post.after, E0_append, set_opttemp]
+  have hu1' : Unch m m1 (fun z => z = E.nautilWorkpermSz ∨ z = E.nautilWorkperm ∨
+      (0 < cN ∧ z = bN)) := hu1.mono fun z h => by
+    simp only [FreeD.globals, nautilDsG, List.flatMap_cons, List.flatMap_nil, List.append_nil,
+      List.mem_cons, List.mem_nil_iff, or_false, exists_eq_left] at h
+    rcases h with (h | h) | ⟨hc, h⟩
+    · exact .inl h
+    · exact .inr (.inl h)
+    · exact .inr (.inr ⟨hc, h⟩)
+  -- what `nautil_freedyn` leaves alone
+  have nW1 : ∀ z ∈ S.blocksG D.toDispatchRep gl cl, z ≠ E.nautilWorkpermSz →
+      z ≠ E.nautilWorkperm →
+      ¬ (z = E.nautilWorkpermSz ∨ z = E.nautilWorkperm ∨ (0 < cN ∧ z = bN)) := by
+    rintro z hz h1 h2 (h | h | ⟨hc, rfl⟩)
+    · exact h1 h
+    · exact h2 h
+    · exact nN hc hz
+  have oW1 : ∀ z, z ∉ S.blocksG D.toDispatchRep gl cl → ¬ IsWorkG D.toDispatchRep m z →
+      ¬ (z = E.nautilWorkpermSz ∨ z = E.nautilWorkperm ∨ (0 < cN ∧ z = bN)) := by
+    rintro z hz hw (h | h | ⟨hc, rfl⟩)
+    · exact hz (h ▸ hSin)
+    · exact hz (h ▸ hPin)
+    · exact hw (.inr ⟨cN, hc, dN⟩)
+  have gW1 : ∀ z ∈ D.globs,
+      ¬ (z = E.nautilWorkpermSz ∨ z = E.nautilWorkperm ∨ (0 < cN ∧ z = bN)) := fun z hz =>
+    nW1 z (mGl z hz) (fun e => D.globs_env _ hz (e ▸ eB.2)) (fun e => D.globs_env _ hz (e ▸ eB.1))
+  have hw1 := D.work_unch hs.work.disp hu1' (fun z hz => gW1 z (D.wglobs_sub _ hz))
+    (fun z hz => by
+      rintro (h | h | ⟨hc, rfl⟩)
+      · exact hs.work.notin z hz (h ▸ hSin)
+      · exact hs.work.notin z hz (h ▸ hPin)
+      · exact uN hc hz) hg1
+  have hF1 := hs.fixed.dFreedyn.unch hu1' (nW1 _ (mB _ (by simp [SLoc.litG])) (by sep_ne hd)
+    (by sep_ne hd))
+  wp_step; wp_step; wp_step
+  apply wp_if_eval
+  rw [Exec.evalExpr, eval_dFieldG rfl T.field_dFreedyn (by decide) (by decide) hF1]
+  simp only [Exec.evalExpr, typeof]
+  rw [show Cfrontend.Cop.sem_cast (Vint (Lib.Integers.Int.repr (zOfInt 0))) tint (tptr .Tvoid) m1 =
+    some (.Vlong (Lib.Integers.Int64.repr (Lib.Integers.Int.signed (Lib.Integers.Int.repr (zOfInt 0)))))
+    from rfl]
+  simp only []
+  have hpF1 : Mem.perm m1 D.freedyn (zOfInt 0) .Cur .Nonempty :=
+    (Alloc.Keep.unch hu1' (by
+      rintro (h | h | ⟨hc, h⟩)
+      · exact hFN.2 h
+      · exact hFN.1 h
+      · exact (hgW _ (.inr ⟨cN, hc, dN⟩)).2.2 h.symm)).perm _ _ hpF
+  rw [ne_ptr_null0 _ hpF1]
+  simp only []
+  rw [show Cfrontend.Cop.bool_val (Val.of_bool true) tint m1 = some true from rfl]
+  simp only [ite_true]
+  have dD1 := hs.dyns.workspace.keep hu1' (gW1 _ D.wsP_mem) (gW1 _ D.wsS_mem)
+    (fun _ => Alloc.Keep.unch hu1' (nW1 _ hwsS (by sep_ne hd) (by sep_ne hd)))
+  obtain ⟨fd, hfd, hty, hsat⟩ := D.freedyn_fn xi
+  wp_step; wp_step
+  refine wp_call (vf := .Vptr D.freedyn Ptrofs.zero) (targs := [])
+    (tres := .Tvoid) (cc := cc_default) (vargs := []) fd _
+    (Satisfies.grow (hsat S.capD S.bws)) rfl
+    (Processnode.eval_dispatch rfl T.field_dFreedyn rfl (by decide) (by decide) hF1) rfl
+    hfd hty
+    ⟨rfl, hw1.1, dD1, fun _ => ⟨fun h => hs.work.notin _ (hw1.2 _ h) hwsS,
+      hs.lit_globs _ (by simp [SLoc.litG])⟩⟩ ?_
+  rintro t2 v2 m2 ⟨⟨rfl, hu2, -, -⟩, hg2⟩
+  simp only [seqPost, Post.after, E0_append, set_opttemp]
+  -- what the dispatch's `freedyn` leaves alone
+  have nW2 : ∀ z, z ∉ D.globs → ¬ D.IsWork m z → z ≠ S.bws →
+      ¬ (z ∈ D.wglobs ∨ z = D.wsP ∨ z = D.wsS ∨ D.IsWork m1 z ∨ (0 < S.capD ∧ z = S.bws)) := by
+    rintro z hg hw hb (h | h | h | h | ⟨-, h⟩)
+    · exact hg (D.wglobs_sub _ h)
+    · exact hg (h ▸ D.wsP_mem)
+    · exact hg (h ▸ D.wsS_mem)
+    · exact hw (hw1.2 z h)
+    · exact hb h
+  have lW2 : ∀ z ∈ S.litG, z ≠ S.bws →
+      ¬ (z ∈ D.wglobs ∨ z = D.wsP ∨ z = D.wsS ∨ D.IsWork m1 z ∨ (0 < S.capD ∧ z = S.bws)) :=
+    fun z hz hb => nW2 z (hs.lit_globs z hz) (fun h => hs.work.notin z h (mB z hz)) hb
+  have oW2 : ∀ z, z ∉ S.blocksG D.toDispatchRep gl cl → ¬ IsWorkG D.toDispatchRep m z →
+      ¬ (z ∈ D.wglobs ∨ z = D.wsP ∨ z = D.wsS ∨ D.IsWork m1 z ∨ (0 < S.capD ∧ z = S.bws)) :=
+    fun z hz hw => nW2 z (fun h => hz (mGl z h)) (fun h => hw (.inl h)) (fun e => hz (e ▸ hwsS))
+  have dW2 : ∀ z, (z = E.nautyDefltwork ∨ z = E.nautyDefltworkSz) →
+      ¬ (z = E.nautilWorkpermSz ∨ z = E.nautilWorkperm ∨ (0 < cN ∧ z = bN)) ∧
+      ¬ (z ∈ D.wglobs ∨ z = D.wsP ∨ z = D.wsS ∨ D.IsWork m1 z ∨ (0 < S.capD ∧ z = S.bws)) := by
+    intro z hz
+    have hzS : z ∉ S.blocksG D.toDispatchRep gl cl := fun h => by
+      rcases hz with rfl | rfl
+      · exact (hgS _ h).1 rfl
+      · exact (hgS _ h).2 rfl
+    have hzW : ¬ IsWorkG D.toDispatchRep m z := fun h => by
+      rcases hz with rfl | rfl
+      · exact (hgW _ h).1 rfl
+      · exact (hgW _ h).2.1 rfl
+    exact ⟨oW1 z hzS hzW, oW2 z hzS hzW⟩
+  have hfm : ∀ z ∈ flat chain, z ∉ S.blocksG D.toDispatchRep gl cl ∧ ¬ IsWorkG D.toDispatchRep m z := by
+    intro z hz
+    simp only [flat, List.mem_flatMap, List.mem_cons, List.mem_nil_iff, or_false] at hz
+    obtain ⟨p, hp, h | h⟩ := hz <;> subst h
+    · exact ⟨(hTo.apart p hp).1, (hTo.apart p hp).2.2.1⟩
+    · exact ⟨(hTo.apart p hp).2.1, (hTo.apart p hp).2.2.2⟩
+  have ok0 := nautyOkG hs hDW (fun hc => ⟨(hDWs hc).1, (hDWs hc).2.2.2.1, (hDWs hc).2.2.2.2⟩) hgS
+  have gl12 : ∀ z ∈ FreeD.globals (nautyDsG S cDW bDW),
+      ¬ (z = E.nautilWorkpermSz ∨ z = E.nautilWorkperm ∨ (0 < cN ∧ z = bN)) ∧
+      ¬ (z ∈ D.wglobs ∨ z = D.wsP ∨ z = D.wsS ∨ D.IsWork m1 z ∨ (0 < S.capD ∧ z = S.bws)) := by
+    intro z hz
+    rcases nautyDsG_globals hs hz with ⟨hl, h1, h2, h3⟩ | e | e
+    · have hl' : z ∈ S.litG := by unfold SLoc.litG; exact List.mem_append_right _ hl
+      exact ⟨nW1 z (mB z hl') h2 h1, lW2 z hl' h3⟩
+    · exact dW2 z (.inl e)
+    · exact dW2 z (.inr e)
+  have bl12 : ∀ d ∈ nautyDsG S cDW bDW, 0 < d.cap →
+      ¬ (d.blk = E.nautilWorkpermSz ∨ d.blk = E.nautilWorkperm ∨ (0 < cN ∧ d.blk = bN)) ∧
+      ¬ (d.blk ∈ D.wglobs ∨ d.blk = D.wsP ∨ d.blk = D.wsS ∨ D.IsWork m1 d.blk ∨
+        (0 < S.capD ∧ d.blk = S.bws)) := by
+    intro d hd' hc
+    rcases nautyDsG_blks hs hd' hc with ⟨-, hl, h1, h2, h3, -⟩ | ⟨hc', e⟩
+    · exact ⟨nW1 _ (mB _ hl) h2 h1, lW2 _ hl h3⟩
+    · rw [e]
+      exact ⟨oW1 _ (hDWs hc').1 (hDWs hc').2.1, oW2 _ (hDWs hc').1 (hDWs hc').2.1⟩
+  have ok2 := FreeD.Ok.unch' (FreeD.Ok.unch' ok0 hu1' (fun z hz => (gl12 z hz).1)
+    (fun d hd' hc => (bl12 d hd' hc).1)) hu2 (fun z hz => (gl12 z hz).2)
+    (fun d hd' hc => (bl12 d hd' hc).2)
+  have hTl : E.tcnode0 ∈ S.litG := by simp [SLoc.litG]
+  have tc12 : ∀ z ∈ tcBlocks E.tcnode0 chain,
+      ¬ (z = E.nautilWorkpermSz ∨ z = E.nautilWorkperm ∨ (0 < cN ∧ z = bN)) ∧
+      ¬ (z ∈ D.wglobs ∨ z = D.wsP ∨ z = D.wsS ∨ D.IsWork m1 z ∨ (0 < S.capD ∧ z = S.bws)) := by
+    intro z hz
+    simp only [Search.tcBlocks, List.mem_cons] at hz
+    rcases hz with rfl | hz
+    · exact ⟨nW1 _ (mB _ hTl) (by sep_ne hd) (by sep_ne hd), lW2 _ hTl (by sep_ne hd)⟩
+    · exact ⟨oW1 z (hfm z hz).1 (hfm z hz).2, oW2 z (hfm z hz).1 (hfm z hz).2⟩
+  have hT2 : TcChain m2 S.M E.tcnode0 chain :=
+    TcChain.unch hu2 (TcChain.unch hu1' hTc fun z hz => (tc12 z hz).1) fun z hz => (tc12 z hz).2
+  have hAl : E.allocM ∈ S.litG := by simp [SLoc.litG]
+  have hA2 : Mem.valid_access m2 .Mint32 E.allocM (zOfInt 0) .Writable :=
+    hu2.access _ _ _ _ (lW2 _ hAl (by sep_ne hd))
+      (hu1'.access _ _ _ _ (nW1 _ (mB _ hAl) (by sep_ne hd) (by sep_ne hd))
+        hs.fixed.allocM.writable)
+  have gA : E.allocM ∉ FreeD.globals (nautyDsG S cDW bDW) := by
+    simp only [FreeD.globals, nautyDsG, List.flatMap_cons, List.flatMap_nil, List.append_nil,
+      List.cons_append, List.nil_append]
+    sep_notin hd
+  have gT : E.tcnode0 ∉ FreeD.globals (nautyDsG S cDW bDW) := by
+    simp only [FreeD.globals, nautyDsG, List.flatMap_cons, List.flatMap_nil, List.append_nil,
+      List.cons_append, List.nil_append]
+    sep_notin hd
+  wp_step; wp_step
+  refine wp_call (vf := .Vptr E.nautyFreedyn Ptrofs.zero) (targs := []) (tres := .Tvoid)
+    (cc := cc_default) (vargs := []) _ _
+    (Satisfies.grow (nautyFreedyn_satisfies S.M chain (nautyDsG S cDW bDW))) rfl ?_ rfl
+    (by simp [Genv.find_funct, E.funct_nautyFreedyn]) type_nautyFreedyn
+    ⟨rfl, rfl, hT2, hTo.pairwise, ?_, ok2, hA2, gA, gT, ?_⟩ ?_
+  · simp only [Exec.evalExpr, Exec.lvalOfVar,
+      show PTree.get dense.id.«nauty_freedyn» (nEnv bI) = none from rfl, E.find_nautyFreedyn,
+      Exec.derefLoc, Cfrontend.Ctypes.access_mode]
+  · intro z hz
+    obtain ⟨hzS, -⟩ := hfm z hz
+    refine ⟨fun e => hzS (by rw [e]; exact mB _ hAl), fun e => hzS (by rw [e]; exact mB _ hTl),
+      fun h => ?_, fun d hd' hc e => ?_⟩
+    · rcases nautyDsG_globals hs h with ⟨hl, -⟩ | e | e
+      · exact hzS (SLoc.mem_blocksG_of _ (.inr (.inr (.inr (.inr (.inl hl))))))
+      · exact (hgC z hz).1 e
+      · exact (hgC z hz).2 e
+    · rcases nautyDsG_blks hs hd' hc with ⟨-, hl, -⟩ | ⟨hc', e'⟩
+      · exact hzS (by rw [e]; exact mB _ hl)
+      · exact (hDWs hc').2.2.1 (by rw [← e', ← e]; exact hz)
+  · intro d hd' hc
+    rcases nautyDsG_blks hs hd' hc with ⟨-, -, -, -, -, h1, h2⟩ | ⟨hc', e⟩
+    · exact ⟨h1, h2⟩
+    · rw [e]
+      exact ⟨fun e' => (hDWs hc').1 (by rw [e']; exact mB _ hAl),
+        fun e' => (hDWs hc').1 (by rw [e']; exact mB _ hTl)⟩
+  · rintro t3 v3 m3 ⟨⟨rfl, -, -, -, hu3, -⟩, hg3⟩
+    simp only [seqPost, Post.after, E0_append, set_opttemp]
+    refine hQ m3 (((hu1'.mono fun z h => ?_).trans (hu2.mono fun z h => ?_)).trans
+      (hu3.mono fun z h => ?_)) (fun z hz => hg3 _ (hg2 _ (hg1 _ hz)))
+    · rcases h with rfl | rfl | ⟨hc, rfl⟩
+      · exact .inl (by simp [freeGlobalsG])
+      · exact .inl (by simp [freeGlobalsG])
+      · exact .inr (.inr (.inr (.inl (.inr ⟨cN, hc, dN⟩))))
+    · rcases h with h | rfl | rfl | h | ⟨-, rfl⟩
+      · exact .inr (.inr (.inr (.inr (.inr (.inl h)))))
+      · exact .inr (.inr (.inr (.inr (.inr (.inr (.inl rfl))))))
+      · exact .inr (.inr (.inr (.inr (.inr (.inr (.inr rfl))))))
+      · exact .inr (.inr (.inr (.inl (.inl (hw1.2 _ h)))))
+      · exact .inr (.inl (by simp))
+    · rcases h with h | rfl | rfl | h | ⟨d, hd', hc, rfl⟩
+      · exact .inr (.inr (.inr (.inr (.inl h))))
+      · exact .inl (by simp [freeGlobalsG])
+      · exact .inl (by simp [freeGlobalsG])
+      · exact .inl (nautyDsG_free h)
+      · rcases nautyDsG_blks hs hd' hc with ⟨hl, -⟩ | ⟨hc', e⟩
+        · refine .inr (.inl ?_)
+          simp only [List.mem_cons, List.mem_nil_iff, or_false] at hl ⊢
+          rcases hl with h | h | h | h | h | h | h | h <;> simp [h]
+        · exact .inr (.inr (.inl ⟨hc', e⟩))
+
 /-- `dispatch.cleanup` is `NULL` and `doschreier` is 0. -/
-theorem wp_freeTail {Q : Post} {le : temp_env} {m : mem}
-    (hC : FieldAt m .Mint64 Proofs.Search.Block.dispatch 80 Vnullptr)
-    (hS : IntAt m Proofs.Search.Block.doschreier 0) (hQ : Q.normal E0 (nEnv bI) le m) :
+theorem wp_freeTailG [T : TopEnv ge] {Q : Post} {le : temp_env} {m : mem}
+    (hC : FieldAt m .Mint64 E.dispatch 80 Vnullptr)
+    (hS : IntAt m E.doschreier 0) (hQ : Q.normal E0 (nEnv bI) le m) :
     Wp xi ge dense.fn.nauty freeTail Q (nEnv bI) le m := by
   wp_step; wp_step; wp_step
   apply wp_if_eval
-  rw [Exec.evalExpr, eval_dField rfl field_dCleanup (by decide) (by decide) hC]
+  rw [Exec.evalExpr, eval_dFieldG rfl T.field_dCleanup (by decide) (by decide) hC]
   simp only [Exec.evalExpr, typeof]
   rw [show Cfrontend.Cop.sem_cast (Vint (Lib.Integers.Int.repr (zOfInt 0))) tint (tptr .Tvoid) m =
     some (.Vlong (Lib.Integers.Int64.repr (Lib.Integers.Int.signed (Lib.Integers.Int.repr (zOfInt 0)))))
@@ -654,17 +634,80 @@ theorem wp_freeTail {Q : Post} {le : temp_env} {m : mem}
   simp only [seqPost, Post.after, E0_append]
   wp_step; wp_step
   apply wp_if_eval
-  rw [Search.eval_gint (e := nEnv bI) rfl find_doschreier hS]
+  rw [Search.eval_gint (e := nEnv bI) rfl E.find_doschreier hS]
   simp only [typeof, cop]
   rw [ite_eq_right (by decide)]
   apply wp_skip
   simpa using hQ
 
+/-- `nauty()`'s release stage (`tFree`), for any dispatch procedures. -/
+theorem wp_tFreeG [T : TopEnv ge] (D : DispatchC ge O) {Q : Post} {le : temp_env} {m : mem}
+    {S : SLoc} {gl : D.GLoc} {cl : D.CLoc} {G : O.Gr n} {st : SearchState n (O.Canon n)}
+    {pre nsp : Bool} {chain : List (block × block)} {cDW : Nat} {bDW : block}
+    (hs : SearchAtG D.toDispatchRep m S gl cl G st pre nsp)
+    (hTc : TcChain m S.M E.tcnode0 chain) (hTo : TcOkG D.toDispatchRep m S gl cl chain)
+    (hDW : DynAt m E.nautyDefltwork E.nautyDefltworkSz 8 cDW bDW)
+    (hpF : Mem.perm m D.freedyn (zOfInt 0) .Cur .Nonempty)
+    (hFN : D.freedyn ≠ E.nautilWorkperm ∧ D.freedyn ≠ E.nautilWorkpermSz)
+    (hgW : ∀ z, IsWorkG D.toDispatchRep m z → z ≠ E.nautyDefltwork ∧ z ≠ E.nautyDefltworkSz ∧
+      z ≠ D.freedyn)
+    (hDWs : 0 < cDW → bDW ∉ S.blocksG D.toDispatchRep gl cl ∧ ¬ IsWorkG D.toDispatchRep m bDW ∧
+      bDW ∉ flat chain ∧ bDW ≠ E.nautyDefltwork ∧ bDW ≠ E.nautyDefltworkSz)
+    (hgS : ∀ z ∈ S.blocksG D.toDispatchRep gl cl, z ≠ E.nautyDefltwork ∧ z ≠ E.nautyDefltworkSz)
+    (hgC : ∀ z ∈ flat chain, z ≠ E.nautyDefltwork ∧ z ≠ E.nautyDefltworkSz)
+    (hQ : ∀ m', Unch m m' (FreeSetG D.toDispatchRep m S chain cDW bDW) →
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) → Q.normal E0 (nEnv bI) le m') :
+    Wp xi ge dense.fn.nauty Nauty.tFree Q (nEnv bI) le m := by
+  have hd := hs.lit
+  have hnl := hs.nlt
+  rw [tFree_eq]
+  wp_step; wp_step; wp_step
+  apply wp_if_eval
+  rw [Exec.evalExpr, Search.eval_gint (e := nEnv bI) rfl E.find_n hs.fixed.nn]
+  simp only [Exec.evalExpr, typeof, cop]
+  rw [show Lib.Integers.Int.repr (zOfInt 320) = ir 320 from rfl,
+    ir_lt (a := n) (b := 320) ⟨by omega, by omega⟩ ⟨by omega, by omega⟩]
+  have hfC := hs.fixed.dCleanup
+  have hfS := hs.fixed.doschreier
+  have nF : ∀ z ∈ [E.dispatch, E.doschreier], ¬ FreeSetG D.toDispatchRep m S chain cDW bDW z := by
+    intro z hz hF
+    have hzl : z ∈ S.litG := by
+      simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
+      rcases hz with rfl | rfl <;> simp [SLoc.litG]
+    have hzS : z ∈ S.blocksG D.toDispatchRep gl cl := (S.litG_sub D.toDispatchRep gl cl).subset hzl
+    have hzg : z ∉ D.globs := hs.lit_globs z hzl
+    rcases hF with h | h | ⟨hc, rfl⟩ | h | h | h | rfl | rfl
+    · simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
+      rcases hz with rfl | rfl <;> exact absurd h (by simp only [freeGlobalsG]; sep_notin hd)
+    · simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
+      rcases hz with rfl | rfl <;> exact absurd h (by sep_notin hd)
+    · exact (hDWs hc).1 hzS
+    · exact hs.work_not h hzS
+    · simp only [flat, List.mem_flatMap, List.mem_cons, List.mem_nil_iff, or_false] at h
+      obtain ⟨p, hp, h | h⟩ := h
+      · exact (hTo.apart p hp).1 (h ▸ hzS)
+      · exact (hTo.apart p hp).2.1 (h ▸ hzS)
+    · exact hzg (D.wglobs_sub _ h)
+    · exact hzg D.wsP_mem
+    · exact hzg D.wsS_mem
+  simp only [List.forall_mem_cons, List.mem_nil_iff, false_implies, implies_true, and_true] at nF
+  by_cases h320 : n < 320
+  · rw [ite_eq_right (by simp; omega)]
+    apply wp_skip
+    simp only [seqPost, Post.after, E0_append]
+    exact wp_freeTailG hfC hfS (hQ m (Unch.refl _ _) fun _ h => h)
+  · rw [ite_eq_left (by simp; omega)]
+    refine wp_freeBodyG D hs hTc hTo hDW hpF hFN hgW hDWs hgS hgC fun m' hu hg => ?_
+    simp only [seqPost, Post.after, E0_append]
+    exact wp_freeTailG (hfC.unch hu nF.1) (hfS.unch hu nF.2) (hQ m' hu hg)
+
+end Generic
+
 /-- `nauty()`'s release stage (`tFree`). -/
 theorem wp_tFree {Q : Post} {le : temp_env} {m : mem} {S : SLoc} {n : Nat} {ctx : Ctx n}
     {st : Hex.GraphIso.Nauty.Search n} {pre nsp : Bool} {chain : List (block × block)} {cDW : Nat}
     {bDW : block}
-    (hs : SearchAt m S ctx st pre nsp) (hvm : ∀ z ∈ S.blocks, Mem.valid_block m z)
+    (hs : SearchAt m S ctx st pre nsp) (_hvm : ∀ z ∈ S.blocks, Mem.valid_block m z)
     (hTc : TcChain m S.M Proofs.Search.Block.tcnode0 chain) (hTo : TcOk m S chain)
     (hDW : DynAt m Block.nautyDefltwork Block.nautyDefltworkSz 8 cDW bDW)
     (hpF : Mem.perm m Proofs.Search.Block.naugraphFreedyn (zOfInt 0) .Cur .Nonempty)
@@ -677,47 +720,25 @@ theorem wp_tFree {Q : Post} {le : temp_env} {m : mem} {S : SLoc} {n : Nat} {ctx 
     (hQ : ∀ m', Unch m m' (FreeSet m S chain cDW bDW) →
       (∀ z, Mem.valid_block m z → Mem.valid_block m' z) → Q.normal E0 (nEnv bI) le m') :
     Wp xi ge dense.fn.nauty Nauty.tFree Q (nEnv bI) le m := by
-  have hd := hs.distinct
-  have hnl := hs.nlt
-  rw [tFree_eq]
-  wp_step; wp_step; wp_step
-  apply wp_if_eval
-  rw [Exec.evalExpr, Search.eval_gint (e := nEnv bI) rfl find_n hs.fixed.nn]
-  simp only [Exec.evalExpr, typeof, cop]
-  rw [show Lib.Integers.Int.repr (zOfInt 320) = ir 320 from rfl,
-    ir_lt (a := n) (b := 320) ⟨by omega, by omega⟩ ⟨by omega, by omega⟩]
-  have hfC := hs.fixed.dCleanup
-  have hfS := hs.fixed.doschreier
-  have hfm' : ∀ z ∈ flat chain, z ∉ S.blocks := by
-    intro z hz
-    simp only [flat, List.mem_flatMap, List.mem_cons, List.mem_nil_iff, or_false] at hz
-    obtain ⟨p, hp, h | h⟩ := hz <;> subst h
-    · exact (hTo.apart p hp).1
-    · exact (hTo.apart p hp).2.1
-  have nF : ∀ z ∈ [Proofs.Search.Block.dispatch, Proofs.Search.Block.doschreier],
-      ¬ FreeSet m S chain cDW bDW z := by
-    intro z hz hF
-    have hzS : z ∈ S.blocks := by
-      simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
-      rcases hz with rfl | rfl <;> simp [SLoc.blocks]
-    rcases hF with h | h | ⟨hc, rfl⟩ | h | h
-    · simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
-      rcases hz with rfl | rfl <;> exact absurd h (by decide)
-    · simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz h
-      rcases hz with rfl | rfl <;>
-        rcases h with h|h|h|h|h|h|h|h|h <;> exact absurd h (by sep_ne hd)
-    · exact (hDWs hc).1 hzS
-    · exact hs.work_not h hzS
-    · exact (hfm' z h) hzS
-  simp only [List.forall_mem_cons, List.mem_nil_iff, false_implies, implies_true, and_true] at nF
-  by_cases h320 : n < 320
-  · rw [ite_eq_right (by simp; omega)]
-    apply wp_skip
-    simp only [seqPost, Post.after, E0_append]
-    exact wp_freeTail hfC hfS (hQ m (Unch.refl _ _) fun _ h => h)
-  · rw [ite_eq_left (by simp; omega)]
-    refine wp_freeBody hs hvm hTc hTo hDW hpF hgW hDWs hgS hgC fun m' hu hg => ?_
-    simp only [seqPost, Post.after, E0_append]
-    exact wp_freeTail (hfC.unch hu nF.1) (hfS.unch hu nF.2) (hQ m' hu hg)
+  have hFG : ∀ z ∈ (freeGlobalsG : List block), z ∈ freeGlobals := by decide
+  have hWG : ∀ z ∈ Dispatch.denseWGlobs, z ∈ freeGlobals := by decide
+  refine wp_tFreeG NautyVerified.Proofs.Dispatch.dense hs.toG hTc
+    ⟨hTo.pairwise, hTo.valid, fun p hp =>
+      let ⟨a1, a2, a3, a4⟩ := hTo.apart p hp
+      ⟨fun h => a1 (SLoc.mem_blocksG.1 h), fun h => a2 (SLoc.mem_blocksG.1 h),
+        fun h => a3 (isWork_dense.1 h), fun h => a4 (isWork_dense.1 h)⟩⟩
+    hDW hpF ⟨by decide, by decide⟩ (fun z hz => hgW z (isWork_dense.1 hz))
+    (fun hc => let ⟨a, b, c, d, e⟩ := hDWs hc
+      ⟨fun h => a (SLoc.mem_blocksG.1 h), fun h => b (isWork_dense.1 h), c, d, e⟩)
+    (fun z hz => hgS z (SLoc.mem_blocksG.1 hz)) hgC fun m' hu hg => hQ m' (hu.mono fun z hz => ?_) hg
+  rcases hz with h | h | h | h | h | h | rfl | rfl
+  · exact .inl (hFG z h)
+  · exact .inr (.inl h)
+  · exact .inr (.inr (.inl h))
+  · exact .inr (.inr (.inr (.inl (isWork_dense.1 h))))
+  · exact .inr (.inr (.inr (.inr h)))
+  · exact .inl (hWG z h)
+  · exact .inl (by decide)
+  · exact .inl (by decide)
 
 end NautyVerified.Proofs.Top

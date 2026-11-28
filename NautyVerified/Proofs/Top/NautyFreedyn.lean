@@ -10,7 +10,9 @@ import NautyVerified.Proofs.Search.Node.FirstEnd
 `nauty_freedyn` frees the target-cell list (each node and its cell), resets
 `alloc_m` and `tcnode0.next`, and runs `DYNFREE` on nauty.c's nine pairs
 (`nautyFreeIds`). `wp_tcLoop`: the list walk, from `TcChain` (whose entries
-record `malloc`'s header) and the list's blocks distinct.
+record `malloc`'s header) and the list's blocks distinct. Both `nauty_freedyn`
+and nautil.c's `nautil_freedyn` (`nautilFreedyn_satisfiesG`) are shared by
+every program, so their proofs are over any `NautyEnv`.
 -/
 
 namespace NautyVerified.Proofs.Top
@@ -28,7 +30,35 @@ open NautyVerified.Proofs.Set (sk)
 
 set_option linter.unusedSimpArgs false
 
-variable {xi : ExternalCalls}
+variable {ge : genv} [E : NautyEnv ge] {xi : ExternalCalls}
+
+/-- A function running `DYNFREE` on the pairs `ds`, over any `NautyEnv`. -/
+def dynfreeSpecG (ds : List FreeD) : FunSpec where
+  pre args m := args = [] ∧ FreeD.Ok m ds
+  post _ m t _ m' := t = E0 ∧ (∀ d ∈ ds, ∀ c b', DynAt m' d.bp d.bs c 0 b') ∧
+    Unch m m' (fun z => z ∈ FreeD.globals ds ∨ ∃ d ∈ ds, 0 < d.cap ∧ z = d.blk) ∧
+    Mem.nextblock m' = Mem.nextblock m
+
+/-- nautil.c's pair. -/
+def nautilDsG (cap : Nat) (b : block) : List FreeD :=
+  [⟨dense.id.«nautil:workperm», dense.id.«nautil:workperm_sz», E.nautilWorkperm,
+    E.nautilWorkpermSz, tint, 4, cap, b⟩]
+
+theorem nautilFreedyn_satisfiesG (cap : Nat) (b : block) :
+    Satisfies xi ge (.Internal dense.fn.nautil_freedyn) (dynfreeSpecG (nautilDsG cap b)) := by
+  let le0 := create_undef_temps dense.fn.nautil_freedyn.fn_temps
+  refine satisfies_internal (Entry := fun _ m₀ e le m => e = empty_env ∧ le = le0 ∧ m = m₀) ?_ ?_
+  · rintro args m ⟨rfl, -⟩
+    refine ⟨empty_env, le0, m, ⟨?_, ?_, ?_, .nil _ _, rfl⟩, rfl, rfl, rfl⟩
+    · exact .nil _
+    · exact Nextelement.norepet_of_nodup (by decide)
+    · exact Nextelement.disjoint_of (by decide)
+  · rintro args m₀ ⟨rfl, hok⟩
+    rw [triple_iff_wp]
+    rintro e le m ⟨rfl, rfl, rfl⟩
+    rw [dense.fn.nautil_freedyn.fn_body_eq, body_nautilFreedyn]
+    exact wp_dynfrees Alloc.noShadow_empty (nautilDsG cap b) _ hok
+      (fun m' hD hu hnb => ⟨m', rfl, rfl, hD, hu, hnb⟩)
 
 /-- The list from a node pointer `v` on: `v` is `NULL` at the end, else the
 node `nd` holding its cell `tc`, both `malloc`ed, and the list from `nd`'s
@@ -79,6 +109,7 @@ abbrev tcLoop : statement :=
             (sk (.Sset dense.id.«tcp» (.Etempvar dense.id.«tcq» (tptr tcStruct))))))))
     .Sskip
 
+omit E in
 theorem ne_ptr_null {m : mem} {b : block} (t : type) (hp : Mem.perm m b (zOfInt (-1)) .Cur .Nonempty) :
     Cfrontend.Cop.sem_binary_operation ge.genv_cenv .One (.Vptr b Ptrofs.zero) (tptr t)
       (.Vlong (Lib.Integers.Int64.repr (Lib.Integers.Int.signed (Lib.Integers.Int.repr (zOfInt 0)))))
@@ -166,19 +197,19 @@ theorem wp_tcLoop {Q : Post} {M : Nat} {chain₀ : List (block × block)} {le₀
       wp_step; wp_step; wp_step
       have hv1 : PTree.get dense.id.«tcp» (PTree.set dense.id.«tcq» v' le) = some (.Vptr nd Ptrofs.zero) := by
         rw [temps_gso _ _ (by decide)]; exact hv
-      refine wp_call (vf := .Vptr Block.free Ptrofs.zero) _ (freeSpec tc (8 * M)) (free_satisfies tc _) rfl
-        (by simp [Exec.evalExpr, Exec.lvalOfVar, empty_env, find_free, Exec.derefLoc,
+      refine wp_call (vf := .Vptr E.free Ptrofs.zero) _ (freeSpec tc (8 * M)) (free_satisfies tc _) rfl
+        (by simp [Exec.evalExpr, Exec.lvalOfVar, empty_env, E.find_free, Exec.derefLoc,
           Cfrontend.Ctypes.access_mode])
         (by simp only [Exec.evalExprlist]; rw [eval_tcF (off := 8) hv1 (field_tcnodeTcell _ _) (by decide) hf8]; rfl)
-        (by simp [Common.Globalenvs.Genv.find_funct, funct_free]) rfl ⟨rfl, mtc⟩ ?_
+        (by simp [Common.Globalenvs.Genv.find_funct, E.funct_free]) rfl ⟨rfl, mtc⟩ ?_
       rintro t1 r1 m1 ⟨rfl, rfl, hu1, hnb1⟩
       simp only [seqPost, Post.after, E0_append, set_opttemp]
       wp_step; wp_step; wp_step
-      refine wp_call (vf := .Vptr Block.free Ptrofs.zero) _ (freeSpec nd 16) (free_satisfies nd _) rfl
-        (by simp [Exec.evalExpr, Exec.lvalOfVar, empty_env, find_free, Exec.derefLoc,
+      refine wp_call (vf := .Vptr E.free Ptrofs.zero) _ (freeSpec nd 16) (free_satisfies nd _) rfl
+        (by simp [Exec.evalExpr, Exec.lvalOfVar, empty_env, E.find_free, Exec.derefLoc,
           Cfrontend.Ctypes.access_mode])
         (by simp only [Exec.evalExprlist, Exec.evalExpr, hv1]; rfl)
-        (by simp [Common.Globalenvs.Genv.find_funct, funct_free]) rfl
+        (by simp [Common.Globalenvs.Genv.find_funct, E.funct_free]) rfl
         ⟨rfl, mnd.keep (Alloc.Keep.unch hu1 ntc)⟩ ?_
       rintro t2 r2 m2 ⟨rfl, rfl, hu2, hnb2⟩
       simp only [seqPost, Post.after, E0_append, set_opttemp]
@@ -235,15 +266,15 @@ kernel_rfl body_nautyFreedyn : dense.body.nauty_freedyn =
 /-- `nauty_freedyn()` on the target-cell list `chain` and the pairs `ds`. -/
 def nautyFreedynSpec (M : Nat) (chain : List (block × block)) (ds : List FreeD) : FunSpec where
   pre args m := args = [] ∧ ds.map (fun d => (d.gp, d.gs, d.elt)) = nautyFreeIds ∧
-    TcChain m M Search.Block.tcnode0 chain ∧ (flat chain).Pairwise (· ≠ ·) ∧
-    (∀ z ∈ flat chain, z ≠ Search.Block.allocM ∧ z ≠ Search.Block.tcnode0 ∧
+    TcChain m M E.tcnode0 chain ∧ (flat chain).Pairwise (· ≠ ·) ∧
+    (∀ z ∈ flat chain, z ≠ E.allocM ∧ z ≠ E.tcnode0 ∧
       z ∉ FreeD.globals ds ∧ ∀ d ∈ ds, 0 < d.cap → z ≠ d.blk) ∧
-    FreeD.Ok m ds ∧ Mem.valid_access m .Mint32 Search.Block.allocM (zOfInt 0) .Writable ∧
-    Search.Block.allocM ∉ FreeD.globals ds ∧ Search.Block.tcnode0 ∉ FreeD.globals ds ∧
-    (∀ d ∈ ds, 0 < d.cap → d.blk ≠ Search.Block.allocM ∧ d.blk ≠ Search.Block.tcnode0)
-  post _ m t _ m' := t = E0 ∧ Search.IntAt m' Search.Block.allocM 0 ∧
-    FieldAt m' .Mint64 Search.Block.tcnode0 0 Vnullptr ∧ (∀ d ∈ ds, ∀ c b', DynAt m' d.bp d.bs c 0 b') ∧
-    Unch m m' (fun z => z ∈ flat chain ∨ z = Search.Block.allocM ∨ z = Search.Block.tcnode0 ∨
+    FreeD.Ok m ds ∧ Mem.valid_access m .Mint32 E.allocM (zOfInt 0) .Writable ∧
+    E.allocM ∉ FreeD.globals ds ∧ E.tcnode0 ∉ FreeD.globals ds ∧
+    (∀ d ∈ ds, 0 < d.cap → d.blk ≠ E.allocM ∧ d.blk ≠ E.tcnode0)
+  post _ m t _ m' := t = E0 ∧ Search.IntAt m' E.allocM 0 ∧
+    FieldAt m' .Mint64 E.tcnode0 0 Vnullptr ∧ (∀ d ∈ ds, ∀ c b', DynAt m' d.bp d.bs c 0 b') ∧
+    Unch m m' (fun z => z ∈ flat chain ∨ z = E.allocM ∨ z = E.tcnode0 ∨
       z ∈ FreeD.globals ds ∨ ∃ d ∈ ds, 0 < d.cap ∧ z = d.blk) ∧
     (∀ z, Mem.valid_block m z → Mem.valid_block m' z)
 
@@ -265,11 +296,11 @@ theorem nautyFreedyn_satisfies (M : Nat) (chain : List (block × block)) (ds : L
     apply wp_set_eval
     simp only [tcHead0, Exec.evalExpr, Exec.evalLvalue, Exec.lvalOfVar,
       show PTree.get Source.dense.id.«nauty:tcnode0» (empty_env : env) = none from rfl,
-      Search.find_tcnode0, Exec.derefLoc, Cfrontend.Ctypes.access_mode, Mem.loadv, typeof]
-    rw [Search.field_tcnodeNext]
+      E.find_tcnode0, Exec.derefLoc, Cfrontend.Ctypes.access_mode, Mem.loadv, typeof]
+    rw [field_tcnodeNext]
     show match Mem.load _ _ _ (Ptrofs.unsigned _) with | some v => _ | none => False
     rw [Search.unsigned_add_off Ptrofs.zero (by decide) (by decide)]
-    rw [Alloc.Mptr_eq, show Mem.load .Mint64 _ Search.Block.tcnode0
+    rw [Alloc.Mptr_eq, show Mem.load .Mint64 _ E.tcnode0
       (zOfInt (intOfZ (Ptrofs.unsigned Ptrofs.zero) + 0)) = some v by simpa using hf0.load]
     simp only []
     wp_step
@@ -278,19 +309,19 @@ theorem nautyFreedyn_satisfies (M : Nat) (chain : List (block × block)) (ds : L
     intro le1 m1 hu1 hnb1 ho1
     simp only [seqPost, Post.after, E0_append]
     wp_step; wp_step; wp_step
-    refine Search.wp_gint rfl Search.find_allocM (hu1.access _ _ _ _ (fun h => (hap _ h).1 rfl) hwA)
+    refine Search.wp_gint rfl E.find_allocM (hu1.access _ _ _ _ (fun h => (hap _ h).1 rfl) hwA)
       (rhs := ci 0 tint) (x := 0) rfl rfl ?_
     intro m2 hA2 hu2 hv2
     simp only [seqPost, Post.after, E0_append]
     wp_step; wp_step; wp_step
-    have hTw : Mem.valid_access m2 .Mint64 Search.Block.tcnode0 (zOfInt 0) .Writable :=
-      hu2.access _ _ _ _ (by decide) (hu1.access _ _ _ _ (fun h => (hap _ h).2.1 rfl) hf0.writable)
+    have hTw : Mem.valid_access m2 .Mint64 E.tcnode0 (zOfInt 0) .Writable :=
+      hu2.access _ _ _ _ (by env_ne) (hu1.access _ _ _ _ (fun h => (hap _ h).2.1 rfl) hf0.writable)
     obtain ⟨m3, hst⟩ := Mem.valid_access_store _ Mptr _ _ Vnullptr hTw
     apply wp_assign_eval
     simp only [tcHead0, Exec.evalLvalue, Exec.evalExpr, Exec.lvalOfVar,
       show PTree.get Source.dense.id.«nauty:tcnode0» (empty_env : env) = none from rfl,
-      Search.find_tcnode0, typeof, cop, Exec.derefLoc, Cfrontend.Ctypes.access_mode]
-    rw [Search.field_tcnodeNext]
+      E.find_tcnode0, typeof, cop, Exec.derefLoc, Cfrontend.Ctypes.access_mode]
+    rw [field_tcnodeNext]
     simp only [Exec.assignLoc, Cfrontend.Ctypes.access_mode, Mem.storev]
     rw [Search.unsigned_add_off Ptrofs.zero (by decide) (by decide),
       show zOfInt (intOfZ (Ptrofs.unsigned Ptrofs.zero) + 0) = zOfInt 0 from rfl,
@@ -298,7 +329,7 @@ theorem nautyFreedyn_satisfies (M : Nat) (chain : List (block × block)) (ds : L
         Vnullptr from rfl, cast_null_ptr]
     simp only [hst, E0_append]
     rw [← hids, List.map_map]
-    have hu3 : Unch m m3 (fun z => z ∈ flat chain ∨ z = Search.Block.allocM ∨ z = Search.Block.tcnode0) :=
+    have hu3 : Unch m m3 (fun z => z ∈ flat chain ∨ z = E.allocM ∨ z = E.tcnode0) :=
       ((hu1.mono fun z h => .inl h).trans (hu2.mono fun z h => .inr (.inl h))).trans
         ((Unch.store hst rfl).mono fun z h => .inr (.inr h.symm))
     have hok3 : FreeD.Ok m3 ds := FreeD.Ok.unch' hok hu3
@@ -314,14 +345,14 @@ theorem nautyFreedyn_satisfies (M : Nat) (chain : List (block × block)) (ds : L
         · exact (hbl d hd hc).2 h)
     refine wp_dynfrees Alloc.noShadow_empty ds m3 hok3 (fun m4 hD4 hu4 hnb4 => ⟨m4, rfl, rfl, ?_, ?_, hD4,
       ?_, ?_⟩)
-    · have nA : ¬ (Search.Block.allocM ∈ FreeD.globals ds ∨
-          ∃ d ∈ ds, 0 < d.cap ∧ Search.Block.allocM = d.blk) := by
+    · have nA : ¬ (E.allocM ∈ FreeD.globals ds ∨
+          ∃ d ∈ ds, 0 < d.cap ∧ E.allocM = d.blk) := by
         rintro (h | ⟨d, hd, hc, e⟩)
         · exact hgA h
         · exact (hbl d hd hc).1 e.symm
-      exact (hA2.unch (Unch.store hst rfl) (by decide)).unch hu4 nA
-    · have nT : ¬ (Search.Block.tcnode0 ∈ FreeD.globals ds ∨
-          ∃ d ∈ ds, 0 < d.cap ∧ Search.Block.tcnode0 = d.blk) := by
+      exact (hA2.unch (Unch.store hst rfl) (by env_ne)).unch hu4 nA
+    · have nT : ¬ (E.tcnode0 ∈ FreeD.globals ds ∨
+          ∃ d ∈ ds, 0 < d.cap ∧ E.tcnode0 = d.blk) := by
         rintro (h | ⟨d, hd, hc, e⟩)
         · exact hgT h
         · exact (hbl d hd hc).2 e.symm
