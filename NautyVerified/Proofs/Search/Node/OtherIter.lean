@@ -66,10 +66,10 @@ structure OEnv (e : env) (S : SLoc) (m₀ : mem) (L : OLocs) : Prop where
 temporaries and the target cell's contents: the values of `numcells` and `tc`,
 the target-cell list (entry `level - 1` is this node's), the locals' blocks,
 the frame since entry `m₀`, and the callback's block. -/
-structure Carry (m₀ m : mem) (S : SLoc) (chain₀ chain : List (block × block)) (level nc tc : Nat)
+structure Carry (m₀ m : mem) (S : SLoc) (chain₀ chain : List (block × block)) (level : Nat) (ncw tcw : val)
     (nd bt : block) (L : OLocs) : Prop where
-  ncv : Mem.load .Mint32 m L.bnc (zOfInt 0) = some (.Vint (ir nc))
-  tcv : Mem.load .Mint32 m L.bc (zOfInt 0) = some (.Vint (ir tc))
+  ncv : Mem.load .Mint32 m L.bnc (zOfInt 0) = some ncw
+  tcv : Mem.load .Mint32 m L.bc (zOfInt 0) = some tcw
   tcc : TcChain m S.M Block.tcnode0 chain
   tco : TcOk m S chain
   own : chain[level - 1]? = some (nd, bt)
@@ -96,7 +96,7 @@ structure OAt (m₀ m : mem) (le : temp_env) (S : SLoc) (ctx : Ctx n) (st : Sear
   tv1 : PTree.get dense.id.tv1 le = some (.Vint (ir tv1))
   tv : PTree.get dense.id.tv le = some (.Vint (ir tvv))
   cellA : ∃ tw, ArrayAt m .Mint64 bt 0 (longs tw) S.M ∧ SetRep (fun w => bv64 (tw w)) S.M cell
-  carry : Carry m₀ m S chain₀ chain level nc tc nd bt L
+  carry : Carry m₀ m S chain₀ chain level (.Vint (ir nc)) (.Vint (ir tc)) nd bt L
 
 theorem TcChain.headValid {m : mem} {M : Nat} {prev : block} :
     ∀ {chain : List (block × block)}, TcChain m M prev chain → Mem.valid_block m prev
@@ -110,8 +110,8 @@ theorem workG_globs : ∀ z ∈ workG, z ∈ globs := by decide
 
 theorem tcnode0_globs : Block.tcnode0 ∈ globs := by decide
 
-theorem Carry.ntc {m₀ m : mem} {S : SLoc} {chain₀ chain : List (block × block)} {level nc tc : Nat}
-    {nd bt : block} {L : OLocs} (c : Carry m₀ m S chain₀ chain level nc tc nd bt L) :
+theorem Carry.ntc {m₀ m : mem} {S : SLoc} {chain₀ chain : List (block × block)} {level : Nat} {ncw tcw : val}
+    {nd bt : block} {L : OLocs} (c : Carry m₀ m S chain₀ chain level ncw tcw nd bt L) :
     bt ∉ S.blocks ∧ ¬ IsWork m bt ∧ Mem.valid_block m bt ∧ nd ∉ S.blocks ∧ Mem.valid_block m nd :=
   have hp := List.mem_of_getElem? c.own
   ⟨(c.tco.apart _ hp).2.1, (c.tco.apart _ hp).2.2.2, (c.tco.valid _ hp).2, (c.tco.apart _ hp).1,
@@ -120,13 +120,13 @@ theorem Carry.ntc {m₀ m : mem} {S : SLoc} {chain₀ chain : List (block × blo
 /-- `Carry` across a step that changes blocks of `S` other than the callback's,
 `tcnode0` and the work arrays' globals, and the target cell. -/
 theorem Carry.unch {m₀ m m' : mem} {S : SLoc} {ctx : Ctx n} {st : Search n} {pre nsp : Bool}
-    {chain₀ chain : List (block × block)} {level nc tc : Nat} {nd bt : block} {L : OLocs}
+    {chain₀ chain : List (block × block)} {level : Nat} {ncw tcw : val} {nd bt : block} {L : OLocs}
     (hLS : ∀ z ∈ L.list, z ∉ S.blocks) (h : SearchAt m S ctx st pre nsp)
-    (c : Carry m₀ m S chain₀ chain level nc tc nd bt L)
+    (c : Carry m₀ m S chain₀ chain level ncw tcw nd bt L)
     {W : block → Prop} (hu : Unch m m' W) (hg : ∀ z, Mem.valid_block m z → Mem.valid_block m' z)
     (hW : ∀ z, W z → (z ∈ S.blocks ∧ z ≠ S.bUA ∧ z ≠ Block.tcnode0 ∧ z ∉ workG) ∨ z = bt)
     (hbt : ∃ vals, ArrayAt m' .Mint64 bt 0 vals S.M) (hk : Alloc.Keep m m' bt) :
-    Carry m₀ m' S chain₀ chain level nc tc nd bt L ∧ WorkMono m m' := by
+    Carry m₀ m' S chain₀ chain level ncw tcw nd bt L ∧ WorkMono m m' := by
   obtain ⟨btS, btW, btV, -, -⟩ := c.ntc
   have notW : ∀ z, z ∉ S.blocks → z ≠ bt → ¬ W z := fun z hz hb hw => by
     rcases hW z hw with ⟨h1, -⟩ | h1
@@ -182,9 +182,9 @@ theorem Carry.unch {m₀ m m' : mem} {S : SLoc} {ctx : Ctx n} {st : Search n} {p
     exact (Keep.unch hu hb).perm _ _ c.uaP
 
 /-- A local is none of the blocks a child may change. -/
-theorem Carry.loc_out {m₀ m : mem} {S : SLoc} {chain₀ chain : List (block × block)} {level nc tc : Nat}
+theorem Carry.loc_out {m₀ m : mem} {S : SLoc} {chain₀ chain : List (block × block)} {level : Nat} {ncw tcw : val}
     {nd bt : block} {L : OLocs} (hLS : ∀ z ∈ L.list, z ∉ S.blocks)
-    (c : Carry m₀ m S chain₀ chain level nc tc nd bt L) {z : block} (hz : z ∈ L.list) (k : Nat) :
+    (c : Carry m₀ m S chain₀ chain level ncw tcw nd bt L) {z : block} (hz : z ∈ L.list) (k : Nat) :
     ¬ NSet m S chain k z := by
   obtain ⟨ha, hw, hc⟩ := c.locs z hz
   have hzS := hLS z hz
@@ -197,8 +197,8 @@ theorem Carry.loc_out {m₀ m : mem} {S : SLoc} {chain₀ chain : List (block ×
   · exact (hc p (List.mem_of_getElem? hp)).2 rfl
 
 /-- The node's target cell is none of the blocks its child may change. -/
-theorem Carry.own_out {m₀ m : mem} {S : SLoc} {chain₀ chain : List (block × block)} {level nc tc : Nat}
-    {nd bt : block} {L : OLocs} (c : Carry m₀ m S chain₀ chain level nc tc nd bt L) :
+theorem Carry.own_out {m₀ m : mem} {S : SLoc} {chain₀ chain : List (block × block)} {level : Nat} {ncw tcw : val}
+    {nd bt : block} {L : OLocs} (c : Carry m₀ m S chain₀ chain level ncw tcw nd bt L) :
     ¬ NSet m S chain (level + 1) bt := by
   obtain ⟨btS, btW, btV, -, -⟩ := c.ntc
   rintro (h | h | h | h | ⟨i, p, hp, -, e⟩ | ⟨i, p, hp, hi, e⟩)
@@ -212,14 +212,14 @@ theorem Carry.own_out {m₀ m : mem} {S : SLoc} {chain₀ chain : List (block ×
 
 /-- `Carry` across a child, which hands back the list `chain'`. -/
 theorem Carry.child {m₀ m m' : mem} {S : SLoc} {ctx : Ctx n} {st : Search n} {pre nsp : Bool}
-    {chain₀ chain chain' : List (block × block)} {level nc tc : Nat} {nd bt : block} {L : OLocs}
+    {chain₀ chain chain' : List (block × block)} {level : Nat} {ncw tcw : val} {nd bt : block} {L : OLocs}
     (hLS : ∀ z ∈ L.list, z ∉ S.blocks) (h : SearchAt m S ctx st pre nsp)
-    (c : Carry m₀ m S chain₀ chain level nc tc nd bt L)
+    (c : Carry m₀ m S chain₀ chain level ncw tcw nd bt L)
     (hF : NodeFrame m m' S chain (level + 1)) (hW : WorkMono m m')
     (hTc : TcChain m' S.M Block.tcnode0 chain') (hTo : TcOk m' S chain')
     (htk : chain'.take level = chain.take level)
     (hold : ∀ p ∈ chain', p ∈ chain ∨ (¬ Mem.valid_block m p.1 ∧ ¬ Mem.valid_block m p.2)) :
-    Carry m₀ m' S chain₀ chain' level nc tc nd bt L := by
+    Carry m₀ m' S chain₀ chain' level ncw tcw nd bt L := by
   have hpw := c.tco.pairwise
   have hlt : level - 1 < chain.length := by
     have := c.own; rw [List.getElem?_eq_some_iff] at this; exact this.1
@@ -252,10 +252,10 @@ theorem Carry.child {m₀ m m' : mem} {S : SLoc} {ctx : Ctx n} {st : Search n} {
 
 /-- `Carry` across a search call (`SFrame`) whose work blocks are old or new. -/
 theorem Carry.sframe {m₀ m m' : mem} {S : SLoc} {ctx : Ctx n} {st : Search n} {pre nsp : Bool}
-    {chain₀ chain : List (block × block)} {level nc tc : Nat} {nd bt : block} {L : OLocs}
+    {chain₀ chain : List (block × block)} {level : Nat} {ncw tcw : val} {nd bt : block} {L : OLocs}
     (hLS : ∀ z ∈ L.list, z ∉ S.blocks) (h : SearchAt m S ctx st pre nsp)
-    (c : Carry m₀ m S chain₀ chain level nc tc nd bt L) (hF : SFrame m m' S) (hW : WorkMono m m') :
-    Carry m₀ m' S chain₀ chain level nc tc nd bt L := by
+    (c : Carry m₀ m S chain₀ chain level ncw tcw nd bt L) (hF : SFrame m m' S) (hW : WorkMono m m') :
+    Carry m₀ m' S chain₀ chain level ncw tcw nd bt L := by
   have hout : ∀ z, z ∉ S.blocks → Mem.valid_block m z → ¬ IsWork m z →
       ¬ (S.Chg z ∨ ¬ Mem.valid_block m z ∨ IsWork m z) := fun z h1 h2 h3 => by
     rintro (h | h | h)
@@ -383,7 +383,7 @@ theorem wp_otherIter {k : Nat} {G : Colored n k} {Em : Bool → Nat → Nat → 
       SearchAt m' S ⟨rowsOf G⟩ (oChild G level nc tc tv1 tv cell st).2.2 false s →
       (s = true → 0 < (oChild G level nc tc tv1 tv cell st).2.2.autos.size) →
       Emits t (Em false (level + 1) (nc + 1) (child false level tc tv st)) →
-      Carry m₀ m' S chain₀ chain' level nc tc nd bt L →
+      Carry m₀ m' S chain₀ chain' level (.Vint (ir nc)) (.Vint (ir tc)) nd bt L →
       match Mem.free_list m' (blocks_of_env ge e) with
       | some m'' => Q.ret t (.Vint (ir tg)) m''
       | none => False) :

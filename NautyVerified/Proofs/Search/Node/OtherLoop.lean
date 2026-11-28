@@ -94,7 +94,7 @@ theorem wp_otherLoop {k : Nat} {G : Colored n k} {Em : Bool → Nat → Nat → 
       Q.normal t e le' m')
     (hQr : ∀ t m' tg s chain', SW.1 = .unwind tg s → tg < level →
       SearchAt m' S ⟨rowsOf G⟩ SW.2.2 false s → (s = true → 0 < SW.2.2.autos.size) →
-      Emits t Total → Carry m₀ m' S chain₀ chain' level nc tc nd bt L →
+      Emits t Total → Carry m₀ m' S chain₀ chain' level (.Vint (ir nc)) (.Vint (ir tc)) nd bt L →
       match Mem.free_list m' (blocks_of_env ge e) with
       | some m'' => Q.ret t (.Vint (ir tg)) m''
       | none => False)
