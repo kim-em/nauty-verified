@@ -29,6 +29,8 @@ the size of `firstcode` (for the first leaf's `Depth`).
 namespace NautyVerified.Spec.SearchInf
 
 open Hex.GraphIso.Nauty
+open Std.Do
+set_option mvcgen.warning false
 
 set_option linter.unusedSimpArgs false
 set_option linter.unusedSectionVars false
@@ -41,7 +43,36 @@ local notation "SState" => Hex.GraphIso.Nauty.Sparse.State
 def OrbIdS (st : SState n) : Prop := ∀ v, v < n → st.orbits[v]! = v
 
 /-- What the sparse transfer needs of a state besides the contract. -/
-def InvS (st : SState n) : Prop := st.noncheaplevel ≤ n + 1 ∧ st.firstcode.size = n + 2
+def InvS (st : SState n) : Prop :=
+  st.noncheaplevel ≤ n + 1 ∧ st.firstcode.size = n + 2 ∧ LeafI st
+
+theorem sparse_leafI_visit {st : SState n} (h : LeafI st) (g : Sparse.Graph n) (level numcells : Nat) :
+    LeafI (Sparse.visit g level numcells st).2.2 := h.congr rfl rfl rfl rfl rfl rfl
+
+theorem sparse_leafI_target {st : SState n} (h : LeafI st) (first : Bool) (g : Sparse.Graph n)
+    (tcLevel level numcells : Nat) : LeafI (Sparse.chooseTarget first g tcLevel level numcells st).2.2.2 := by
+  have e : leafF (Sparse.chooseTarget first g tcLevel level numcells st).2.2.2 = leafF st := by
+    unfold Sparse.chooseTarget
+    apply Id.of_wp_run_eq rfl (fun out : Int × VSet n × Nat × SState n => leafF out.2.2.2 = leafF st)
+    mvcgen
+    all_goals simp_all +zetaDelta [leafF]
+  exact h.of_leafF e
+
+theorem sparse_leafF_classify (g : Sparse.Graph n) (level nc : Nat) (st : SState n) :
+    leafF (Sparse.classify g level nc st).2 = leafF st := by
+  unfold leafF Sparse.classify
+  simp only [Id.run_pure, apply_ite Id.run, apply_ite Prod.snd, scatter_eq,
+    apply_ite SearchState.noncheaplevel, apply_ite SearchState.cosetindex,
+    apply_ite SearchState.firstcode, apply_ite SearchState.firstlab,
+    apply_ite SearchState.canonlab, apply_ite SearchState.eqlevCanon, ite_self]
+
+theorem sparse_leafI_classify {st : SState n} (h : LeafI st) (g : Sparse.Graph n) (level nc : Nat) :
+    LeafI (Sparse.classify g level nc st).2 := h.of_leafF (sparse_leafF_classify g level nc st)
+
+/-- The partition of a sparse state reached from the initial cells is a permutation. -/
+theorem sparse_labPerm {G : Hex.GraphIso.Sparse.Colored n k} {level numcells : Nat} {st : SState n}
+    (hn0 : 0 < n) (h : Sparse.Ready G level numcells st) : LabPerm st.lab n :=
+  labPerm_of_ok (st := st.frame) hn0 h.ok
 
 theorem compareCodes_noncheapG {κ : Type} (level code : Nat) (st : SearchState n κ) :
     (compareCodes level code st).noncheaplevel = st.noncheaplevel := by
@@ -196,7 +227,8 @@ theorem sparse_nodeStep_off (hn0 : 0 < n) (hB : n + 2 < B) (fuel : Nat)
   have hcl := hv.compare code
   dsimp only [Sparse.policy, Generic.Policy.compareCodes] at hcf
   have hci : InvS (compareCodes level code s1) :=
-    ⟨by rw [compareCodes_noncheapG]; exact hvi.1, by rw [(reference_fields hcf).2]; exact hvi.2⟩
+    ⟨by rw [compareCodes_noncheapG]; exact hvi.1, by rw [(reference_fields hcf).2]; exact hvi.2.1,
+      leafI_compare hvi.2.2 level code⟩
   rw [compareCodes_twG]
   generalize compareCodes level code s1 = s2 at hcd hcf hcl hci ⊢
   -- target
@@ -212,7 +244,8 @@ theorem sparse_nodeStep_off (hn0 : 0 < n) (hB : n + 2 < B) (fuel : Nat)
   have hk := sparse_chooseTarget_keeps false (.ofGraph G.graph) tcLevel level nc s2
   dsimp only [Sparse.policy, Generic.Policy.chooseTarget] at htd htf hk htarget
   have hti : InvS (Sparse.chooseTarget false (.ofGraph G.graph) tcLevel level nc s2).2.2.2 :=
-    ⟨by rw [hk.1]; exact hci.1, by rw [hk.2.1]; exact hci.2⟩
+    ⟨by rw [hk.1]; exact hci.1, by rw [hk.2.1]; exact hci.2.1,
+      sparse_leafI_target hci.2.2 false _ tcLevel level nc⟩
   generalize Sparse.chooseTarget false (.ofGraph G.graph) tcLevel level nc s2 = c
     at htd htf htl htarget hti hk ⊢
   obtain ⟨tc, cell, size, s3⟩ := c
@@ -225,7 +258,8 @@ theorem sparse_nodeStep_off (hn0 : 0 < n) (hB : n + 2 < B) (fuel : Nat)
   have hclr := htl.ready.classify
   dsimp only [Sparse.policy, Generic.Policy.classify] at hcld hclf
   have hcli : InvS (Sparse.classify (.ofGraph G.graph) level nc s3).2 :=
-    ⟨by rw [sparse_classify_noncheap]; exact hti.1, by rw [(reference_fields hclf).2]; exact hti.2⟩
+    ⟨by rw [sparse_classify_noncheap]; exact hti.1, by rw [(reference_fields hclf).2]; exact hti.2.1,
+      sparse_leafI_classify hti.2.2 _ level nc⟩
   generalize Sparse.classify (.ofGraph G.graph) level nc s3 = cl at hcld hclf hclr hcli ⊢
   obtain ⟨leaf, s4⟩ := cl
   dsimp only at hcld hclf hclr hcli ⊢
@@ -236,7 +270,8 @@ theorem sparse_nodeStep_off (hn0 : 0 < n) (hB : n + 2 < B) (fuel : Nat)
   have hler := hclr.ready.leaf leaf
   dsimp only [Sparse.policy, Generic.Policy.leafExit] at hled hlef
   have hlei : InvS (leafExit leaf level s4).2 :=
-    ⟨by rw [leafExit_noncheap]; exact hcli.1, by rw [(reference_fields hlef).2]; exact hcli.2⟩
+    ⟨by rw [leafExit_noncheap]; exact hcli.1, by rw [(reference_fields hlef).2]; exact hcli.2.1,
+      leafI_leafExit hcli.2.2 leaf level (sparse_labPerm hn0 hclr.ready)⟩
   generalize leafExit leaf level s4 = le at hled hlef hler hlei ⊢
   obtain ⟨exit, s5⟩ := le
   dsimp only at hled hlef hler hlei ⊢
@@ -254,7 +289,7 @@ theorem sparse_nodeStep_off (hn0 : 0 < n) (hB : n + 2 < B) (fuel : Nat)
     have hchr := hler.ready.cheap false
     dsimp only [Sparse.policy, Generic.Policy.cheapCheck] at hchd hchf
     have hchi : InvS (cheapCheck false level s5) := by
-      refine ⟨?_, by rw [(reference_fields hchf).2]; exact hlei.2⟩
+      refine ⟨?_, by rw [(reference_fields hchf).2]; exact hlei.2.1, leafI_cheap hlei.2.2 false level⟩
       unfold cheapCheck; split
       · show level + 1 ≤ n + 1; omega
       · exact hlei.1
@@ -310,20 +345,22 @@ theorem sparse_nodeStep_first (hn0 : 0 < n) (hB : n + 2 < B) (fuel : Nat)
   have hvi : InvS (Sparse.visit (.ofGraph G.graph) level numcells st).2.2 := hinv
   have hvo : OrbIdS (Sparse.visit (.ofGraph G.graph) level numcells st).2.2 := horb
   have hva : AgreeTo (level - 1) t (Sparse.visit (.ofGraph G.graph) level numcells st).2.2.firsttc := ha
+  have hcode := (Sparse.depthPolicy (.ofGraph G.graph) (n + 2) tcLevel 0).code level numcells st
   unfold Generic.nodeStep
   dsimp only [Sparse.policy, Generic.Policy.visit, Generic.Policy.recordFirst,
     Generic.Policy.compareCodes, Generic.Policy.chooseTarget, Generic.Policy.firstterminal,
     Generic.Policy.classify, Generic.Policy.leafExit, Generic.Policy.cheapCheck,
-    Generic.Policy.afterSweep]
+    Generic.Policy.afterSweep] at hcode ⊢
   rw [sparse_visit_twG t _ level numcells st hL1 hL2]
-  generalize Sparse.visit (.ofGraph G.graph) level numcells st = r at hv hvi hvo hva ⊢
+  generalize Sparse.visit (.ofGraph G.graph) level numcells st = r at hv hvi hvo hva hcode ⊢
   obtain ⟨nc, code, s1⟩ := r
-  dsimp only at hv hvi hvo hva ⊢
+  dsimp only at hv hvi hvo hva hcode ⊢
   simp only [ite_true]
   -- the first-path code
   rw [recordFirst_twG]
   have hrl := hv.record code
-  have hri : InvS (recordFirst level code s1) := ⟨hvi.1, by simp [recordFirst, hvi.2]⟩
+  have hri : InvS (recordFirst level code s1) := ⟨hvi.1, by simp [recordFirst, hvi.2.1],
+    leafI_record hvi.2.2 hcode⟩
   have hro : OrbIdS (recordFirst level code s1) := hvo
   have hra : AgreeTo (level - 1) t (recordFirst level code s1).firsttc := hva
   generalize recordFirst level code s1 = s2 at hrl hri hro hra ⊢
@@ -333,14 +370,15 @@ theorem sparse_nodeStep_first (hn0 : 0 < n) (hB : n + 2 < B) (fuel : Nat)
   have htarget := hrl.ready.target hn0 hlevel true tcLevel
   have hk := sparse_chooseTarget_keeps true (.ofGraph G.graph) tcLevel level nc s2
   have hcell := sparse_first_cell (tcLevel := tcLevel) hn0 hlevel hrl.ready
+  have hl3 := sparse_leafI_target hri.2.2 true (.ofGraph G.graph) tcLevel level nc
   generalize Sparse.chooseTarget true (.ofGraph G.graph) tcLevel level nc s2 = c
-    at htl htarget hk hcell ⊢
+    at htl htarget hk hcell hl3 ⊢
   obtain ⟨tc, cell, size, s3⟩ := c
   dsimp only at htl htarget hk hcell ⊢
   simp only [ite_true]
   obtain ⟨hk1, hk2, hk3, hk4⟩ := hk
   simp only [ite_true] at hk4
-  have hi3 : InvS s3 := ⟨by rw [hk1]; exact hri.1, by rw [hk2]; exact hri.2⟩
+  have hi3 : InvS s3 := ⟨by rw [hk1]; exact hri.1, by rw [hk2]; exact hri.2.1, hl3⟩
   have ho3 : OrbIdS s3 := fun v hv => by rw [hk3]; exact hro v hv
   have ha3 : AgreeTo level (t.set! level tc) s3.firsttc := by
     rw [hk4]
@@ -352,9 +390,10 @@ theorem sparse_nodeStep_first (hn0 : 0 < n) (hB : n + 2 < B) (fuel : Nat)
       .inr ⟨level, ?_, ?_⟩, ?_⟩
     · refine ⟨Nat.le_refl _, ?_⟩
       show (s3.firstcode.set! (level + 1) codeSentinel)[level + 1]! = codeSentinel
-      exact Array.getElem!_set!_self _ _ _ (by rw [hi3.2]; omega)
+      exact Array.getElem!_set!_self _ _ _ (by rw [hi3.2.1]; omega)
     · exact ha3.set (-1)
-    · exact ⟨hi3.1, by show (s3.firstcode.set! (level + 1) codeSentinel).size = n + 2; simp [hi3.2]⟩
+    · exact ⟨hi3.1, by show (s3.firstcode.set! (level + 1) codeSentinel).size = n + 2; simp [hi3.2.1],
+        leafI_firstterminal hi3.2.2 level (sparse_labPerm hn0 htl.ready)⟩
   · simp only [hleaf, Bool.false_eq_true, ite_false]
     obtain ⟨v, hv⟩ := hcell (by simpa using hleaf)
     rw [cheapCheck_twG (t.set! level tc) true level s3 hL1 hL2]
@@ -364,7 +403,8 @@ theorem sparse_nodeStep_first (hn0 : 0 < n) (hB : n + 2 < B) (fuel : Nat)
       · exact ⟨level + 1, rfl, by omega⟩
       · exact ⟨s3.noncheaplevel, rfl, hi3.1⟩
     obtain ⟨k', hk', hk'le⟩ := hcheq
-    have hchi : InvS (cheapCheck true level s3) := ⟨by rw [hk']; exact hk'le, by rw [hk']; exact hi3.2⟩
+    have hchi : InvS (cheapCheck true level s3) := ⟨by rw [hk']; exact hk'le, by rw [hk']; exact hi3.2.1,
+      leafI_cheap hi3.2.2 true level⟩
     have hcho : OrbIdS (cheapCheck true level s3) := by rw [hk']; exact ho3
     have hcha : AgreeTo level (t.set! level tc) (cheapCheck true level s3).firsttc := by
       rw [hk']; exact ha3
@@ -439,7 +479,8 @@ theorem sparse_resume_off (hn0 : 0 < n) (hB : n + 2 < B) (fuel cfuel : Nat)
   have hrd := D.recover level out hd
   have hrf := F.recover level out
   have hri : InvS ((Sparse.policy (n := n)).recover (n + 2) level out) := by
-    refine ⟨?_, by rw [(reference_fields hrf).2]; exact hinv.2⟩
+    refine ⟨?_, by rw [(reference_fields hrf).2]; exact hinv.2.1,
+      (leafI_recover hinv.2.2 (n + 2) level).congr rfl rfl rfl rfl rfl rfl⟩
     show (Hex.GraphIso.Nauty.recover (n + 2) level out).noncheaplevel ≤ n + 1
     rw [recover_noncheap]; split <;> omega
   let cell'' := if (!first && tv == tv1) = true then longprune cell' out.fixedpts out.autos else cell'
@@ -525,7 +566,9 @@ theorem sparse_sweepStep_off (hn0 : 0 < n) (hB : n + 2 < B) (fuel cfuel : Nat)
     have hdn := hdescend false (level + 1) (numcells + 1) ((Sparse.policy (n := n)).child first level tc tv st)
       ⟨by omega, hch⟩
     obtain ⟨hdreach, hdimp⟩ := hdn
-    obtain ⟨hoff, -⟩ := hdimp (by cases first <;> exact hinv)
+    obtain ⟨hoff, -⟩ := hdimp (by
+      cases first <;> exact ⟨hinv.1, hinv.2.1,
+        (leafI_child hinv.2.2 _ level tc tv (fun _ => VSet.mem_lt htv)).congr rfl rfl rfl rfl rfl rfl⟩)
     have hac : AgreeTo (last + 1) t ((Sparse.policy (n := n)).child first level tc tv st).firsttc := by
       rw [(reference_fields hcf).1]; exact ha
     obtain ⟨heq, hdd, hfd, hinvd⟩ := hoff rfl last t hcd hac
@@ -628,7 +671,8 @@ theorem sparse_sweepStep_first (hn0 : 0 < n) (hB : n + 2 < B) (fuel cfuel : Nat)
   have hdn := hdescend true (level + 1) (numcells + 1) ((Sparse.policy (n := n)).child true level tc tv1 st)
     ⟨by omega, hch⟩
   obtain ⟨hdreach, hdimp⟩ := hdn
-  obtain ⟨-, hfirst⟩ := hdimp hinv
+  obtain ⟨-, hfirst⟩ := hdimp ⟨hinv.1, hinv.2.1,
+    (leafI_child hinv.2.2 true level tc tv1 (fun _ => VSet.mem_lt htv)).congr rfl rfl rfl rfl rfl rfl⟩
   have hac : AgreeTo (level + 1 - 1) t ((Sparse.policy (n := n)).child true level tc tv1 st).firsttc := by
     rw [(reference_fields hcf).1, Nat.add_sub_cancel]; exact ha
   obtain ⟨t', heq, hph, hinvd⟩ := hfirst rfl t horb hac
@@ -741,9 +785,13 @@ theorem sparseInitialC_eq (g : Sparse.Graph n) (lab0 : Array Nat) (cellEnds : Li
   rw [show (Sparse.initial g lab0 cellEnds).ptn = initPtn n (n + 2) cellEnds from rfl,
     initPtn_map (by omega)]
 
-theorem sparse_initial_invS (g : Sparse.Graph n) (lab0 : Array Nat) (cellEnds : List Nat) :
+theorem sparse_initial_invS (hn0 : 0 < n) (g : Sparse.Graph n) (lab0 : Array Nat) (cellEnds : List Nat) :
     InvS (Sparse.initial g lab0 cellEnds) :=
-  ⟨by show 1 ≤ n + 1; omega, by simp [Sparse.initial]⟩
+  ⟨by show 1 ≤ n + 1; omega, by simp [Sparse.initial], Nat.le_refl 1, hn0, fun ⟨i, hi⟩ => by
+    change (Array.replicate (n + 2) 0)[i]! = codeSentinel at hi
+    by_cases h : i < n + 2
+    · rw [getElem!_pos _ i (by simpa using h)] at hi; simp [codeSentinel] at hi
+    · rw [getElem!_neg _ i (by simpa using h)] at hi; simp [codeSentinel] at hi⟩
 
 theorem sparse_initial_orbId (g : Sparse.Graph n) (lab0 : Array Nat) (cellEnds : List Nat) :
     OrbIdS (Sparse.initial g lab0 cellEnds) := by
@@ -778,7 +826,7 @@ theorem sparse_node_inf (G : Hex.GraphIso.Sparse.Colored n k) (hn0 : 0 < n)
     true (n + 2) 1 p.2.length (Sparse.initial (.ofGraph G.graph) p.1 p.2)
     ⟨Nat.le_refl _, Sparse.NodeInv.initial G hn0⟩
   obtain ⟨-, himp⟩ := hpost
-  obtain ⟨-, hfirst⟩ := himp (sparse_initial_invS _ _ _)
+  obtain ⟨-, hfirst⟩ := himp (sparse_initial_invS hn0 _ _ _)
   have hag : AgreeTo (1 - 1) (.replicate (n + 2) 0) (Sparse.initial (.ofGraph G.graph) p.1 p.2).firsttc :=
     ⟨by simp [Sparse.initial], fun i h1 h2 => absurd h2 (by omega)⟩
   obtain ⟨t', heq, -, -⟩ := hfirst rfl _ (sparse_initial_orbId _ _ _) hag
@@ -867,7 +915,7 @@ theorem sparseNodeOk_root (G : Hex.GraphIso.Sparse.Colored n k) (hn0 : 0 < n) :
     SparseNodeOk₀ G true 1 p.2.length (sparseInitialC (.ofGraph G.graph) p.1 p.2) := by
   intro p
   refine ⟨.replicate (n + 2) 0, Sparse.initial (.ofGraph G.graph) p.1 p.2, sparseInitialC_eq _ _ _,
-    Nat.le_refl _, Sparse.NodeInv.initial G hn0, sparse_initial_invS _ _ _,
+    Nat.le_refl _, Sparse.NodeInv.initial G hn0, sparse_initial_invS hn0 _ _ _,
     fun _ => ⟨sparse_initial_orbId _ _ _, ?_⟩, fun h => absurd h (by decide)⟩
   exact ⟨by simp [Sparse.initial], fun i h1 h2 => absurd h2 (by omega)⟩
 

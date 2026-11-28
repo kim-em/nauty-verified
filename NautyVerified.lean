@@ -265,6 +265,8 @@ import NautyVerified.Spec.SparseInfRefine
 import NautyVerified.Spec.SparseInfTw
 import NautyVerified.Spec.SparseInfOps
 import NautyVerified.Spec.SparseInfRun
+import NautyVerified.Spec.SparseFirstStore
+import NautyVerified.Spec.SparseNodeOk
 import NautyVerified.Spec.NodeOk
 import NautyVerified.Spec.Gca
 import NautyVerified.Spec.NodeExit
