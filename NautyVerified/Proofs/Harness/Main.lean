@@ -212,9 +212,9 @@ theorem _root_.NautyVerified.Proofs.Alloc.Fresh.longs {m m' : mem} {b : block} {
     (hN : N * 8 < 2 ^ 62) : ArrayAt m' .Mint64 b 0 (fun _ => .Vlong (lr 0)) N :=
   Alloc.zero_longs hz (fun ofs h0 h1 => hfr.perm ofs (by omega) h1) hN N (by omega)
 
-/-- `expected`'s first block: the words of HexGraphIso's generators. -/
+/-- `expected`'s first block: the words of HexGraphIso's emitted generators. -/
 def autosWords {n k : Nat} (G : Colored n k) : List Int :=
-  (runColoredTraced G).autos.toList.flatMap (fun p => 1 :: p.toList.map (fun (i : Nat) => (i : Int)))
+  (runColoredTraced G).emitted.toList.flatMap (fun p => 1 :: p.toList.map (fun (i : Nat) => (i : Int)))
 
 theorem expected_eq {n k : Nat} (G : Colored n k) :
     Statement.expected G = autosWords G ++ outWords G := by

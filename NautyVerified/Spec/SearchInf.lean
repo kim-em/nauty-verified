@@ -477,14 +477,14 @@ theorem leafExit_tw {a b : Nat} (t : Array Int) (leaf : Leaf) (level : Nat) (st 
         | .internal => ((Generic.Exit.done, tw (phi a b) t S) : Exit × Search n)
         | .autoFirst =>
           let s1 := admit (tw (phi a b) t S)
-          let s2 := { s1 with numgenerators := s1.numgenerators + 1 }
+          let s2 := { s1 with numgenerators := s1.numgenerators + 1, emitted := s1.emitted.push s1.workperm }
           (Generic.Exit.unwind s2.gcaFirst false, s2)
         | .autoCanon =>
           let s1 := admit (tw (phi a b) t S)
           if s1.numorbits == (tw (phi a b) t S).numorbits then
             (Generic.Exit.unwind s1.gcaCanon (s1.gcaCanon != s1.gcaFirst), s1)
           else
-            let s2 := { s1 with numgenerators := s1.numgenerators + 1 }
+            let s2 := { s1 with numgenerators := s1.numgenerators + 1, emitted := s1.emitted.push s1.workperm }
             if s2.orbits[s2.cosetindex]! < s2.cosetindex then (Generic.Exit.unwind s2.gcaFirst false, s2)
             else (Generic.Exit.unwind s2.gcaCanon (s2.gcaCanon != s2.gcaFirst), s2)
         | .better sr => pruneReturn level (install level sr (tw (phi a b) t S))
@@ -493,14 +493,14 @@ theorem leafExit_tw {a b : Nat} (t : Array Int) (leaf : Leaf) (level : Nat) (st 
         | .internal => ((Generic.Exit.done, S) : Exit × Search n)
         | .autoFirst =>
           let s1 := admit S
-          let s2 := { s1 with numgenerators := s1.numgenerators + 1 }
+          let s2 := { s1 with numgenerators := s1.numgenerators + 1, emitted := s1.emitted.push s1.workperm }
           (Generic.Exit.unwind s2.gcaFirst false, s2)
         | .autoCanon =>
           let s1 := admit S
           if s1.numorbits == S.numorbits then
             (Generic.Exit.unwind s1.gcaCanon (s1.gcaCanon != s1.gcaFirst), s1)
           else
-            let s2 := { s1 with numgenerators := s1.numgenerators + 1 }
+            let s2 := { s1 with numgenerators := s1.numgenerators + 1, emitted := s1.emitted.push s1.workperm }
             if s2.orbits[s2.cosetindex]! < s2.cosetindex then (Generic.Exit.unwind s2.gcaFirst false, s2)
             else (Generic.Exit.unwind s2.gcaCanon (s2.gcaCanon != s2.gcaFirst), s2)
         | .better sr => pruneReturn level (install level sr S)
@@ -509,14 +509,14 @@ theorem leafExit_tw {a b : Nat} (t : Array Int) (leaf : Leaf) (level : Nat) (st 
         | .internal => ((Generic.Exit.done, S) : Exit × Search n)
         | .autoFirst =>
           let s1 := admit S
-          let s2 := { s1 with numgenerators := s1.numgenerators + 1 }
+          let s2 := { s1 with numgenerators := s1.numgenerators + 1, emitted := s1.emitted.push s1.workperm }
           (Generic.Exit.unwind s2.gcaFirst false, s2)
         | .autoCanon =>
           let s1 := admit S
           if s1.numorbits == S.numorbits then
             (Generic.Exit.unwind s1.gcaCanon (s1.gcaCanon != s1.gcaFirst), s1)
           else
-            let s2 := { s1 with numgenerators := s1.numgenerators + 1 }
+            let s2 := { s1 with numgenerators := s1.numgenerators + 1, emitted := s1.emitted.push s1.workperm }
             if s2.orbits[s2.cosetindex]! < s2.cosetindex then (Generic.Exit.unwind s2.gcaFirst false, s2)
             else (Generic.Exit.unwind s2.gcaCanon (s2.gcaCanon != s2.gcaFirst), s2)
         | .better sr => pruneReturn level (install level sr S)
@@ -534,18 +534,24 @@ theorem leafExit_tw {a b : Nat} (t : Array Int) (leaf : Leaf) (level : Nat) (st 
         simp only [h1, h1', ite_false, Bool.false_eq_true]
         by_cases h2 : (admit S).orbits[(admit S).cosetindex]! < (admit S).cosetindex
         · have h2' : ({ tw (phi a b) t (admit S) with
-              numgenerators := (tw (phi a b) t (admit S)).numgenerators + 1 } : Search n).orbits[
+              numgenerators := (tw (phi a b) t (admit S)).numgenerators + 1,
+                emitted := (tw (phi a b) t (admit S)).emitted.push (tw (phi a b) t (admit S)).workperm } : Search n).orbits[
               ({ tw (phi a b) t (admit S) with
-                numgenerators := (tw (phi a b) t (admit S)).numgenerators + 1 } : Search n).cosetindex]! <
+                numgenerators := (tw (phi a b) t (admit S)).numgenerators + 1,
+                emitted := (tw (phi a b) t (admit S)).emitted.push (tw (phi a b) t (admit S)).workperm } : Search n).cosetindex]! <
               ({ tw (phi a b) t (admit S) with
-                numgenerators := (tw (phi a b) t (admit S)).numgenerators + 1 } : Search n).cosetindex := h2
+                numgenerators := (tw (phi a b) t (admit S)).numgenerators + 1,
+                emitted := (tw (phi a b) t (admit S)).emitted.push (tw (phi a b) t (admit S)).workperm } : Search n).cosetindex := h2
           simp only [h2, h2', ite_true]; rfl
         · have h2' : ¬ ({ tw (phi a b) t (admit S) with
-              numgenerators := (tw (phi a b) t (admit S)).numgenerators + 1 } : Search n).orbits[
+              numgenerators := (tw (phi a b) t (admit S)).numgenerators + 1,
+                emitted := (tw (phi a b) t (admit S)).emitted.push (tw (phi a b) t (admit S)).workperm } : Search n).orbits[
               ({ tw (phi a b) t (admit S) with
-                numgenerators := (tw (phi a b) t (admit S)).numgenerators + 1 } : Search n).cosetindex]! <
+                numgenerators := (tw (phi a b) t (admit S)).numgenerators + 1,
+                emitted := (tw (phi a b) t (admit S)).emitted.push (tw (phi a b) t (admit S)).workperm } : Search n).cosetindex]! <
               ({ tw (phi a b) t (admit S) with
-                numgenerators := (tw (phi a b) t (admit S)).numgenerators + 1 } : Search n).cosetindex := h2
+                numgenerators := (tw (phi a b) t (admit S)).numgenerators + 1,
+                emitted := (tw (phi a b) t (admit S)).emitted.push (tw (phi a b) t (admit S)).workperm } : Search n).cosetindex := h2
           simp only [h2, h2', ite_false]; rfl
     | better sr =>
       simp only [install_tw]

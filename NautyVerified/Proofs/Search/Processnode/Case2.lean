@@ -184,7 +184,7 @@ theorem wp_case2 {f : function} {Q : Post} {le : temp_env} {level : Nat}
     have hWt : Writes t (leafWords st { st with
         autos := pushA st.autos (fmperm st.workperm n), genTrace := st.genTrace.push st.workperm,
         orbits := (orbjoin st.orbits st.workperm n).1, numorbits := (orbjoin st.orbits st.workperm n).2,
-        numgenerators := st.numgenerators + 1 }) := by
+        numgenerators := st.numgenerators + 1, emitted := st.emitted.push st.workperm }) := by
       simp only [leafWords, ite_true]; exact hW
     wp_step; wp_step; wp_step
     refine wp_ifB (eval_coset c h4 hci) rfl ?_

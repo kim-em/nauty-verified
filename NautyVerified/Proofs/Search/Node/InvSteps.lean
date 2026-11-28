@@ -445,14 +445,15 @@ def lxBody (leaf : Leaf) (level : Nat) (st : Search n) : Exit × Search n :=
   | .internal => (.done, st)
   | .autoFirst =>
     let st := { Hex.GraphIso.Nauty.admit st with
-      numgenerators := (Hex.GraphIso.Nauty.admit st).numgenerators + 1 }
+      numgenerators := (Hex.GraphIso.Nauty.admit st).numgenerators + 1,
+      emitted := (Hex.GraphIso.Nauty.admit st).emitted.push (Hex.GraphIso.Nauty.admit st).workperm }
     (.unwind st.gcaFirst false, st)
   | .autoCanon =>
     let save := st.numorbits
     let st := Hex.GraphIso.Nauty.admit st
     if st.numorbits == save then (.unwind st.gcaCanon (st.gcaCanon != st.gcaFirst), st)
     else
-      let st := { st with numgenerators := st.numgenerators + 1 }
+      let st := { st with numgenerators := st.numgenerators + 1, emitted := st.emitted.push st.workperm }
       if st.orbits[st.cosetindex]! < st.cosetindex then (.unwind st.gcaFirst false, st)
       else (.unwind st.gcaCanon (st.gcaCanon != st.gcaFirst), st)
   | .better sr => Hex.GraphIso.Nauty.pruneReturn level (Hex.GraphIso.Nauty.install level sr st)

@@ -241,7 +241,7 @@ def finalState {n k : Nat} (G : Colored n k) : Nauty.Search n :=
   (Nauty.runState n (Nauty.rowsOf G) lab0 cellEnds).2
 
 /-- What `dense_main` writes when nauty computes what HexGraphIso computes:
-each emitted generator (tag 1), the canonical labelling (2), the orbits (3),
+each generator HexGraphIso's search emits (`TraceRun.emitted`, tag 1), the canonical labelling (2), the orbits (3),
 the canonical graph's setwords (4) and the statistics (5), the last of which,
 `errstatus`, is 0. The statistics are written as the C types hold them
 (`asInt`, `asLong`): nothing bounds the search's counters, and nauty never
@@ -249,7 +249,7 @@ reads them back to make a decision. -/
 def expected {n k : Nat} (G : Colored n k) : List Int :=
   let r := Nauty.runColoredTraced G
   let m := setwordsNeeded n
-  r.autos.toList.flatMap (fun p => 1 :: p.toList.map (fun (i : Nat) => (i : Int))) ++
+  r.emitted.toList.flatMap (fun p => 1 :: p.toList.map (fun (i : Nat) => (i : Int))) ++
   (2 :: r.result.canonlab.toList.map (fun (i : Nat) => (i : Int))) ++
   (3 :: (finalState G).orbits.toList.map (fun (i : Nat) => (i : Int))) ++
   (4 :: r.result.canong.toList.flatMap (rowWords m)) ++

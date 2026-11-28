@@ -76,7 +76,8 @@ theorem wp_maxlevel {f : function} {Q : Post} {le : temp_env} {level : Nat}
 /-- `stats->numgenerators += 1`. -/
 theorem wp_numgenerators {f : function} {Q : Post} {le : temp_env}
     (c : PCtx m₀ m₁ S e bsr) (h : PAt m₀ m₁ m S ctx bsr st nsp)
-    (hQ : ∀ m', PAt m₀ m₁ m' S ctx bsr { st with numgenerators := st.numgenerators + 1 } nsp →
+    (hQ : ∀ m', PAt m₀ m₁ m' S ctx bsr
+        { st with numgenerators := st.numgenerators + 1, emitted := st.emitted.push st.workperm } nsp →
       (∀ v, SrAt m bsr v → SrAt m' bsr v) → Unch m m' (· = S.bst) → Q.normal E0 e le m') :
     Wp xi ge f (.Sassign (statsF dense.id.numgenerators tint)
       (.Ebinop .Oadd (statsF dense.id.numgenerators tint) (ci 1 tint) tint)) Q e le m := by
@@ -93,7 +94,9 @@ theorem wp_numgenerators {f : function} {Q : Post} {le : temp_env}
     push_cast; rfl
   intro m' hst
   have sS := hs.stats
-  obtain ⟨hP, hS, hU⟩ := PAt.stat (st' := { st with numgenerators := st.numgenerators + 1 }) c h hst
+  obtain ⟨hP, hS, hU⟩ := PAt.stat
+      (st' := { st with numgenerators := st.numgenerators + 1, emitted := st.emitted.push st.workperm })
+      c h hst
     { (sS.fix.store hst (by first | omega | (simp only [csize32, csize64]; omega))) with
       numorbits := sS.numorbits.store_other hst (by simp only [csize32]; omega)
       numgenerators := FieldAt.store_same hst sS.numgenerators.writable

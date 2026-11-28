@@ -7,6 +7,8 @@ import NautyVerified.Proofs.Search.Node.Nodes
 import NautyVerified.Spec.SearchInfRun
 import NautyVerified.Proofs.Search.Emit
 import NautyVerified.Proofs.Harness.Main
+import NautyVerified.Proofs.Search.Node.Emitted
+import HexGraphIso.Nauty.Policy.Generated.Root
 
 /-!
 # `nauty()` satisfies `nautySpec`
@@ -1204,18 +1206,64 @@ theorem densenauty_ok {k : Nat} (G : Colored n k) (gens : List (Array Nat))
   densenauty_satisfies G gens bg bl bp bo bst bc fun capD bD =>
     nauty_satisfies G gens Em hOff hFirst hEm hAut bg bl bp bo bst bc capD bD
 
-/-- `main` meets its specification, given the emission laws, the root's emitted
-words, and their agreement with `expected`'s first block. -/
-theorem main_ok {k : Nat} (G : Colored n k) (gens : List (Array Nat)) (ins : List Int)
-    (Em : Bool → Nat → Nat → Search n → List Int)
-    (hOff : EmLawOff Em ⟨rowsOf G⟩) (hFirst : EmLawFirst Em ⟨rowsOf G⟩)
-    (hEm : Em true 1 (initialPartition G).2.length
-      (SearchInf.initialC n (initialPartition G).1 (initialPartition G).2) = gensWords gens n)
-    (hgens : gensWords gens n = Harness.autosWords G)
+/-- At the root, `emWords` is the words of HexGraphIso's emitted generators. -/
+theorem emWords_root {k : Nat} (G : Colored n k) (hn0 : 0 < n) (hn : n + 2 < 2000000002) :
+    emWords ⟨rowsOf G⟩ true 1 (initialPartition G).2.length
+      (SearchInf.initialC n (initialPartition G).1 (initialPartition G).2) =
+      gensWords (runColoredTraced G).emitted.toList n := by
+  have h := congrArg TraceRun.emitted (SearchInf.runTraced_inf G hn0 hn)
+  have hf : nodeFuel n 1 = n + 2 := by simp only [nodeFuel]; omega
+  rw [emWords, hexNode, hf]
+  simp only [added]
+  rw [show (SearchInf.initialC n (initialPartition G).1 (initialPartition G).2).emitted = #[] from rfl,
+    Array.size_empty, List.drop_zero]
+  exact congrArg (gensWords · n) (congrArg Array.toList h)
+
+theorem size_of_autom {k : Nat} {G : Colored n k} {γ : Array Nat} {p : Hex.Perm n}
+    (h : autom? G γ = some p) : γ.size = n := by
+  rw [autom?] at h
+  split at h
+  · rename_i q hq
+    rw [Hex.Perm.ofNatArray?] at hq
+    split at hq
+    · rename_i hc; exact hc.1
+    · simp at hq
+  · simp at h
+
+theorem genWords_eq {γ : Array Nat} (hs : γ.size = n) :
+    genWords γ n = 1 :: γ.toList.map (fun (i : Nat) => (i : Int)) := by
+  simp only [genWords, List.cons.injEq, true_and]
+  apply List.ext_getElem
+  · simp [hs]
+  · intro i h1 h2
+    have hi : i < γ.size := by simpa [hs] using h1
+    simp only [List.getElem_map, List.getElem_range, Array.getElem_toList]
+    rw [getElem!_pos γ i hi]
+
+/-- The words of the emitted generators are `expected`'s first block. -/
+theorem gensWords_emitted {k : Nat} (G : Colored n k) :
+    gensWords (runColoredTraced G).emitted.toList n = Harness.autosWords G := by
+  have key : ∀ l : List (Array Nat), (∀ γ ∈ l, γ.size = n) →
+      l.flatMap (fun g => genWords g n) =
+        l.flatMap (fun p => 1 :: p.toList.map (fun (i : Nat) => (i : Int))) := by
+    intro l hl
+    induction l with
+    | nil => rfl
+    | cons g l ih =>
+      simp only [List.flatMap_cons]
+      rw [ih (fun γ h => hl γ (List.mem_cons_of_mem _ h)), genWords_eq (hl g List.mem_cons_self)]
+  exact key _ fun γ hγ => (emitted_admitted G hγ).elim fun _ hp => size_of_autom hp
+
+/-- `main` meets its specification. -/
+theorem main_ok {k : Nat} (G : Colored n k) (ins : List Int)
     (hins : Statement.Encodes G ins) (hn0 : 0 < n) (hmax : n ≤ Statement.maxN)
     (hkmax : k ≤ Statement.maxN) :
-    Satisfies Statement.xi ge (.Internal dense.fn.main) (Harness.mainSpec G ins) :=
-  Harness.main_satisfies G gens ins hins hn0 hmax hkmax hgens fun bg bl bp bo bst bc =>
-    densenauty_ok G gens Em hOff hFirst hEm automCb_emit bg bl bp bo bst bc
+    Satisfies Statement.xi ge (.Internal dense.fn.main) (Harness.mainSpec G ins) := by
+  have hmax' : n + 2 < 2000000002 := by
+    have : Statement.maxN = 65536 := rfl
+    omega
+  exact Harness.main_satisfies G _ ins hins hn0 hmax hkmax (gensWords_emitted G) fun bg bl bp bo bst bc =>
+    densenauty_ok G _ (emWords ⟨rowsOf G⟩) (emLawOff _) (emLawFirst _) (emWords_root G hn0 hmax')
+      automCb_emit bg bl bp bo bst bc
 
 end NautyVerified.Proofs.Top
