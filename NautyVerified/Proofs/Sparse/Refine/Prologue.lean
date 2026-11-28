@@ -1,6 +1,7 @@
 import NautyVerified.Proofs.Sparse.Refine.Spec
 import NautyVerified.Proofs.Sparse.Refine.Queue
 import NautyVerified.Proofs.Sparse.Testcanlab.Satisfies
+import NautyVerified.Proofs.Sparse.Bestcell.Frame
 
 /-!
 # The prologue of `refine_sg`
@@ -28,6 +29,8 @@ open NautyVerified.Proofs.Nextelement (LeftbitTable)
 open NautyVerified.Proofs.Alloc (DynAt Keep dynalloc1)
 open Hex.GraphIso.Nauty (VSet)
 open Hex.GraphIso.Nauty.Sparse (RefineSt Graph Scratch)
+
+open NautyVerified.Proofs.Sparse.Bestcell (wp_dynZ)
 
 attribute [local instance] NautyEnv.sparse
 
@@ -71,41 +74,6 @@ abbrev restS : statement :=
         (.Ssequence dist (.Ssequence mainLoop finish))))
 
 theorem body_pro : body = pro restS := rfl
-
-/-- `DYNALLOC1` of an `int` array to `n` held in an `int` temporary: either
-nothing happens, or the array moves to a zero-filled block new to memory. -/
-theorem wp_dynZ {f : function} {Q : Post} {le : temp_env} {m : mem}
-    {gs gp x t1 t2 msg : ident} {msgLen : Int} {bs bp b : block} {cap k : Nat}
-    (hgs : Genv.find_symbol sge.genv_genv gs = some bs)
-    (hgp : Genv.find_symbol sge.genv_genv gp = some bp)
-    (hD : DynAt m bp bs 4 cap b) (hx : PTree.get x le = some (.Vint (ir k)))
-    (hk : k < 2147483648) (hck : 4 * k < 2 ^ 62)
-    (hQ : ∀ le' m' cap' b', DynAt m' bp bs 4 cap' b' → k ≤ cap' →
-      Unch m m' (fun z => z = bs ∨ z = bp ∨ (0 < cap ∧ z = b) ∨ (¬ Mem.valid_block m b' ∧ z = b')) →
-      ((cap' = cap ∧ b' = b ∧ m' = m) ∨ (¬ Mem.valid_block m b' ∧ Alloc.Zeros m' b' (4 * cap'))) →
-      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
-      (∀ y, y ≠ t1 → y ≠ t2 → PTree.get y le' = PTree.get y le) →
-      Q.normal E0 empty_env le' m') :
-    Wp xi sge f (dynalloc1 gs gp tint (.Etempvar x tint) t1 t2 msg msgLen) Q empty_env le m := by
-  by_cases hc : k ≤ cap
-  · have hnil1 := NautyVerified.Proofs.Alloc.noShadow_empty _ _ hgs
-    have hcap := hD.capLt
-    wp_step; wp_step
-    apply wp_if_eval
-    simp only [Exec.evalExpr, hx]
-    simp only [Exec.lvalOfVar, hnil1, hgs, Exec.derefLoc,
-      Cfrontend.Ctypes.access_mode, typeof, cop, Mem.loadv,
-      show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl, hD.capLd,
-      cast_int_long_ir (a := k) ⟨by omega, by omega⟩]
-    rw [Alloc.ltu_lr (a := cap) (b := k) (by omega) (by omega)]
-    rw [ite_eq_right (by simpa using hc)]
-    apply wp_skip
-    exact hQ le m cap b hD hc (Unch.refl _ _) (.inl ⟨rfl, rfl, rfl⟩) (fun _ h => h) (fun _ _ _ => rfl)
-  · refine Alloc.wp_dynalloc1Z hgs hgp rfl hD (fun _ _ => hx) rfl hk hck ?_
-    intro le' m' cap' b' hD' hk' hu hor hg ho
-    rcases hor with ⟨rfl, rfl⟩ | hz
-    · omega
-    · exact hQ le' m' cap' b' hD' hk' hu (.inr hz) hg ho
 
 /-- The argument temporaries on entry. -/
 structure Args (le : temp_env) (L : Loc) (n : Nat) : Prop where

@@ -26,7 +26,7 @@ open CompCert4Lean.Foundation.Numbers.Rocq.Coq CompCert4Lean.Lib.Integers
 open NautyVerified NautyVerified.Logic NautyVerified.Program NautyVerified.Word NautyVerified.Spec
 open NautyVerified.Source
 open NautyVerified.Proofs.Alloc (DynAt Keep Slot InUse SlotsOk)
-open NautyVerified.Proofs.Sparse (SparseGraphAt CanonAt CanonRows MarksAt base start)
+open NautyVerified.Proofs.Sparse (HitsOk SparseGraphAt CanonAt CanonRows MarksAt base start)
 open Hex.GraphIso.Nauty
 
 attribute [local instance] NautyEnv.sparse
@@ -106,7 +106,9 @@ theorem sparse_isautom (xi : ExternalCalls) : sparseRep.IsautomFn xi sparseRep.i
     refine ⟨rfl, hv, sparse_step hw hval hu [VM1, VM1S, VM1V] [(VM1, VM1S, 2)] (by decide)
       (by simp [sparseSlots]) (by decide) hW (fun _ h => h.elim) ?_ ?_ ⟨_, _, _, _, hM'⟩
       (marks2_keep hw hu (by decide) (by simp [sparseSlots]) hW (fun _ h => h.elim) (by decide)
-        (by decide) (by decide) (by decide)) (fun _ h => h.elim)⟩
+        (by decide) (by decide) (by decide))
+      (hits_keep hw hu (by decide) (by simp [sparseSlots]) hW (fun _ h => h.elim) (by decide)
+        (by decide) (by decide)) (fun _ h => h.elim)⟩
     · intro p hp
       rw [List.mem_singleton] at hp; subst hp
       exact ⟨cap, b, cap', b', hM.dyn, hM'.dyn, hr⟩
@@ -201,7 +203,13 @@ theorem sparse_targetcell (xi : ExternalCalls) : sparseRep.TargetcellFn xi spars
     obtain ⟨hv, hgl, -, hne⟩ := sep_z hsep hz'
     exact ⟨hv, fun hm => hgl (List.mem_append_left _ (bwglobs_sub _ hm)), fun k hk e =>
       hne (hu4 k hk) e⟩
-  · rintro t v m' ⟨⟨rfl, hv, c', b', hW4', hr, hu, -⟩, hval⟩
+  · rintro t v m' ⟨⟨rfl, hv, c', b', hW4', hr, hu, -, hH⟩, hval⟩
+    have hH2 : HitsOk m (c 2) (b 2) := by
+      obtain ⟨c3, b3, d3, hH3⟩ := hw.2.2.2.2
+      have e := (hW4.dyn 2).same_cap d3
+      by_cases hc : 0 < c 2
+      · rw [← (hW4.dyn 2).same_block d3 hc, ← e]; exact hH3
+      · rw [show c 2 = 0 by omega]; exact HitsOk.zero _ _
     have hW : ∀ z, Sparse.Bestcell.worksSet m c b z → z ∈ Sparse.Bestcell.wglobs ∨
         InUse m workSlots z ∨ ¬ Mem.valid_block m z ∨ False := by
       rintro z (h | ⟨k, hk, rfl⟩ | h)
@@ -214,7 +222,7 @@ theorem sparse_targetcell (xi : ExternalCalls) : sparseRep.TargetcellFn xi spars
       (marks1_keep hw hu (by decide) hPs hW (fun _ h => h.elim) (by decide) (by decide) (by decide)
         (by decide))
       (marks2_keep hw hu (by decide) hPs hW (fun _ h => h.elim) (by decide) (by decide) (by decide)
-        (by decide)) (fun _ h => h.elim)⟩
+        (by decide)) ⟨c' 2, b' 2, hW4'.dyn 2, hH hH2⟩ (fun _ h => h.elim)⟩
     · intro p hp
       obtain ⟨k, rfl⟩ := workSlot_inv hp
       exact ⟨c k, b k, c' k, b' k, hW4.dyn k, hW4'.dyn k, hr k⟩

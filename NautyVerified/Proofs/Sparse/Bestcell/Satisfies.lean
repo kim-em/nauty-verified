@@ -192,22 +192,22 @@ theorem bestcell_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sofs
       simp (config := {decide := true}) only [le0, E, entryTemps, temps_gso, temps_gss]
     wp_step
     refine wp_dynW 0 find_work1Sz find_work1 hpre.works hn0' hnlt ?_
-    intro le1 m1 cap1 b1 hW1 hc1 ho1 hu1 hg1 ht1
+    intro le1 m1 cap1 b1 hW1 hc1 ho1 hu1 hf1 hz1 hg1 ht1
     have hn1 : PTree.get id.n le1 = some (.Vint (ir n)) := by
       rw [ht1 _ (by decide) (by decide)]; exact hn0'
     wp_step
     refine wp_dynW 1 find_work2Sz find_work2 hW1 hn1 hnlt ?_
-    intro le2 m2 cap2 b2 hW2 hc2 ho2 hu2 hg2 ht2
+    intro le2 m2 cap2 b2 hW2 hc2 ho2 hu2 hf2 hz2 hg2 ht2
     have hn2 : PTree.get id.n le2 = some (.Vint (ir n)) := by
       rw [ht2 _ (by decide) (by decide)]; exact hn1
     wp_step
     refine wp_dynW 2 find_work3Sz find_work3 hW2 hn2 hnlt ?_
-    intro le3 m3 cap3 b3 hW3 hc3 ho3 hu3 hg3 ht3
+    intro le3 m3 cap3 b3 hW3 hc3 ho3 hu3 hf3 hz3 hg3 ht3
     have hn3 : PTree.get id.n le3 = some (.Vint (ir n)) := by
       rw [ht3 _ (by decide) (by decide)]; exact hn2
     wp_step
     refine wp_dynW 3 find_work4Sz find_work4 hW3 hn3 hnlt ?_
-    intro le4 m4 cap4 b4 hW4 hc4 ho4 hu4 hg4 ht4
+    intro le4 m4 cap4 b4 hW4 hc4 ho4 hu4 hf4 hz4 hg4 ht4
     -- the four pairs
     obtain ⟨C, hCd⟩ : ∃ C, C = fset (fset (fset (fset c 0 cap1) 1 cap2) 2 cap3) 3 cap4 := ⟨_, rfl⟩
     obtain ⟨B, hBd⟩ : ∃ B, B = fset (fset (fset (fset b 0 b1) 1 b2) 2 b3) 3 b4 := ⟨_, rfl⟩
@@ -229,6 +229,12 @@ theorem bestcell_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sofs
       · rw [hCd, e2]; omega
       · rw [hCd, e3]; omega
     have hC0 : ∀ k, 0 < C k := fun k => by have := hCn k; omega
+    have hH4 : HitsOk m (c 2) (b 2) → HitsOk m4 (C 2) (B 2) := fun hH => by
+      have h1 := hits_other hpre.works (k := 0) (by decide) hf1 hH
+      have h2 := hits_other hW1 (k := 1) (by decide) hf2 (by simpa [fset] using h1)
+      have h3 := hits_new hW3 (by omega) (by simpa [fset] using h2) hz3
+      have h4 := hits_other hW3 (k := 3) (by decide) hf4 (by simpa [fset] using h3)
+      rw [hCd, hBd]; simpa [fset] using h4
     have hle4 : ∀ x, x ≠ idOf 703 → x ≠ idOf 704 → x ≠ idOf 705 → x ≠ idOf 706 → x ≠ idOf 707 →
         x ≠ idOf 708 → x ≠ idOf 709 → x ≠ idOf 710 → PTree.get x le4 = PTree.get x le0 :=
       fun x a1 a2 a3 a4 a5 a6 a7 a8 => by
@@ -346,16 +352,18 @@ theorem bestcell_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sofs
     obtain ⟨W4, hw4⟩ := Alloc.malloced_array ((hW4.dyn 3).mal (hC0 3)) .Mint32 4 rfl rfl n
       (Nat.mul_le_mul_left 4 (hCn 3))
     have post : ∀ mF, Mod m4 mF B → (∀ z, Mem.valid_block m4 z → Mem.valid_block mF z) →
-        Post m mF c b := fun mF hmod hgF => by
+        (HitsOk m (c 2) (b 2) → HitsOk mF (C 2) (B 2)) → Post m mF c b := fun mF hmod hgF hH => by
       have nB : ∀ z ∈ wglobs, ¬ ∃ k, z = B k := fun z hz ⟨k, he⟩ => hW4.apart k (hC0 k) (he ▸ hz)
       exact ⟨C, B, ⟨fun k => (hW4.dyn k).keep hmod.1 (nB _ (wp_mem k)) (nB _ (ws_mem k))
           (fun _ => hmod.2 k), hW4.apart, hW4.distinct⟩, hO,
-        hU.trans (hmod.1.mono (worksSet_of hO hC0)), fun z h => hgF _ (hg _ h)⟩
+        hU.trans (hmod.1.mono (worksSet_of hO hC0)), fun z h => hgF _ (hg _ h), hH⟩
     -- the cell scan
     wp_step
     refine wp_cellLoop hF hw1 hw2 (temps_gss _ _ _)
       (by simp only [le5]; rw [temps_gso _ _ (by decide), temps_gss]) ?_
-    intro le6 m6 W1' W2' hw1' hw2' hS1 hW2' hnnt6 hgood hmod6 hg6 ho6
+    intro le6 m6 W1' W2' hw1' hw2' hS1 hW2' hnnt6 hgood hmod6 h016 hg6 ho6
+    have hH6 : HitsOk m (c 2) (b 2) → HitsOk m6 (C 2) (B 2) := fun hH =>
+      (hH4 hH).unch h016 (by rintro (e | e); exact hF.wdist 2 0 (by decide) e; exact hF.wdist 2 1 (by decide) e)
     have hF6 := (hF.unch hmod6.1).temps (le' := le6) fun x hx => ho6 x (args_not_scan x hx)
     have harr : ∀ mF, Mod m4 mF B → ∀ k, ∃ vals, ArrayAt mF .Mint32 (B k) 0 vals n := by
       intro mF hmod k
@@ -377,7 +385,7 @@ theorem bestcell_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sofs
       apply wp_return_some_eval
       simp only [Exec.evalExpr, hF6.hn, typeof, cop, sparse.fn.«nausparse:bestcell_sg».fn_return_eq,
         Isautom.free_empty]
-      refine ⟨rfl, ?_, post m6 hmod6 hg6⟩
+      refine ⟨rfl, ?_, post m6 hmod6 hg6 hH6⟩
       rw [bestcell_eq, ite_eq_left (by simp [Array.isEmpty, hK0])]
     rw [ite_eq_right (by simpa using hK0)]
     apply wp_skip
@@ -386,7 +394,7 @@ theorem bestcell_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sofs
     obtain ⟨W4a, hw4a⟩ := harr m6 hmod6 3
     wp_step
     refine wp_zero hF6 hw3a hw4a hnnt6 (by omega) ?_
-    intro le7 m7 W3z W4z hw3z hw4z hz hu7 hk72 hk73 hg7 ho7
+    intro le7 m7 W3z W4z hw3z hw4z hz hu7 hout7 hk72 hk73 hg7 ho7
     have hF7 := (hF6.unch (hu7.mono fun _ hz => hz.elim (fun e => ⟨2, e⟩) (fun e => ⟨3, e⟩))).temps
       (le' := le7) fun x hx => ho7 x
         (by rcases hx with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> decide)
@@ -398,7 +406,23 @@ theorem bestcell_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sofs
     wp_step
     refine wp_joins hF7 hgood (hw1'.unch hu7 (hF6.not23 0 (.inl rfl))) hS1
       (hw2'.unch hu7 (hF6.not23 1 (.inr rfl))) hW2' hw3z hw4z hz hnnt7 ?_
-    intro le8 m8 W4c hw4c hc8 hu8 hk82 hk83 hg8 ho8
+    intro le8 m8 W4c hw4c hc8 hu8 ⟨W3f, hw3f, hz3f⟩ hout8 hk82 hk83 hg8 ho8
+    have hH8 : HitsOk m (c 2) (b 2) → HitsOk m8 (C 2) (B 2) := fun hH => by
+      obtain ⟨T, hT, ha⟩ := hH6 hH
+      have ho : Outside m6 m8 (B 2) (0 + csize .Mint32 * ((0 : Nat) : Int))
+          (0 + csize .Mint32 * (((0 + (cells n lab ptn level).starts.size : Nat)) : Int)) := by
+        simpa using hout7.trans hout8
+      have hs := hw3f.slice 0 (cells n lab ptn level).starts.size (by omega)
+      have hf := ha.outside 0 _ hs ho
+      refine ⟨fun i => if i < (cells n lab ptn level).starts.size then 0 else T i, fun i => ?_,
+        hf.congr fun i _ => ?_⟩
+      · by_cases h : i < (cells n lab ptn level).starts.size
+        · simp only [ite_eq_left h]; decide
+        · simp only [ite_eq_right h]; exact hT i
+      · by_cases h : i < (cells n lab ptn level).starts.size
+        · simp only [Nat.zero_le, true_and, Nat.zero_add, h, ite_true, Nat.sub_zero]
+          exact hz3f i h
+        · simp only [Nat.zero_le, true_and, Nat.zero_add, h, ite_false]
     have hF8 := (hF7.unch (hu8.mono fun _ hz => hz.elim (fun e => ⟨2, e⟩) (fun e => ⟨3, e⟩))).temps
       (le' := le8) fun x hx => ho8 x (args_not_j x hx)
     have hmod8 := hF7.mod23 hu8 hk82 hk83
@@ -446,7 +470,7 @@ theorem bestcell_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sofs
       hw1c (by omega) (eval_gvar (k := 0) find_work1 (hF8.wptr 0)) rfl rfl rfl (tl id.j) _ (by omega) hj9 rfl,
       (hS1 _ (by omega)).1]
     simp only [typeof, cop, sparse.fn.«nausparse:bestcell_sg».fn_return_eq, Isautom.free_empty]
-    refine ⟨rfl, ?_, post m8 ((hmod6.trans hmod7).trans hmod8) fun z h => hg8 _ (hg7 _ (hg6 _ h))⟩
+    refine ⟨rfl, ?_, post m8 ((hmod6.trans hmod7).trans hmod8) (fun z h => hg8 _ (hg7 _ (hg6 _ h))) hH8⟩
     rw [bestcell_eq, ite_eq_right (by simpa [Array.isEmpty] using hK0)]
     have hch := choose_arg (Graph.ofGraph G) lab (cells n lab ptn level) K (by omega)
     simp only [choose]

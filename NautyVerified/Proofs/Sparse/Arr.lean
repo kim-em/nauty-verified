@@ -267,6 +267,71 @@ theorem _root_.NautyVerified.Logic.ArrayAt.past {m m' : mem} {chunk : memory_chu
   rw [elemOfs, ho.load _ _ (.inr (by omega))]
   exact h.load i hi'
 
+/-- Storing element `i` changes the block only inside that element. -/
+theorem _root_.NautyVerified.Logic.Outside.store_at {m m' : mem} {chunk : memory_chunk} {b : block}
+    {base : Int} {vals : Nat → val} {n : Nat} (h : ArrayAt m chunk b base vals n) {i : Nat}
+    (hi : i < n) {v : val} (hst : Mem.store chunk m b (elemOfs chunk base i) v = some m')
+    {lo hi' : Int} (hlo : lo ≤ base + csize chunk * i)
+    (hhi : base + csize chunk * ((i : Int) + 1) ≤ hi') : Outside m m' b lo hi' := by
+  have hs := h.slice i 1 (by omega)
+  have e : elemOfs chunk (base + csize chunk * i) 0 = elemOfs chunk base i := by
+    rw [elemOfs_slice]; rfl
+  refine Outside.store hs (i := 0) (by omega) (by rw [e]; exact hst) hlo ?_
+  rw [Int.mul_add, Int.mul_one] at hhi
+  simpa [Int.add_assoc] using hhi
+
+theorem zero_lo (k : Nat) : (0 : Int) ≤ intOfZ (Ptrofs.unsigned Ptrofs.zero) + csize .Mint32 * k := by
+  show (0 : Int) ≤ 0 + csize .Mint32 * k
+  rw [show csize .Mint32 = 4 from rfl]; omega
+
+theorem zero_hi {k K : Nat} (h : k < K) :
+    intOfZ (Ptrofs.unsigned Ptrofs.zero) + csize .Mint32 * ((k : Int) + 1) ≤ 0 + csize .Mint32 * K := by
+  show (0 : Int) + csize .Mint32 * ((k : Int) + 1) ≤ 0 + csize .Mint32 * K
+  rw [show csize .Mint32 = 4 from rfl]; omega
+
+/-- `wp_idx_store`, recording that the block changed only inside the element. -/
+theorem wp_idx_store_at {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {pe : expr}
+    {ty : Cfrontend.Ctypes.type} {chunk : memory_chunk} {bo : block} {ofs : ptrofs}
+    {vals : Nat → val} {n : Nat}
+    (harr : ArrayAt m chunk bo (intOfZ (Ptrofs.unsigned ofs)) vals n) (hn : n < 2147483648)
+    (hp : Exec.evalExpr ge e le m pe = some (.Vptr bo ofs)) (hpty : typeof pe = tptr ty)
+    (hmode : Cfrontend.Ctypes.access_mode ty = .By_value chunk)
+    (hsz : intOfZ (Cfrontend.Ctypes.sizeof ge.genv_cenv ty) = csize chunk)
+    (a : expr) (c : Nat) (hc : c < n) {lo hi : Int}
+    (hlo : lo ≤ intOfZ (Ptrofs.unsigned ofs) + csize chunk * c)
+    (hhi : intOfZ (Ptrofs.unsigned ofs) + csize chunk * ((c : Int) + 1) ≤ hi)
+    (ha : Exec.evalExpr ge e le m a = some (.Vint (ir c))) (hty : typeof a = tint)
+    (rhs : expr) (rty : Cfrontend.Ctypes.type) (hrty : typeof rhs = rty) (v w : val)
+    (hrhs : Exec.evalExpr ge e le m rhs = some v)
+    (hcast : Cfrontend.Cop.sem_cast v rty ty m = some w)
+    (hw : Val.load_result chunk w = w)
+    (hQ : ∀ m', ArrayAt m' chunk bo (intOfZ (Ptrofs.unsigned ofs)) (upd vals c w) n →
+      Outside m m' bo lo hi →
+      Unch m m' (· = bo) → Alloc.Keep m m' bo → (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
+      Q.normal E0 e le m') :
+    Wp xi ge f (.Sassign (.Ederef (.Ebinop .Oadd pe a (tptr ty)) ty) rhs) Q e le m := by
+  obtain ⟨m', hst, harr', -⟩ := store_array harr hc w hw
+  have hcp := csize_pos chunk
+  have haddr : Ptrofs.unsigned (Ptrofs.add ofs (Ptrofs.mul (Ptrofs.repr
+      (Cfrontend.Ctypes.sizeof ge.genv_cenv ty)) (Ptrofs.of_ints (ir c)))) =
+      elemOfs chunk (intOfZ (Ptrofs.unsigned ofs)) c := by
+    apply addr_elem ofs _ chunk hsz rfl (by omega)
+    have hf := harr.fits
+    have : csize chunk * c ≤ csize chunk * n :=
+      Int.mul_le_mul_of_nonneg_left (by omega) (by omega)
+    omega
+  have ho : Outside m m' bo lo hi := Outside.store_at harr hc hst hlo hhi
+  apply wp_assign_eval
+  simp only [Exec.evalLvalue, Exec.evalExpr, hp, ha, hty, hpty, hrhs, hrty]
+  simp only [typeof, cop, hcast, Exec.assignLoc, hmode, Mem.storev]
+  rw [haddr, hst]
+  exact hQ m' harr' ho (Unch.store hst rfl) (Alloc.Keep.store hst (by
+    have := harr.base_nonneg
+    simp only [elemOfs, intOfZ_zOfInt]
+    have : 0 ≤ csize chunk * (c : Int) := Int.mul_nonneg (by omega) (by omega)
+    omega))
+    (fun z hz => Mem.store_valid_block_1 _ _ _ _ _ _ hst _ hz)
+
 /-! ### Arrays of small naturals -/
 
 /-- Two adjacent arrays of a block as one. -/

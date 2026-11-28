@@ -36,7 +36,7 @@ open NautyVerified NautyVerified.Logic NautyVerified.Program NautyVerified.Word 
 open NautyVerified.Source
 open NautyVerified.Proofs.Alloc (DynAt Keep Slot InUse SlotsOk)
 open NautyVerified.Proofs.Set (BitTable longs)
-open NautyVerified.Proofs.Sparse (SparseGraphAt CanonAt CanonRows MarksAt base start)
+open NautyVerified.Proofs.Sparse (SparseGraphAt CanonAt CanonRows MarksAt base start HitsOk)
 open Hex.GraphIso.Nauty
 
 attribute [local instance] NautyEnv.sparse
@@ -175,10 +175,12 @@ theorem valid_of_load {m : mem} {chunk : memory_chunk} {b : block} {ofs : Z} {v 
     (h : Mem.load chunk m b ofs = some v) : Mem.valid_block m b :=
   Alloc.valid_of_access (Mem.load_valid_access _ _ _ _ _ h)
 
-/-- The scratch state: the six pairs, the globals valid, and both mark invariants. -/
+/-- The scratch state: the six pairs, the globals valid, both mark invariants,
+and `HITS` (`work3`) holding naturals below `2^31` up to its capacity. -/
 def sparseWork (m : mem) : Prop :=
   SlotsOk m sparseSlots sparseL ∧ (∀ z ∈ sparseL, Mem.valid_block m z) ∧
-    (∃ c b s k, MarksAt m c b s k) ∧ (∃ c b s k, Sparse.Marks2.MarksAt m c b s k)
+    (∃ c b s k, MarksAt m c b s k) ∧ (∃ c b s k, Sparse.Marks2.MarksAt m c b s k) ∧
+    (∃ c b, DynAt m W3 W3S 4 c b ∧ HitsOk m c b)
 
 theorem vm1_inUse {m : mem} {c : Nat} {b : block} {s : Nat} {k : Nat → Int} (h : MarksAt m c b s k)
     (hc : 0 < c) : InUse m sparseSlots b := ⟨(VM1, VM1S, 2), by simp [sparseSlots], c, hc, h.dyn⟩
@@ -230,13 +232,19 @@ def sparseRep : DispatchRep sparseGe sparseOps where
     exact this
   globs_valid hw z hz := hw.2.1 z (List.mem_append_left _ hz)
   work_unch hw hu hg hk hv := by
-    obtain ⟨hs, hL, ⟨c1, b1, s1, k1, h1⟩, ⟨c2, b2, s2, k2, h2⟩⟩ := hw
+    obtain ⟨hs, hL, ⟨c1, b1, s1, k1, h1⟩, ⟨c2, b2, s2, k2, h2⟩, ⟨c3, b3, d3, h3⟩⟩ := hw
     have h := hs.unch hu (fun p hp => ⟨hg _ (slot_globs hp).1, hg _ (slot_globs hp).2⟩) hk
-    refine ⟨⟨h.1, fun z hz => hv z (hL z hz), ⟨c1, b1, s1, k1, ?_⟩, ⟨c2, b2, s2, k2, ?_⟩⟩, h.2⟩
+    have hk3 := fun (hc : 0 < c3) => hk b3 ⟨(W3, W3S, 4), by simp [sparseSlots], c3, hc, d3⟩
+    refine ⟨⟨h.1, fun z hz => hv z (hL z hz), ⟨c1, b1, s1, k1, ?_⟩, ⟨c2, b2, s2, k2, ?_⟩,
+      ⟨c3, b3, d3.keep hu (hg _ (by decide)) (hg _ (by decide)) fun hc => Keep.unch hu (hk3 hc), ?_⟩⟩,
+      h.2⟩
     · exact h1.unch hu (hg _ (by decide)) (hg _ (by decide)) (hg _ (by decide))
         fun hc => hk _ (vm1_inUse h1 hc)
     · exact h2.unch hu (hg _ (by decide)) (hg _ (by decide)) (hg _ (by decide))
         fun hc => hk _ (vm2_inUse h2 hc)
+    · by_cases hc : 0 < c3
+      · exact h3.unch hu (hk3 hc)
+      · rw [show c3 = 0 by omega]; exact HitsOk.zero _ _
   tables_unch ht hu hg := fun i hi => by
     rw [hu.load _ _ _ (hg _ (by simp [sparseGlobs]) (by decide))]; exact ht i hi
   graphBlocks_head _ _ := List.mem_cons_self
@@ -361,9 +369,10 @@ theorem sparse_step {m m' : mem} {out : block → Prop} (hw : sparseWork m)
     (hfresh : ∀ p ∈ Ps, ∀ q ∈ Ps, ∀ c c' z, 0 < c → 0 < c' → p.At m' c z → q.At m' c' z →
       ¬ Mem.valid_block m z → p = q)
     (hm1 : ∃ c b s k, MarksAt m' c b s k) (hm2 : ∃ c b s k, Sparse.Marks2.MarksAt m' c b s k)
+    (hm3 : ∃ c b, DynAt m' W3 W3S 4 c b ∧ HitsOk m' c b)
     (hk : ∀ z, out z → Mem.valid_block m z → Keep m m' z) : sparseRep.Step m m' out := by
   have h := slots_step hw hu hGs hPs hGq hW hout hch hfresh
-  refine ⟨hu.mono fun z hz => ?_, hv, ⟨h.1, fun z hz => hv z (hw.2.1 z hz), hm1, hm2⟩, h.2, hk⟩
+  refine ⟨hu.mono fun z hz => ?_, hv, ⟨h.1, fun z hz => hv z (hw.2.1 z hz), hm1, hm2, hm3⟩, h.2, hk⟩
   rcases hW z hz with h | h | h | h
   · exact .inr (.inl (hGs z h))
   · exact .inr (.inr (.inl (inUse_sub h hPs)))
@@ -400,7 +409,7 @@ theorem marks2_keep {m m' : mem} (hw : sparseWork m) {W out : block → Prop} (h
     (hout : ∀ z, out z → Mem.valid_block m z → z ∉ sparseWGlobs ∧ ¬ InUse m sparseSlots z)
     (hP : (VM2, VM2S, 2) ∉ Ps) (h1 : VM2 ∉ Gs) (h2 : VM2S ∉ Gs) (h3 : VM2V ∉ Gs) :
     ∃ c b s k, Sparse.Marks2.MarksAt m' c b s k := by
-  obtain ⟨c, b, s, k, hM⟩ := hw.2.2.2
+  obtain ⟨c, b, s, k, hM⟩ := hw.2.2.2.1
   obtain ⟨k1, k2, k3⟩ := keep_pair hw hGs hPs hW hout (q := (VM2, VM2S, 2)) (by simp [sparseSlots])
     hP h1 h2
   have k4 : ¬ W VM2V := by
@@ -413,6 +422,22 @@ theorem marks2_keep {m m' : mem} (hw : sparseWork m) {W out : block → Prop} (h
     · exact h (hw.2.1 _ hL)
     · exact (hout _ h (hw.2.1 _ hL)).1 hG
   exact ⟨c, b, s, k, hM.unch hu k1 k2 k4 fun hc => k3 c b hc hM.dyn⟩
+
+/-- `HITS` survives a call that leaves `work3` alone. -/
+theorem hits_keep {m m' : mem} (hw : sparseWork m) {W out : block → Prop} (hu : Unch m m' W)
+    {Gs : List block} {Ps : List Slot} (hGs : ∀ z ∈ Gs, z ∈ sparseWGlobs)
+    (hPs : ∀ p ∈ Ps, p ∈ sparseSlots)
+    (hW : ∀ z, W z → z ∈ Gs ∨ InUse m Ps z ∨ ¬ Mem.valid_block m z ∨ out z)
+    (hout : ∀ z, out z → Mem.valid_block m z → z ∉ sparseWGlobs ∧ ¬ InUse m sparseSlots z)
+    (hP : (W3, W3S, 4) ∉ Ps) (h1 : W3 ∉ Gs) (h2 : W3S ∉ Gs) :
+    ∃ c b, DynAt m' W3 W3S 4 c b ∧ HitsOk m' c b := by
+  obtain ⟨c, b, d, hH⟩ := hw.2.2.2.2
+  obtain ⟨k1, k2, k3⟩ := keep_pair hw hGs hPs hW hout (q := (W3, W3S, 4)) (by simp [sparseSlots])
+    hP h1 h2
+  refine ⟨c, b, d.keep hu k1 k2 fun hc => Keep.unch hu (k3 c b hc d), ?_⟩
+  by_cases hc : 0 < c
+  · exact hH.unch hu (k3 c b hc d)
+  · rw [show c = 0 by omega]; exact HitsOk.zero _ _
 
 /-- What the separation of a call's arguments gives for one of them. -/
 theorem sep_z {m : mem} {bs : List block} (h : sparseRep.Sep m bs) {z : block} (hz : z ∈ bs) :

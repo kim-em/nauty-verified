@@ -89,14 +89,16 @@ structure Pre {n : Nat} (m : mem) (G : Hex.SparseGraph n) (bsg : block) (sofs : 
   nlt : n < 1073741824
 
 /-- What they leave: the four pairs, each as before or a block not valid
-before, with room for `n` entries, and only `worksSet` changed. -/
+before, with room for `n` entries, only `worksSet` changed, and `HITS`
+(`work3`) holding naturals below `2^31` up to its capacity if it did before. -/
 def Post (m m' : mem) (c : Fin 4 → Nat) (b : Fin 4 → block) : Prop :=
   ∃ c' b', Works m' c' b' ∧ (∀ k, (c' k = c k ∧ b' k = b k) ∨ ¬ Mem.valid_block m (b' k)) ∧
-    Unch m m' (worksSet m c b) ∧ (∀ z, Mem.valid_block m z → Mem.valid_block m' z)
+    Unch m m' (worksSet m c b) ∧ (∀ z, Mem.valid_block m z → Mem.valid_block m' z) ∧
+    (HitsOk m (c 2) (b 2) → HitsOk m' (c' 2) (b' 2))
 
 theorem Post.refl {m : mem} {c : Fin 4 → Nat} {b : Fin 4 → block} (h : Works m c b) :
     Post m m c b :=
-  ⟨c, b, h, fun _ => .inl ⟨rfl, rfl⟩, Unch.refl _ _, fun _ h => h⟩
+  ⟨c, b, h, fun _ => .inl ⟨rfl, rfl⟩, Unch.refl _ _, fun _ h => h, fun h => h⟩
 
 def bestcellSpec {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sofs : ptrofs) (bv : block)
     (vo : ptrofs) (bd : block) (dofs : ptrofs) (be : block) (eo : ptrofs) (bl : block)

@@ -227,7 +227,8 @@ def StAt (m m' : mem) (le le' : temp_env) (n : Nat) (lab ptn : Array Nat) (level
   ∃ W1 W2, PTree.get id.i le' = some (.Vint (ir (s.first : Int))) ∧
     PTree.get id.nnt le' = some (.Vint (ir (s.starts.size : Int))) ∧
     ArrayAt m' .Mint32 (w 0) 0 W1 n ∧ ArrayAt m' .Mint32 (w 1) 0 W2 n ∧ ScanAt n lab s W1 W2 ∧
-    Mod m m' w ∧ (∀ z, Mem.valid_block m z → Mem.valid_block m' z) ∧
+    Mod m m' w ∧ Unch m m' (fun z => z = w 0 ∨ z = w 1) ∧
+    (∀ z, Mem.valid_block m z → Mem.valid_block m' z) ∧
     (∀ x, ¬ ScanLocal x → PTree.get x le' = PTree.get x le) ∧ Good n lab s ∧
     cellRun n lab ptn level (n - s.first) s = cells n lab ptn level
 
@@ -242,7 +243,7 @@ theorem run_step (hs : ptn.size = n) (hlast : ptn[n - 1]! ≤ level) {s : Cells}
 theorem StAt.frame (h : Frame m le G bv vo bd dofs be eo bl lofs lab bp pofs ptn level w o1b)
     {m' : mem} {le' : temp_env} {s : Cells} (hs : StAt m m' le le' n lab ptn level w s) :
     Frame m' le' G bv vo bd dofs be eo bl lofs lab bp pofs ptn level w o1b := by
-  obtain ⟨-, -, -, -, -, -, -, hmod, -, ho, -⟩ := hs
+  obtain ⟨-, -, -, -, -, -, -, hmod, -, -, ho, -⟩ := hs
   exact (h.unch hmod.1).temps fun x hx => ho x (args_not_scan x hx)
 
 /-- `NNTCELL[lab[i]] = n; ++i;` at a singleton. -/
@@ -253,7 +254,7 @@ theorem wp_single {Q : Logic.Post} {m' : mem} {le' : temp_env} {s : Cells}
       Q.normal E0 empty_env le'' m'') :
     Wp xi sge F single Q empty_env le' m' := by
   have hf' := hs.frame h
-  obtain ⟨W1, W2, hi, hnnt, hw1, hw2, ⟨hS1, hS2⟩, hmod, hg, ho, hgood, hrun⟩ := hs
+  obtain ⟨W1, W2, hi, hnnt, hw1, hw2, ⟨hS1, hS2⟩, hmod, h01, hg, ho, hgood, hrun⟩ := hs
   have hnlt := h.nlt
   have hlf := h.lsmall _ hf
   wp_step; wp_step; wp_step
@@ -267,7 +268,7 @@ theorem wp_single {Q : Logic.Post} {m' : mem} {le' : temp_env} {s : Cells}
   apply wp_set_eval
   simp only [Exec.evalExpr, hi, typeof, cop, ir_add]
   refine hQ _ m'' ⟨W1, _, ?_, ?_, hw1.unch hu' (hf'.wdist 0 1 (by decide)), hw2', ⟨?_, ?_⟩,
-    hmod.trans (hf'.mod 1 hu' hk'), fun z hz => hg' _ (hg _ hz), ?_,
+    hmod.trans (hf'.mod 1 hu' hk'), h01.trans (hu'.mono fun _ hz => .inr hz), fun z hz => hg' _ (hg _ hz), ?_,
     good_single hgood h.psize hf h.plast hp, run_step h.psize h.plast hf hrun⟩
   · rw [cellStep_single h.psize hf h.plast hp, temps_gss]; push_cast; rfl
   · rw [cellStep_single h.psize hf h.plast hp, temps_gso _ _ (by decide)]; exact hnnt
@@ -291,7 +292,7 @@ theorem wp_nontriv {Q : Logic.Post} {m' : mem} {le' : temp_env} {s : Cells}
       Q.normal E0 empty_env le'' m'') :
     Wp xi sge F nontriv Q empty_env le' m' := by
   have hf' := hs.frame h
-  obtain ⟨W1, W2, hi, hnnt, hw1, hw2, ⟨hS1, hS2⟩, hmod, hg, ho, hgood, hrun⟩ := hs
+  obtain ⟨W1, W2, hi, hnnt, hw1, hw2, ⟨hS1, hS2⟩, hmod, h01, hg, ho, hgood, hrun⟩ := hs
   have hnlt := h.nlt
   have sp := Spec.cellEnd_spec h.psize hf h.plast
   have hgt := cellEnd_gt h.psize hf h.plast hp
@@ -351,6 +352,8 @@ theorem wp_nontriv {Q : Logic.Post} {m' : mem} {le' : temp_env} {s : Cells}
   have hnsz := hgood.nsize
   refine hQ _ m3 ⟨_, _, ?_, ?_, hw1b, hw2a.unch hu3 (hf'.wdist 1 0 (by decide)), ⟨?_, ?_⟩,
     hmod.trans (((hf'.mod 0 hu1 hk1).trans (hf1.mod 1 hu2 hk2)).trans (hf2.mod 0 hu3 hk3)),
+    ((h01.trans (hu1.mono fun _ hz => .inl hz)).trans (hu2.mono fun _ hz => .inr hz)).trans
+      (hu3.mono fun _ hz => .inl hz),
     fun z hz => hg3 _ (hg2 _ (hg1 _ (hg _ hz))), ?_,
     good_nontriv hgood h.psize hf h.plast hp h.lsmall h.linj, run_step h.psize h.plast hf hrun⟩
   · rw [hstep, temps_gss]
@@ -401,7 +404,7 @@ theorem wp_cellLoop {Q : Logic.Post} {W1 W2 : Nat → val}
         W1' (n / 2 + k) = .Vint (ir ((cells n lab ptn level).sizes[k]! : Int))) →
       (∀ v < n, W2' v = .Vint (ir ((cells n lab ptn level).nntcell[v]! : Int))) →
       PTree.get id.nnt le' = some (.Vint (ir ((cells n lab ptn level).starts.size : Int))) →
-      Good n lab (cells n lab ptn level) → Mod m m' w →
+      Good n lab (cells n lab ptn level) → Mod m m' w → Unch m m' (fun z => z = w 0 ∨ z = w 1) →
       (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
       (∀ x, ¬ ScanLocal x → PTree.get x le' = PTree.get x le) → Q.normal E0 empty_env le' m') :
     Wp xi sge F cellLoop Q empty_env le m := by
@@ -411,12 +414,12 @@ theorem wp_cellLoop {Q : Logic.Post} {W1 W2 : Nat → val}
     (J := fun v t e' le' m' => t = E0 ∧ e' = empty_env ∧ ∃ s, n - s.first < v ∧
       StAt m m' le le' n lab ptn level w s) ?_ ?_ (n := n - 0)
     ⟨rfl, rfl, ⟨#[], #[], Array.replicate n n, 0⟩, rfl, W1, W2, hi, hnnt, hw1, hw2,
-      ⟨fun k hk => by simp at hk, fun p hp => by simp at hp⟩, Mod.refl _ _, fun _ h => h,
+      ⟨fun k hk => by simp at hk, fun p hp => by simp at hp⟩, Mod.refl _ _, Unch.refl _ _, fun _ h => h,
       fun _ _ => rfl, good_start h.lsmall, by rw [Nat.sub_zero]; rfl⟩
   · rintro v t e' le' m' ⟨rfl, rfl, s, rfl, hs⟩
     have hf' := hs.frame h
     have hi' : PTree.get id.i le' = some (.Vint (ir (s.first : Int))) := hs.choose_spec.choose_spec.1
-    have hfle := hs.choose_spec.choose_spec.2.2.2.2.2.2.2.2.1.fle
+    have hfle := hs.choose_spec.choose_spec.2.2.2.2.2.2.2.2.2.1.fle
     wp_step; wp_step; wp_step
     apply wp_if_eval
     simp only [Exec.evalExpr, hi', hf'.hn, typeof, cop]
@@ -437,12 +440,12 @@ theorem wp_cellLoop {Q : Logic.Post} {W1 W2 : Nat → val}
     · rw [ite_eq_right (by simpa using hfn)]
       apply wp_break
       simp only [E0_append]
-      obtain ⟨W1', W2', -, hnnt', hw1', hw2', ⟨hS1, hS2⟩, hmod, hg, ho, hgood, hrun⟩ := hs
+      obtain ⟨W1', W2', -, hnnt', hw1', hw2', ⟨hS1, hS2⟩, hmod, h01, hg, ho, hgood, hrun⟩ := hs
       have hsc : s = cells n lab ptn level := by rw [← hrun, show n - s.first = 0 by omega]; rfl
       subst hsc
       exact hQ le' m' W1' W2' hw1' hw2' hS1 (fun v hv => by
         obtain ⟨p, hp, rfl⟩ := h.lonto v hv
-        exact hS2 p (by omega)) hnnt' hgood hmod hg ho
+        exact hS2 p (by omega)) hnnt' hgood hmod h01 hg ho
   · rintro v t e' le' m' ⟨rfl, rfl, s, hlt, hs⟩
     apply wp_skip
     exact ⟨n - s.first, hlt, by simp, rfl, s, rfl, hs⟩

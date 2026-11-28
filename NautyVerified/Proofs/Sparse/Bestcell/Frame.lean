@@ -26,7 +26,7 @@ open CompCert4Lean.Foundation.Numbers.Rocq.Coq CompCert4Lean.Lib.Maps CompCert4L
 open NautyVerified NautyVerified.Logic NautyVerified.Word NautyVerified.Proofs NautyVerified.Source
 open NautyVerified.Proofs.Sparse NautyVerified.Program
 open NautyVerified.Proofs.Sparse.Isautom (sk tv tl iat lat)
-open NautyVerified.Proofs.Alloc (DynAt Keep)
+open NautyVerified.Proofs.Alloc (DynAt Keep dynalloc1)
 
 attribute [local instance] NautyEnv.sparse
 
@@ -89,6 +89,41 @@ theorem worksSet_of {c1 : Fin 4 → Nat} {b1 : Fin 4 → block} (ho : Orig m c b
 
 end
 
+/-- `DYNALLOC1` of an `int` array to `n` held in an `int` temporary: either
+nothing happens, or the array moves to a zero-filled block new to memory. -/
+theorem wp_dynZ {f : function} {Q : Logic.Post} {le : temp_env} {m : mem}
+    {gs gp x t1 t2 msg : ident} {msgLen : Int} {bs bp b : block} {cap k : Nat}
+    (hgs : Genv.find_symbol sge.genv_genv gs = some bs)
+    (hgp : Genv.find_symbol sge.genv_genv gp = some bp)
+    (hD : DynAt m bp bs 4 cap b) (hx : PTree.get x le = some (.Vint (ir k)))
+    (hk : k < 2147483648) (hck : 4 * k < 2 ^ 62)
+    (hQ : ∀ le' m' cap' b', DynAt m' bp bs 4 cap' b' → k ≤ cap' →
+      Unch m m' (fun z => z = bs ∨ z = bp ∨ (0 < cap ∧ z = b) ∨ (¬ Mem.valid_block m b' ∧ z = b')) →
+      ((cap' = cap ∧ b' = b ∧ m' = m) ∨ (¬ Mem.valid_block m b' ∧ Alloc.Zeros m' b' (4 * cap'))) →
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
+      (∀ y, y ≠ t1 → y ≠ t2 → PTree.get y le' = PTree.get y le) →
+      Q.normal E0 empty_env le' m') :
+    Wp xi sge f (dynalloc1 gs gp tint (.Etempvar x tint) t1 t2 msg msgLen) Q empty_env le m := by
+  by_cases hc : k ≤ cap
+  · have hnil1 := NautyVerified.Proofs.Alloc.noShadow_empty _ _ hgs
+    have hcap := hD.capLt
+    wp_step; wp_step
+    apply wp_if_eval
+    simp only [Exec.evalExpr, hx]
+    simp only [Exec.lvalOfVar, hnil1, hgs, Exec.derefLoc,
+      Cfrontend.Ctypes.access_mode, typeof, cop, Mem.loadv,
+      show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl, hD.capLd,
+      cast_int_long_ir (a := k) ⟨by omega, by omega⟩]
+    rw [Alloc.ltu_lr (a := cap) (b := k) (by omega) (by omega)]
+    rw [ite_eq_right (by simpa using hc)]
+    apply wp_skip
+    exact hQ le m cap b hD hc (Unch.refl _ _) (.inl ⟨rfl, rfl, rfl⟩) (fun _ h => h) (fun _ _ _ => rfl)
+  · refine Alloc.wp_dynalloc1Z hgs hgp rfl hD (fun _ _ => hx) rfl hk hck ?_
+    intro le' m' cap' b' hD' hk' hu hor hg ho
+    rcases hor with ⟨rfl, rfl⟩ | hz
+    · omega
+    · exact hQ le' m' cap' b' hD' hk' hu (.inr hz) hg ho
+
 /-- One `DYNALLOC1(int, work<k>, work<k>_sz, n, "bestcell_sg")`. -/
 theorem wp_dynW {Q : Logic.Post} {le : temp_env} {m : mem} {c : Fin 4 → Nat} {b : Fin 4 → block}
     {n : Nat} (k : Fin 4) {x y t1 t2 : ident}
@@ -97,12 +132,15 @@ theorem wp_dynW {Q : Logic.Post} {le : temp_env} {m : mem} {c : Fin 4 → Nat} {
     (hW : Works m c b) (hx : PTree.get id.n le = some (.Vint (ir n))) (hn : n < 1073741824)
     (hQ : ∀ le' m' cap' b', Works m' (fset c k cap') (fset b k b') → n ≤ cap' →
       Orig m c b (fset c k cap') (fset b k b') → Unch m m' (worksSet m c b) →
+      Unch m m' (fun z => z = ws k ∨ z = wp k ∨ (0 < c k ∧ z = b k) ∨ ¬ Mem.valid_block m z) →
+      ((cap' = c k ∧ b' = b k ∧ m' = m) ∨ (¬ Mem.valid_block m b' ∧ Alloc.Zeros m' b' (4 * cap'))) →
       (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
       (∀ z, z ≠ t1 → z ≠ t2 → PTree.get z le' = PTree.get z le) → Q.normal E0 empty_env le' m') :
     Wp xi sge F (dyn x y t1 t2) Q empty_env le m := by
-  refine Alloc.wp_dynalloc1 (E := NautyEnv.sparse) hgs hgp rfl (hW.dyn k) hx (by omega)
-    (show 4 * n < 2 ^ 62 by omega) ?_
-  intro le' m' cap' b' hD' hle hu hor hg ho
+  refine wp_dynZ hgs hgp (hW.dyn k) hx (by omega) (show 4 * n < 2 ^ 62 by omega) ?_
+  intro le' m' cap' b' hD' hle hu horZ hg ho
+  have hor : (cap' = c k ∧ b' = b k) ∨ ¬ Mem.valid_block m b' :=
+    horZ.imp (fun h => ⟨h.1, h.2.1⟩) (·.1)
   have hS : ∀ z, Mem.valid_block m z → z ≠ ws k → z ≠ wp k → (0 < c k → z ≠ b k) →
       ¬ (z = ws k ∨ z = wp k ∨ (0 < c k ∧ z = b k) ∨ (¬ Mem.valid_block m b' ∧ z = b')) :=
     fun z hv h1 h2 h3 => Alloc.not_dynSet hv h1 h2 h3
@@ -110,7 +148,13 @@ theorem wp_dynW {Q : Logic.Post} {le : temp_env} {m : mem} {c : Fin 4 → Nat} {
   have hvs : ∀ j, Mem.valid_block m (ws j) := fun j => Alloc.valid_of_access (hW.dyn j).bsW
   have hap : ∀ j, 0 < c j → ∀ z ∈ wglobs, b j ≠ z := fun j hc z hz h => hW.apart j hc (h ▸ hz)
   refine hQ le' m' cap' b' ⟨fun j => ?_, fun j hc => ?_, fun j j' hjj hc hc' => ?_⟩ hle
-    (fun j => ?_) (hu.mono fun z hz => ?_) hg ho
+    (fun j => ?_) (hu.mono fun z hz => ?_)
+    (hu.mono fun z hz => by
+      rcases hz with h | h | h | ⟨hnv, rfl⟩
+      · exact .inl h
+      · exact .inr (.inl h)
+      · exact .inr (.inr (.inl h))
+      · exact .inr (.inr (.inr hnv))) horZ hg ho
   · by_cases hj : j = k
     · subst hj; simp only [fset, ite_true]; exact hD'
     · simp only [fset, ite_eq_right hj]
@@ -151,6 +195,31 @@ theorem wp_dynW {Q : Logic.Post} {le : temp_env} {m : mem} {c : Fin 4 → Nat} {
     · exact .inl (wp_mem k)
     · exact .inr (.inl ⟨k, hc, rfl⟩)
     · exact .inr (.inr hnv)
+
+/-- `HITS` through the `DYNALLOC1` of another pair. -/
+theorem hits_other {m m' : mem} {c : Fin 4 → Nat} {b : Fin 4 → block} (hW : Works m c b)
+    {k : Fin 4} (hk : k ≠ 2)
+    (hu : Unch m m' (fun z => z = ws k ∨ z = wp k ∨ (0 < c k ∧ z = b k) ∨ ¬ Mem.valid_block m z))
+    (h : HitsOk m (c 2) (b 2)) : HitsOk m' (c 2) (b 2) := by
+  by_cases hc : 0 < c 2
+  · refine h.unch hu ?_
+    rintro (e | e | ⟨hck, e⟩ | e)
+    · exact hW.apart 2 hc (e ▸ ws_mem k)
+    · exact hW.apart 2 hc (e ▸ wp_mem k)
+    · exact hW.distinct 2 k (Ne.symm hk) hc hck e
+    · exact e (hW.valid 2 hc)
+  · rw [show c 2 = 0 by omega]; exact HitsOk.zero _ _
+
+/-- `HITS` through its own `DYNALLOC1`: kept, or a zero-filled block. -/
+theorem hits_new {m m' : mem} {c : Fin 4 → Nat} {b : Fin 4 → block} {cap' : Nat} {b' : block}
+    (hW : Works m' (fset c 2 cap') (fset b 2 b')) (hn : 0 < cap') (h : HitsOk m (c 2) (b 2))
+    (hz : (cap' = c 2 ∧ b' = b 2 ∧ m' = m) ∨ (¬ Mem.valid_block m b' ∧ Alloc.Zeros m' b' (4 * cap'))) :
+    HitsOk m' cap' b' := by
+  rcases hz with ⟨rfl, rfl, rfl⟩ | ⟨-, hz⟩
+  · exact h
+  · have hmal := (hW.dyn 2).mal (by simp [fset]; exact hn)
+    simp only [fset, ite_true] at hmal
+    exact HitsOk.zeros hz hmal
 
 /-! ## The frame of the loops -/
 

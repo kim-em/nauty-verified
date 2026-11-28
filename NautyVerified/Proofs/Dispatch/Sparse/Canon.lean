@@ -130,6 +130,7 @@ theorem sparse_testcanlab (xi : ExternalCalls) : sparseRep.TestcanlabFn xi spars
     refine ⟨rfl, hv, harr, sparse_step hw hval hu [VM1, VM1S, VM1V, W1, W1S]
       [(VM1, VM1S, 2), (W1, W1S, 4)] (by decide) hPs (by decide) hW hout ?_ ?_ ⟨_, _, _, _, hM'⟩
       (marks2_keep hw hu (by decide) hPs hW hout (by decide) (by decide) (by decide) (by decide))
+      (hits_keep hw hu (by decide) hPs hW hout (by decide) (by decide) (by decide))
       (fun z hz _ => hz ▸ hK)⟩
     · intro p hp
       simp only [List.mem_cons, List.mem_nil_iff, or_false] at hp
@@ -223,7 +224,7 @@ theorem sparse_updatecan (xi : ExternalCalls) : sparseRep.UpdatecanFn xi sparseR
       sparse_step hw hval hu [W1, W1S] [(W1, W1S, 4)] (by decide) hPs (by decide) hW hout ?_ ?_
         (marks1_keep hw hu (by decide) hPs hW hout (by decide) (by decide) (by decide) (by decide))
         (marks2_keep hw hu (by decide) hPs hW hout (by decide) (by decide) (by decide) (by decide))
-        ?_⟩
+        (hits_keep hw hu (by decide) hPs hW hout (by decide) (by decide) (by decide)) ?_⟩
     · intro p hp
       rw [List.mem_singleton] at hp; subst hp
       exact ⟨capW, bW, capW', bW', dW, dW', rW⟩

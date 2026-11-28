@@ -87,7 +87,9 @@ theorem sparse_init (xi : ExternalCalls) : sparseRep.InitFn xi sparseRep.init :=
       (marks1_keep hw hu (fun _ h => absurd h List.not_mem_nil) hPs hW hout (by decide) (by decide)
         (by decide) (by decide))
       (marks2_keep hw hu (fun _ h => absurd h List.not_mem_nil) hPs hW hout (by decide) (by decide)
-        (by decide) (by decide)) fun z hz _ => ?_⟩
+        (by decide) (by decide))
+      (hits_keep hw hu (fun _ h => absurd h List.not_mem_nil) hPs hW hout (by decide) (by decide)
+        (by decide)) fun z hz _ => ?_⟩
   · rw [show i = 0 by omega, e0]; exact hstld
   · rw [show i = 0 by omega, e0]; exact hstW
   · change z ∈ bc :: bV :: bD :: esOf (Sparse.Graph.ofGraph G).blank.neighbors.size bE at hz
