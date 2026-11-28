@@ -36,6 +36,7 @@ theorem wp_canonTest {f : function} {Q : Post} {le : temp_env} {level : Nat} (C 
     (hlev : PTree.get dense.id.level le = some (.Vint (ir level))) (hlv : level < 2147483648)
     (hlab : PTree.get dense.id.lab le = some (.Vptr S.bl S.lofs))
     (hcl : ∀ i < n, st.canonlab[i]! < n) (hcs : ∀ v < n, ∃ i < n, st.canonlab[i]! = v)
+    (hfit : st.compCanon = 0 → O.Fits G (O.rows st.canong) st.canonlab st.samerows)
     (hQ : ∀ le' m', PAt D m₀ m₁ m' S gl cl G bsr (canonTestG O (C.update G) G level st).1 nsp →
       SrAt m' bsr ((canonTestG O (C.update G) G level st).2 : Int) →
       (∀ x, x ≠ idOf 705 → PTree.get x le' = PTree.get x le) → Q.normal E0 e le' m') :
@@ -63,7 +64,7 @@ theorem wp_canonTest {f : function} {Q : Post} {le : temp_env} {level : Nat} (C 
       exact hQ le m' h' (hsr' _ hs0) fun _ _ => rfl
     · rw [decide_eq_false (by exact_mod_cast hlt), if_neg (by decide)]
       wp_step; wp_step; wp_step
-      refine wp_updatecan C c h hcl hcs ?_
+      refine wp_updatecan C c h hcl hcs (hfit hc0) ?_
       intro m2 h2 hfull hsr2
       simp only [seqPost, Post.after, E0_append]
       wp_step; wp_step; wp_step

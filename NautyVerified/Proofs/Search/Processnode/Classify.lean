@@ -67,6 +67,7 @@ theorem wp_canonBranch {f : function} {Q : Post} {le : temp_env} {level : Nat} (
     (hlab : PTree.get dense.id.lab le = some (.Vptr S.bl S.lofs))
     (hcode : PTree.get dense.id.code le = some (.Vint (ir 0)))
     (hcl : ∀ i < n, st.canonlab[i]! < n) (hcs : ∀ v < n, ∃ i < n, st.canonlab[i]! = v)
+    (hfit : st.compCanon = 0 → O.Fits G (O.rows st.canong) st.canonlab st.samerows)
     (hQ : ∀ le' m', Classified D m₀ m₁ m' S gl cl G bsr le le' (classifyCanonG O (C.update G) G level st) →
       Q.normal E0 e le' m') :
     Wp xi ge f (sk (.Sifthenelse (.Ebinop .Oeq (tv dense.id.«code») (ci 0 tint) tint)
@@ -91,7 +92,7 @@ theorem wp_canonBranch {f : function} {Q : Post} {le : temp_env} {level : Nat} (
   intro m2 h2 hsr2
   simp only [seqPost, Post.after, E0_append]
   wp_step
-  refine wp_canonTest C c h2 hsr2 hlev hlv hlab hcl hcs ?_
+  refine wp_canonTest C c h2 hsr2 hlev hlv hlab hcl hcs hfit ?_
   intro le3 m3 h3 hsr3 ho3
   simp only [seqPost, Post.after, E0_append]
   refine wp_canonPick (s := (canonTestG O (C.update G) G level st).2) c h3
@@ -118,6 +119,7 @@ theorem wp_classifyC {f : function} {Q : Post} {le : temp_env} {level numcells :
     (hcode : PTree.get dense.id.code le = some (.Vint (ir 0)))
     (hfl : ∀ i < n, st.firstlab[i]! < n) (hfs : ∀ v < n, ∃ i < n, st.firstlab[i]! = v)
     (hcl : ∀ i < n, st.canonlab[i]! < n) (hcs : ∀ v < n, ∃ i < n, st.canonlab[i]! = v)
+    (hfit : st.compCanon = 0 → O.Fits G (O.rows st.canong) st.canonlab st.samerows)
     (hQ : ∀ le' m', Classified D m₀ m₁ m' S gl cl G bsr le le' (O.classify G level numcells st) →
       Q.normal E0 e le' m') :
     Wp xi ge f classifyC Q e le m := by
@@ -181,7 +183,7 @@ theorem wp_classifyC {f : function} {Q : Post} {le : temp_env} {level numcells :
           refine wp_canonBranch C c h3 (by rw [ho3 _ (by decide) (by decide) (by decide) (by decide)]; exact hlev2)
             (by omega) (by rw [ho3 _ (by decide) (by decide) (by decide) (by decide)]; exact hlab2)
             (by rw [hF hfa]; exact hcode2) (by rw [Spec.scatter_eq]; exact hcl)
-            (by rw [Spec.scatter_eq]; exact hcs) ?_
+            (by rw [Spec.scatter_eq]; exact hcs) (by simpa only [Spec.scatter_eq] using hfit) ?_
           intro le4 m4 hC
           exact hQ le4 m4 ⟨hC.at_, hC.code, hC.perm, hC.sr, fun x hx => by
             obtain ⟨t1, t2, t3, t4, -, t6⟩ := tl x hx
@@ -200,7 +202,7 @@ theorem wp_classifyC {f : function} {Q : Post} {le : temp_env} {level numcells :
         rw [if_neg hel] at hQ
         apply wp_skip
         simp only [seqPost, Post.after, E0_append]
-        refine wp_canonBranch C c h hlev2 (by omega) hlab2 hcode2 hcl hcs ?_
+        refine wp_canonBranch C c h hlev2 (by omega) hlab2 hcode2 hcl hcs hfit ?_
         intro le4 m4 hC
         exact hQ le4 m4 ⟨hC.at_, hC.code, hC.perm, hC.sr, fun x hx => by
           rw [hC.temps x hx, g x (tl x hx).2.2.2.2.2]⟩

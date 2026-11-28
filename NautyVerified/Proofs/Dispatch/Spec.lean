@@ -71,6 +71,10 @@ structure Ops where
   isautom : {n : Nat} → Gr n → Array Nat → Bool
   testcanlab : {n : Nat} → Gr n → Store n → Array Nat → Int × Nat
   updatecan : {n : Nat} → Gr n → Store n → Array Nat → Nat → Store n
+  /-- What `updatecan G c lab sr` needs of `lab` and `sr` against the store (dense:
+  nothing; sparse: the rewritten rows fit the store's edge array, which holds
+  when the first `sr` rows are `G`'s relabelled by `lab`). -/
+  Fits : {n : Nat} → Gr n → Store n → Array Nat → Nat → Prop
   cheapautom : Array Nat → Nat → Nat → Bool
   /-- The canonical store as HexGraphIso's search state carries it (dense: the
   rows; sparse: the rows and the refinement scratch). -/
@@ -92,6 +96,7 @@ structure Ops where
   isautom := isautom
   testcanlab := testcanlab
   updatecan := updatecan
+  Fits _ _ _ _ := True
   cheapautom := cheapautom
   Canon n := Array (VSet n)
   rows c := c
@@ -292,7 +297,7 @@ def updatecanSpec {n : Nat} (G : O.Gr n) (gl : R.GLoc) (bg : block) (gofs : ptro
     ArrayAt m .Mint32 bl (intOfZ (Ptrofs.unsigned lofs)) (ints lab) n ∧ lab.size = n ∧
     (∀ j < n, lab[j]! < n) ∧ (∀ p < n, ∃ j < n, lab[j]! = p) ∧
     (∀ i < n, ∀ j < n, lab[i]! = lab[j]! → i = j) ∧ sr ≤ n ∧
-    R.Sep m (R.graphBlocks gl bg ++ R.canonBlocks cl bc ++ [bl])
+    R.Sep m (R.graphBlocks gl bg ++ R.canonBlocks cl bc ++ [bl]) ∧ O.Fits G c lab sr
   post _ m t _ m' := t = E0 ∧ R.CanonRep m' cl bc cofs M (O.updatecan G c lab sr) n ∧
     O.StoreOk G (O.updatecan G c lab sr) ∧ R.Step m m' (· ∈ R.canonBlocks cl bc)
 

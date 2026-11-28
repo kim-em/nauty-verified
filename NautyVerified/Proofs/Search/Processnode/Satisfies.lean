@@ -149,7 +149,7 @@ theorem processnode_satisfiesG (D : DispatchC ge O) (C : Classifier O) (S : SLoc
     · exact Nextelement.norepet_of_nodup (by decide)
     · exact Nextelement.norepet_of_nodup (by decide)
     · exact Nextelement.disjoint_of (by decide)
-  · rintro args m₀ ⟨rfl, h, hcb, hl1, hln, hncl, hlok, hval, hua⟩
+  · rintro args m₀ ⟨rfl, h, hcb, hl1, hln, hncl, hlok, hval, hua, hfit⟩
     rw [triple_iff_wp]
     rintro e le m₁ ⟨bsr, rfl, hal, rfl⟩
     have hfresh : ¬ Mem.valid_block m₀ bsr := Mem.fresh_block_alloc _ _ _ _ _ hal
@@ -209,7 +209,7 @@ theorem processnode_satisfiesG (D : DispatchC ge O) (C : Classifier O) (S : SLoc
     wp_step
     refine wp_classifyC C c hP (by rw [t0 _ (by simp)]; exact hlev0) hln
       (by rw [t0 _ (by simp)]; exact hnc0) hncl (by rw [t0 _ (by simp)]; exact hlab0) (temps_gss _ _ _)
-      hlok.firstlabSmall hlok.firstlabSurj hlok.canonlabSmall hlok.canonlabSurj ?_
+      hlok.firstlabSmall hlok.firstlabSurj hlok.canonlabSmall hlok.canonlabSurj hfit ?_
     intro le2 m2 hC
     simp only [seqPost, Post.after, E0_append]
     have hcl := C.classify_eq G level numcells st

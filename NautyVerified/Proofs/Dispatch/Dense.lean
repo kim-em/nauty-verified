@@ -244,7 +244,7 @@ theorem dense_updatecan (xi : ExternalCalls) : denseRep.UpdatecanFn xi denseRep.
   refine ⟨_, by simp [Genv.find_funct, denseRep, Search.funct_updatecanFn], type_updatecanD,
     fun G _ bg gofs c _ bc cofs bl lofs lab sr M => ?_⟩
   refine Satisfies.of_pre fun args m ⟨hargs, hc, ⟨gw, hg⟩, _, ⟨cw, hcr⟩, hok, hl, hls, hlsm, hsurj,
-    _, hsr, hsep⟩ => ?_
+    _, hsr, hsep, _⟩ => ?_
   have hw := hc.work
   obtain ⟨⟨cP, bP, dP⟩, ⟨cS, bS, dS⟩, ⟨cB, bB, dB⟩⟩ := dense_dyn hw
   have wP := fun h => work_ne hw (dense_inUseW dP h)

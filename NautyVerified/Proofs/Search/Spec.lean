@@ -181,7 +181,8 @@ def processnodeSpecG {n : Nat} (xi : ExternalCalls) (S : SLoc) (gl : D.GLoc) (cl
   pre args m := args = [.Vptr S.bl S.lofs, .Vptr S.bp S.pofs, .Vint (ir level),
       .Vint (ir numcells)] ∧ SearchAtG D m S gl cl G st false false ∧ AutomCb xi S.bUA ∧
     1 ≤ level ∧ level ≤ n ∧ numcells ≤ n ∧ LeafOkG st ∧
-    (∀ z ∈ S.blocksG D gl cl, Mem.valid_block m z) ∧ Mem.perm m S.bUA (zOfInt 0) .Cur .Nonempty
+    (∀ z ∈ S.blocksG D gl cl, Mem.valid_block m z) ∧ Mem.perm m S.bUA (zOfInt 0) .Cur .Nonempty ∧
+    (st.compCanon = 0 → O.Fits G (O.rows st.canong) st.canonlab st.samerows)
   post _ m t v m' :=
     let r := leafExit (O.classify G level numcells st).1 level (O.classify G level numcells st).2
     v = .Vint (ir (exitValue level r.1).1) ∧
@@ -263,7 +264,8 @@ theorem processnodeSpec_ofG {xi : ExternalCalls} {fd : fundef} {n : Nat} {S : SL
 by
   refine Satisfies.mono ?_ ?_ h
   · rintro _ _ ⟨ha, hs, hu, h1, h2, h3, hl, hv, hp⟩
-    exact ⟨ha, hs.toG, hu, h1, h2, h3, hl.toG, fun z hz => hv z (SLoc.mem_blocksG.1 hz), hp⟩
+    exact ⟨ha, hs.toG, hu, h1, h2, h3, hl.toG, fun z hz => hv z (SLoc.mem_blocksG.1 hz), hp,
+      fun _ => trivial⟩
   · rintro _ _ _ _ _ ⟨_, hs, _⟩ ⟨hv, hs', hw, hf, hm⟩
     exact ⟨hv, hs'.dense hs.gw, hw, hf.dense, workMonoG_dense hm⟩
 

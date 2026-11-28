@@ -70,6 +70,7 @@ theorem lab_inj {lab : Array Nat} (hl : ∀ i < n, lab[i]! < n) (hs : ∀ v < n,
 theorem wp_updatecan {f : function} {Q : Post} {le : temp_env} (C : Classifier O)
     (c : PCtx D m₀ m₁ S gl cl e bsr) (h : PAt D m₀ m₁ m S gl cl G bsr st nsp)
     (hcl : ∀ i < n, st.canonlab[i]! < n) (hcs : ∀ v < n, ∃ i < n, st.canonlab[i]! = v)
+    (hfit : O.Fits G (O.rows st.canong) st.canonlab st.samerows)
     (hQ : ∀ m', PAt D m₀ m₁ m' S gl cl G bsr
         { st with canong := C.update G st.canong st.canonlab st.samerows } nsp →
       D.CanonRep m' cl S.bc S.cofs S.M (O.rows (C.update G st.canong st.canonlab st.samerows)) n →
@@ -98,7 +99,7 @@ theorem wp_updatecan {f : function} {Q : Post} {le : temp_env} (C : Classifier O
       eval_gint (c.eg _ (by decide)) E.find_n hs.fixed.nn, typeof, cop]
   · exact ⟨rfl, hs.ctx, hs.arrays.graph, hs.graphOk, hs.arrays.canong, hinv.canong,
       hs.arrays.canonlab, hinv.canonlabSize, hcl, hcs, lab_inj hcl hcs, hinv.samerows,
-      h.sepGC c (by simp) (by simp [ArgBlock])⟩
+      h.sepGC c (by simp) (by simp [ArgBlock]), hfit⟩
   · rintro t r m' ⟨rfl, hcr, hok, hstep⟩
     have hout : ∀ z, z ∈ D.canonBlocks cl S.bc → z ∈ D.canonBlocks cl S.bc ∨ z = bsr :=
       fun z hz => .inl hz
