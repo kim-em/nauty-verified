@@ -95,6 +95,19 @@ def exitValue (level : Nat) : Exit → Int × Bool
   | .unwind target short => (target, short)
   | .fuel => (level, false)
 
+/-- The HexGraphIso facts `processnode` needs beyond `SInv`: the first and best
+labellings are permutations, the best leaf's code agreement is a level, the
+noncheap level is at least 1 (so `fmptn` sees `ptn[n-1]` closed), and the coset
+index is a vertex. -/
+structure LeafOk {n : Nat} (st : Search n) : Prop where
+  firstlabSmall : ∀ i < n, st.firstlab[i]! < n
+  firstlabSurj : ∀ v < n, ∃ i < n, st.firstlab[i]! = v
+  canonlabSmall : ∀ i < n, st.canonlab[i]! < n
+  canonlabSurj : ∀ v < n, ∃ i < n, st.canonlab[i]! = v
+  eqlevCanon : 0 ≤ st.eqlevCanon
+  noncheaplevel : 1 ≤ st.noncheaplevel
+  cosetindex : st.cosetindex < n
+
 /-- `processnode(lab, ptn, level, numcells)` off the first path: HexGraphIso's
 `classify` then `leafExit`. nauty calls `userautomproc` exactly when it counts a
 new generator, so the trace writes the leaf's permutation iff `numgenerators`
@@ -104,12 +117,12 @@ def processnodeSpec {n : Nat} (xi : ExternalCalls) (S : SLoc) (ctx : Ctx n) (st 
     (level numcells : Nat) : FunSpec where
   pre args m := args = [.Vptr S.bl S.lofs, .Vptr S.bp S.pofs, .Vint (ir level),
       .Vint (ir numcells)] ∧ SearchAt m S ctx st false false ∧ AutomCb xi S.bUA ∧
-    1 ≤ level ∧ level ≤ n ∧ numcells ≤ n
+    1 ≤ level ∧ level ≤ n ∧ numcells ≤ n ∧ LeafOk st ∧ (∀ z ∈ S.blocks, Mem.valid_block m z)
   post _ m t v m' :=
     let r := leafExit (classify ctx level numcells st).1 level (classify ctx level numcells st).2
     v = .Vint (ir (exitValue level r.1).1) ∧
     SearchAt m' S ctx r.2 false (exitValue level r.1).2 ∧
     Writes t (if r.2.numgenerators = st.numgenerators + 1 then genWords r.2.workperm n else []) ∧
-    SFrame m m' S
+    SFrame m m' S ∧ (∀ z, IsWork m' z → IsWork m z ∨ ¬ Mem.valid_block m z)
 
 end NautyVerified.Proofs.Search

@@ -53,6 +53,7 @@ theorem wp_nodeProcess {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_
     (h : SearchAt m S ctx st false false)
     (hP : Satisfies xi ge (.Internal dense.fn.«nauty:processnode») (processnodeSpec xi S ctx st level nc))
     (hcb : AutomCb xi S.bUA) (hl1 : 1 ≤ level) (hln : level ≤ n) (hncl : nc ≤ n)
+    (hlok : LeafOk st) (hval : ∀ z ∈ S.blocks, Mem.valid_block m z)
     {bnc : block} (hen : PTree.get dense.id.numcells e = some (bnc, tint))
     (hncv : Mem.load .Mint32 m bnc (zOfInt 0) = some (.Vint (ir nc)))
     (hge : PTree.get dense.id.«nauty:processnode» e = none)
@@ -82,7 +83,7 @@ theorem wp_nodeProcess {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_
     (vargs := [.Vptr S.bl S.lofs, .Vptr S.bp S.pofs, .Vint (ir level), .Vint (ir nc)])
     (.Internal dense.fn.«nauty:processnode») _ hP rfl ?_ ?_
     (by simp [Common.Globalenvs.Genv.find_funct, funct_processnodeFn]) rfl
-    ⟨rfl, h, hcb, hl1, hln, hncl⟩ ?_
+    ⟨rfl, h, hcb, hl1, hln, hncl, hlok, hval⟩ ?_
   · simp only [Exec.evalExpr, Exec.lvalOfVar, hge, find_processnodeFn, Exec.derefLoc,
       Cfrontend.Ctypes.access_mode]
   · simp only [Exec.evalExprlist, Exec.evalExpr, hlab, hptn, hlev, typeof, cop, Exec.lvalOfVar, hen,
@@ -115,7 +116,7 @@ theorem wp_nodeProcess {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_
     apply wp_skip
     simp only [seqPost, Post.after, E0_append]
     rw [hx] at hS''
-    exact hDone t _ m' hx hS'' hW' hF fun x h1 h2 => hle _ x h1 h2
+    exact hDone t _ m' hx hS'' hW' hF.1 fun x h1 h2 => hle _ x h1 h2
   · -- an unwind below this level: return its target
     have htg := hlt tg s hx
     simp only [exitValue]
@@ -129,7 +130,7 @@ theorem wp_nodeProcess {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_
     wp_step; wp_step
     apply wp_return_some_eval
     simp only [Exec.evalExpr, hrl, Refine.tv, typeof, hfret, cop]
-    have := hRet t m' (by rw [hx]; simp) hS' hW' hF
+    have := hRet t m' (by rw [hx]; simp) hS' hW' hF.1
     rw [hx] at this
     simp only [exitValue] at this
     revert this
