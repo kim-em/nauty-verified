@@ -819,6 +819,29 @@ theorem node_inf (G : Colored n k) (hn0 : 0 < n) (hn : n + 2 < nautyInfinity) :
   rw [initialC_eq, node_eq_generic, node_eq_generic, heq]
   exact ⟨rfl, finish_tw _ _ _ _⟩
 
+/-- nauty's root call ends in HexGraphIso's final orbits. -/
+theorem orbits_inf (G : Colored n k) (hn0 : 0 < n) (hn : n + 2 < nautyInfinity) :
+    (node true { g := rowsOf G } nautyInfinity 100 (n + 2) 1 (initialPartition G).2.length
+        (initialC n (initialPartition G).1 (initialPartition G).2)).2.orbits =
+      (runState n (rowsOf G) (initialPartition G).1 (initialPartition G).2).2.orbits := by
+  have hpost := Generic.node_sound (infPolicy (G := G) (ctx := { g := rowsOf G }) (tcLevel := 100)
+    (B := nautyInfinity) hn0 hn) true (n + 2) 1 (initialPartition G).2.length
+    (initial n (initialPartition G).1 (initialPartition G).2) ⟨Nat.le_refl _, initial_ok G hn0⟩
+  obtain ⟨-, himp⟩ := hpost
+  have horb : OrbId (initial n (initialPartition G).1 (initialPartition G).2) := by
+    intro v hv
+    show (Array.ofFn (n := n) fun i => i.val)[v]! = v
+    rw [getElem!_pos _ v (by simpa using hv)]
+    simp
+  have hag : AgreeTo (1 - 1) (.replicate (n + 2) 0)
+      (initial n (initialPartition G).1 (initialPartition G).2).firsttc :=
+    ⟨by simp [initial], fun i h1 h2 => absurd h2 (by omega)⟩
+  obtain ⟨-, hfirst⟩ := himp (initial_inv hn0 _ _)
+  obtain ⟨t', heq, -, -⟩ := hfirst rfl _ horb hag
+  unfold runState
+  rw [ite_eq_right (by simp; omega), initialC_eq, node_eq_generic, node_eq_generic, heq]
+  rfl
+
 /-- The corollary for HexGraphIso's traced run on a nonempty graph. -/
 theorem runTraced_inf (G : Colored n k) (hn0 : 0 < n) (hn : n + 2 < nautyInfinity) :
     finish { g := rowsOf G }
