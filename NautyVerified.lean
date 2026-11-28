@@ -123,6 +123,7 @@ import NautyVerified.Proofs.Search.Node.ReallocW
 import NautyVerified.Proofs.Search.Node.Visit
 import NautyVerified.Proofs.Search.Node.FirstSteps
 import NautyVerified.Proofs.Search.Node.FirstLocal
+import NautyVerified.Proofs.Search.Node.FirstMisc
 import NautyVerified.Proofs.Search.Node.Target
 import NautyVerified.Proofs.Search.Node.Choose
 import NautyVerified.Proofs.Search.Node.Process
