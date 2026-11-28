@@ -164,4 +164,174 @@ theorem wp_fpnTarget {f : function} {Q : Post} {e : env} {le : temp_env} {m : me
       fun z hz e => h₁.work_not hz (e ▸ by simp [SLoc.blocks])))
     (fun z hz => (hK₁ z hz).trans (Alloc.Keep.unch hu' (hb z hz)))
 
+/-! ### For any dispatch representation -/
+
+section Generic
+
+open NautyVerified.Proofs.Dispatch (Ops DispatchRep DispatchC)
+open NautyVerified.Proofs.Maketargetcell (mtcOf)
+
+variable {ge : genv} [E : NautyEnv ge] {O : Ops}
+
+theorem ArraysG.setFirstcode {D : DispatchRep ge O} {m m' : mem} {S : SLoc} {gl : D.GLoc}
+    {cl : D.CLoc} {G : O.Gr n} {st : SearchState n (O.Canon n)} {m₀ : mem}
+    {st₀ : SearchState n (O.Canon n)} {pre nsp : Bool} (h : ArraysG D m S gl cl G st)
+    (h₀ : SearchAtG D m₀ S gl cl G st₀ pre nsp) (hu : Unch m m' (· = S.bFC))
+    {fc : Array Nat} (hfc : ArrayAt m' .Mint16signed S.bFC 0 (shorts fc) (n + 2)) :
+    ArraysG D m' S gl cl G { st with firstcode := fc } := by
+  have hd := h₀.lit
+  obtain ⟨aw, ha, har⟩ := h.active
+  obtain ⟨fw, hf, hfr⟩ := h.fixedpts
+  obtain ⟨wv, hwv⟩ := h.workperm
+  exact ⟨h.lab.unch hu (by sep_ne hd), h.ptn.unch hu (by sep_ne hd),
+    h.orbits.unch hu (by sep_ne hd), ⟨aw, ha.unch hu (by sep_ne hd), har⟩,
+    ⟨fw, hf.unch hu (by sep_ne hd), hfr⟩, ⟨wv, hwv.unch hu (by sep_ne hd)⟩,
+    h.firstlab.unch hu (by sep_ne hd), h.canonlab.unch hu (by sep_ne hd), hfc,
+    h.canoncode.unch hu (by sep_ne hd), h.firsttc.unch hu (by sep_ne hd),
+    D.canon_unch h.canong hu fun z hz e => h₀.canon_ne hz (.inr (.inr (.inl (by simp)))) e,
+    h.autos.unch hu (by sep_ne hd) (by sep_ne hd),
+    D.graph_unch h.graph hu fun z hz e => h₀.graph_ne hz (.inr (.inr (.inl (by simp)))) e⟩
+
+/-- `firstcode[level] = (short)refcode;`, for `D`. -/
+theorem wp_recordFirstG {D : DispatchRep ge O} {f : function} {Q : Post} {e : env}
+    {le : temp_env} {m : mem} {S : SLoc} {gl : D.GLoc} {cl : D.CLoc} {G : O.Gr n}
+    {st : SearchState n (O.Canon n)} {pre nsp : Bool} {level code : Nat} {bk : block}
+    (h : SearchAtG D m S gl cl G st pre nsp)
+    (hE : PTree.get dense.id.«nauty:firstcode» e = none)
+    (hek : PTree.get dense.id.«refcode» e = some (bk, tint))
+    (hkv : Mem.load .Mint32 m bk (zOfInt 0) = some (.Vint (ir code)))
+    (hlev : PTree.get dense.id.level le = some (.Vint (ir level)))
+    (hc : code < 32768) (hn : level ≤ n)
+    (hQ : ∀ m', SearchAtG D m' S gl cl G (recordFirst level code st) pre nsp →
+      Unch m m' (· ∈ [S.bFC]) → (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
+      Q.normal E0 e le m') :
+    Wp xi ge f (.Sassign (gats dense.id.«nauty:firstcode» (tv dense.id.level))
+      (.Ecast (.Evar dense.id.«refcode» tint) tshort)) Q e le m := by
+  have hnl := h.nlt
+  have hd := h.lit
+  have hrhs : Exec.evalExpr ge e le m (.Ecast (.Evar dense.id.«refcode» tint) tshort) =
+      some (.Vint (ir (code : Int))) := by
+    rw [Exec.evalExpr, eval_local hek hkv]
+    simp only [typeof, Cfrontend.Cop.sem_cast, Cfrontend.Cop.classify_cast, Cfrontend.Cop.cast_int_int]
+    exact congrArg (fun x => some (val.Vint x)) (sign_ext16_ir (a := code) (by omega) (by omega))
+  refine wp_gstoreS hE E.find_nautyFirstcode
+    (h.dyns.firstcode.ptr (by have := h.dyns.capFC; omega)) h.arrays.firstcode (by omega)
+    (tv dense.id.level) level (by omega) hlev rfl _ code hc hrhs (.inr rfl) ?_
+  intro m' harr hu hk hv
+  have hU : Unch m m' (· ∈ [S.bFC]) := hu.mono fun z hz => by simp [hz]
+  have hfs := h.inv.firstcodeSize
+  refine hQ m' ?_ hU hv
+  refine h.rebuild hU (fun z hz => by simp at hz; subst hz; exact .inr (.inl (by simp)))
+    (fun z hz => by
+      simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
+      rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
+      all_goals first | exact hk | exact Keep.unch hu (by sep_ne hd)) hv
+    { h.scalars.unch hu (by sep_all hd) with } { h.stats.unch hu (by sep_ne hd) with }
+    (h.arrays.setFirstcode h hu (by rw [shorts_set (by omega)]; exact harr)) ?_
+  have i := h.inv
+  exact { i with
+    codesSmall := fun j hj => by
+      refine ⟨?_, (i.codesSmall j hj).2⟩
+      show (st.firstcode.set! level code)[j]! < 32768
+      by_cases hjl : j = level
+      · subst hjl; rw [Array.getElem!_set!_self _ _ _ (by omega)]; omega
+      · rw [Array.getElem!_set!_ne _ _ _ _ (Ne.symm hjl)]; exact (i.codesSmall j hj).1
+    firstcodeSize := by show (st.firstcode.set! level code).size = n + 2; simp [hfs] }
+
+set_option maxHeartbeats 4000000 in
+/-- The first path's target cell with `D`'s target-cell procedure: `if (numcells != n)
+{ maketargetcell(…, -1, …); stats->tctotal += tcellsize; }`. `htc` is what nautil.c's
+scan needs of `O.targetcell`'s position. The call may change `D`'s written globals, its
+scratch blocks in use and new blocks. -/
+theorem wp_fpnTargetG {D : DispatchC ge O} {f : function} {Q : Post} {e : env} {le : temp_env}
+    {m : mem} {S : SLoc} {gl : D.GLoc} {cl : D.CLoc} {G : O.Gr n}
+    {st : SearchState n (O.Canon n)} {pre nsp : Bool} {level nc : Nat}
+    (h : SearchAtG D.toDispatchRep m S gl cl G st pre nsp) (hvU : Mem.valid_block m S.bUA)
+    (hvT : Mem.valid_block m E.tcnode0)
+    {bt bz bc bnc : block}
+    (hloc : [bt, bz, bc].Pairwise (· ≠ ·))
+    (hlocS : ∀ z ∈ [bt, bz, bc], z ∉ S.blocksG D.toDispatchRep gl cl ∧ Mem.valid_block m z ∧
+      ¬ IsWorkG D.toDispatchRep m z)
+    (htcell : PTree.get dense.id.«tcell» le = some (.Vptr bt Ptrofs.zero))
+    (hez : PTree.get dense.id.«tcellsize» e = some (bz, tint))
+    (hec : PTree.get dense.id.«tc» e = some (bc, tint))
+    (hge : ∀ x ∈ [dense.id.«maketargetcell», dense.id.«nauty:g», dense.id.«nauty:tc_level»,
+      dense.id.«nauty:digraph», dense.id.«nauty:dispatch», dense.id.«nauty:m», dense.id.«nauty:n»],
+      PTree.get x e = none)
+    (hEs : PTree.get dense.id.«nauty:stats» e = none)
+    (ht : ∃ v, ArrayAt m .Mint64 bt 0 v S.M) (hz : ∃ v, ArrayAt m .Mint32 bz 0 v 1)
+    (hc : ∃ v, ArrayAt m .Mint32 bc 0 v 1)
+    (hnc : PTree.get dense.id.numcells e = some (bnc, tint))
+    (hncv : Mem.load .Mint32 m bnc (zOfInt 0) = some (.Vint (ir nc))) (hncl : nc ≤ n)
+    (hlab : PTree.get dense.id.«lab» le = some (.Vptr S.bl S.lofs))
+    (hptn : PTree.get dense.id.«ptn» le = some (.Vptr S.bp S.pofs))
+    (hlev : PTree.get dense.id.«level» le = some (.Vint (ir level)))
+    (hl1 : 1 ≤ level) (hln : level ≤ n)
+    (htc : nc ≠ n → O.targetcell G st.lab st.ptn level 100 (-1) < n ∧
+      level < st.ptn[O.targetcell G st.lab st.ptn level 100 (-1)]!)
+    (hQy : nc ≠ n → ∀ m', SearchAtG D.toDispatchRep m' S gl cl G
+        { st with tctotal := st.tctotal +
+          (mtcOf n st.lab st.ptn level (O.targetcell G st.lab st.ptn level 100 (-1))).2.2 }
+        pre nsp →
+      (∃ ws, ArrayAt m' .Mint64 bt 0 (Set.longs ws) S.M ∧ SetRep (fun w => bv64 (ws w)) S.M
+        (mtcOf n st.lab st.ptn level (O.targetcell G st.lab st.ptn level 100 (-1))).2.1) →
+      ArrayAt m' .Mint32 bz 0 (fun _ => .Vint (ir
+        ((mtcOf n st.lab st.ptn level (O.targetcell G st.lab st.ptn level 100 (-1))).2.2 : Int))) 1 →
+      ArrayAt m' .Mint32 bc 0 (fun _ => .Vint (ir
+        ((mtcOf n st.lab st.ptn level (O.targetcell G st.lab st.ptn level 100 (-1))).1 : Int))) 1 →
+      Unch m m' (fun z => S.ChgG D.toDispatchRep gl cl z ∨ ¬ Mem.valid_block m z ∨
+        IsWorkG D.toDispatchRep m z ∨ z = bt ∨ z = bz ∨ z = bc) →
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) → WorkMonoG D.toDispatchRep m m' →
+      (∀ z ∈ [bt, bz, bc], Keep m m' z) → Q.normal E0 e le m')
+    (hQn : nc = n → Q.normal E0 e le m) :
+    Wp xi ge f Firstpathnode.target Q e le m := by
+  have hnl := h.nlt
+  have hncE : Exec.evalExpr ge e le m (.Evar dense.id.numcells tint) = some (.Vint (ir nc)) :=
+    eval_local hnc hncv
+  have hEn : PTree.get dense.id.«nauty:n» e = none := hge _ (by simp)
+  have mL : ∀ z ∈ S.litG, z ∈ S.blocksG D.toDispatchRep gl cl := fun z hz =>
+    (S.litG_sub D.toDispatchRep gl cl).subset hz
+  simp only [Firstpathnode.target, Set.sk]
+  apply wp_if_eval
+  rw [Exec.evalExpr, hncE, eval_gint hEn E.find_n h.fixed.nn]
+  simp only [typeof, cop]
+  rw [ir_eq (a := (nc : Int)) (b := (n : Int)) ⟨by omega, by omega⟩ ⟨by omega, by omega⟩]
+  by_cases hne : nc = n
+  · rw [ite_eq_right (by simp [hne])]
+    exact wp_skip (hQn hne)
+  rw [ite_eq_left (by simp; omega)]
+  obtain ⟨htn, htl⟩ := htc hne
+  have hsz := h.inv.ptnSize
+  have hlast : st.ptn[n - 1]! ≤ level := Nat.le_trans h.inv.ptnLast hl1
+  have hsz2 := mtcOf_size (lab := st.lab) hsz hlast htn htl
+  wp_step; wp_step; wp_step
+  refine wp_nodeTargetG h hvU hvT hloc hlocS htcell hez hec hge ht hz hc hlab hptn hlev hl1 hln
+    (hintE := .Eunop .Oneg (ci 1 tint) tint) (hint := -1) rfl rfl (by decide) (by omega)
+    ⟨htn, htl⟩ ?_
+  intro m₁ h₁ hws hzv hcv hu₁ hg₁ hw₁ hK₁
+  simp only [seqPost, Post.after, E0_append]
+  wp_step; wp_step
+  have hzl : Mem.load .Mint32 m₁ bz (zOfInt 0) = some (.Vint (ir
+      ((mtcOf n st.lab st.ptn level (O.targetcell G st.lab st.ptn level 100 (-1))).2.2 : Int))) :=
+    hzv.load 0 (by decide)
+  refine wp_tctotalG h₁ hEs hez hzl (by omega) ?_
+  intro m' h' hu' hg'
+  have hb : ∀ z ∈ [bt, bz, bc], z ≠ S.bst := fun z hz e =>
+    (hlocS z hz).1 (e ▸ mL _ (by simp [SLoc.litG]))
+  have hw₃ := (SStepG.of_unch h₁ hu' hg'
+    (fun z hz => .inl (by subst hz; exact ⟨mL _ (by simp [SLoc.litG]), by sep_ne h.lit,
+      by sep_ne h.lit⟩))
+    (fun z hz e => h.lit_globs S.bst (by simp [SLoc.litG]) (e ▸ D.wglobs_sub _ hz))
+    ⟨(by sep_ne h.lit : E.nautilWorkperm ≠ S.bst),
+      (by sep_ne h.lit : E.nautilWorkpermSz ≠ S.bst)⟩).2
+  obtain ⟨ws, hwa, hwr⟩ := hws
+  exact hQy hne m' h' ⟨ws, hwa.unch hu' (hb bt (by simp)), hwr⟩ (hzv.unch hu' (hb bz (by simp)))
+    (hcv.unch hu' (hb bc (by simp)))
+    (hu₁.trans (hu'.mono fun z hz => .inl (by
+      subst hz; exact ⟨mL _ (by simp [SLoc.litG]), by sep_ne h.lit, by sep_ne h.lit⟩)))
+    (fun z hz => hg' z (hg₁ z hz)) (hw₁.trans hg₁ hw₃)
+    (fun z hz => (hK₁ z hz).trans (Alloc.Keep.unch hu' (hb z hz)))
+
+end Generic
+
 end NautyVerified.Proofs.Search
