@@ -440,7 +440,7 @@ theorem SRest.pruneReturn {level : Nat} {st : Search n} (h : SRest st) :
   · exact h
 
 /-- `leafExit` after its `maxlevel` update. -/
-def lxBody (leaf : Leaf) (level : Nat) (st : Search n) : Exit × Search n :=
+def lxBody {κ : Type} (leaf : Leaf) (level : Nat) (st : SearchState n κ) : Exit × SearchState n κ :=
   match leaf with
   | .internal => (.done, st)
   | .autoFirst =>
@@ -458,7 +458,7 @@ def lxBody (leaf : Leaf) (level : Nat) (st : Search n) : Exit × Search n :=
   | .better sr => Hex.GraphIso.Nauty.pruneReturn level (Hex.GraphIso.Nauty.install level sr st)
   | .bad => Hex.GraphIso.Nauty.pruneReturn level { st with numbadleaves := st.numbadleaves + 1 }
 
-theorem leafExit_eq (leaf : Leaf) (level : Nat) (st : Search n) :
+theorem leafExit_eq {κ : Type} (leaf : Leaf) (level : Nat) (st : SearchState n κ) :
     Hex.GraphIso.Nauty.leafExit leaf level st = lxBody leaf level
       (if leaf != .internal && level > st.maxlevel then { st with maxlevel := level } else st) := by
   cases leaf <;> simp only [Hex.GraphIso.Nauty.leafExit, lxBody, Id.run, pure] <;> split <;> rfl

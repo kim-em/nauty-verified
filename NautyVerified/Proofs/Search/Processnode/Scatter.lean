@@ -1,6 +1,7 @@
 import NautyVerified.Proofs.Search.Processnode.Syntax
 import NautyVerified.Proofs.Search.Step
 import NautyVerified.Spec.Processnode
+import NautyVerified.Proofs.Search.Processnode.Classifier
 
 /-!
 # `processnode`'s scatter loops

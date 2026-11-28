@@ -210,7 +210,7 @@ open Hex.GraphIso.Nauty
 variable {n : Nat}
 
 /-- The fields `classify` leaves alone. -/
-structure Keeps (st st' : Search n) : Prop where
+structure Keeps {κ : Type} (st st' : SearchState n κ) : Prop where
   lab : st'.lab = st.lab
   firstlab : st'.firstlab = st.firstlab
   canonlab : st'.canonlab = st.canonlab
@@ -220,13 +220,16 @@ structure Keeps (st st' : Search n) : Prop where
   numgenerators : st'.numgenerators = st.numgenerators
   workperm : st'.workperm.size = st.workperm.size
 
-theorem Keeps.refl (st : Search n) : Keeps st st := ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
+theorem Keeps.refl {κ : Type} (st : SearchState n κ) : Keeps st st :=
+  ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
 
-theorem Keeps.trans {a b c : Search n} (h1 : Keeps a b) (h2 : Keeps b c) : Keeps a c :=
+theorem Keeps.trans {κ : Type} {a b c : SearchState n κ} (h1 : Keeps a b) (h2 : Keeps b c) :
+    Keeps a c :=
   ⟨h2.1.trans h1.1, h2.2.trans h1.2, h2.3.trans h1.3, h2.4.trans h1.4, h2.5.trans h1.5,
     h2.6.trans h1.6, h2.7.trans h1.7, h2.8.trans h1.8⟩
 
-theorem Keeps.scatter (R : Array Nat) (st : Search n) : Keeps st (Hex.GraphIso.Nauty.scatter R st) := by
+theorem Keeps.scatter {κ : Type} (R : Array Nat) (st : SearchState n κ) :
+    Keeps st (Hex.GraphIso.Nauty.scatter R st) := by
   rw [Spec.scatter_eq]; exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, scatterW_size _ _ _ _⟩
 
 theorem Keeps.canonTestS (ctx : Ctx n) (level : Nat) (st : Search n) :
