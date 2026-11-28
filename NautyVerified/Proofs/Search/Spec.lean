@@ -87,7 +87,7 @@ def recoverSpec {n : Nat} (S : SLoc) (ctx : Ctx n) (st : Search n) (level : Nat)
   pre args m := args = [.Vptr S.bp S.pofs, .Vint (ir level)] ∧ SearchAt m S ctx st pre false ∧
     1 ≤ level ∧ level ≤ n
   post _ m t _ m' := t = E0 ∧ SearchAt m' S ctx (Hex.GraphIso.Nauty.recover nautyInf level st) pre false ∧
-    SFrame m m' S
+    SFrame m m' S ∧ ∀ z, IsWork m' z → IsWork m z ∨ ¬ Mem.valid_block m z
 
 /-- The `int` `processnode` returns for an exit, and the short-prune flag it leaves. -/
 def exitValue (level : Nat) : Exit → Int × Bool

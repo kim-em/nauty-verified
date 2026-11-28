@@ -36,7 +36,8 @@ theorem wp_nodeRecover {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_
     (hlev : PTree.get dense.id.«level» le = some (.Vint (ir level)))
     (hl1 : 1 ≤ level) (hln : level ≤ n)
     (hQ : ∀ m', SearchAt m' S ctx (Hex.GraphIso.Nauty.recover nautyInf level st) pre false →
-      SFrame m m' S → Q.normal E0 e le m') :
+      SFrame m m' S → (∀ z, IsWork m' z → IsWork m z ∨ ¬ Mem.valid_block m z) →
+      Q.normal E0 e le m') :
     Wp xi ge f recCall Q e le m := by
   wp_step; wp_step
   refine wp_call (vf := .Vptr Block.recoverFn Ptrofs.zero) (targs := [tptr tint, tint])
@@ -47,8 +48,8 @@ theorem wp_nodeRecover {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_
   · simp only [Exec.evalExpr, Exec.lvalOfVar, hge, find_recoverFn, Exec.derefLoc,
       Cfrontend.Ctypes.access_mode]
   · simp only [Exec.evalExprlist, Exec.evalExpr, hptn, hlev, Refine.tv, typeof, cop]
-  · rintro t _ m' ⟨rfl, h', hF⟩
-    exact hQ m' h' hF
+  · rintro t _ m' ⟨rfl, h', hF, hW⟩
+    exact hQ m' h' hF hW
 
 /-- `t716 = nextelement(tcell, M, tv); tv = t716;` -/
 abbrev nextStep : statement :=

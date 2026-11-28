@@ -1,5 +1,6 @@
 import NautyVerified.Proofs.Search.Recover.Syntax
 import NautyVerified.Spec.Recover
+import NautyVerified.Proofs.Search.Node.Prune
 
 /-!
 # `recover` restores the partition and the levels
@@ -271,8 +272,11 @@ theorem recover_satisfies {n : Nat} (S : SLoc) (ctx : Ctx n) (st : Search n) (le
                   refine ⟨b1, ?_, ?_, b4, ?_, ?_, ?_, ?_, ?_, b10, b11, b12⟩ <;> dsimp only <;>
                     split <;> (try simp only [Int.ofNat_eq_natCast]) <;> omega }
             n0 := h.n0, nlt := h.nlt, nM := h.nM, M1 := h.M1, Mlt := h.Mlt }
-      · exact ⟨hUf.mono fun z hz => .inl (by revert hz; revert z; simp [SLoc.blocks]),
-          fun z hz => hvf _ (hv4 _ (hv3 _ (hv2 _ (hv1 _ hz))))⟩
+      · refine ⟨⟨hUf.mono fun z hz => .inl (by revert hz; revert z; simp [SLoc.blocks]),
+          fun z hz => hvf _ (hv4 _ (hv3 _ (hv2 _ (hv1 _ hz))))⟩, fun z hz => .inl (IsWork.back h hUf ?_ hz)⟩
+        intro z hz
+        simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
+        rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> sep_notin hd
     -- `if (level <= eqlev_canon) { eqlev_canon = level; comp_canon = 0; }`
     simp only [seqPost, Post.after, E0_append]
     wp_step; wp_step
