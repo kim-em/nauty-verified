@@ -4,10 +4,9 @@ import NautyVerified.Proofs.Top.Nauty
 /-!
 # The end-to-end theorem for dense nauty, from the emission laws
 
-`densenauty_binary_correct_of` proves `densenauty_binary_correct`'s statement
-under the hypotheses `main_ok` takes about the words nauty emits: an emission
-function `Em` obeying `EmLawOff` and `EmLawFirst`, its value `gensWords gens n`
-at the root, and the agreement of those words with `expected`'s first block.
+`densenauty_binary_correct_of` proves `densenauty_binary_correct`'s statement.
+It lives here rather than in `Statement/Dense.lean` because `main_ok` imports
+the harness proofs, which import `Statement/Dense.lean`.
 
 - `init_mem_some`: the linked program has an initial memory. CompCert's
   `init_mem_exists` asks for every global's initialiser to be aligned and to
@@ -115,22 +114,14 @@ theorem exec_of_main {S : FunSpec}
 
 /-! ## The end-to-end theorem -/
 
-/-- `densenauty_binary_correct`, given an emission function obeying the
-emission laws whose value at the root is the words of `gens`, and those words
-being `expected`'s first block. -/
+/-- `densenauty_binary_correct`. -/
 theorem densenauty_binary_correct_of {n k : Nat} (G : Colored n k) (hn : 0 < n) (hmax : n ≤ maxN)
-    (hk : k ≤ maxN) {ins : List Int} (hins : Encodes G ins) {tp : X86.Asm.program} (hc : Compiled tp)
-    (gens : List (Array Nat)) (Em : Bool → Nat → Nat → Search n → List Int)
-    (hOff : Search.EmLawOff Em ⟨rowsOf G⟩) (hFirst : Search.EmLawFirst Em ⟨rowsOf G⟩)
-    (hEm : Em true 1 (initialPartition G).2.length
-      (Spec.SearchInf.initialC n (initialPartition G).1 (initialPartition G).2) =
-        Search.gensWords gens n)
-    (hgens : Search.gensWords gens n = Harness.autosWords G) :
+    (hk : k ≤ maxN) {ins : List Int} (hins : Encodes G ins) {tp : X86.Asm.program} (hc : Compiled tp) :
     ∀ beh, program_behaves (X86.Asm.semantics Build.config xi tp) beh → Consistent ins beh →
       ∃ t, beh = .Terminates t (Lib.Integers.Int.repr .Z0) ∧ writes t = expected G := by
   refine binary_of_execution G hc ?_
   obtain ⟨m₀, t, v, m', hinit, hstar, hv, hr, hw, hz⟩ :=
-    exec_of_main (Top.main_ok G gens ins Em hOff hFirst hEm hgens hins hn hmax hk) fun _ hm => ⟨rfl, hm⟩
+    exec_of_main (Top.main_ok G ins hins hn hmax hk) fun _ hm => ⟨rfl, hm⟩
   subst hv
   exact ⟨_, _, t, hinit, hstar, .intro _ m', hr, hz, hw⟩
 

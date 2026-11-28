@@ -1,4 +1,5 @@
 import NautyVerified.Statement.Corollaries
+import HexGraphIso.Nauty.Policy.Generated.Root
 
 /-!
 # The end-to-end theorem for dense nauty: bounds, the binary, the output
@@ -62,11 +63,11 @@ theorem canonWords_eq_iff {n k : Nat} (G H : Colored n k) :
 /-- The generators the binary writes (block 1) are automorphisms of `G`, and
 every automorphism of `G` is a product of them. -/
 theorem generators_correct {n k : Nat} (G : Colored n k) :
-    (∀ p ∈ (Nauty.runColoredTraced G).autos.toList, ∃ q, (∀ i : Fin n, (q.get i).val = p[i.val]!) ∧
+    (∀ p ∈ (Nauty.runColoredTraced G).emitted.toList, ∃ q, (∀ i : Fin n, (q.get i).val = p[i.val]!) ∧
       IsIso G G q) ∧
     ∀ q, IsIso G G q → Perm.Generated (Aut.gens G) q := by
   refine ⟨fun p hp => ?_, fun q hq => Aut.complete G hq⟩
-  obtain ⟨q, hq⟩ := Aut.trace_admitted G p hp
+  obtain ⟨q, hq⟩ := Nauty.emitted_admitted G hp
   exact ⟨q, autom?_val_get hq, autom?_isIso hq⟩
 
 /-- The orbits the binary writes (block 3): two vertices get the same

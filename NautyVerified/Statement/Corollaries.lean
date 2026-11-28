@@ -1,4 +1,6 @@
 import NautyVerified.Statement.Harness
+import HexGraphIso.Nauty.Policy.Emission
+import HexGraphIso.Nauty.Invariant.OrbitComplete
 
 /-!
 # Facts behind the corollaries of the end-to-end theorem
@@ -8,10 +10,10 @@ import NautyVerified.Statement.Harness
 * `canong_toList`: the search's canonical rows are the rows of HexGraphIso's
   canonical form `canon G`;
 * `finalState_orbits`: the orbit array of the final search state is
-  `Aut.orbits G`, the `orbjoin` fold over the recorded generators that
-  HexGraphIso's orbit theorem is stated for. The search changes the orbit
-  array only when it records a generator, and then joins exactly that
-  generator.
+  `Aut.orbits G`, the `orbjoin` fold over the emitted generators that
+  HexGraphIso's orbit theorem is stated for. The search joins every
+  automorphism it discovers, and one it does not emit leaves the orbit count,
+  hence the orbit array, unchanged.
 -/
 
 namespace NautyVerified.Statement
@@ -178,202 +180,114 @@ theorem canon_eq_of {n k : Nat} {G H : Colored n k} (hg : (canon G).graph = (can
 
 /-! ## The orbit array of the search -/
 
-/-- The orbit array is the `orbjoin` fold over the recorded generators. -/
-def OrbFold {n : Nat} (st : Search n) : Prop :=
-  st.orbits = Aut.orbitsOf n st.genTrace.toList
+/-- Entries below `n` on the first `n` positions. -/
+abbrev Bounded (n : Nat) (γ : Array Nat) : Prop := ∀ i, i < n → γ[i]! < n
 
-theorem OrbFold.congr {n : Nat} {st out : Search n} (h : OrbFold st)
-    (ho : out.orbits = st.orbits) (ht : out.genTrace = st.genTrace) : OrbFold out := by
-  unfold OrbFold; rw [ho, ht]; exact h
+theorem desc_fold {n : Nat} : ∀ (l : List (Array Nat)), (∀ γ ∈ l, Bounded n γ) → ∀ o,
+    Orbit.Descending o n → Orbit.Descending (l.foldl (fun o γ => (orbjoin o γ n).1) o) n
+  | [], _, _, h => h
+  | γ :: l, hb, o, h =>
+    desc_fold l (fun δ hδ => hb δ (List.mem_cons_of_mem _ hδ)) _
+      (h.orbjoin (hb γ List.mem_cons_self))
 
-/-- A step that leaves the orbit array and the generator trace alone. -/
-def Keeps {n : Nat} (f : Search n → Search n) : Prop :=
-  ∀ st, (f st).orbits = st.orbits ∧ (f st).genTrace = st.genTrace
+theorem ofFn_get {n v : Nat} (hv : v < n) : (Array.ofFn (n := n) fun i => i.val)[v]! = v := by
+  rw [getElem!_pos _ v (by simpa using hv)]
+  simp
 
-theorem Keeps.fold {n : Nat} {f : Search n → Search n} (h : Keeps f) {st : Search n}
-    (hs : OrbFold st) : OrbFold (f st) :=
-  hs.congr (h st).1 (h st).2
+theorem desc_init {n : Nat} : Orbit.Descending (Array.ofFn (n := n) fun i => i.val) n :=
+  ⟨by simp, fun v hv => by rw [ofFn_get hv]; exact Nat.le_refl v⟩
 
-theorem keeps_visit {n : Nat} (ctx : Ctx n) (level numcells : Nat) :
-    Keeps fun st => (visit ctx level numcells st).2.2 := fun _ => ⟨rfl, rfl⟩
+theorem flat_init {n : Nat} : Orbit.Flat (Array.ofFn (n := n) fun i => i.val) n :=
+  fun v hv => by rw [ofFn_get hv, ofFn_get hv]
 
-theorem keeps_recordFirst {n : Nat} (level code : Nat) :
-    Keeps (n := n) (recordFirst level code) := fun _ => ⟨rfl, rfl⟩
+theorem count_init {n : Nat} :
+    n = (List.range n).countP (fun i => (Array.ofFn (n := n) fun i => i.val)[i]! == i) := by
+  rw [List.countP_eq_length.mpr (fun v hv => by rw [ofFn_get (List.mem_range.mp hv)]; simp),
+    List.length_range]
 
-theorem keeps_compareCodes {n : Nat} (level code : Nat) :
-    Keeps (n := n) (compareCodes level code) := by
-  intro st
-  unfold compareCodes
-  constructor <;> simp only [Id.run_pure, apply_ite Id.run, apply_ite SearchState.genTrace,
-    apply_ite SearchState.orbits, ite_self]
+/-- While the discovery trace stays within `T`: the orbit array is the
+`orbjoin` fold over the emitted generators, `numorbits` counts its roots, and
+the emitted generators are bounded. -/
+def OrbEmit (n : Nat) (T : List (Array Nat)) (l : Emission.Log) : Prop :=
+  List.Subset l.trace.toList T →
+    l.orbits = Aut.orbitsOf n l.emitted.toList ∧
+    l.numorbits = (List.range n).countP (fun i => l.orbits[i]! == i) ∧
+    ∀ γ ∈ l.emitted.toList, Bounded n γ
 
-theorem keeps_chooseTarget {n : Nat} (first : Bool) (ctx : Ctx n) (tcLevel level numcells : Nat) :
-    Keeps fun st => (chooseTarget first ctx tcLevel level numcells st).2.2.2 := by
-  intro st
-  unfold chooseTarget
-  constructor <;> simp only [Id.run_pure, apply_ite Id.run, apply_ite Prod.snd,
-    apply_ite SearchState.genTrace, apply_ite SearchState.orbits, ite_self] <;> split <;> rfl
-
-theorem keeps_firstterminal {n : Nat} (level : Nat) :
-    Keeps (n := n) (firstterminal level) := fun _ => ⟨rfl, rfl⟩
-
-theorem keeps_cheapCheck {n : Nat} (first : Bool) (level : Nat) :
-    Keeps (n := n) (cheapCheck first level) := by
-  intro st; unfold cheapCheck; split <;> exact ⟨rfl, rfl⟩
-
-theorem keeps_child {n : Nat} (first : Bool) (level tc tv : Nat) :
-    Keeps (n := n) (child first level tc tv) := by
-  intro st; unfold child; cases first <;> exact ⟨rfl, rfl⟩
-
-theorem keeps_afterChildFirst {n : Nat} (level tv1 : Nat) :
-    Keeps (n := n) (afterChildFirst level tv1) := fun _ => ⟨rfl, rfl⟩
-
-theorem keeps_afterSweep {n : Nat} (first : Bool) (level size index : Nat) :
-    Keeps (n := n) (afterSweep first level size index) := by
-  intro st; unfold afterSweep; split <;> exact ⟨rfl, rfl⟩
-
-theorem keeps_recover {n : Nat} (inf level : Nat) :
-    Keeps (n := n) (Nauty.recover inf level) := by
-  intro st
-  unfold Nauty.recover recoverLevels
-  constructor <;> simp only [Id.run_pure, apply_ite Id.run,
-    apply_ite SearchState.genTrace, apply_ite SearchState.orbits, ite_self] <;> rfl
-
-theorem fold_classify {n : Nat} (ctx : Ctx n) (level numcells : Nat) {st : Search n}
-    (h : OrbFold st) : OrbFold (classify ctx level numcells st).2 :=
-  h.congr (classify_orbits ctx level numcells st) (classify_trace ctx level numcells st)
-
-theorem fold_leafExit {n : Nat} (leaf : Leaf) (level : Nat) {st : Search n}
-    (h : OrbFold st) : OrbFold (leafExit leaf level st).2 := by
-  unfold OrbFold at h ⊢
-  rw [leafExit_orbits, leafExit_trace]
+/-- Each leaf keeps `OrbEmit`. A code-2 automorphism that is not emitted leaves
+the orbit count unchanged, so its join leaves the orbit array unchanged
+(`orbjoin_eq_of_count`). -/
+theorem orbEmit_leaf {n : Nat} {T : List (Array Nat)} (hT : ∀ γ ∈ T, Bounded n γ)
+    (leaf : Leaf) (level : Nat) (st : Search n) (h : OrbEmit n T (Emission.log st)) :
+    OrbEmit n T (Emission.log (leafExit leaf level st).2) := by
+  rw [Emission.leaf_log]
+  generalize Emission.log st = l at h ⊢
+  generalize st.workperm = γ
+  have hjt : List.Subset l.trace.toList (l.join γ n).trace.toList := fun δ hd => by
+    simp [Emission.Log.join, hd]
+  have hγ : γ ∈ (l.join γ n).trace.toList := by simp [Emission.Log.join]
+  have base : List.Subset (l.join γ n).trace.toList T →
+      (l.orbits = Aut.orbitsOf n l.emitted.toList ∧
+        l.numorbits = (List.range n).countP (fun i => l.orbits[i]! == i) ∧
+        ∀ δ ∈ l.emitted.toList, Bounded n δ) ∧
+      Bounded n γ ∧ Orbit.Descending l.orbits n ∧ Orbit.Flat l.orbits n := by
+    intro hs
+    obtain ⟨ho, hc, hb⟩ := h (fun δ hd => hs (hjt hd))
+    refine ⟨⟨ho, hc, hb⟩, hT γ (hs hγ), ?_, ?_⟩
+    · rw [ho]; exact desc_fold _ hb _ desc_init
+    · rw [ho]; exact Orbit.flat_fold _ hb _ desc_init flat_init
+  have emitCase : OrbEmit n T ((l.join γ n).emit γ) := by
+    intro hs
+    obtain ⟨⟨ho, -, hb⟩, hγb, hd, -⟩ := base hs
+    refine ⟨?_, ?_, ?_⟩
+    · show (orbjoin l.orbits γ n).1 = Aut.orbitsOf n (l.emitted.push γ).toList
+      rw [Array.toList_push, Aut.orbitsOf, List.foldl_append, ← Aut.orbitsOf, ← ho]
+      rfl
+    · exact Orbit.count_orbjoin hd hγb
+    · intro δ hδ
+      have hδ' : δ ∈ l.emitted.toList ∨ δ = γ := by
+        simpa [Emission.Log.emit, Emission.Log.join] using hδ
+      rcases hδ' with hδ' | rfl
+      · exact hb δ hδ'
+      · exact hγb
   cases leaf
-  all_goals first
-    | exact h
-    | rw [Array.toList_push, Aut.orbitsOf, List.foldl_append, ← Aut.orbitsOf, ← h]; rfl
+  all_goals try first | exact h | exact emitCase
+  change OrbEmit n T
+    (if (l.join γ n).numorbits == l.numorbits then l.join γ n else (l.join γ n).emit γ)
+  split
+  · rename_i hc
+    intro hs
+    obtain ⟨⟨ho, hcnt, hb⟩, hγb, hd, hf⟩ := base hs
+    have hc' : (orbjoin l.orbits γ n).2 = l.numorbits := beq_iff_eq.mp hc
+    have heq : (orbjoin l.orbits γ n).1 = l.orbits :=
+      Orbit.orbjoin_eq_of_count hd hf hγb (hc'.trans hcnt)
+    refine ⟨?_, ?_, hb⟩
+    · show (orbjoin l.orbits γ n).1 = _
+      rw [heq]; exact ho
+    · show (orbjoin l.orbits γ n).2 = (List.range n).countP (fun i => (orbjoin l.orbits γ n).1[i]! == i)
+      rw [heq]; exact hc'.trans hcnt
+  · exact emitCase
 
-/-- The fold invariant as a contract on every node and sweep call. -/
-def foldContract (n : Nat) : Generic.Contract (Search n) n where
-  nodePre _ _ _ _ st := OrbFold st
-  nodePost _ _ _ _ _ result := OrbFold result.2
-  sweepPre _ _ _ _ _ _ _ _ _ _ st := OrbFold st
-  sweepPost _ _ _ _ _ _ _ _ _ _ _ result := OrbFold result.2.2
-
-theorem fold_sound {n : Nat} (ctx : Ctx n) (inf tcLevel : Nat) :
-    Generic.SoundPolicy ctx inf tcLevel (foldContract n) where
-  node_zero := fun _ _ _ _ hin => hin
-  node_step := by
-    intro fuel next hnext first level numcells st hin
-    change OrbFold st at hin
-    change OrbFold (Generic.nodeStep ctx tcLevel next first level numcells st).2
-    unfold Generic.nodeStep
-    have hv : OrbFold (Generic.Policy.visit (n := n) ctx level numcells st).2.2 :=
-      (keeps_visit ctx level numcells).fold hin
-    generalize Generic.Policy.visit (n := n) ctx level numcells st = r at hv ⊢
-    obtain ⟨nc, code, refined⟩ := r
-    cases first with
-    | true =>
-      simp only [ite_true]
-      have hc : OrbFold (Generic.Policy.recordFirst (n := n) level code refined) :=
-        (keeps_recordFirst level code).fold hv
-      generalize Generic.Policy.recordFirst (n := n) level code refined = compared at hc ⊢
-      have ht : OrbFold (Generic.Policy.chooseTarget (n := n) true ctx tcLevel level nc compared).2.2.2 :=
-        (keeps_chooseTarget true ctx tcLevel level nc).fold hc
-      generalize Generic.Policy.chooseTarget (n := n) true ctx tcLevel level nc compared = t at ht ⊢
-      obtain ⟨tc, cell, size, targeted⟩ := t
-      dsimp only
-      split
-      · exact (keeps_firstterminal level).fold ht
-      · have hn := hnext true level nc tc.toNat ((cell.nextElem none).getD 0)
-          (cell.nextElem none) cell 0 (Generic.Policy.cheapCheck (n := n) true level targeted)
-          ((keeps_cheapCheck true level).fold ht)
-        change OrbFold (next true level nc tc.toNat ((cell.nextElem none).getD 0)
-          (cell.nextElem none) cell 0 (Generic.Policy.cheapCheck (n := n) true level targeted)).2.2 at hn
-        generalize next true level nc tc.toNat ((cell.nextElem none).getD 0)
-          (cell.nextElem none) cell 0 (Generic.Policy.cheapCheck (n := n) true level targeted) = s at hn ⊢
-        obtain ⟨exit, index, result⟩ := s
-        cases exit <;> first | exact hn | exact (keeps_afterSweep true level size index).fold hn
-    | false =>
-      simp only [Bool.false_eq_true, ite_false]
-      have hc : OrbFold (Generic.Policy.compareCodes (n := n) level code refined) :=
-        (keeps_compareCodes level code).fold hv
-      generalize Generic.Policy.compareCodes (n := n) level code refined = compared at hc ⊢
-      have ht : OrbFold (Generic.Policy.chooseTarget (n := n) false ctx tcLevel level nc compared).2.2.2 :=
-        (keeps_chooseTarget false ctx tcLevel level nc).fold hc
-      generalize Generic.Policy.chooseTarget (n := n) false ctx tcLevel level nc compared = t at ht ⊢
-      obtain ⟨tc, cell, size, targeted⟩ := t
-      have hcl : OrbFold (Generic.Policy.classify (n := n) ctx level nc targeted).2 :=
-        fold_classify ctx level nc ht
-      generalize Generic.Policy.classify (n := n) ctx level nc targeted = c at hcl ⊢
-      obtain ⟨leaf, classified⟩ := c
-      have hle : OrbFold (Generic.Policy.leafExit (n := n) leaf level classified).2 :=
-        fold_leafExit leaf level hcl
-      generalize Generic.Policy.leafExit (n := n) leaf level classified = result at hle ⊢
-      obtain ⟨exit, out⟩ := result
-      dsimp only
-      cases exit with
-      | fuel => exact hle
-      | unwind => exact hle
-      | done =>
-        dsimp only
-        have hn := hnext false level nc tc.toNat ((cell.nextElem none).getD 0)
-          (cell.nextElem none) cell 0 (Generic.Policy.cheapCheck (n := n) false level out)
-          ((keeps_cheapCheck false level).fold hle)
-        change OrbFold (next false level nc tc.toNat ((cell.nextElem none).getD 0)
-          (cell.nextElem none) cell 0 (Generic.Policy.cheapCheck (n := n) false level out)).2.2 at hn
-        generalize next false level nc tc.toNat ((cell.nextElem none).getD 0)
-          (cell.nextElem none) cell 0 (Generic.Policy.cheapCheck (n := n) false level out) = s at hn ⊢
-        obtain ⟨exit, index, result⟩ := s
-        cases exit <;> first | exact hn | exact (keeps_afterSweep false level size index).fold hn
-  sweep_none := fun _ _ _ _ _ _ _ _ _ _ hin => hin
-  sweep_zero := fun _ _ _ _ _ _ _ _ _ _ hin => hin
-  sweep_step := by
-    intro fuel cfuel descend next hdescend hnext first level numcells tc tv1 tv cell index st hin
-    change OrbFold st at hin
-    change OrbFold (Generic.sweepStep inf descend next first level numcells tc tv1 tv cell
-      index st).2.2
-    have hcontinue : ∀ cell index out, OrbFold out →
-        OrbFold (Generic.resume inf next first level numcells tc tv1 tv cell index out).2.2 := by
-      intro cell index out hout
-      have hr : OrbFold (Generic.Policy.recover (n := n) inf level out) :=
-        (keeps_recover inf level).fold hout
-      unfold Generic.resume
-      simp only [Id.run_pure, apply_ite Id.run, apply_ite Prod.snd]
-      split <;> exact hnext _ _ _ _ _ _ _ _ _ hr
-    unfold Generic.sweepStep Generic.advance
-    dsimp only
-    split
-    · have hc : OrbFold (Generic.Policy.child (n := n) first level tc tv st) :=
-        (keeps_child first level tc tv).fold hin
-      have hd := hdescend (first && tv == tv1) (level + 1) (numcells + 1) _ hc
-      change OrbFold (descend (first && tv == tv1) (level + 1) (numcells + 1)
-        (Generic.Policy.child (n := n) first level tc tv st)).2 at hd
-      generalize descend (first && tv == tv1) (level + 1) (numcells + 1)
-        (Generic.Policy.child (n := n) first level tc tv st) = result at hd ⊢
-      obtain ⟨exit, out⟩ := result
-      have hd' : OrbFold out := hd
-      have hl1 : OrbFold (Generic.Policy.leaveChild (n := n) tv
-          (Generic.Policy.afterChildFirst (n := n) level tv1 out)) :=
-        ((keeps_afterChildFirst level tv1).fold hd').congr rfl rfl
-      have hl2 : OrbFold (Generic.Policy.leaveChild (n := n) tv out) := hd'.congr rfl rfl
-      dsimp only
-      split <;> cases exit <;> dsimp only <;> (try split) <;> (try split) <;>
-        first | exact hl1 | exact hl2 | exact hcontinue _ _ _ hl1 | exact hcontinue _ _ _ hl2
-    · exact hnext _ _ _ _ _ _ _ _ _ hin
-
-theorem fold_runState {n : Nat} (g : Array (VSet n)) (lab0 : Array Nat) (cellEnds : List Nat) :
-    OrbFold (runState n g lab0 cellEnds).2 := by
-  have hinit : OrbFold (initial n lab0 cellEnds) := rfl
+theorem orbEmit_runState {n : Nat} (g : Array (VSet n)) (lab0 : Array Nat) (cellEnds : List Nat)
+    {T : List (Array Nat)} (hT : ∀ γ ∈ T, Bounded n γ) :
+    OrbEmit n T (Emission.log (runState n g lab0 cellEnds).2) := by
+  have hinit : OrbEmit n T (Emission.log (initial n lab0 cellEnds)) :=
+    fun _ => ⟨rfl, count_init, by simp [Emission.log, initial]⟩
   unfold runState
   split
   · exact hinit
   · rw [node_eq_generic]
-    exact Generic.node_sound (fold_sound _ _ _) _ _ _ _ _ hinit
+    exact Generic.node_sound (Emission.preserve _ _ _ (OrbEmit n T)
+      (fun v l s h => orbEmit_leaf hT v l s h)).sound _ _ _ _ _ hinit
 
 /-- The orbit array of the final search state is `Aut.orbits G`. -/
 theorem finalState_orbits {n k : Nat} (G : Colored n k) : (finalState G).orbits = Aut.orbits G := by
-  have h := fold_runState (rowsOf G) (initialPartition G).1 (initialPartition G).2
-  rw [Aut.orbits, Aut.raw_eq_trace]
-  exact h
+  have hT : ∀ γ ∈ Aut.trace G, Bounded n γ := fun γ hγ i hi => by
+    obtain ⟨p, hp⟩ := Aut.trace_admitted G γ hγ
+    rw [← autom?_val_get hp ⟨i, hi⟩]
+    exact (p.get _).isLt
+  have h := orbEmit_runState (rowsOf G) (initialPartition G).1 (initialPartition G).2 hT
+  rw [Aut.orbits, Aut.raw_eq_emitted]
+  exact (h (fun _ hγ => hγ)).1
 
 end NautyVerified.Statement
