@@ -85,6 +85,26 @@ theorem Stats.cast {st' : Search n} (h : Stats m S st pre) (e : statView st' = s
   exact ⟨e1 ▸ h.numorbits, e2 ▸ h.numgenerators, e3 ▸ h.numnodes, e4 ▸ h.numbadleaves,
     e5 ▸ h.maxlevel, h.maxlevelW, e6 ▸ h.tctotal, e7 ▸ h.canupdates, h.fits⟩
 
+/-- `Arrays` after a change confined to `workperm`'s block. -/
+theorem Arrays.wp {st' : Search n} (h : Arrays m S ctx st) (hd : S.blocks.Pairwise (· ≠ ·))
+    (hu : Unch m m' (· = S.bWP)) (hw : ∃ v, ArrayAt m' .Mint32 S.bWP 0 v n)
+    (e : st'.lab = st.lab ∧ st'.ptn = st.ptn ∧ st'.orbits = st.orbits ∧ st'.active = st.active ∧
+      st'.fixedpts = st.fixedpts ∧ st'.firstlab = st.firstlab ∧ st'.canonlab = st.canonlab ∧
+      st'.firstcode = st.firstcode ∧ st'.canoncode = st.canoncode ∧ st'.firsttc = st.firsttc ∧
+      st'.canong = st.canong ∧ st'.samerows = st.samerows ∧ st'.autos = st.autos) :
+    Arrays m' S ctx st' := by
+  obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13⟩ := e
+  obtain ⟨aw, ha, har⟩ := h.active
+  obtain ⟨fw, hf, hfr⟩ := h.fixedpts
+  have c := h.canong.unch hu (by sep_ne hd)
+  have au := h.autos.unch hu (by sep_ne hd) (by sep_ne hd)
+  exact ⟨e1 ▸ h.lab.unch hu (by sep_ne hd), e2 ▸ h.ptn.unch hu (by sep_ne hd),
+    e3 ▸ h.orbits.unch hu (by sep_ne hd), ⟨aw, ha.unch hu (by sep_ne hd), e4 ▸ har⟩,
+    ⟨fw, hf.unch hu (by sep_ne hd), e5 ▸ hfr⟩, hw, e6 ▸ h.firstlab.unch hu (by sep_ne hd),
+    e7 ▸ h.canonlab.unch hu (by sep_ne hd), e8 ▸ h.firstcode.unch hu (by sep_ne hd),
+    e9 ▸ h.canoncode.unch hu (by sep_ne hd), e10 ▸ h.firsttc.unch hu (by sep_ne hd),
+    e11 ▸ e12 ▸ c, e13 ▸ au, ⟨h.graph.arr.unch hu (by sep_ne hd), h.graph.rep⟩⟩
+
 /-- The fields of the search state held in arrays. -/
 def arrView (st : Search n) :=
   (st.lab, st.ptn, st.orbits, st.active, st.fixedpts, st.firstlab, st.canonlab, st.firstcode,
