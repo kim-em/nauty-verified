@@ -42,7 +42,7 @@ theorem refinePre_unch {n : Nat} {G : O.Gr n} {gl : R.GLoc} {bg : block} {gofs :
     (R.refineSpec G gl bg gofs bl lofs lab bp pofs ptn level bn nofs numcells bc cofs ba aofs active bk
       kofs M).pre args m₁ := by
   obtain ⟨hargs, hc, hg, hgo, hl, hp, hnc, ⟨v, hcnt⟩, ⟨aw, ha, har⟩, ⟨kv, hk⟩, hok, hps, hncl, hlev,
-    hsep⟩ := h
+    hsep, hact⟩ := h
   have hwk := R.work_unch hc.work hu (fun z hz hWz => (hW z hWz).2.1 (R.wglobs_sub z hz))
     (fun z hz hWz => (hW z hWz).2.2.1 hz) hv
   have nA : ∀ z ∈ R.graphBlocks gl bg ++ [bl, bp, bn, bc, ba, bk], ¬ W z :=
@@ -55,7 +55,7 @@ theorem refinePre_unch {n : Nat} {G : O.Gr n} {gl : R.GLoc} {bg : block} {gofs :
     ⟨v, hcnt.unch hu (nA bc (by simp))⟩, ⟨aw, ha.unch hu (nA ba (by simp)), har⟩,
     ⟨kv, hk.unch hu (nA bk (by simp))⟩, hok, hps, hncl, hlev,
     ⟨hsep.distinct, fun z hz => hv z (hsep.valid z hz),
-      fun z hz hw => hsep.notWork z hz (hwk.2 z hw), hsep.notGlobs, hsep.notTab⟩⟩
+      fun z hz hw => hsep.notWork z hz (hwk.2 z hw), hsep.notGlobs, hsep.notTab⟩, hact⟩
 
 local notation "NWP" => E.nautilWorkperm
 local notation "NWPS" => E.nautilWorkpermSz
@@ -84,7 +84,7 @@ theorem doref_refineT {n : Nat} (G : O.Gr n) (gl : R.GLoc) (L : Refine.Loc) (lab
         t = E0 ∧ ∃ W : block → Prop, Unch m₁ m₂ W ∧ ¬ W bq ∧ ¬ W NWP ∧ ¬ W NWPS ∧
           (0 < c' → ¬ W b')) := by
   have hc := h.2.1
-  have hsep := h.2.2.2.2.2.2.2.2.2.2.2.2.2.2
+  have hsep := h.2.2.2.2.2.2.2.2.2.2.2.2.2.2.1
   have eB : NWP ∈ E.blocks ∧ NWPS ∈ E.blocks := by simp [NautyEnv.blocks]
   have eA : NWP ∈ envAvoid ∧ NWPS ∈ envAvoid := by simp
   -- what the `DYNALLOC1` may change

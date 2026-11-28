@@ -140,6 +140,12 @@ between their calls. -/
 abbrev envAvoid : List block :=
   [E.nautyBit, E.nautilBit, E.leftbit, E.nautilWorkperm, E.nautilWorkpermSz]
 
+/-- The active set a node refines from: its positions start cells of `ptn` at
+`level` (nauty.c's initial active set, or the target cell's start after
+`breakout`), and there are at most `numcells` of them. -/
+def ActiveOk {n : Nat} (ptn : Array Nat) (level numcells : Nat) (active : VSet n) : Prop :=
+  (∀ v, active.mem v = true → v = 0 ∨ ptn[v - 1]! ≤ level) ∧ active.card ≤ numcells
+
 /-- How a linked program represents the dispatch procedures and their state. -/
 structure DispatchRep (ge : genv) [NautyEnv ge] (O : Ops) where
   isautom : block
@@ -307,7 +313,8 @@ abbrev initSt {n : Nat} (lab ptn : Array Nat) (active : VSet n) (numcells : Nat)
 
 /-- `refine(g, lab, ptn, level, &numcells, count, active, &code, m, n)`: refine
 the partition to the equitable one, writing `O.refine`'s `lab`, `ptn`,
-`active`, cell count and code (`count` is scratch). -/
+`active`, cell count and code (`count` is scratch). The active set is
+`ActiveOk`, which sparse `refine_sg` needs and dense `refine` ignores. -/
 def refineSpec {n : Nat} (G : O.Gr n) (gl : R.GLoc) (bg : block) (gofs : ptrofs) (bl : block)
     (lofs : ptrofs)
     (lab : Array Nat) (bp : block) (pofs : ptrofs) (ptn : Array Nat) (level : Nat) (bn : block)
@@ -324,7 +331,8 @@ def refineSpec {n : Nat} (G : O.Gr n) (gl : R.GLoc) (bg : block) (gofs : ptrofs)
       SetRep (fun w => bv64 (aw w)) M active) ∧
     (∃ kv, ArrayAt m .Mint32 bk (intOfZ (Ptrofs.unsigned kofs)) kv 1) ∧
     StOk n level (initSt lab ptn active numcells) ∧ (∀ i < n, ptn[i]! < 2147483648) ∧
-    numcells ≤ n ∧ level < 2147483648 ∧ R.Sep m (R.graphBlocks gl bg ++ [bl, bp, bn, bc, ba, bk])
+    numcells ≤ n ∧ level < 2147483648 ∧ R.Sep m (R.graphBlocks gl bg ++ [bl, bp, bn, bc, ba, bk]) ∧
+    ActiveOk ptn level numcells active
   post _ m t _ m' := t = E0 ∧
     ArrayAt m' .Mint32 bl (intOfZ (Ptrofs.unsigned lofs))
       (ints (O.refine G level lab ptn active numcells).lab) n ∧

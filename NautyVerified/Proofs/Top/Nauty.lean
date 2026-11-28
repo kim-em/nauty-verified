@@ -991,10 +991,10 @@ theorem nauty_satisfies {k : Nat} (G : Colored n k) (gens : List (Array Nat))
     (Keep.unch B6 (by nb)).perm _ _ ((Keep.unch U01 (by nG hm0)).perm _ _
       (fnPerm hm0 funct_emitGenerator))
   -- the root call
-  refine wp_tRoot (NodeOk := SearchInf.NodeOk G) (Em := Em) (S := S) (ctx := ⟨rowsOf G⟩) (st := st0)
+  refine wp_tRoot (NodeOk := denseNodeOk G) (Em := Em) (S := S) (ctx := ⟨rowsOf G⟩) (st := st0)
     (nc := (initialPartition G).2.length) (root_satisfies G Em hOff hFirst S st0 _ []) hS11
     (hT5.unch F5 (by nb)) ⟨.nil, fun p hp => absurd hp (List.not_mem_nil), fun p hp => absurd hp
-      (List.not_mem_nil)⟩ hAut (by omega) hlen (SearchInf.nodeOk_root G hn0) hvU hpU
+      (List.not_mem_nil)⟩ hAut (by omega) hlen ⟨SearchInf.nodeOk_root G hn0, activeOk_root G hn0⟩ hvU hpU
     (by rw [hL11 _ (by decide)]; simp (config := {decide := true}) only [nT, nTemps, temps_gso, temps_gss]; rfl)
     (by rw [hL11 _ (by decide)]; simp (config := {decide := true}) only [nT, nTemps, temps_gso, temps_gss]; rfl)
     (by rw [hle11 _ (by decide), hle10 _ (by decide) (by decide), hle9 _ (by decide),

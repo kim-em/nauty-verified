@@ -422,7 +422,7 @@ theorem dense_refineFn {xi : ExternalCalls} {M : Nat} {vf : val} (h : Refine.Ref
   refine ⟨fd, hfd, hty, fun G _ bg gofs bl lofs lab bp pofs ptn level bn nofs numcells bc cofs ba
     aofs active bk kofs => ?_⟩
   refine Satisfies.of_pre fun args m ⟨hargs, hc, ⟨gw, hg⟩, _, hl, hp, hnc, hcnt, ⟨aw, ha, har⟩, hk,
-    hok, hps, hncl, hlev, hsep⟩ => ?_
+    hok, hps, hncl, hlev, hsep, _⟩ => ?_
   have hw := hc.work
   obtain ⟨⟨cP, bP, dP⟩, ⟨cS, bS, dS⟩, ⟨cB, bB, dB⟩⟩ := dense_dyn hw
   obtain ⟨bP', dP', eP⟩ := slotBlk dP (dense_inUseW dP) Block.naugraphDnwork

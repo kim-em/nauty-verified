@@ -35,7 +35,7 @@ that need HexGraphIso's partition facts are the laws `visit_inv`,
 
 namespace NautyVerified.Proofs.Search
 
-open NautyVerified.Proofs.Dispatch (Ops denseOps)
+open NautyVerified.Proofs.Dispatch (Ops denseOps ActiveOk)
 open NautyVerified.Spec NautyVerified.Spec.SearchInf
 open Hex.GraphIso Hex.GraphIso.Nauty
 open Generic (Policy)
@@ -232,6 +232,37 @@ theorem EmLawFirst.toG {Em : Bool → Nat → Nat → Search n → List Int} {ct
 
 end Dense
 
+/-! ### The active set at a child -/
+
+theorem card_empty_insert (v : Nat) : ((VSet.empty : VSet n).insert v).card ≤ 1 := by
+  have h := VSet.card_insert_le (VSet.empty : VSet n) v
+  have h0 : (VSet.empty : VSet n).card = 0 := by
+    rw [VSet.card_eq_countBelow, VSet.countBelow]; simp
+  omega
+
+/-- After `breakout` at a target cell starting at `tc`, the child's active set
+`{tc}` is `ActiveOk` at the next level. -/
+theorem activeOk_child {κ : Type} (first : Bool) (level nc tc tv : Nat) (st : SearchState n κ)
+    (htc : tc = 0 ∨ st.ptn[tc - 1]! ≤ level) :
+    ActiveOk (Hex.GraphIso.Nauty.child first level tc tv st).ptn (level + 1) (nc + 1)
+      (Hex.GraphIso.Nauty.child first level tc tv st).active := by
+  have hp : (Hex.GraphIso.Nauty.child first level tc tv st).ptn = st.ptn.set! tc (level + 1) := by
+    cases first <;> rfl
+  have ha : (Hex.GraphIso.Nauty.child first level tc tv st).active = VSet.empty.insert tc := by
+    cases first <;> rfl
+  rw [hp, ha]
+  refine ⟨fun v hv => ?_, Nat.le_trans (card_empty_insert tc) (by omega)⟩
+  rw [VSet.mem_insert, VSet.mem_empty] at hv
+  simp only [Bool.false_or, Bool.and_eq_true, beq_iff_eq, decide_eq_true_eq] at hv
+  obtain ⟨rfl, -⟩ := hv
+  by_cases h0 : tc = 0
+  · exact .inl h0
+  · rcases htc with h | h
+    · exact absurd h h0
+    · right
+      rw [Array.getElem!_set!_ne _ _ _ _ (by omega)]
+      omega
+
 /-! ### The laws -/
 
 section Laws
@@ -269,6 +300,11 @@ structure NodeLaws (L : PolicyLink O n) (G : O.Gr n) where
   /-- `SInv.visitSt`. -/
   visit_inv : ∀ {first level nc st}, NodeOk first level nc st → SInvG O G st →
     SInvG O G (visitStG O G level nc st)
+  /-- The node's active set is `ActiveOk` (nauty.c's initial active set at the
+  root, the target cell's start after `breakout`; `activeOk_child`), as the
+  dispatch `refine` needs. -/
+  visit_active : ∀ {first level nc st}, NodeOk first level nc st →
+    ActiveOk st.ptn level nc st.active
   /-- `PartOk.visit`'s partition facts. -/
   visit_part : ∀ {first level nc st}, NodeOk first level nc st →
     PartFactsG n level (P.visit G level nc st).1 (P.visit G level nc st).2.2
@@ -374,30 +410,65 @@ section DenseLaws
 
 variable {k : Nat}
 
+/-- The target cell of a first-path sweep starts a cell. -/
+theorem sweepOkFirst_tc {G : Colored n k} {level nc tc tv1 tv : Nat} {cell : VSet n} {st : Search n}
+    (h : SweepOkFirst G level nc tc tv1 cell (some tv) st) : tc = 0 ∨ st.ptn[tc - 1]! ≤ level := by
+  obtain ⟨⟨t, st₂, rfl, -, hok, ⟨len, hc, -⟩, hcur, -⟩, -⟩ := h
+  have hm := hcur tv rfl
+  have hne : cell ≠ VSet.empty := fun he => by rw [he, VSet.mem_empty] at hm; cases hm
+  obtain ⟨⟨-, h2, -, -⟩, -, -⟩ := hc hne
+  rcases h2 with h2 | h2
+  · exact .inl h2
+  · right
+    show (st₂.ptn.map (phi (n + 2) nautyInfinity))[tc - 1]! ≤ level
+    have hl := level_le_of_ok hok
+    have h2' : st₂.ptn[tc - 1]! ≤ level := h2
+    rw [getElem!_map_phi (by omega), phi_ne (show st₂.ptn[tc - 1]! ≠ n + 2 by omega)]
+    exact h2'
+
+/-- The target cell of an off-path sweep starts a cell. -/
+theorem sweepOkOff_tc {G : Colored n k} {level nc tc tv : Nat} {cell : VSet n} {st : Search n}
+    (h : SweepOkOff G level nc tc cell (some tv) st) : tc = 0 ∨ st.ptn[tc - 1]! ≤ level := by
+  obtain ⟨⟨t, st₂, rfl, -, hok, ⟨len, hc, -⟩, hcur, -⟩, -⟩ := h
+  have hm := hcur tv rfl
+  have hne : cell ≠ VSet.empty := fun he => by rw [he, VSet.mem_empty] at hm; cases hm
+  obtain ⟨⟨-, h2, -, -⟩, -, -⟩ := hc hne
+  rcases h2 with h2 | h2
+  · exact .inl h2
+  · right
+    show (st₂.ptn.map (phi (n + 2) nautyInfinity))[tc - 1]! ≤ level
+    have hl := level_le_of_ok hok
+    have h2' : st₂.ptn[tc - 1]! ≤ level := h2
+    rw [getElem!_map_phi (by omega), phi_ne (show st₂.ptn[tc - 1]! ≠ n + 2 by omega)]
+    exact h2'
+
 /-- The dense laws, on the coloured graph `G` with its rows `ctx`. -/
 def denseLaws (G : Colored n k) (ctx : Ctx n) (hn0 : 0 < n) (hn : n + 2 < nautyInfinity) :
     NodeLaws (denseLink (n := n)) ctx where
-  NodeOk := NodeOk G
+  NodeOk := denseNodeOk G
   SweepFirst := SweepOkFirst G
   SweepOff := SweepOkOff G
-  level_pos h := by obtain ⟨⟨_, _, _, h1, _⟩, _⟩ := h; exact h1
-  level_le h := by obtain ⟨⟨_, _, _, _, hso, _⟩, _⟩ := h; exact SearchInf.level_le_of_ok hso
+  level_pos h := by obtain ⟨⟨_, _, _, h1, _⟩, _⟩ := h.1; exact h1
+  level_le h := by obtain ⟨⟨_, _, _, _, hso, _⟩, _⟩ := h.1; exact SearchInf.level_le_of_ok hso
   inv _ := trivial
   inv_first _ := trivial
   inv_off _ := trivial
   visitOk _ := trivial
   targetOk _ := trivial
   code_lt {_ level nc st} _ := Nat.lt_trans (visit_code_lt ctx level nc st) (by decide)
-  visit_inv h hs := (SInv.visitSt hn0 hn hs.dense h ctx).toG
+  visit_inv h hs := (SInv.visitSt hn0 hn hs.dense h.1 ctx).toG
+  visit_active h := h.2
   visit_part h := ((PartOk.visit hn0 hn
-    (by obtain ⟨⟨_, _, _, h1, _⟩, _⟩ := h; exact h1) (PartOk.of_nodeOk hn h) ctx).facts hn0 hn).toG
+    (by obtain ⟨⟨_, _, _, h1, _⟩, _⟩ := h.1; exact h1) (PartOk.of_nodeOk hn h.1) ctx).facts hn0 hn).toG
   target_lt {_ level _ _} h hlt hint hh := by
+    replace h := h.1
     have h1 : 1 ≤ level := by obtain ⟨⟨_, _, _, h1, _⟩, _⟩ := h; exact h1
     have hp := (PartOk.visit hn0 hn h1 (PartOk.of_nodeOk hn h) ctx).facts hn0 hn
     obtain ⟨x, hx, hgt⟩ := exists_gt_of_bcount (hp.count ▸ hlt)
     exact Bestcell.targetcell_mem ctx _ _ _ 100 hint hp.ptnSize (Nat.le_trans hp.ptnLast h1) hh hx hgt
-  first_start h := nodeOk_sweepFirst hn0 hn h ctx 100
-  first_child h := sweepOkFirst_child hn0 h ctx 100
+  first_start h := nodeOk_sweepFirst hn0 hn h.1 ctx 100
+  first_child {level nc tc _ tv _ st} h :=
+    ⟨sweepOkFirst_child hn0 h ctx 100, activeOk_child true level nc tc tv st (sweepOkFirst_tc h)⟩
   first_next fuel h hd := by
     rw [firstChildG_dense] at hd ⊢
     exact sweepOkFirst_next hn0 hn h ctx 100 fuel hd
@@ -421,8 +492,9 @@ def denseLaws (G : Colored n k) (ctx : Ctx n) (hn0 : 0 < n) (hn : n + 2 < nautyI
       simp [h1]
     · have := hpast rfl tv1 rfl
       omega
-  off_start h := nodeOk_sweepOff hn0 hn h ctx 100
-  off_child h := sweepOkOff_child hn0 h ctx 100
+  off_start h := nodeOk_sweepOff hn0 hn h.1 ctx 100
+  off_child {level nc tc tv _ st} h :=
+    ⟨sweepOkOff_child hn0 h ctx 100, activeOk_child false level nc tc tv st (sweepOkOff_tc h)⟩
   off_next fuel h hd := by
     rw [otherChildG_dense] at hd ⊢
     exact sweepOkOff_next hn0 hn h ctx 100 fuel hd
@@ -430,13 +502,13 @@ def denseLaws (G : Colored n k) (ctx : Ctx n) (hn0 : 0 < n) (hn : n + 2 < nautyI
   off_args h := sweepOkOff_breakArgs h
   noFuel h hl := by
     rw [hexNodeG_dense]
-    exact nodeOk_noFuel hn0 hn h ctx 100 hl
+    exact nodeOk_noFuel hn0 hn h.1 ctx 100 hl
   unwind_lt h fuel tg s he := by
     rw [← node_eq_generic] at he
-    exact nodeOk_unwind_lt h ctx nautyInf 100 fuel tg s he
-  leaf_lt h := node_hlt h ctx 100
-  leaf_done h := node_hDone hn0 hn h ctx 100
-  leafOk h := (proc_leafOk h ctx 100).toG
+    exact nodeOk_unwind_lt h.1 ctx nautyInf 100 fuel tg s he
+  leaf_lt h := node_hlt h.1 ctx 100
+  leaf_done h := node_hDone hn0 hn h.1 ctx 100
+  leafOk h := (proc_leafOk h.1 ctx 100).toG
   leafFits _ _ := trivial
   short_autos first fuel level nc st _ hcap he := by
     rw [← node_eq_generic] at hcap he ⊢

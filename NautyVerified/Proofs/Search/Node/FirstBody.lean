@@ -258,7 +258,7 @@ theorem firstpathnode_bodyG [P : Generic.Policy (SearchState n (O.Canon n)) n (�
       simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
       rcases hz with rfl | rfl | rfl <;> simp [L, LCtxG.locals]))
     enc eq ek (gl' _ (by decide)) hA2 ⟨_, hqA⟩ ⟨_, hkA⟩ hlab1 hptn1 hlev1 hl1 hln hncn
-    { Lw.visit_inv hok hS1.inv with } ?_
+    (Lw.visit_active (st := st) hok) { Lw.visit_inv hok hS1.inv with } ?_
   intro m3 h3 hnc3 hk3 hq3 hU3 hg3 hwm3 hK3
   have hsame3 := Lk.visit_same G level nc st hI0 hVo
   have hnc3' : ArrayAt m3 .Mint32 Lo.bnc 0 (fun _ => .Vint (ir (v.1 : Int))) 1 := by

@@ -285,7 +285,7 @@ theorem othernode_bodyG (D : DispatchC ge O) (C : Classifier O) (L : PolicyLink 
       rcases hz with rfl | rfl | rfl <;> simp))
     hE.enc hE.eq hE.ek (hE.gl _) hA2 hqA hkA
     (by rw [k708 _ (by decide)]; exact hlab1) (by rw [k708 _ (by decide)]; exact hptn1)
-    (by rw [k708 _ (by decide)]; exact hlev1) hl1 hln hncn
+    (by rw [k708 _ (by decide)]; exact hlev1) hl1 hln hncn (Lw.visit_active (st := st) hok)
     { Lw.visit_inv hok h0.inv with } ?_
   intro m3 h3 hnc3 hk3 hq3 hU3 hg3 hwm3 hK3
   -- the policy's visit

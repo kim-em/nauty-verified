@@ -34,7 +34,8 @@ then not `S.bUA`.
 needs at a node, beyond `SearchAt`: the fuel bound is never reached, and the
 cell count is the one `refine` expects. It is a parameter of the
 specifications here; `firstpathnodeSpecG`/`othernodeSpecG` instantiate it
-with `SearchInf.NodeOk G` (`Spec/NodeOk.lean`).
+with `denseNodeOk G`: `SearchInf.NodeOk G` (`Spec/NodeOk.lean`) and the
+active set's `ActiveOk`.
 
 `NodeFrame m m' S chain level`: the blocks a node at `level` may change: those
 of `SFrame`, the list's nodes from index `level - 2` (the parent's `next`
@@ -181,19 +182,44 @@ abbrev othernodeSpec {n : Nat} (xi : ExternalCalls)
     (level numcells : Nat) (chain : List (block × block)) : FunSpec :=
   nodeSpec xi NodeOk Em false S ctx st level numcells chain
 
+/-- The dense node precondition: the HexGraphIso facts of `Spec/NodeOk.lean`
+and the active set `ActiveOk`, which the dispatch `refine` takes. -/
+def denseNodeOk {n k : Nat} (G : Hex.GraphIso.Colored n k) (first : Bool) (level numcells : Nat)
+    (st : Search n) : Prop :=
+  SearchInf.NodeOk G first level numcells st ∧
+    NautyVerified.Proofs.Dispatch.ActiveOk st.ptn level numcells st.active
+
+/-- nauty()'s initial active set, one position per cell start, is `ActiveOk`
+at the root. -/
+theorem activeOk_root {n k : Nat} (G : Hex.GraphIso.Colored n k) (hn0 : 0 < n) :
+    NautyVerified.Proofs.Dispatch.ActiveOk
+      (SearchInf.initialC n (initialPartition G).1 (initialPartition G).2).ptn 1
+      (initialPartition G).2.length
+      (SearchInf.initialC n (initialPartition G).1 (initialPartition G).2).active := by
+  have hok := Hex.GraphIso.Nauty.initial_nodeOk G hn0
+  refine ⟨fun v hv => ?_, initActive_card n _⟩
+  rcases hok.starts v hv with h | h
+  · exact .inl h
+  · right
+    show (initPtn n SearchInf.nautyInfinity (initialPartition G).2)[v - 1]! ≤ 1
+    have h' : (initPtn n (n + 2) (initialPartition G).2)[v - 1]! ≤ 1 := h
+    rw [← SearchInf.initPtn_map (a := n + 2) (b := SearchInf.nautyInfinity) (by omega),
+      SearchInf.getElem!_map_phi (by omega),
+      SearchInf.phi_ne (show (initPtn n (n + 2) (initialPartition G).2)[v - 1]! ≠ n + 2 by omega)]
+    exact h'
+
 /-- `firstpathnode0` on the graph `G`, with `NodeOk` the HexGraphIso facts of
-`Spec/NodeOk.lean`. -/
+`Spec/NodeOk.lean` and `ActiveOk` (`denseNodeOk`). -/
 abbrev firstpathnodeSpecG {n k : Nat} (xi : ExternalCalls) (G : Hex.GraphIso.Colored n k)
     (Em : Bool → Nat → Nat → Search n → List Int) (S : SLoc) (st : Search n)
     (level numcells : Nat) (chain : List (block × block)) : FunSpec :=
-  firstpathnodeSpec xi (SearchInf.NodeOk G) Em S ⟨rowsOf G⟩ st level numcells chain
+  firstpathnodeSpec xi (denseNodeOk G) Em S ⟨rowsOf G⟩ st level numcells chain
 
-/-- `othernode0` on the graph `G`, with `NodeOk` the HexGraphIso facts of
-`Spec/NodeOk.lean`. -/
+/-- `othernode0` on the graph `G`, with `NodeOk` `denseNodeOk`. -/
 abbrev othernodeSpecG {n k : Nat} (xi : ExternalCalls) (G : Hex.GraphIso.Colored n k)
     (Em : Bool → Nat → Nat → Search n → List Int) (S : SLoc) (st : Search n)
     (level numcells : Nat) (chain : List (block × block)) : FunSpec :=
-  othernodeSpec xi (SearchInf.NodeOk G) Em S ⟨rowsOf G⟩ st level numcells chain
+  othernodeSpec xi (denseNodeOk G) Em S ⟨rowsOf G⟩ st level numcells chain
 
 /-! ### For any dispatch representation
 

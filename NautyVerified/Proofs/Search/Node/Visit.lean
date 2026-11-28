@@ -372,7 +372,7 @@ theorem wp_nodeVisit {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_en
 
 section Generic
 
-open NautyVerified.Proofs.Dispatch (Ops DispatchRep DispatchC)
+open NautyVerified.Proofs.Dispatch (Ops DispatchRep DispatchC ActiveOk)
 
 variable {ge : genv} [E : NautyEnv ge] {O : Ops}
 
@@ -409,6 +409,7 @@ theorem wp_nodeVisitG {D : DispatchC ge O} {n : Nat} {f : function} {Q : Post} {
     (hptn : PTree.get dense.id.«ptn» le = some (.Vptr S.bp S.pofs))
     (hlev : PTree.get dense.id.«level» le = some (.Vint (ir level)))
     (hl1 : 1 ≤ level) (hln : level ≤ n) (hncn : numcells ≤ n)
+    (hact : ActiveOk st.ptn level numcells st.active)
     (hinv : SInvG O G (visitStG O G level numcells st))
     (hQ : ∀ m', SearchAtG D.toDispatchRep m' S gl cl G (visitStG O G level numcells st) pre false →
       ArrayAt m' .Mint32 bnc 0
@@ -559,7 +560,7 @@ theorem wp_nodeVisitG {D : DispatchC ge O} {n : Nat} {f : function} {Q : Post} {
       (Doref.refArgs L n) m := by
     refine ⟨rfl, ⟨h.work.disp, h.tables.disp, h.tables.env, hn0, hnl, h.M1, h.Mlt, h.nM⟩,
       h.arrays.graph, h.graphOk, h.arrays.lab, h.arrays.ptn, hnc, ⟨wv, hwv⟩, ⟨aw, haw, hawr⟩,
-      ⟨kv, hkv⟩, ?_, ?_, hncn, by omega, hsep⟩
+      ⟨kv, hkv⟩, ?_, ?_, hncn, by omega, hsep, hact⟩
     · refine ⟨hI.labSize, fun i hiz => hI.labSmall i (by
         have := hI.labSize; simp only [NautyVerified.Proofs.Dispatch.DispatchRep.initSt] at hiz; omega), hI.ptnSize, ?_⟩
       show st.ptn[st.ptn.size - 1]! ≤ level
