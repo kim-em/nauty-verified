@@ -3,8 +3,9 @@ import NautyVerified.Proofs.Search.Firstterminal.Syntax
 /-!
 # The copy loops of `firstterminal`
 
-`wp_copyInts`: `for (i = 0; i < n; ++i) dst[i] = src[i];` with `n` nauty.c's
-global, `dst` an `int *` global and `src` an `int *` temporary.
+`wp_copyIntsG`: `for (i = 0; i < n; ++i) dst[i] = src[i];` with `n` nauty.c's
+global, `dst` an `int *` global and `src` an `int *` temporary, in any program
+with a `NautyEnv`; `wp_copyInts` is the dense instance.
 `wp_copyShorts`: `for (i = 0; i <= level; ++i) dst[i] = src[i];` with both
 `short *` globals.
 -/
@@ -27,7 +28,11 @@ set_option linter.unusedSimpArgs false
 
 variable {xi : ExternalCalls}
 
-theorem wp_copyInts {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
+section Generic
+
+variable {ge : genv} [E : NautyEnv ge]
+
+theorem wp_copyIntsG {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
     {dst src : ident} {bgD bD bs : block} {sofs : ptrofs} {vals : Nat → val} {o : Array Nat}
     {N : Nat} (hN : N < 2147483648)
     (hdE : PTree.get dst e = none) (hnE : PTree.get dense.id.«nauty:n» e = none) (hgD : Genv.find_symbol ge.genv_genv dst = some bgD)
@@ -35,8 +40,8 @@ theorem wp_copyInts {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem
     (harr : ArrayAt m .Mint32 bD 0 vals N)
     (hsrc : PTree.get src le = some (.Vptr bs sofs))
     (hsa : ArrayAt m .Mint32 bs (intOfZ (Ptrofs.unsigned sofs)) (ints o) N)
-    (hn : IntAt m Block.n N) (hsi : src ≠ dense.id.i)
-    (hDn : bD ≠ Block.n) (hDg : bD ≠ bgD) (hDs : bD ≠ bs)
+    (hn : IntAt m E.n N) (hsi : src ≠ dense.id.i)
+    (hDn : bD ≠ E.n) (hDg : bD ≠ bgD) (hDs : bD ≠ bs)
     (hQ : ∀ le' m', ArrayAt m' .Mint32 bD 0 (ints o) N → Unch m m' (· = bD) → Keep m m' bD →
       (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
       (∀ x, x ≠ dense.id.i → PTree.get x le' = PTree.get x le) → Q.normal E0 e le' m') :
@@ -57,7 +62,7 @@ theorem wp_copyInts {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem
     dense.id.i _ rfl _ N hN ?_ ?_ ?_ ?_ ?_
   · rintro k le' m' ⟨hk, hi, -, -, hu, -, -⟩
     refine ⟨hk, hi, ?_⟩
-    rw [Exec.evalExpr, eval_gint (le := le') hnE find_n (hn.unch hu (Ne.symm hDn)),
+    rw [Exec.evalExpr, eval_gint (le := le') hnE E.find_n (hn.unch hu (Ne.symm hDn)),
       show Exec.evalExpr ge e le' m' (tv dense.id.i) = _ from hi]
     simp only [typeof, cop]
     rw [ir_lt (a := (k : Int)) (b := (N : Int)) ⟨by omega, by omega⟩ ⟨by omega, by omega⟩]
@@ -152,5 +157,25 @@ theorem wp_copyShorts {f : function} {Q : Post} {le : temp_env} {m : mem}
     exact ⟨hi, hk, temps_gss _ _ _, fun x hx => by rw [temps_gso _ _ hx, ho x hx], ha, hu, hkp, hv⟩
   · rintro le' m' ⟨-, -, ho, ha, hu, hkp, hv⟩
     exact hQ le' m' ha hu hkp hv ho
+
+end Generic
+
+theorem wp_copyInts {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
+    {dst src : ident} {bgD bD bs : block} {sofs : ptrofs} {vals : Nat → val} {o : Array Nat}
+    {N : Nat} (hN : N < 2147483648)
+    (hdE : PTree.get dst e = none) (hnE : PTree.get dense.id.«nauty:n» e = none) (hgD : Genv.find_symbol ge.genv_genv dst = some bgD)
+    (hpD : Mem.load .Mint64 m bgD (zOfInt 0) = some (.Vptr bD Ptrofs.zero))
+    (harr : ArrayAt m .Mint32 bD 0 vals N)
+    (hsrc : PTree.get src le = some (.Vptr bs sofs))
+    (hsa : ArrayAt m .Mint32 bs (intOfZ (Ptrofs.unsigned sofs)) (ints o) N)
+    (hn : IntAt m Block.n N) (hsi : src ≠ dense.id.i)
+    (hDn : bD ≠ Block.n) (hDg : bD ≠ bgD) (hDs : bD ≠ bs)
+    (hQ : ∀ le' m', ArrayAt m' .Mint32 bD 0 (ints o) N → Unch m m' (· = bD) → Keep m m' bD →
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
+      (∀ x, x ≠ dense.id.i → PTree.get x le' = PTree.get x le) → Q.normal E0 e le' m') :
+    Wp xi ge f (forLoopC dense.id.i
+      (.Ebinop .Olt (tv dense.id.i) (.Evar dense.id.«nauty:n» tint) tint)
+      (sk (.Sassign (gat dst (tv dense.id.i)) (ix src (tv dense.id.i))))) Q e le m :=
+  wp_copyIntsG hN hdE hnE hgD hpD harr hsrc hsa hn hsi hDn hDg hDs hQ
 
 end NautyVerified.Proofs.Search.Firstterminal

@@ -1,13 +1,17 @@
 import NautyVerified.Proofs.Search.Firstterminal.Copy
 import NautyVerified.Spec.Firstterminal
 import NautyVerified.Proofs.Search.Step
+import NautyVerified.Proofs.Search.Node.Rebuild
 
 /-!
 # `firstterminal` installs the first leaf
 
-`firstterminal_satisfies`: nauty.c's `firstterminal` satisfies
-`firstterminalSpec`, i.e. takes memory holding the search state `st` to memory
-holding HexGraphIso's `firstterminal level st`.
+`firstterminal_satisfiesG`: nauty.c's `firstterminal` satisfies
+`firstterminalSpecG D` for any dispatch representation `D`, i.e. takes memory
+holding the search state `st` to memory holding HexGraphIso's
+`firstterminal level st`. It calls no dispatch procedure and writes only the
+search's own blocks (`SearchAtG.rebuild`). `firstterminal_satisfies` is the
+dense instance, through `firstterminalSpec_ofG`.
 -/
 
 namespace NautyVerified.Proofs.Search.Firstterminal
@@ -32,10 +36,17 @@ def entryTemps (S : SLoc) (level : Nat) : temp_env :=
   PTree.set dense.id.level (.Vint (ir level)) (PTree.set dense.id.lab (.Vptr S.bl S.lofs)
     (create_undef_temps dense.fn.«nauty:firstterminal».fn_temps))
 
+section Generic
+
+open NautyVerified.Proofs.Dispatch (Ops DispatchRep)
+
+variable {ge : genv} [E : NautyEnv ge] {O : Ops} (D : DispatchRep ge O)
+
 set_option maxHeartbeats 4000000 in
-theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx : Ctx n)
-    (st : Search n) (level : Nat) :
-    Satisfies xi ge (.Internal dense.fn.«nauty:firstterminal») (firstterminalSpec S ctx st level) := by
+theorem firstterminal_satisfiesG {xi : ExternalCalls} {n : Nat} (S : SLoc) (gl : D.GLoc)
+    (cl : D.CLoc) (G : O.Gr n) (st : SearchState n (O.Canon n)) (level : Nat) :
+    Satisfies xi ge (.Internal dense.fn.«nauty:firstterminal»)
+      (firstterminalSpecG D S gl cl G st level) := by
   refine satisfies_internal (Entry := fun _ m₀ e le m =>
     e = empty_env ∧ le = entryTemps S level ∧ m = m₀) ?_ ?_
   · rintro args m ⟨rfl, -⟩
@@ -48,7 +59,7 @@ theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx :
     rintro e le m ⟨rfl, rfl, rfl⟩
     rw [dense.fn.«nauty:firstterminal».fn_body_eq, body_eq]
     simp only [body]
-    have hd := h.distinct
+    have hd := h.lit
     have hn := h.nlt
     have hlev : PTree.get dense.id.level (entryTemps S level) = some (.Vint (ir level)) := by
       simp (config := {decide := true}) only [entryTemps, temps_gss]
@@ -79,7 +90,7 @@ theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx :
     wp_step; wp_step; wp_step; wp_step; wp_step; wp_step; wp_step
     apply wp_set_eval
     simp only [Exec.evalExpr, hlev, Refine.tv, typeof, cop]
-    refine wp_gint (x := level) rfl find_eqlevFirst
+    refine wp_gint (x := level) rfl E.find_eqlevFirst
       (h.scalars.eqlevFirst.unch hU1 (by sep_notin hd)).writable
       (by simp only [Exec.evalExpr, Refine.tv, temps_gss]) rfl ?_
     intro m2 iEF hu2 hv2
@@ -88,14 +99,14 @@ theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx :
     simp only [seqPost, Post.after, E0_append]
     apply wp_set_eval
     simp only [Exec.evalExpr, Refine.tv, temps_gss, typeof, cop]
-    refine wp_gint (x := level) rfl find_allsamelevel
+    refine wp_gint (x := level) rfl E.find_allsamelevel
       (h.scalars.allsamelevel.unch hU2 (by sep_notin hd)).writable
       (by simp only [Exec.evalExpr, Refine.tv, temps_gss]) rfl ?_
     intro m3 iAS hu3 hv3
     have hU3 := hU2.snoc hu3
     fwd hd hu3 [sFix sMax sOrb sGen sNod sBad sTct sCan iEF]
     simp only [seqPost, Post.after, E0_append]
-    refine wp_gint (x := level) rfl find_gcaFirst
+    refine wp_gint (x := level) rfl E.find_gcaFirst
       (h.scalars.gcaFirst.unch hU3 (by sep_notin hd)).writable
       (by simp only [Exec.evalExpr, Refine.tv, temps_gss]) rfl ?_
     intro m4 iGF hu4 hv4
@@ -118,7 +129,7 @@ theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx :
       simp only [Exec.evalExpr, Refine.tv, hlev4, typeof, cop, ir_add]; push_cast; rfl
     -- `firstcode[level+1] = 077777`
     wp_step; wp_step; wp_step
-    refine wp_gstoreS (le := le4) rfl find_nautyFirstcode
+    refine wp_gstoreS (le := le4) rfl E.find_nautyFirstcode
       (by rw [hU4.load _ _ _ (by sep_notin hd)]; exact h.dyns.firstcode.ptr hcFC)
       (h.arrays.firstcode.unch hU4 (by sep_notin hd)) (by omega) _ (level + 1) (by omega) (hl1v _) rfl
       (ci 32767 tint) 32767 (by decide) rfl (.inl rfl) ?_
@@ -128,7 +139,7 @@ theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx :
     -- `firsttc[level+1] = -1`
     simp only [seqPost, Post.after, E0_append]
     wp_step; wp_step; wp_step
-    refine wp_gstoreV (le := le4) rfl find_nautyFirsttc
+    refine wp_gstoreV (le := le4) rfl E.find_nautyFirsttc
       (by rw [hU5.load _ _ _ (by sep_notin hd)]; exact h.dyns.firsttc.ptr hcTC)
       (h.arrays.firsttc.unch hU5 (by sep_notin hd)) (by omega) _ (level + 1) (by omega) (hl1v _) rfl
       (.Eunop .Oneg (ci 1 tint) tint) (-1) (by simp only [Exec.evalExpr, typeof, cop]; rfl) rfl ?_
@@ -139,7 +150,7 @@ theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx :
     -- `for (i = 0; i < n; ++i) firstlab[i] = lab[i]`
     simp only [seqPost, Post.after, E0_append]
     wp_step
-    refine wp_copyInts (le := le4) (by omega) rfl rfl find_nautyFirstlab
+    refine wp_copyIntsG (le := le4) (by omega) rfl rfl E.find_nautyFirstlab
       (by rw [hU6.load _ _ _ (by sep_notin hd)]; exact h.dyns.firstlab.ptr hcFL)
       (h.arrays.firstlab.unch hU6 (by sep_notin hd)) hlab4
       (h.arrays.lab.unch hU6 (by sep_notin hd)) (h.fixed.nn.unch hU6 (by sep_notin hd)) (by decide)
@@ -156,14 +167,14 @@ theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx :
     simp only [seqPost, Post.after, E0_append]
     wp_step; wp_step
     apply wp_if_eval
-    rw [eval_gint rfl find_getcanon (h.fixed.getcanon.unch hU7 (by sep_notin hd))]
+    rw [eval_gint rfl E.find_getcanon (h.fixed.getcanon.unch hU7 (by sep_notin hd))]
     simp only [typeof, cop]
     rw [ite_eq_left (by decide)]
     -- `canonlevel = eqlev_canon = gca_canon = level`
     wp_step; wp_step; wp_step; wp_step; wp_step; wp_step; wp_step
     apply wp_set_eval
     simp only [Exec.evalExpr, hlev7, Refine.tv, typeof, cop]
-    refine wp_gint (x := level) rfl find_gcaCanon
+    refine wp_gint (x := level) rfl E.find_gcaCanon
       (h.scalars.gcaCanon.unch hU7 (by sep_notin hd)).writable
       (by simp only [Exec.evalExpr, Refine.tv, temps_gss]) rfl ?_
     intro m8 iGC hu8 hv8
@@ -173,7 +184,7 @@ theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx :
     simp only [seqPost, Post.after, E0_append]
     apply wp_set_eval
     simp only [Exec.evalExpr, Refine.tv, temps_gss, typeof, cop]
-    refine wp_gint (x := level) rfl find_eqlevCanon
+    refine wp_gint (x := level) rfl E.find_eqlevCanon
       (h.scalars.eqlevCanon.unch hU8 (by sep_notin hd)).writable
       (by simp only [Exec.evalExpr, Refine.tv, temps_gss]) rfl ?_
     intro m9 iEC hu9 hv9
@@ -181,7 +192,7 @@ theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx :
     fwd hd hu9 [sFix sMax sOrb sGen sNod sBad sTct sCan iEF iAS iGF aFC aTC aFL iGC]
     fwdK hd hu9 [kFC kTC kFL]
     simp only [seqPost, Post.after, E0_append]
-    refine wp_gint (x := level) rfl find_canonlevel
+    refine wp_gint (x := level) rfl E.find_canonlevel
       (h.scalars.canonlevel.unch hU9 (by sep_notin hd)).writable
       (by simp only [Exec.evalExpr, Refine.tv, temps_gss]) rfl ?_
     intro m10 iCL hu10 hv10
@@ -191,7 +202,7 @@ theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx :
     -- `comp_canon = 0; samerows = 0`
     simp only [seqPost, Post.after, E0_append]
     wp_step; wp_step; wp_step
-    refine wp_gint (x := 0) rfl find_compCanon
+    refine wp_gint (x := 0) rfl E.find_compCanon
       (h.scalars.compCanon.unch hU10 (by sep_notin hd)).writable
       (by simp only [Exec.evalExpr]) rfl ?_
     intro m11 iCC0 hu11 hv11
@@ -200,7 +211,7 @@ theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx :
     fwdK hd hu11 [kFC kTC kFL]
     simp only [seqPost, Post.after, E0_append]
     wp_step; wp_step; wp_step
-    refine wp_gint (x := 0) rfl find_samerows
+    refine wp_gint (x := 0) rfl E.find_samerows
       (h.scalars.samerows.unch hU11 (by sep_notin hd)).writable
       (by simp only [Exec.evalExpr]) rfl ?_
     intro m12 iSR hu12 hv12
@@ -215,7 +226,7 @@ theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx :
     -- `for (i = 0; i < n; ++i) canonlab[i] = lab[i]`
     simp only [seqPost, Post.after, E0_append]
     wp_step
-    refine wp_copyInts (le := le12) (by omega) rfl rfl find_nautyCanonlab
+    refine wp_copyIntsG (le := le12) (by omega) rfl rfl E.find_nautyCanonlab
       (by rw [hU12.load _ _ _ (by sep_notin hd)]; exact h.dyns.canonlab.ptr hcCL)
       (h.arrays.canonlab.unch hU12 (by sep_notin hd)) hlab12
       (h.arrays.lab.unch hU12 (by sep_notin hd)) (h.fixed.nn.unch hU12 (by sep_notin hd)) (by decide)
@@ -234,9 +245,9 @@ theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx :
       rw [shorts_set (by omega)]; exact aFC
     simp only [seqPost, Post.after, E0_append]
     wp_step
-    refine wp_copyShorts (le := le13) (by omega) (by omega) rfl find_nautyCanoncode
+    refine wp_copyShorts (le := le13) (by omega) (by omega) rfl E.find_nautyCanoncode
       (by rw [hU13.load _ _ _ (by sep_notin hd)]; exact h.dyns.canoncode.ptr hcCC)
-      (h.arrays.canoncode.unch hU13 (by sep_notin hd)) rfl find_nautyFirstcode
+      (h.arrays.canoncode.unch hU13 (by sep_notin hd)) rfl E.find_nautyFirstcode
       (by rw [hU13.load _ _ _ (by sep_notin hd)]; exact h.dyns.firstcode.ptr hcFC)
       hfc' (fun j hj => by
         by_cases hjl : j = level + 1
@@ -252,7 +263,7 @@ theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx :
     -- `canoncode[level+1] = 077777`
     simp only [seqPost, Post.after, E0_append]
     wp_step; wp_step; wp_step
-    refine wp_gstoreS (le := le14) rfl find_nautyCanoncode
+    refine wp_gstoreS (le := le14) rfl E.find_nautyCanoncode
       (by rw [hU14.load _ _ _ (by sep_notin hd)]; exact h.dyns.canoncode.ptr hcCC)
       aCC (by omega) _ (level + 1) (by omega)
       (by simp only [Exec.evalExpr, Refine.tv, hlev14, typeof, cop, ir_add]; push_cast; rfl) rfl
@@ -297,105 +308,108 @@ theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx :
         by_cases hi' : i = level + 1
         · subst hi'; rw [Array.getElem!_set!_self _ _ _ (by omega), hcs]; decide
         · rw [Array.getElem!_set!_ne _ _ _ _ (Ne.symm hi')]; exact (hinv.codesSmall i hi).1
+    have hL : ∀ z ∈ [S.bst, S.bCC, S.bCC, S.bCL, E.samerows, E.compCanon, E.canonlevel,
+        E.eqlevCanon, E.gcaCanon, S.bFL, S.bTC, S.bFC, E.gcaFirst, E.allsamelevel, E.eqlevFirst, S.bst],
+        z ∈ wrEnv ∨ z ∈ S.wrVG ∨ z ∈ D.canonBlocks cl S.bc := by
+      intro z hz
+      simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
+      rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
+        rfl | rfl | rfl <;> simp
+    have nL := h.not_wr hL
+    have hgL : ∀ z ∈ D.graphBlocks gl S.bg, ¬ z ∈ [S.bst, S.bCC, S.bCC, S.bCL, E.samerows,
+        E.compCanon, E.canonlevel, E.eqlevCanon, E.gcaCanon, S.bFL, S.bTC, S.bFC, E.gcaFirst, E.allsamelevel,
+        E.eqlevFirst, S.bst] := fun z hz hzL => by
+      simp only [List.mem_cons, List.mem_nil_iff, or_false] at hzL
+      rcases hzL with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
+        rfl | rfl | rfl <;> exact h.graph_ne hz (by simp) rfl
+    have hcL : ∀ z ∈ D.canonBlocks cl S.bc, ¬ z ∈ [S.bst, S.bCC, S.bCC, S.bCL, E.samerows,
+        E.compCanon, E.canonlevel, E.eqlevCanon, E.gcaCanon, S.bFL, S.bTC, S.bFC, E.gcaFirst, E.allsamelevel,
+        E.eqlevFirst, S.bst] := fun z hz hzL => by
+      simp only [List.mem_cons, List.mem_nil_iff, or_false] at hzL
+      rcases hzL with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
+        rfl | rfl | rfl <;> exact h.canon_ne hz (by simp) rfl
     refine ⟨m16, Nextelement.free_empty m16, rfl, ?_, ?_⟩
     · rw [firstterminal_eq]
-      exact
-        { fixed := h.fixed.unch hU16 (by sep_all hd)
-          scalars := ⟨iGF, iGC, h.scalars.noncheaplevel.unch hU16 (by sep_notin hd), iAS, iEF, iEC,
-            iCC0, iSR, iCL, h.scalars.stabvertex.unch hU16 (by sep_notin hd),
-            h.scalars.cosetindex.unch hU16 (by sep_notin hd),
-            h.scalars.needshortprune.unch hU16 (by sep_notin hd)⟩
-          stats := ⟨sOrb, sGen, sNod, sBad, fun _ => sMax, sMax.writable, sTct, sCan16,
-            h.stats.fits, sFix.perm, sFix.errstatus, sFix.grpsize1, sFix.grpsize2⟩
-          arrays :=
-            { lab := h.arrays.lab.unch hU16 (by sep_notin hd)
-              ptn := h.arrays.ptn.unch hU16 (by sep_notin hd)
-              orbits := h.arrays.orbits.unch hU16 (by sep_notin hd)
-              active := let ⟨aw, ha, hr⟩ := h.arrays.active
-                ⟨aw, ha.unch hU16 (by sep_notin hd), hr⟩
-              fixedpts := let ⟨fw, hf, hr⟩ := h.arrays.fixedpts
-                ⟨fw, hf.unch hU16 (by sep_notin hd), hr⟩
-              workperm := let ⟨wv, hwv⟩ := h.arrays.workperm
-                ⟨wv, hwv.unch hU16 (by sep_notin hd)⟩
-              firstlab := aFL
-              canonlab := aCL
-              firstcode := by rw [shorts_set (by omega), hcs]; exact aFC
-              canoncode := aCC2.congr fun j hj => by
-                simp only [upd, shorts]
-                by_cases hjl : j = level + 1
-                · subst hjl
-                  rw [ite_eq_left rfl, Array.getElem!_set!_self _ _ _ (by rw [ccCopy_size]; omega),
-                    hcs]
-                · rw [ite_eq_right hjl]
-                  simp only [Array.getElem!_set!_ne _ _ _ _ (Ne.symm hjl),
-                    ccCopy_get _ _ _ (show level + 1 ≤ st.canoncode.size by omega)]
-                  split <;> rfl
-              firsttc := by rw [intsZ_set (by omega)]; exact aTC
-              canong := ⟨by
-                obtain ⟨cw, ha, -⟩ := h.arrays.canong.arr
-                exact ⟨cw, ha.unch hU16 (by sep_notin hd), fun v hv => absurd hv (Nat.not_lt_zero _)⟩⟩
-              autos := h.arrays.autos.unch hU16 (by sep_notin hd) (by sep_notin hd)
-              graph := ⟨h.arrays.graph.arr.unch hU16 (by sep_notin hd), h.arrays.graph.rep⟩ }
-          dyns :=
-            { h.dyns with
-              workspace := h.dyns.workspace.keep hU16 (by sep_notin hd) (by sep_notin hd)
-                fun _ => Keep.unch hU16 (by sep_notin hd)
-              active := h.dyns.active.keep hU16 (by sep_notin hd) (by sep_notin hd)
-                fun _ => Keep.unch hU16 (by sep_notin hd)
-              fixedpts := h.dyns.fixedpts.keep hU16 (by sep_notin hd) (by sep_notin hd)
-                fun _ => Keep.unch hU16 (by sep_notin hd)
-              workperm := h.dyns.workperm.keep hU16 (by sep_notin hd) (by sep_notin hd)
-                fun _ => Keep.unch hU16 (by sep_notin hd)
-              firstlab := h.dyns.firstlab.keep hU16 (by sep_notin hd) (by sep_notin hd)
-                fun _ => (Keep.unch hU6 (by sep_notin hd)).trans kFL
-              canonlab := h.dyns.canonlab.keep hU16 (by sep_notin hd) (by sep_notin hd)
-                fun _ => (Keep.unch hU12 (by sep_notin hd)).trans kCL
-              firstcode := h.dyns.firstcode.keep hU16 (by sep_notin hd) (by sep_notin hd)
-                fun _ => (Keep.unch hU4 (by sep_notin hd)).trans kFC
-              canoncode := h.dyns.canoncode.keep hU16 (by sep_notin hd) (by sep_notin hd)
-                fun _ => (Keep.unch hU13 (by sep_notin hd)).trans kCC
-              firsttc := h.dyns.firsttc.keep hU16 (by sep_notin hd) (by sep_notin hd)
-                fun _ => (Keep.unch hU5 (by sep_notin hd)).trans kTC }
-          work := h.work.unch hU16 (by sep_all hd) fun z hz hm => h.work_not hz (by
-            clear hz; revert hm; revert z; simp [SLoc.blocks])
-          tables := h.tables.unch hU16 (by sep_all hd)
-          distinct := hd
-          inv :=
-            { hinv with
-              codesSmall := fun i hi => ⟨hfc'small i hi, by
-                by_cases hi' : i = level + 1
-                · subst hi'
-                  rw [Array.getElem!_set!_self _ _ _ (by rw [ccCopy_size]; omega), hcs]; decide
-                · rw [Array.getElem!_set!_ne _ _ _ _ (Ne.symm hi'), ccCopy_get _ _ _ (by omega)]
-                  split
-                  · exact hfc'small i hi
-                  · exact (hinv.codesSmall i hi).2⟩
-              firsttcRange := fun i hi => by
-                by_cases hi' : i = level + 1
-                · subst hi'; rw [Array.getElem!_set!_self _ _ _ (by omega)]
-                  have := h.n0; omega
-                · rw [Array.getElem!_set!_ne _ _ _ _ (Ne.symm hi')]; exact hinv.firsttcRange i hi
-              samerows := Nat.zero_le n
-              firstlabSize := hinv.labSize
-              canonlabSize := hinv.labSize
-              firstcodeSize := by simp [hfcs]
-              canoncodeSize := by simp [ccCopy_size, hccs]
-              firsttcSize := by simp [htcs]
-              scalars := by
-                obtain ⟨-, -, a3, -, -, -, -, -, -, -, a11, a12⟩ := hinv.scalars
-                have := h.nlt
-                exact ⟨by simp; omega, by simp; omega, a3, by simp; omega, by simp; omega,
-                  by simp, by simp; omega, by simp, by simp, by simp; omega, a11, a12⟩
-              maxlevelLe := by simp only []; omega }
-          n0 := h.n0, nlt := h.nlt, nM := h.nM, M1 := h.M1, Mlt := h.Mlt }
-    · exact ⟨⟨hU16.mono fun z hz => .inl ⟨by revert hz; revert z; simp [SLoc.blocks], by revert hz; revert z; sep_all hd,
-          by revert hz; revert z; sep_all hd⟩, hV⟩, WorkMono.of_unch h.work hU16
-        (fun g hg hg' => by
-          simp only [List.mem_cons, List.mem_nil_iff, or_false] at hg'
-          rcases hg' with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
-            first
-              | (revert hg; decide)
-              | exact SLoc.vars_ne hd _ (by simp [SLoc.vars]) _ ((by decide : ∀ z ∈ workG, z ∈ globs) _ hg) rfl)
-        (fun z hz hz' => h.work_not hz (by clear hz; revert hz'; revert z; simp [SLoc.blocks]))⟩
+      refine h.rebuild hU16 hL ?_ hV
+        ⟨iGF, iGC, h.scalars.noncheaplevel.unch hU16 (by sep_notin hd), iAS, iEF, iEC,
+          iCC0, iSR, iCL, h.scalars.stabvertex.unch hU16 (by sep_notin hd),
+          h.scalars.cosetindex.unch hU16 (by sep_notin hd),
+          h.scalars.needshortprune.unch hU16 (by sep_notin hd)⟩
+        ⟨sOrb, sGen, sNod, sBad, fun _ => sMax, sMax.writable, sTct, sCan16,
+          h.stats.fits, sFix.perm, sFix.errstatus, sFix.grpsize1, sFix.grpsize2⟩
+        { lab := h.arrays.lab.unch hU16 (by sep_notin hd)
+          ptn := h.arrays.ptn.unch hU16 (by sep_notin hd)
+          orbits := h.arrays.orbits.unch hU16 (by sep_notin hd)
+          active := let ⟨aw, ha, hr⟩ := h.arrays.active
+            ⟨aw, ha.unch hU16 (by sep_notin hd), hr⟩
+          fixedpts := let ⟨fw, hf, hr⟩ := h.arrays.fixedpts
+            ⟨fw, hf.unch hU16 (by sep_notin hd), hr⟩
+          workperm := let ⟨wv, hwv⟩ := h.arrays.workperm
+            ⟨wv, hwv.unch hU16 (by sep_notin hd)⟩
+          firstlab := aFL
+          canonlab := aCL
+          firstcode := by rw [shorts_set (by omega), hcs]; exact aFC
+          canoncode := aCC2.congr fun j hj => by
+            simp only [upd, shorts]
+            by_cases hjl : j = level + 1
+            · subst hjl
+              rw [ite_eq_left rfl, Array.getElem!_set!_self _ _ _ (by rw [ccCopy_size]; omega),
+                hcs]
+            · rw [ite_eq_right hjl]
+              simp only [Array.getElem!_set!_ne _ _ _ _ (Ne.symm hjl),
+                ccCopy_get _ _ _ (show level + 1 ≤ st.canoncode.size by omega)]
+              split <;> rfl
+          firsttc := by rw [intsZ_set (by omega)]; exact aTC
+          canong := D.canon_le (D.canon_unch h.arrays.canong hU16 hcL) (Nat.zero_le _)
+          autos := h.arrays.autos.unch hU16 (by sep_notin hd) (by sep_notin hd)
+          graph := D.graph_unch h.arrays.graph hU16 hgL }
+        { hinv with
+          codesSmall := fun i hi => ⟨hfc'small i hi, by
+            by_cases hi' : i = level + 1
+            · subst hi'
+              rw [Array.getElem!_set!_self _ _ _ (by rw [ccCopy_size]; omega), hcs]; decide
+            · rw [Array.getElem!_set!_ne _ _ _ _ (Ne.symm hi'), ccCopy_get _ _ _ (by omega)]
+              split
+              · exact hfc'small i hi
+              · exact (hinv.codesSmall i hi).2⟩
+          firsttcRange := fun i hi => by
+            by_cases hi' : i = level + 1
+            · subst hi'; rw [Array.getElem!_set!_self _ _ _ (by omega)]
+              have := h.n0; omega
+            · rw [Array.getElem!_set!_ne _ _ _ _ (Ne.symm hi')]; exact hinv.firsttcRange i hi
+          samerows := Nat.zero_le n
+          firstlabSize := hinv.labSize
+          canonlabSize := hinv.labSize
+          firstcodeSize := by simp [hfcs]
+          canoncodeSize := by simp [ccCopy_size, hccs]
+          firsttcSize := by simp [htcs]
+          scalars := by
+            obtain ⟨-, -, a3, -, -, -, -, -, -, -, a11, a12⟩ := hinv.scalars
+            have := h.nlt
+            exact ⟨by simp; omega, by simp; omega, a3, by simp; omega, by simp; omega,
+              by simp, by simp; omega, by simp, by simp, by simp; omega, a11, a12⟩
+          maxlevelLe := by simp only []; omega }
+      simp only [List.forall_mem_cons, List.mem_nil_iff, false_implies, implies_true, and_true]
+      exact ⟨Keep.unch hU16 (by sep_notin hd), Keep.unch hU16 (by sep_notin hd),
+        Keep.unch hU16 (by sep_notin hd), (Keep.unch hU6 (by sep_notin hd)).trans kFL,
+        (Keep.unch hU12 (by sep_notin hd)).trans kCL, (Keep.unch hU4 (by sep_notin hd)).trans kFC,
+        (Keep.unch hU13 (by sep_notin hd)).trans kCC, (Keep.unch hU5 (by sep_notin hd)).trans kTC,
+        Keep.unch hU16 (by sep_notin hd)⟩
+    · exact SStepG.of_unch h hU16 hV
+        (fun z hz => .inl ⟨SLoc.mem_blocksG_of D (by
+            rcases SLoc.wr_mem (hL z hz) with h' | h' | h' | h'
+            · exact .inr (.inl h')
+            · exact .inr (.inr (.inl h'))
+            · exact .inr (.inr (.inr (.inl h')))
+            · exact .inr (.inr (.inr (.inr (.inl h'))))),
+          by revert hz; revert z; sep_all hd, by revert hz; revert z; sep_all hd⟩)
+        (fun z hz => nL.2.1 z (D.wglobs_sub z hz)) ⟨by sep_notin hd, by sep_notin hd⟩
+
+end Generic
+
+theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx : Ctx n)
+    (st : Search n) (level : Nat) :
+    Satisfies xi ge (.Internal dense.fn.«nauty:firstterminal») (firstterminalSpec S ctx st level) :=
+  firstterminalSpec_ofG (firstterminal_satisfiesG Dispatch.denseRep S () () ctx st level)
 
 end NautyVerified.Proofs.Search.Firstterminal

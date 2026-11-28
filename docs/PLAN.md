@@ -699,6 +699,12 @@ Tools from batch 1, for the batches after it:
   the node bodies (batch 3). The dense HexGraphIso unfoldings (`FirstHex`,
   `OtherHex`) and the dense `UaFrame`/`Rebuild` lemmas keep their own proofs
   beside the generic ones.
+- Firstterminal (batch 2 (a)): `firstterminal_satisfiesG D` meets
+  `firstterminalSpecG D` for any `D : DispatchRep ge O` (no dispatch call;
+  the final state by `SearchAtG.rebuild`, the frame by `SStepG.of_unch`), and
+  `wp_copyIntsG` is the copy loop over any `NautyEnv`. The dense
+  `firstterminal_satisfies` and `wp_copyInts` are their instances. A generic
+  node body calls `firstterminal_satisfiesG` directly.
 
 Remaining files (`Proofs/`), in dependency order; the files of one batch
 depend only on earlier batches, so a batch's groups can go to parallel
