@@ -117,6 +117,7 @@ import NautyVerified.Proofs.Top.NautyPost
 import NautyVerified.Proofs.Top.Freedyn
 import NautyVerified.Proofs.Top.NautyFreedyn
 import NautyVerified.Proofs.Top.NautyFree
+import NautyVerified.Proofs.Top.Globals
 import NautyVerified.Proofs.Search.Node.Spec
 import NautyVerified.Proofs.Search.Node.OtherHex
 import NautyVerified.Proofs.Search.Node.Rebuild

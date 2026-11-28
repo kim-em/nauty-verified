@@ -66,6 +66,7 @@ theorem wp_tWork {Q : Post} {le : temp_env} {m : mem} {S : SLoc} {M : Nat} {bD :
       IntAt m' Search.Block.needshortprune 0 → IntAt m' Search.Block.invarsuclevel 2000000002 →
       FieldAt m' .Mint64 Search.Block.invsuccesses 0 (.Vlong (lr 0)) →
       FieldAt m' .Mint64 Search.Block.invapplics 0 (.Vlong (lr 0)) →
+      (∀ c o p, Mem.valid_access m c S.bst o p → Mem.valid_access m' c S.bst o p) →
       Unch m m' (fun z => z = S.bst ∨ z = Search.Block.workspace ∨ z = Search.Block.worktop ∨
         z = Search.Block.fmptr ∨ z = Search.Block.needshortprune ∨ z = Search.Block.invarsuclevel ∨
         z = Search.Block.invsuccesses ∨ z = Search.Block.invapplics) →
@@ -213,7 +214,9 @@ theorem wp_tWork {Q : Post} {le : temp_env} {m : mem} {S : SLoc} {M : Nat} {bD :
       exact k48 (hF3.unch hu4 hq3.symm) (by decide) (by decide) (by decide) (by decide))
     (k48 hE4 hq4 hq5 hq6 hq7)
     (((hN5.unch hu6 (by decide)).unch hu7 (by decide)).unch hu8 (by decide))
-    ((hI6.unch hu7 (by decide)).unch hu8 (by decide)) (hS7.unch hu8 (by decide)) hA8 hU
+    ((hI6.unch hu7 (by decide)).unch hu8 (by decide)) (hS7.unch hu8 (by decide)) hA8
+    (fun c o p h => ha8 _ _ _ _ (ha7 _ _ _ _ (ha6 _ _ _ _ (ha5 _ _ _ _ (ha4 _ _ _ _
+      (ha3 _ _ _ _ (ha2 _ _ _ _ (ha1 _ _ _ _ h)))))))) hU
     (fun z h => hv8 _ (hv7 _ (hv6 _ (hv5 _ (hv4 _ (hv3 _ (hv2 _ (hv1 _ h))))))))
     (fun x hx => temps_gso _ _ hx)
 

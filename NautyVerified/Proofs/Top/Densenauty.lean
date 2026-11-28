@@ -1,3 +1,4 @@
+import NautyVerified.Proofs.Alloc.DynG
 import NautyVerified.Proofs.Top.Spec
 import NautyVerified.Proofs.Search.Ops
 import NautyVerified.Proofs.Search.Frame
@@ -350,8 +351,8 @@ theorem densenauty_satisfies {xi : ExternalCalls} {n k : Nat} (G : Colored n k)
         (nS find_naugraphDnworkSz (by decide)) (fun h => absurd h (Nat.lt_irrefl 0))
     have hws : wordsOf n ≤ 1024 := by simp only [wordsOf, Statement.setwordsNeeded]; omega
     wp_step
-    refine Alloc.wp_dynalloc1' (c := 8) (n := 2 * 500 * wordsOf n) find_naugraphDnworkSz
-      find_naugraphDnwork rfl hD0 (fun _ => by
+    refine Alloc.wp_dynalloc1Z (c := 8) (n := 2 * 500 * wordsOf n) find_naugraphDnworkSz
+      find_naugraphDnwork rfl hD0 (fun _ _ => by
         simp only [Exec.evalExpr, hm1, Refine.tv, typeof, cop, ir_mul]
         rw [Int.natCast_mul, Int.natCast_mul]; rfl)
       rfl (by omega) (by omega) ?_
@@ -403,7 +404,11 @@ theorem densenauty_satisfies {xi : ExternalCalls} {n k : Nat} (G : Colored n k)
       have hbDm : ¬ Mem.valid_block m bD := by
         rcases hbD with ⟨h, -⟩ | h
         · omega
-        · exact h
+        · exact h.1
+      have hZ : Alloc.Zeros m2 bD (8 * capD) := by
+        rcases hbD with ⟨h, -⟩ | h
+        · omega
+        · exact h.2
       have hvopt : Mem.valid_block m₀ Harness.Block.options := Init.valid_global hm0 Harness.find_options
       -- a harness block: valid now, fresh relative to the initial memory
       have nH : ∀ z, Mem.valid_block m z → ¬ Mem.valid_block m₀ z →
@@ -430,7 +435,7 @@ theorem densenauty_satisfies {xi : ExternalCalls} {n k : Nat} (G : Colored n k)
       refine ⟨rfl, ⟨m₀, hm0, (hu0.mono fun z hz => ?_).trans (hu2.mono fun z hz => ?_),
           fun z hz => hg2 _ (hgrow _ hz), fun z hz => ⟨(hfresh z hz).1, hg2 _ (hfresh z hz).2⟩,
           fun h => hbDm (hgrow _ h), fun h => hbDm (hfresh _ h).2⟩,
-        hD, hcapD, OptionsAt.unch hopt hu2 nO, ⟨gw, hg.arr.unch hu2 (hH _ (by simp)), hg.rep⟩,
+        hD, hcapD, hZ, OptionsAt.unch hopt hu2 nO, ⟨gw, hg.arr.unch hu2 (hH _ (by simp)), hg.rep⟩,
         hlab.unch hu2 (hH _ (by simp)), hptn.unch hu2 (hH _ (by simp)),
         ⟨ov, hov.unch hu2 (hH _ (by simp))⟩, ⟨cv, hcv.unch hu2 (hH _ (by simp))⟩,
         range_perm_unch hst hu2 (hH _ (by simp)), hpw, hn0, hnmax⟩

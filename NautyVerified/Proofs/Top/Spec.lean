@@ -7,8 +7,8 @@ import NautyVerified.Proofs.Top.DensenautySyntax
 `nautySpec G gens bg bl bp bo bst bc capD bD`: `densenauty` calls
 `nauty(g, lab, ptn, NULL, orbits, options, stats, dnwork, 2 * 500 * m, m, n,
 canong)` in the memory `densenautySpec` describes, except that `densenauty`
-has (re)allocated its workspace `dnwork` (naugraph.c's `DYNALLSTAT` pair
-holding `capD ≥ 1000 * m` setwords at `bD`). Its postcondition is
+has allocated its workspace `dnwork` (naugraph.c's `DYNALLSTAT` pair
+holding `capD ≥ 1000 * m` setwords at `bD`, zero-filled by the allocator). Its postcondition is
 `densenautySpec`'s, and `options->digraph` stays writable (`densenauty`
 writes it back afterwards).
 -/
@@ -46,6 +46,7 @@ def nautySpec {n k : Nat} (G : Colored n k) (gens : List (Array Nat)) (bg bl bp 
       (∀ z ∈ [bg, bl, bp, bo, bst, bc], ¬ Mem.valid_block m₀ z ∧ Mem.valid_block m z) ∧
       ¬ Mem.valid_block m₀ bD ∧ bD ∉ [bg, bl, bp, bo, bst, bc]) ∧
     DynAt m Block.naugraphDnwork Block.naugraphDnworkSz 8 capD bD ∧ 2 * 500 * wordsOf n ≤ capD ∧
+    Alloc.Zeros m bD (8 * capD) ∧
     OptionsAt m ∧
     (∃ gw, GraphAt m bg Ptrofs.zero gw (rowsOf G) (wordsOf n)) ∧
     ArrayAt m .Mint32 bl 0 (ints (initialPartition G).1) n ∧

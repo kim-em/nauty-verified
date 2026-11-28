@@ -73,6 +73,7 @@ theorem wp_tStats {Q : Post} {le : temp_env} {m : mem} {S : SLoc} {n M : Nat} {b
       FieldAt m' .Mint64 S.bst (S.sb + 56) (.Vlong (lr 0)) →
       ArrayAt m' .Mint64 bF 0 (Set.longs fun _ => lr 0) M →
       IntAt m' Search.Block.noncheaplevel 1 → IntAt m' Search.Block.eqlevCanon (-1) →
+      (∀ c o p, Mem.valid_access m c S.bst o p → Mem.valid_access m' c S.bst o p) →
       Unch m m' (fun z => z = S.bst ∨ z = bF ∨ z = Search.Block.noncheaplevel ∨
         z = Search.Block.eqlevCanon) →
       (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
@@ -232,7 +233,8 @@ theorem wp_tStats {Q : Post} {le : temp_env} {m : mem} {S : SLoc} {n M : Nat} {b
   refine hQ le9 m11 (k G8_0) (k G8_8) (k F8_12) (k F8_16) (k F8_24) (k F8_32)
     (ha11 _ _ _ _ (ha10 _ _ _ _ (hu9.access _ _ _ _ hb5
       (hA8 _ _ _ _ (hva _ _ (by decide) (by decide) ⟨zOfInt 10, rfl⟩)))))
-    (k F8_48) (k F8_56) ((hfw9.unch hu10 hf3).unch hu11 hf4) (hN10.unch hu11 (by decide)) hE11 hU
+    (k F8_48) (k F8_56) ((hfw9.unch hu10 hf3).unch hu11 hf4) (hN10.unch hu11 (by decide)) hE11
+    (fun c o p h => ha11 _ _ _ _ (ha10 _ _ _ _ (hu9.access _ _ _ _ hb5 (hA8 _ _ _ _ h)))) hU
     (fun z hz => hv11 _ (hv10 _ (hv9 _ (Mem.store_valid_block_1 _ _ _ _ _ _ hs8 _ (Mem.store_valid_block_1 _ _ _ _ _ _ hs7 _ (Mem.store_valid_block_1 _ _ _ _ _ _ hs6 _ (Mem.store_valid_block_1 _ _ _ _ _ _ hs5 _ (Mem.store_valid_block_1 _ _ _ _ _ _ hs4 _ (Mem.store_valid_block_1 _ _ _ _ _ _ hs3 _ (Mem.store_valid_block_1 _ _ _ _ _ _ hs2 _ (Mem.store_valid_block_1 _ _ _ _ _ _ hs1 _ (hz)))))))))))) ho9
 
 
