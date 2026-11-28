@@ -660,6 +660,46 @@ after it build unchanged):
 3. A dense-only lemma with no generic counterpart (naugraph.c's slots) stays
    as it is until its last user is converted, then goes.
 
+Tools from batch 1, for the batches after it:
+
+- Distinctness. `S.blocksG` has opaque parts (`D.graphBlocks`,
+  `D.canonBlocks`, `D.globs`), so `sep_ne` cannot index it. Use
+  `sep_ne h.lit` / `sep_all h.lit` / `sep_notin h.lit` (`SearchAtG.lit`:
+  `S.litG`, `S`'s own blocks with `S.bg`, `S.bc` and `envSearch`, is pairwise
+  distinct) for list entries; `h.graph_ne`, `h.canon_ne`, `h.globs_ne` for a
+  block of the graph's or store's representation or a global of `D` against
+  the other parts. Where the dense proofs decided `¬ z ∈ L` for many blocks by
+  `decide`, prove one permutation of `S.litG` by `perm_lit` and read the
+  disjointness off its `Pairwise` (`SLoc.keepG_perm`, `SLoc.scal_perm` in
+  `Node/Rebuild.lean`). Inside `first | exact .inl (by simp) | …` the `by`
+  is elaborated late, so a failing branch is not skipped: order the cases.
+- Rebuilding. `SearchAtG.rebuild` (writes confined to `wrEnv`, `S.wrVG` and
+  `D.canonBlocks cl S.bc`) and `SearchAtG.setScalars` need every valid block
+  kept valid (for `D.work_unch`); the `wp_*` lemmas all supply it. The dense
+  `SearchAt.rebuild`/`setScalars` do not take it, so they stay dense-only.
+  Fields of a changed state go in as `{ h.scalars.unch hu … with }` (the
+  structure-update form), not `h.scalars.unch hu …` directly.
+- Struct members. `NautyEnv` carries the member offsets of `tcnode`,
+  `statsblk` and `dispatchvec` (`E.field_*`, kernel-checked per program);
+  `Node/Fields.lean`'s `field_*` and `Ops.lean`'s `fld_*` are generic.
+- Nodes. `nodeSpecG D … first S gl cl G st level numcells chain` is stated
+  against `Generic.node` for a policy instance
+  `[Generic.Policy (SearchState n (O.Canon n)) n (γ := O.Gr n)]` taken as an
+  argument (`hexNodeG`); the node proofs will need hypotheses tying that
+  policy's `visit`, `chooseTarget`, `classify` and the shared transitions to
+  `O` and to the dense ones. `nodeSpec_ofG` instantiates it with HexGraphIso's
+  nauty policy (`node_eq_generic`). `firstChildG`, `otherChildG`,
+  `node_true_succG`, `node_false_succG`, `sweep_*_someG` are the unfoldings at
+  any policy; `cmpFirst`/`cmpCanon` and `compareCodes_eq` are over any store.
+  `tcParent` is over any `NautyEnv`.
+- Not converted: `Node/GcaSteps.lean`. Its facts rest on `Spec/Gca.lean` and
+  `node_gca` (`Spec/SearchInfRun.lean`), stated for the dense `node`; the
+  generic form needs those over `Generic.node` with the policy's
+  `child`/`recover`/`leafExit` keeping the level counters, which belongs with
+  the node bodies (batch 3). The dense HexGraphIso unfoldings (`FirstHex`,
+  `OtherHex`) and the dense `UaFrame`/`Rebuild` lemmas keep their own proofs
+  beside the generic ones.
+
 Remaining files (`Proofs/`), in dependency order; the files of one batch
 depend only on earlier batches, so a batch's groups can go to parallel
 agents:

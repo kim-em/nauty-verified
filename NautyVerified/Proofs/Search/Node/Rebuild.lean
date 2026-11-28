@@ -287,6 +287,43 @@ theorem SearchAtG.rebuild {n : Nat} {m m' : mem} {S : SLoc} {gl : D.GLoc} {cl : 
       tables := h.tables.unch hu nR.2.2.1 nR.2.2.2.1 nR.2.2.2.2.1 fun z hz _ => nG z hz
       inv := hinv }
 
+/-- `S`'s own blocks and `fmptr`, which no store to a static scalar touches. -/
+abbrev SLoc.varsF (S : SLoc) : List block :=
+  [S.bg, S.bl, S.bp, S.bo, S.bst, S.bc, S.bws, S.bA, S.bF, S.bWP, S.bFL, S.bCL, S.bFC, S.bCC,
+   S.bTC, S.bUA, E.fmptr]
+
+/-- The rest of `S.litG`. -/
+abbrev restScal : List block :=
+  [E.getcanon, E.digraph, E.writeautoms, E.domarkers, E.doschreier,
+   E.tcLevel, E.invarproc, E.usernodeproc, E.userlevelproc, E.usercanonproc,
+   E.userautomproc, E.dispatch, E.orbits, E.m, E.n, E.g, E.canong, E.stats, E.tcnode0, E.allocM,
+   E.workspace, E.worktop, E.killRequest] ++ dynPairs ++
+  [E.nautilWorkperm, E.nautilWorkpermSz, E.nautyBit, E.nautilBit, E.leftbit,
+   E.mininvarlevel, E.maxinvarlevel, E.invararg]
+
+theorem SLoc.scal_perm (S : SLoc) :
+    ((scalarBlocks : List block) ++ S.varsF ++ restScal).Perm S.litG := by perm_lit
+
+/-- After writes to scalars only: new `ScalarsG`, and the other parts for the new state. -/
+theorem SearchAtG.setScalars {n : Nat} {m m' : mem} {S : SLoc} {gl : D.GLoc} {cl : D.CLoc}
+    {G : O.Gr n} {st st' : SearchState n (O.Canon n)} {pre nsp pre' nsp' : Bool}
+    (h : SearchAtG D m S gl cl G st pre nsp) {L : List block} (hu : Unch m m' (· ∈ L))
+    (hL : ∀ z ∈ L, z ∈ (scalarBlocks : List block))
+    (hv : ∀ z, Mem.valid_block m z → Mem.valid_block m' z) (hsc : ScalarsG m' st' nsp')
+    (har : ArraysG D m S gl cl G st') (hst : StatsG m S st' pre') (hinv : SInvG O G st') :
+    SearchAtG D m' S gl cl G st' pre' nsp' := by
+  have hp := (S.scal_perm.pairwise_iff (fun h => Ne.symm h)).2 h.lit
+  have hd := (List.pairwise_append.1 (List.pairwise_append.1 hp).1).2.2
+  have nv : ∀ y ∈ S.varsF, ¬ y ∈ L := fun y hy hyL => hd _ (hL _ hyL) y hy rfl
+  have sE : ∀ z ∈ (scalarBlocks : List block), z ∈ envSearch := by simp
+  have sW : ∀ z ∈ (scalarBlocks : List block), z ∈ wrEnv := by simp
+  refine h.rebuild hu (fun z hz => .inl (sW z (hL z hz)))
+    (fun z hz => Keep.unch hu (nv z (by revert z; simp))) hv hsc
+    (hst.unch hu (nv _ (by simp)))
+    (har.unch hu (fun z hz => nv z (by revert z; simp))
+      (fun z hz hzL => h.graph_ne hz (.inr (.inr (.inr (.inl (sE z (hL z hzL)))))) rfl)
+      (fun z hz hzL => h.canon_ne hz (.inr (.inr (.inr (.inl (sE z (hL z hzL)))))) rfl)) hinv
+
 end Generic
 
 end NautyVerified.Proofs.Search
