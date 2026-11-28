@@ -759,6 +759,38 @@ Batch 2 group (b), the node leaf steps (generic names next to the dense ones):
   structure (partition facts of `P.visit`, `P.child`, …) rather than from
   these files; `SRest` itself is store-independent except `canongSize`.
 
+Batch 3, the policy side (generic names next to the dense ones):
+
+- `Node/Policy.lean`: `PolicyLink O n` for a policy instance
+  `[Generic.Policy (SearchState n (O.Canon n)) n (γ := O.Gr n)]`, a separate
+  argument of the node proofs (like `Classifier O`): `visit` through
+  `O.refine` (`visit_numcells`, `visit_code`, `visit_same` to `visitStG` of the
+  counted state), `chooseTarget` through `O.targetcell` and `mtcOf`
+  (`chooseTargetG`; `target_eq`, `target_same`), `classify_eq` to
+  `O.classify`, the shared transitions equal to HexGraphIso's, `child`,
+  `recover` and `afterSweep` equal up to `Same` (every field but the carried
+  store, whose rows agree, and `order`), `cheapautom_eq` for `wp_cheapG`.
+  `visit` and `chooseTarget` are conditional on the store invariant `Inv`
+  (kept by `visit_inv`, `target_inv`, `classify_inv`, `child_inv`,
+  `recover_inv`, `afterSweep_inv`; the other transitions keep the store) and
+  on `VisitOk`/`TargetOk`. `SearchAtG.same`/`SInvG.same` move the C state
+  along `Same`. Dense: `denseLink` (all three conditions `True`).
+- `Node/Laws.lean`: `NodeLaws L G`, the HexGraphIso facts the node bodies
+  read (`NodeOk`, `SweepFirst`, `SweepOff` and the laws `first_start`,
+  `first_child`, `first_next`, `off_start`, `off_child`, `off_next`,
+  `visit_inv`, `visit_part`, `target_lt`, `first_broken`, `off_broken`,
+  `first_args`, `off_args`, `noFuel`, `unwind_lt`, `leaf_lt`, `leaf_done`,
+  `leafOk`, `short_autos`, and `inv`, `visitOk`, `targetOk` for the link's
+  conditions), stated against `Generic.node`, `firstChildG`, `otherChildG`
+  and `SInvG`. They rest on HexGraphIso's soundness of the policy, so they
+  are a structure rather than theorems; `denseLaws G ctx hn0 hn` is the
+  dense instance from the dense lemmas (`Spec/NodeOk`, `NodeOkOff`,
+  `NodeExit`, `NodeBound`, `PartOk`, `Node/OkOff`, `OkFirst`, `ProcFacts`),
+  and a sparse instance comes from HexGraphIso's sparse soundness. The
+  emitted words: `EmLawOffG`/`EmLawFirstG` (`sweepEmG`, `sweepEmFirstG`,
+  `procExitG`, `procWordsG`), from the dense laws by `EmLawOff.toG`/
+  `EmLawFirst.toG`. `PartFactsG`, `SRestG`, `SInvG.of`.
+
 Remaining files (`Proofs/`), in dependency order; the files of one batch
 depend only on earlier batches, so a batch's groups can go to parallel
 agents:

@@ -383,3 +383,4 @@ import NautyVerified.Proofs.Sparse.Refine.Spec
 import NautyVerified.Proofs.Sparse.Refine.Prologue
 import NautyVerified.Proofs.Search.Node.Policy
 import NautyVerified.Proofs.Sparse.Refine.Satisfies
+import NautyVerified.Proofs.Search.Node.Laws
