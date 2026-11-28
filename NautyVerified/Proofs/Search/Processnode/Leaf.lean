@@ -148,4 +148,123 @@ theorem wp_canonPick {f : function} {Q : Post} {le : temp_env} {s : Nat}
       exact hQ _ m h (temps_gss _ _ _) (fun h => nomatch h) (fun _ h => h)
         fun x _ h2 => temps_gso _ _ h2
 
+abbrev isautomCall : statement :=
+  .Scall (some (idOf 704))
+    (.Ederef
+      (.Efield (.Evar dense.id.«nauty:dispatch» (Tstruct dense.id.«_1027» noattr)) dense.id.«isautom»
+        (tptr (tfun [(tptr tulong), (tptr tint), tint, tint, tint] tint)))
+      (tfun [(tptr tulong), (tptr tint), tint, tint, tint] tint))
+    [(.Evar dense.id.«nauty:g» (tptr tulong)),
+     (.Evar dense.id.«nauty:workperm» (tptr tint)),
+     (.Evar dense.id.«nauty:digraph» tint),
+     (.Evar dense.id.«nauty:m» tint),
+     (.Evar dense.id.«nauty:n» tint)]
+
+theorem wp_isautom {f : function} {Q : Post} {le : temp_env} {w : Array Nat}
+    (c : PCtx m₀ m₁ S e bsr) (h : PAt m₀ m₁ m S ctx bsr st nsp)
+    (hw : ArrayAt m .Mint32 S.bWP 0 (ints w) n) (hws : ∀ i < n, w[i]! < n)
+    (hQ : Q.normal E0 e
+      (PTree.set (idOf 704) (.Vint (ir (if isautom ctx w then 1 else 0))) le) m) :
+    Wp xi ge f isautomCall Q e le m := by
+  have hs := h.search
+  have hcWP : 0 < S.capWP := by have := hs.dyns.capWP; have := hs.n0; omega
+  refine wp_call (vf := .Vptr Block.isautomFn Ptrofs.zero)
+    (targs := [tptr tulong, tptr tint, tint, tint, tint]) (tres := tint)
+    (cc := cc_default) (vargs := [.Vptr S.bg S.gofs, .Vptr S.bWP Ptrofs.zero, .Vint (ir 0),
+      .Vint (ir S.M), .Vint (ir n)]) _ _
+    (Isautom.isautom_satisfies S.bg S.gofs S.gw ctx.g S.bWP Ptrofs.zero w S.M) rfl
+    (eval_dispatch (c.eg _ (by decide)) field_dIsautom rfl (by decide) (by decide)
+      hs.fixed.dIsautom)
+    ?_ (by simp [Genv.find_funct, funct_isautomFn]) type_isautom
+    ⟨rfl, hs.arrays.graph, hw, hws, hs.tables.naugraphBit, hs.tables.left, hs.M1,
+      by have := hs.Mlt; omega, hs.nM⟩ ?_
+  · simp only [Exec.evalExprlist,
+      eval_gptr (ty := tptr tulong) (c.eg _ (by decide)) find_g rfl hs.fixed.g,
+      eval_gptr (ty := tptr tint) (c.eg _ (by decide)) find_nautyWorkperm rfl
+        ⟨hs.dyns.workperm.ptr hcWP, hs.dyns.workperm.bpW⟩,
+      eval_gint (c.eg _ (by decide)) find_digraph hs.fixed.digraph,
+      eval_gint (c.eg _ (by decide)) find_m hs.fixed.mm,
+      eval_gint (c.eg _ (by decide)) find_n hs.fixed.nn, typeof, cop]
+  · rintro t v m' ⟨rfl, rfl, rfl⟩
+    exact hQ
+
+/-- `processnode`'s first-leaf test: `true` for code 1. -/
+def firstAuto (ctx : Ctx n) (st : Search n) : Bool :=
+  decide (st.gcaFirst ≥ st.noncheaplevel) || isautom ctx (scatter st.firstlab st).workperm
+
+theorem wp_firstC {f : function} {Q : Post} {le : temp_env}
+    (c : PCtx m₀ m₁ S e bsr) (h : PAt m₀ m₁ m S ctx bsr st nsp)
+    (hfl : ∀ i < n, st.firstlab[i]! < n) (hfs : ∀ v < n, ∃ i < n, st.firstlab[i]! = v)
+    (hlab : PTree.get dense.id.lab le = some (.Vptr S.bl S.lofs))
+    (hQ : ∀ le' m', PAt m₀ m₁ m' S ctx bsr (scatter st.firstlab st) nsp →
+      ArrayAt m' .Mint32 S.bWP 0 (ints (scatter st.firstlab st).workperm) n →
+      (firstAuto ctx st = true → PTree.get dense.id.code le' = some (.Vint (ir 1))) →
+      (firstAuto ctx st = false → PTree.get dense.id.code le' = PTree.get dense.id.code le) →
+      (∀ v, SrAt m bsr v → SrAt m' bsr v) →
+      (∀ x, x ≠ dense.id.i → x ≠ idOf 703 → x ≠ idOf 704 → x ≠ dense.id.code →
+        PTree.get x le' = PTree.get x le) →
+      Q.normal E0 e le' m') :
+    Wp xi ge f firstC Q e le m := by
+  have hs := h.search
+  have hd := hs.distinct
+  have hinv := hs.inv
+  have hFL : 0 < S.capFL := by have := hs.dyns.capFL; have := hs.n0; omega
+  wp_step
+  refine wp_scatterAt c h (by decide) find_nautyFirstlab (hs.dyns.firstlab.ptr hFL)
+    hs.arrays.firstlab hfl hfs (by sep_ne hd) (by sep_ne hd) hlab ?_
+  intro le1 m1 h1 ha1 hsr1 ho1
+  simp only [seqPost, Post.after, E0_append]
+  have hs1 := h1.search
+  have hinv1 := hs1.inv
+  obtain ⟨a1, -, a3, -, -, -, -, -, -, -, -, -⟩ := hinv1.scalars
+  have hwsm : ∀ i < n, (scatter st.firstlab st).workperm[i]! < n := hinv1.workpermSmall
+  -- the test, into temporary 703
+  have hT : ∀ le2, PTree.get (idOf 703) le2 = some (.Vint (ir (if firstAuto ctx st then 1 else 0))) →
+      (∀ x, x ≠ idOf 703 → x ≠ idOf 704 → PTree.get x le2 = PTree.get x le1) →
+      Wp xi ge f (.Sifthenelse (tv (idOf 703)) (sk (.Sset dense.id.code (ci 1 tint))) .Sskip)
+        Q e le2 m1 := by
+    intro le2 h703 ho2
+    apply wp_if_eval
+    rw [show Exec.evalExpr ge e le2 m1 (tv (idOf 703)) = _ from h703]
+    cases hb : firstAuto ctx st
+    · simp only [Bool.false_eq_true, ite_false, typeof, cop]
+      apply wp_skip
+      exact hQ le2 m1 h1 ha1 (fun h' => by rw [hb] at h'; exact absurd h' (by decide)) (fun _ => by rw [ho2 _ (by decide) (by decide),
+        ho1 _ (by decide)]) hsr1 fun x h1' h2 h3 _ => by rw [ho2 x h2 h3, ho1 x h1']
+    · simp only [ite_true, typeof, cop]
+      wp_step; wp_step
+      apply wp_set_eval
+      rw [eval_ci]
+      exact hQ _ m1 h1 ha1 (fun _ => temps_gss _ _ _)
+        (fun h' => by rw [hb] at h'; exact absurd h' (by decide)) hsr1
+        fun x h1' h2 h3 h4 => by rw [temps_gso _ _ h4, ho2 x h2 h3, ho1 x h1']
+  wp_step; wp_step; wp_step
+  refine wp_ifB (eval_geI (eval_gint (c.eg _ (by decide)) find_gcaFirst hs1.scalars.gcaFirst)
+    (eval_gint (c.eg _ (by decide)) find_noncheaplevel hs1.scalars.noncheaplevel) rfl rfl
+    ⟨by omega, by omega⟩ ⟨by omega, by omega⟩) rfl ?_
+  by_cases hge : st.noncheaplevel ≤ st.gcaFirst
+  · rw [decide_eq_true (by exact_mod_cast hge), ite_eq_left rfl]
+    apply wp_set_eval
+    rw [eval_ci]
+    simp only [seqPost, Post.after, E0_append]
+    refine hT _ ?_ fun x h1 _ => temps_gso _ _ h1
+    rw [temps_gss]
+    have : firstAuto ctx st = true := by simp [firstAuto, hge]
+    rw [this]; rfl
+  · rw [decide_eq_false (by exact_mod_cast hge), ite_eq_right (by decide)]
+    wp_step; wp_step; wp_step
+    refine wp_isautom c h1 ha1 hwsm ?_
+    simp only [seqPost, Post.after, E0_append]
+    apply wp_set_eval
+    have hfa : firstAuto ctx st = isautom ctx (scatter st.firstlab st).workperm := by
+      simp [firstAuto, show ¬ st.noncheaplevel ≤ st.gcaFirst from hge]
+    simp only [Exec.evalExpr, Refine.tv, temps_gss, typeof]
+    cases hb : isautom ctx (scatter st.firstlab st).workperm
+    · simp only [Bool.false_eq_true, ite_false]
+      refine hT _ ?_ fun x h1 h2 => by rw [temps_gso _ _ h1, temps_gso _ _ h2]
+      rw [temps_gss, hfa, hb]; rfl
+    · simp only [ite_true]
+      refine hT _ ?_ fun x h1 h2 => by rw [temps_gso _ _ h1, temps_gso _ _ h2]
+      rw [temps_gss, hfa, hb]; rfl
+
 end NautyVerified.Proofs.Search.Processnode
