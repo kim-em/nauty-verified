@@ -164,6 +164,7 @@ import NautyVerified.Proofs.Search.Processnode.CanonTest
 import NautyVerified.Proofs.Search.Processnode.Leaf
 import NautyVerified.Proofs.Search.Processnode.Classify
 import NautyVerified.Proofs.Search.Processnode.Stats
+import NautyVerified.Proofs.Search.Processnode.Ring
 import NautyVerified.Proofs.Refine.Frame
 import NautyVerified.Proofs.Refine.Trivial
 import NautyVerified.Proofs.Refine.Pop
