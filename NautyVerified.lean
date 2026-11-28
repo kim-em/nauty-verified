@@ -207,6 +207,7 @@ import NautyVerified.Proofs.Testcanlab.Cmp
 import NautyVerified.Proofs.Testcanlab.Rows
 import NautyVerified.Proofs.Testcanlab.Satisfies
 import NautyVerified.Logic.ForFrom
+import NautyVerified.Logic.Rest
 import NautyVerified.Spec.Bestcell
 import NautyVerified.Spec.Processnode
 import NautyVerified.Proofs.Bestcell.Satisfies

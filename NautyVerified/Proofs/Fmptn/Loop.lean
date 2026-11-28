@@ -1,5 +1,6 @@
 import NautyVerified.Proofs.Alloc.KeepV
 import NautyVerified.Proofs.Fmptn.Scan
+import NautyVerified.Logic.Rest
 
 /-!
 # The cells of `fmptn`
@@ -35,9 +36,9 @@ structure Sets (m : mem) (le : temp_env) (bf : block) (fofs : ptrofs) (bm : bloc
   Mlt : M < 2147483648
   nM : n ≤ 64 * M
 
-/-- The blocks of `fmptn`'s arrays are distinct. -/
+/-- The blocks of `fmptn`'s arrays are distinct, except that `fix` and `mcr` may
+share one (`Apart`). -/
 structure Disjoint (bl bp bf bm : block) : Prop where
-  fm : bf ≠ bm
   fl : bf ≠ bl
   fp : bf ≠ bp
   ml : bm ≠ bl
@@ -62,12 +63,16 @@ theorem wp_single {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} 
     {mofs : ptrofs} {lab ptn : Array Nat} {n level M c : Nat} {wf wm : Nat → Lib.Integers.int64}
     {fx mc : VSet n}
     (h : Frame m le bl lofs bp pofs lab ptn n level) (hs : Sets m le bf fofs bm mofs n M wf wm fx mc)
-    (hd : Disjoint bl bp bf bm) (he : PTree.get Set.bit e = none) (hc : c < n)
+    (hd : Disjoint bl bp bf bm)
+    (hfm : Apart bf (intOfZ (Ptrofs.unsigned fofs)) bm (intOfZ (Ptrofs.unsigned mofs)) M)
+    (he : PTree.get Set.bit e = none) (hc : c < n)
     (hi : PTree.get id.i le = some (.Vint (ir c)))
     (hQ : ∀ m', Frame m' le bl lofs bp pofs lab ptn n level →
       Sets m' le bf fofs bm mofs n M (addW wf lab[c]!) (addW wm lab[c]!)
         (fx.insert lab[c]!) (mc.insert lab[c]!) →
-      Unch m m' (fun b => b = bf ∨ b = bm) → Alloc.KeepA m m' → Q.normal E0 e le m') :
+      Unch m m' (fun b => b = bf ∨ b = bm) →
+      Rest m m' bf (intOfZ (Ptrofs.unsigned fofs)) bm (intOfZ (Ptrofs.unsigned mofs)) M →
+      Alloc.KeepA m m' → Q.normal E0 e le m') :
     Wp xi ge f single Q e le m := by
   have hlc := h.lsmall c hc
   have hn := h.nlt
@@ -79,29 +84,34 @@ theorem wp_single {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} 
   refine Set.wp_addElement' hs.farr hs.Mlt hs.hfix (hev m h) rfl (by omega) (by omega) hs.bit he ?_
   intro m1 harr1 hu1 hO1
   have hf1 := h.unch hu1 (Ne.symm hd.fl) (Ne.symm hd.fp)
-  refine Set.wp_addElement' (hs.marr.unch hu1 (Ne.symm hd.fm)) hs.Mlt hs.hmcr (hev m1 hf1) rfl
+  refine Set.wp_addElement' (hs.marr.acrossF hu1 hO1 hfm) hs.Mlt hs.hmcr (hev m1 hf1) rfl
     (by omega) (by omega) (hs.bit.unch hu1 hd.bf) he ?_
   intro m2 harr2 hu2 hO2
   apply hQ m2 (hf1.unch hu2 (Ne.symm hd.ml) (Ne.symm hd.mp))
-    ⟨hs.hfix, hs.hmcr, harr1.unch hu2 hd.fm, harr2, Set.setRep_add hs.frep hlc,
+    ⟨hs.hfix, hs.hmcr, harr1.acrossM hu2 hO2 hfm, harr2, Set.setRep_add hs.frep hlc,
       Set.setRep_add hs.mrep hlc, (hs.bit.unch hu1 hd.bf).unch hu2 hd.bm, hs.Mlt, hs.nM⟩
   · exact (hu1.mono fun b hb => .inl hb).trans (hu2.mono fun b hb => .inr hb)
+  · exact (Rest.fix hu1 hO1).trans (Rest.mcr hu2 hO2)
   · exact (Alloc.KeepA.of_outside hu1 hO1 hs.farr.base_nonneg).trans
-      (Alloc.KeepA.of_outside hu2 hO2 (hs.marr.unch hu1 (Ne.symm hd.fm)).base_nonneg)
+      (Alloc.KeepA.of_outside hu2 hO2 (hs.marr.acrossF hu1 hO1 hfm).base_nonneg)
 
 theorem wp_cell {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {bl : block}
     {lofs : ptrofs} {bp : block} {pofs : ptrofs} {bf : block} {fofs : ptrofs} {bm : block}
     {mofs : ptrofs} {lab ptn : Array Nat} {n level M c c2 : Nat} {wf wm : Nat → Lib.Integers.int64}
     {fx mc : VSet n}
     (h : Frame m le bl lofs bp pofs lab ptn n level) (hs : Sets m le bf fofs bm mofs n M wf wm fx mc)
-    (hd : Disjoint bl bp bf bm) (he : PTree.get Set.bit e = none) (hc : c < c2) (hc2 : c2 < n)
+    (hd : Disjoint bl bp bf bm)
+    (hfm : Apart bf (intOfZ (Ptrofs.unsigned fofs)) bm (intOfZ (Ptrofs.unsigned mofs)) M)
+    (he : PTree.get Set.bit e = none) (hc : c < c2) (hc2 : c2 < n)
     (hend : ptn[c2]! ≤ level) (hgt : ∀ k, c ≤ k → k < c2 → level < ptn[k]!)
     (hi : PTree.get id.i le = some (.Vint (ir c)))
     (hQ : ∀ le' m', PTree.get id.i le' = some (.Vint (ir c2)) →
       Frame m' le' bl lofs bp pofs lab ptn n level →
       Sets m' le' bf fofs bm mofs n M wf (addW wm (scanMin lab (List.range' (c + 1) (c2 - c)) lab[c]!))
         fx (mc.insert (scanMin lab (List.range' (c + 1) (c2 - c)) lab[c]!)) →
-      Unch m m' (fun b => b = bf ∨ b = bm) → Alloc.KeepA m m' →
+      Unch m m' (fun b => b = bf ∨ b = bm) →
+      Rest m m' bf (intOfZ (Ptrofs.unsigned fofs)) bm (intOfZ (Ptrofs.unsigned mofs)) M →
+      Alloc.KeepA m m' →
       (∀ k, k ≠ id.i → k ≠ id.lmin → k ≠ id.t3 → PTree.get k le' = PTree.get k le) →
       Q.normal E0 e le' m') :
     Wp xi ge f cell Q e le m := by
@@ -128,8 +138,8 @@ theorem wp_cell {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {b
   refine Set.wp_addElement' hs2.marr hs2.Mlt hs2.hmcr hl2 rfl (by omega) (by omega) hs2.bit he ?_
   intro m3 harr3 hu3 hO3
   refine hQ le2 m3 hi2 (hf2.unch hu3 (Ne.symm hd.ml) (Ne.symm hd.mp))
-    ⟨hs2.hfix, hs2.hmcr, hs2.farr.unch hu3 hd.fm, harr3, hs2.frep, Set.setRep_add hs2.mrep hsm,
-      hs2.bit.unch hu3 hd.bm, hs2.Mlt, hs2.nM⟩ (hu3.mono fun b hb => .inr hb)
+    ⟨hs2.hfix, hs2.hmcr, hs2.farr.acrossM hu3 hO3 hfm, harr3, hs2.frep, Set.setRep_add hs2.mrep hsm,
+      hs2.bit.unch hu3 hd.bm, hs2.Mlt, hs2.nM⟩ (hu3.mono fun b hb => .inr hb) (Rest.mcr hu3 hO3)
     (Alloc.KeepA.of_outside hu3 hO3 hs2.marr.base_nonneg) ?_
   intro k h1 h2 h3
   rw [ho2 k h1 h2 h3, ho1 k h2]
@@ -139,11 +149,15 @@ theorem wp_loop_fmptn {f : function} {Q : Post} {e : env} {le : temp_env} {m : m
     {mofs : ptrofs} {lab ptn : Array Nat} {n level M : Nat} {wf wm : Nat → Lib.Integers.int64}
     (h : Frame m le bl lofs bp pofs lab ptn n level)
     (hs : Sets m le bf fofs bm mofs n M wf wm VSet.empty VSet.empty)
-    (hd : Disjoint bl bp bf bm) (he : PTree.get Set.bit e = none) (hsize : ptn.size = n)
+    (hd : Disjoint bl bp bf bm)
+    (hfm : Apart bf (intOfZ (Ptrofs.unsigned fofs)) bm (intOfZ (Ptrofs.unsigned mofs)) M)
+    (he : PTree.get Set.bit e = none) (hsize : ptn.size = n)
     (hlast : ptn[n - 1]! ≤ level) (hi : PTree.get id.i le = some (.Vint (ir 0)))
     (hQ : ∀ le' m' wf' wm', Frame m' le' bl lofs bp pofs lab ptn n level →
       Sets m' le' bf fofs bm mofs n M wf' wm' (fmptn lab ptn level n).1 (fmptn lab ptn level n).2 →
-      Unch m m' (fun b => b = bf ∨ b = bm) → Alloc.KeepA m m' →
+      Unch m m' (fun b => b = bf ∨ b = bm) →
+      Rest m m' bf (intOfZ (Ptrofs.unsigned fofs)) bm (intOfZ (Ptrofs.unsigned mofs)) M →
+      Alloc.KeepA m m' →
       (∀ k, k ≠ id.i → k ≠ id.lmin → k ≠ id.t3 → PTree.get k le' = PTree.get k le) →
       Q.normal E0 e le' m') :
     Wp xi ge f loop Q e le m := by
@@ -157,17 +171,19 @@ theorem wp_loop_fmptn {f : function} {Q : Post} {e : env} {le : temp_env} {m : m
       n - c ≤ F ∧ (cells.go ptn level n F c).foldl (cellStep lab) (fx, mc) = R ∧
       PTree.get id.i le' = some (.Vint (ir c)) ∧ Frame m' le' bl lofs bp pofs lab ptn n level ∧
       Sets m' le' bf fofs bm mofs n M wf wm fx mc ∧ Unch m m' (fun b => b = bf ∨ b = bm) ∧
+      Rest m m' bf (intOfZ (Ptrofs.unsigned fofs)) bm (intOfZ (Ptrofs.unsigned mofs)) M ∧
       Alloc.KeepA m m' ∧ Oth le')
     (J := fun v t e' le' m' => t = E0 ∧ e = e' ∧ ∃ c c2 wf wm fx mc F, c ≤ c2 ∧ c2 < n ∧
       v = n - c ∧ n - (c2 + 1) ≤ F ∧
       (cells.go ptn level n F (c2 + 1)).foldl (cellStep lab) (fx, mc) = R ∧
       PTree.get id.i le' = some (.Vint (ir c2)) ∧ Frame m' le' bl lofs bp pofs lab ptn n level ∧
       Sets m' le' bf fofs bm mofs n M wf wm fx mc ∧ Unch m m' (fun b => b = bf ∨ b = bm) ∧
+      Rest m m' bf (intOfZ (Ptrofs.unsigned fofs)) bm (intOfZ (Ptrofs.unsigned mofs)) M ∧
       Alloc.KeepA m m' ∧ Oth le')
     ?_ ?_ (n := n - 0)
     ⟨rfl, rfl, 0, wf, wm, _, _, n, Nat.zero_le _, rfl, by omega, rfl, hi, h, hs, Unch.refl _ _,
-      Alloc.KeepA.refl _, fun _ _ _ _ => rfl⟩
-  · rintro v t e' le' m' ⟨rfl, rfl, c, wf, wm, fx, mc, F, hcn, rfl, hF, hfold, hic, hf, hs', hu, hk, ho⟩
+      Rest.refl _ _ _ _ _ _, Alloc.KeepA.refl _, fun _ _ _ _ => rfl⟩
+  · rintro v t e' le' m' ⟨rfl, rfl, c, wf, wm, fx, mc, F, hcn, rfl, hF, hfold, hic, hf, hs', hu, hr, hk, ho⟩
     wp_step; wp_step; wp_step
     apply wp_if_eval
     rw [Exec.evalExpr, show Exec.evalExpr ge e le' m' (tv id.i) = _ from hic,
@@ -196,10 +212,10 @@ theorem wp_loop_fmptn {f : function} {Q : Post} {e : env} {le : temp_env} {m : m
           · omega
         rw [hce] at hfold
         simp only [cellStep, beq_self_eq_true, ite_true] at hfold
-        refine wp_single hf hs' hd he hc hic ?_
-        intro m2 hf2 hs2 hu2 hk2
+        refine wp_single hf hs' hd hfm he hc hic ?_
+        intro m2 hf2 hs2 hu2 hr2 hk2
         exact ⟨by simp, rfl, c, c, _, _, _, _, F, Nat.le_refl _, hc, rfl, by omega, hfold, hic, hf2,
-          hs2, hu.trans hu2, hk.trans hk2, ho⟩
+          hs2, hu.trans hu2, hr.trans hr2, hk.trans hk2, ho⟩
       · rw [ite_eq_right (by simp; omega)]
         have hce : c < cellEnd ptn level c := by
           rcases Nat.lt_or_ge c (cellEnd ptn level c) with hlt | hge
@@ -209,10 +225,10 @@ theorem wp_loop_fmptn {f : function} {Q : Post} {e : env} {le : temp_env} {m : m
             rw [h1] at h2; omega
         have hne : (c == cellEnd ptn level c) = false := by simp; omega
         simp only [cellStep, hne] at hfold
-        refine wp_cell hf hs' hd he hce hsp.2.1 hsp.2.2.1 hsp.2.2.2 hic ?_
-        intro le2 m3 hi2 hf2 hs2 hu3 hk3 ho2
+        refine wp_cell hf hs' hd hfm he hce hsp.2.1 hsp.2.2.1 hsp.2.2.2 hic ?_
+        intro le2 m3 hi2 hf2 hs2 hu3 hr3 hk3 ho2
         exact ⟨by simp, rfl, c, cellEnd ptn level c, _, _, _, _, F, Nat.le_of_lt hce, hsp.2.1, rfl, by omega,
-          hfold, hi2, hf2, hs2, hu.trans hu3, hk.trans hk3, fun k h1 h2 h3 => by rw [ho2 k h1 h2 h3, ho k h1 h2 h3]⟩
+          hfold, hi2, hf2, hs2, hu.trans hu3, hr.trans hr3, hk.trans hk3, fun k h1 h2 h3 => by rw [ho2 k h1 h2 h3, ho k h1 h2 h3]⟩
     · rw [ite_eq_right (by simpa using hc)]
       apply wp_break
       have hcn' : c = n := by omega
@@ -220,10 +236,10 @@ theorem wp_loop_fmptn {f : function} {Q : Post} {e : env} {le : temp_env} {m : m
       rw [cells_go_ge _ _ _ _ _ hc, List.foldl_nil] at hfold
       have h1 : (fmptn lab ptn level c).1 = fx := by rw [hR, ← hfold]
       have h2 : (fmptn lab ptn level c).2 = mc := by rw [hR, ← hfold]
-      have := hQ le' m' wf wm hf (by rw [h1, h2]; exact hs') hu hk ho
+      have := hQ le' m' wf wm hf (by rw [h1, h2]; exact hs') hu hr hk ho
       simpa using this
   · rintro v t e' le' m' ⟨rfl, rfl, c, c2, wf, wm, fx, mc, F, hcc, hc2, rfl, hF, hfold, hic, hf, hs',
-      hu, hk, ho⟩
+      hu, hr, hk, ho⟩
     wp_step; wp_step
     apply wp_set_eval
     rw [Exec.evalExpr, show Exec.evalExpr ge e le' m' (tv id.i) = _ from hic]
@@ -232,6 +248,6 @@ theorem wp_loop_fmptn {f : function} {Q : Post} {e : env} {le : temp_env} {m : m
         PTree.get k le' := fun k hk => temps_gso _ _ hk
     refine ⟨n - (c2 + 1), by omega, by simp, trivial, c2 + 1, wf, wm, fx, mc, F, by omega, rfl, hF,
       hfold, by rw [temps_gss]; rfl, hf.temps fun k h1 _ _ _ _ _ _ => hoth k h1,
-      hs'.temps fun k h1 _ _ _ _ _ _ => hoth k h1, hu, hk, fun k h1 h2 h3 => by rw [hoth k h1, ho k h1 h2 h3]⟩
+      hs'.temps fun k h1 _ _ _ _ _ _ => hoth k h1, hu, hr, hk, fun k h1 h2 h3 => by rw [hoth k h1, ho k h1 h2 h3]⟩
 
 end NautyVerified.Proofs.Fmptn

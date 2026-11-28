@@ -1,5 +1,6 @@
 import NautyVerified.Proofs.Alloc.KeepV
 import NautyVerified.Proofs.Fmperm.Cycle
+import NautyVerified.Logic.Rest
 
 /-!
 # The main loop of `fmperm`
@@ -38,9 +39,9 @@ structure St (m : mem) (le : temp_env) (b bf : block) (fofs : ptrofs) (bm : bloc
   Mlt : M < 2147483648
   nM : n ≤ 64 * M
 
-/-- The blocks of `fmperm`'s arrays are distinct. -/
+/-- The blocks of `fmperm`'s arrays are distinct, except that `fix` and `mcr` may
+share one (`Apart`). -/
 structure Disj (n : Nat) (bpm b bf bm : block) : Prop where
-  fm : bf ≠ bm
   fp : bf ≠ bpm
   mp : bm ≠ bpm
   fb : 0 < n → bf ≠ b
@@ -81,11 +82,13 @@ theorem wp_vertex {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} 
     {perm : Array Nat} {n M i0 : Nat} {wf wm : Nat → Lib.Integers.int64}
     {s : VSet n × VSet n × Array Bool}
     (h : Frame m le bpm pofs b perm n) (hs : St m le b bf fofs bm mofs n M wf wm s)
-    (hd : Disj n bpm b bf bm) (he : PTree.get Set.bit e = none) (hge : PTree.get id.wp e = none)
+    (hd : Disj n bpm b bf bm) (hfm : Apart bf (intOfZ (Ptrofs.unsigned fofs)) bm (intOfZ (Ptrofs.unsigned mofs)) M)
+    (he : PTree.get Set.bit e = none) (hge : PTree.get id.wp e = none)
     (hi : PTree.get id.i le = some (.Vint (ir i0))) (hi0 : i0 < n)
     (hQ : ∀ le' m' wf' wm', Frame m' le' bpm pofs b perm n →
       St m' le' b bf fofs bm mofs n M wf' wm' (permStep perm s i0) →
-      Unch m m' (fun z => z = b ∨ z = bf ∨ z = bm) → Alloc.KeepA m m' →
+      Unch m m' (fun z => z = b ∨ z = bf ∨ z = bm) → Rest m m' bf (intOfZ (Ptrofs.unsigned fofs)) bm (intOfZ (Ptrofs.unsigned mofs)) M →
+      Alloc.KeepA m m' →
       (∀ x, x ≠ id.k → x ≠ id.l → PTree.get x le' = PTree.get x le) → Q.normal E0 e le' m') :
     Wp xi ge f step Q e le m := by
   have hnlt := h.nlt
@@ -102,19 +105,20 @@ theorem wp_vertex {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} 
     wp_step
     refine Set.wp_addElement' hs.farr hs.Mlt hs.hfix hi rfl (by omega) (by omega) hs.bit he ?_
     intro m1 harr1 hu1 hO1
-    refine Set.wp_addElement' (hs.marr.unch hu1 (Ne.symm hd.fm)) hs.Mlt hs.hmcr hi rfl (by omega)
+    refine Set.wp_addElement' (hs.marr.acrossF hu1 hO1 hfm) hs.Mlt hs.hmcr hi rfl (by omega)
       (by omega) (hs.bit.unch hu1 hd.bitf) he ?_
     intro m2 harr2 hu2 hO2
     have hps : permStep perm s i0 = (s.1.insert i0, s.2.1.insert i0, s.2.2) := by
       simp [permStep, hfx]
     refine hQ le m2 (addW wf i0) (addW wm i0) ((h.unch hu1 (Ne.symm hd.fp) hd.wf).unch hu2 (Ne.symm hd.mp) hd.wm) ?_
       ((hu1.mono fun z hz => .inr (.inl hz)).trans (hu2.mono fun z hz => .inr (.inr hz)))
+      ((Rest.fix hu1 hO1).trans (Rest.mcr hu2 hO2))
       ((Alloc.KeepA.of_outside hu1 hO1 hs.farr.base_nonneg).trans
-        (Alloc.KeepA.of_outside hu2 hO2 (hs.marr.unch hu1 (Ne.symm hd.fm)).base_nonneg))
+        (Alloc.KeepA.of_outside hu2 hO2 (hs.marr.acrossF hu1 hO1 hfm).base_nonneg))
       (fun _ _ _ => rfl)
     rw [hps]
     exact { hs with
-      farr := harr1.unch hu2 hd.fm
+      farr := harr1.acrossM hu2 hO2 hfm
       marr := harr2
       frep := Set.setRep_add hs.frep hi0
       mrep := Set.setRep_add hs.mrep hi0
@@ -135,7 +139,8 @@ theorem wp_vertex {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} 
       apply wp_skip
       have hps : permStep perm s i0 = s := by simp [permStep, hfx, hseen]
       rw [← hps] at hs
-      exact hQ le m wf wm h hs (Unch.refl _ _) (Alloc.KeepA.refl _) (fun _ _ _ => rfl)
+      exact hQ le m wf wm h hs (Unch.refl _ _) (Rest.refl _ _ _ _ _ _) (Alloc.KeepA.refl _)
+        (fun _ _ _ => rfl)
     · rw [ite_eq_right hseen]
       rw [ir_eq (a := 0) (b := 0) ⟨by decide, by decide⟩ ⟨by decide, by decide⟩]
       try simp only [cop]
@@ -164,12 +169,13 @@ theorem wp_vertex {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} 
       refine hQ le2 m3 wf (addW wm i0) (((h.temps fun x _ h2 h3 => hoth x h2 h3).unch hu2
           (h.bpm_b (by omega)) (h.wp_b (by omega))).unch hu3 (Ne.symm hd.mp) hd.wm) ?_
         ((hu2.mono fun z hz => .inl hz).trans (hu3.mono fun z hz => .inr (.inr hz)))
+        ((Rest.unch hu2 (hd.fb (by omega))).trans (Rest.mcr hu3 hO3))
         ((Alloc.KeepA.of_keep hu2 hk2).trans (Alloc.KeepA.of_outside hu3 hO3
           (hs.marr.unch hu2 (hd.mb (by omega))).base_nonneg)) hoth
       rw [hps]
       exact { hfix := by rw [hoth _ (by decide) (by decide)]; exact hs.hfix
               hmcr := hmcr2
-              farr := (hs.farr.unch hu2 (hd.fb (by omega))).unch hu3 hd.fm
+              farr := (hs.farr.unch hu2 (hd.fb (by omega))).acrossM hu3 hO3 hfm
               marr := harr3
               frep := hs.frep
               mrep := Set.setRep_add hs.mrep hi0
@@ -190,11 +196,13 @@ theorem wp_main {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {b
     {perm : Array Nat} {n M : Nat} {wf wm : Nat → Lib.Integers.int64}
     (h : Frame m le bpm pofs b perm n)
     (hs : St m le b bf fofs bm mofs n M wf wm (VSet.empty, VSet.empty, Array.replicate n false))
-    (hd : Disj n bpm b bf bm) (he : PTree.get Set.bit e = none) (hge : PTree.get id.wp e = none)
+    (hd : Disj n bpm b bf bm) (hfm : Apart bf (intOfZ (Ptrofs.unsigned fofs)) bm (intOfZ (Ptrofs.unsigned mofs)) M)
+    (he : PTree.get Set.bit e = none) (hge : PTree.get id.wp e = none)
     (hQ : ∀ le' m' wf' wm', Frame m' le' bpm pofs b perm n →
       St m' le' b bf fofs bm mofs n M wf' wm'
         ((List.range n).foldl (permStep perm) (VSet.empty, VSet.empty, Array.replicate n false)) →
-      Unch m m' (fun z => (0 < n ∧ z = b) ∨ z = bf ∨ z = bm) → Alloc.KeepA m m' →
+      Unch m m' (fun z => (0 < n ∧ z = b) ∨ z = bf ∨ z = bm) → Rest m m' bf (intOfZ (Ptrofs.unsigned fofs)) bm (intOfZ (Ptrofs.unsigned mofs)) M →
+      Alloc.KeepA m m' →
       (∀ x, x ≠ id.i → x ≠ id.k → x ≠ id.l → PTree.get x le' = PTree.get x le) →
       Q.normal E0 e le' m') :
     Wp xi ge f (forLoop id.i id.n step) Q e le m := by
@@ -205,34 +213,37 @@ theorem wp_main {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {b
   let Inv := fun (k : Nat) (le' : temp_env) (m' : mem) => k ≤ n ∧
     PTree.get id.i le' = some (.Vint (ir k)) ∧ ∃ wf' wm', Frame m' le' bpm pofs b perm n ∧
       St m' le' b bf fofs bm mofs n M wf' wm' (sk k) ∧
-      Unch m m' (fun z => (0 < n ∧ z = b) ∨ z = bf ∨ z = bm) ∧ Alloc.KeepA m m' ∧ Oth le'
+      Unch m m' (fun z => (0 < n ∧ z = b) ∨ z = bf ∨ z = bm) ∧ Rest m m' bf (intOfZ (Ptrofs.unsigned fofs)) bm (intOfZ (Ptrofs.unsigned mofs)) M ∧
+      Alloc.KeepA m m' ∧ Oth le'
   let Mid := fun (k : Nat) (le' : temp_env) (m' : mem) =>
     PTree.get id.i le' = some (.Vint (ir k)) ∧ k < n ∧ ∃ wf' wm', Frame m' le' bpm pofs b perm n ∧
       St m' le' b bf fofs bm mofs n M wf' wm' (sk (k + 1)) ∧
-      Unch m m' (fun z => (0 < n ∧ z = b) ∨ z = bf ∨ z = bm) ∧ Alloc.KeepA m m' ∧ Oth le'
+      Unch m m' (fun z => (0 < n ∧ z = b) ∨ z = bf ∨ z = bm) ∧ Rest m m' bf (intOfZ (Ptrofs.unsigned fofs)) bm (intOfZ (Ptrofs.unsigned mofs)) M ∧
+      Alloc.KeepA m m' ∧ Oth le'
   refine wp_forLoop id.i id.n step n h.nlt Inv Mid ?_ ?_ ?_ ?_ ?_
   · rintro k le' m' ⟨hk, hi, wf', wm', hf, -, -, -, -⟩
     exact ⟨hk, hi, hf.hn⟩
   · refine ⟨Nat.zero_le _, temps_gss _ _ _, wf, wm, h.temps fun x hx _ _ => temps_gso _ _ hx,
-      hs.temps fun x hx _ _ => temps_gso _ _ hx, Unch.refl _ _, Alloc.KeepA.refl _,
+      hs.temps fun x hx _ _ => temps_gso _ _ hx, Unch.refl _ _, Rest.refl _ _ _ _ _ _,
+      Alloc.KeepA.refl _,
       fun x hx _ _ => temps_gso _ _ hx⟩
-  · rintro k le' m' hk ⟨-, hi, wf', wm', hf, hs', hu, hkp, ho⟩
-    refine wp_vertex hf hs' hd he hge hi hk ?_
-    intro le2 m2 wf2 wm2 hf2 hs2 hu2 hk2 ho2
+  · rintro k le' m' hk ⟨-, hi, wf', wm', hf, hs', hu, hr, hkp, ho⟩
+    refine wp_vertex hf hs' hd hfm he hge hi hk ?_
+    intro le2 m2 wf2 wm2 hf2 hs2 hu2 hr2 hk2 ho2
     refine ⟨rfl, ?_, hk, wf2, wm2, hf2, ?_, hu.trans (hu2.mono fun z hz => by
         rcases hz with h | h | h
         · exact .inl ⟨by omega, h⟩
         · exact .inr (.inl h)
-        · exact .inr (.inr h)), hkp.trans hk2,
+        · exact .inr (.inr h)), hr.trans hr2, hkp.trans hk2,
       fun x h1 h2 h3 => by rw [ho2 x h2 h3, ho x h1 h2 h3]⟩
     · rw [ho2 _ (by decide) (by decide)]; exact hi
     · show St m2 le2 b bf fofs bm mofs n M wf2 wm2 ((List.range (k + 1)).foldl (permStep perm) s0)
       rw [foldl_range_succ]; exact hs2
-  · rintro k le' m' ⟨hi, hk, wf', wm', hf, hs', hu, hkp, ho⟩
+  · rintro k le' m' ⟨hi, hk, wf', wm', hf, hs', hu, hr, hkp, ho⟩
     refine ⟨hi, by omega, temps_gss _ _ _, wf', wm', hf.temps fun x hx _ _ => temps_gso _ _ hx,
-      hs'.temps fun x hx _ _ => temps_gso _ _ hx, hu, hkp, fun x h1 h2 h3 => by
+      hs'.temps fun x hx _ _ => temps_gso _ _ hx, hu, hr, hkp, fun x h1 h2 h3 => by
         rw [temps_gso _ _ h1, ho x h1 h2 h3]⟩
-  · rintro le' m' ⟨-, -, wf', wm', hf, hs', hu, hkp, ho⟩
-    exact hQ le' m' wf' wm' hf hs' hu hkp ho
+  · rintro le' m' ⟨-, -, wf', wm', hf, hs', hu, hr, hkp, ho⟩
+    exact hQ le' m' wf' wm' hf hs' hu hr hkp ho
 
 end NautyVerified.Proofs.Fmperm

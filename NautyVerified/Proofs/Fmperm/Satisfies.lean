@@ -36,7 +36,8 @@ def fmpermSpec (bpm : block) (pofs : ptrofs) (bf : block) (fofs : ptrofs) (bm : 
     ArrayAt m .Mint64 bm (intOfZ (Ptrofs.unsigned mofs)) (longs wm) M ∧
     BitTable m Block.nautilBit ∧ DynAt m WP WPS 4 cap b0 ∧
     Mem.valid_block m bpm ∧ Mem.valid_block m bf ∧ Mem.valid_block m bm ∧
-    bf ≠ bm ∧ bf ≠ bpm ∧ bm ≠ bpm ∧
+    Apart bf (intOfZ (Ptrofs.unsigned fofs)) bm (intOfZ (Ptrofs.unsigned mofs)) M ∧
+    bf ≠ bpm ∧ bm ≠ bpm ∧
     (∀ z, z = WP ∨ z = WPS ∨ z = Block.nautilBit → z ≠ bpm ∧ z ≠ bf ∧ z ≠ bm) ∧
     (0 < cap → b0 ≠ bpm ∧ b0 ≠ bf ∧ b0 ≠ bm ∧ b0 ≠ Block.nautilBit) ∧
     perm.size = n ∧ (∀ x, x < n → perm[x]! < n) ∧
@@ -50,6 +51,7 @@ def fmpermSpec (bpm : block) (pofs : ptrofs) (bf : block) (fofs : ptrofs) (bm : 
     DynAt m' WP WPS 4 cap' b' ∧ n ≤ cap' ∧ ((cap' = cap ∧ b' = b0) ∨ ¬ Mem.valid_block m b') ∧
     Unch m m' (fun z => z = bf ∨ z = bm ∨ z = WPS ∨ z = WP ∨ (0 < cap ∧ z = b0) ∨
       (¬ Mem.valid_block m b' ∧ z = b')) ∧
+    Rest m m' bf (intOfZ (Ptrofs.unsigned fofs)) bm (intOfZ (Ptrofs.unsigned mofs)) M ∧
     ∀ z ∈ [bf, bm], Alloc.Keep m m' z
 
 /-- The temporaries on entry. -/
@@ -125,7 +127,7 @@ theorem fmperm_satisfies {xi : ExternalCalls} (bpm : block) (pofs : ptrofs) (bf 
       rw [ho2 k h3 h4, hT1 k h1 h2]
     wp_step
     refine Set.wp_emptySet' (vals := Set.longs wm) (by decide) (by decide) (by decide)
-      (hmarr1.unch hu2 (Ne.symm hfm)) hM hM2
+      (hmarr1.acrossF hu2 hO2 hfm) hM hM2
       (by rw [hT2 _ (by decide) (by decide) (by decide) (by decide)]
           simp (config := {decide := true}) only [entryTemps, temps_gso, temps_gss])
       (by rw [hT2 _ (by decide) (by decide) (by decide) (by decide)]
@@ -181,7 +183,7 @@ theorem fmperm_satisfies {xi : ExternalCalls} (bpm : block) (pofs : ptrofs) (bf 
           (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
         hmcr := hlk _ _ (by simp (config := {decide := true}) only [entryTemps, temps_gso, temps_gss])
           (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
-        farr := (harr2.unch hu3 hfm).unch hu4 (nb _ fun h => (hbD h).2.1)
+        farr := (harr2.acrossM hu3 hO3 hfm).unch hu4 (nb _ fun h => (hbD h).2.1)
         marr := harr3.unch hu4 (nb _ fun h => (hbD h).2.2.1)
         frep := Set.setRep_zero hnM
         mrep := Set.setRep_zero hnM
@@ -190,16 +192,16 @@ theorem fmperm_satisfies {xi : ExternalCalls} (bpm : block) (pofs : ptrofs) (bf 
         bit := ((hbit1.unch hu2 hgBit.2.1).unch hu3 hgBit.2.2).unch hu4 (nb _ fun h => (hbD h).2.2.2)
         Mlt := hM2, nM := hnM }
     have hd : Disj n bpm b' bf bm :=
-      { fm := hfm, fp := hfp, mp := hmp
+      { fp := hfp, mp := hmp
         fb := fun h0 => ((hbD (by omega)).2.1).symm
         mb := fun h0 => ((hbD (by omega)).2.2.1).symm
         wf := hgWP.2.1, wm := hgWP.2.2, bitf := hgBit.2.1, bitm := hgBit.2.2
         bitb := fun h0 => ((hbD (by omega)).2.2.2).symm }
-    refine wp_main (e := empty_env) hf hs hd rfl rfl ?_
-    intro le5 m5 wf5 wm5 hf5 hs5 hu5 hk5 ho5
+    refine wp_main (e := empty_env) hf hs hd hfm rfl rfl ?_
+    intro le5 m5 wf5 wm5 hf5 hs5 hu5 hr5 hk5 ho5
     have hR := fmperm_eq perm n
     refine ⟨m5, Nextelement.free_empty m5, rfl, wf5, wm5, cap', b', hs5.farr, hs5.marr,
-      by rw [hR]; exact hs5.frep, by rw [hR]; exact hs5.mrep, ?_, hcap, hb', ?_, ?_⟩
+      by rw [hR]; exact hs5.frep, by rw [hR]; exact hs5.mrep, ?_, hcap, hb', ?_, ?_, ?_⟩
     · refine (((hD'.keep hu2 hgWP.2.1 hgWPS.2.1 fun hc0 => Alloc.Keep.unch hu2 (hbD hc0).2.1).keep
         hu3 hgWP.2.2 hgWPS.2.2 fun hc0 => Alloc.Keep.unch hu3 (hbD hc0).2.2.1).keep hu4
         (nb _ fun h => (hD'.bne h).2) (nb _ fun h => (hD'.bne h).1) fun _ => hk4).keep hu5 ?_ ?_
@@ -230,7 +232,9 @@ theorem fmperm_satisfies {xi : ExternalCalls} (bpm : block) (pofs : ptrofs) (bf 
         · exact hbS z h
         · exact .inl h
         · exact .inr (.inl h)
-
+    · exact ((((Rest.unch hu1 (hout _ hvf hgWPS.2.1.symm hgWP.2.1.symm
+        (fun ⟨h1, h2⟩ => (hb0 h1).2.1 h2.symm))).trans (Rest.fix hu2 hO2)).trans
+        (Rest.mcr hu3 hO3)).trans (Rest.unch hu4 (nb _ fun h => (hbD h).2.1))).trans hr5
     · have kf1 : Alloc.Keep m m1 bf := Alloc.Keep.unch hu1 (hout _ hvf hgWPS.2.1.symm hgWP.2.1.symm
         (fun ⟨h1, h2⟩ => (hb0 h1).2.1 h2.symm))
       have km1 : Alloc.Keep m m1 bm := Alloc.Keep.unch hu1 (hout _ hvm hgWPS.2.2.symm hgWP.2.2.symm

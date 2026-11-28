@@ -32,6 +32,7 @@ def fmptnSpec (bl : block) (lofs : ptrofs) (bp : block) (pofs : ptrofs) (bf : bl
     ArrayAt m .Mint64 bf (intOfZ (Ptrofs.unsigned fofs)) (longs wf) M ∧
     ArrayAt m .Mint64 bm (intOfZ (Ptrofs.unsigned mofs)) (longs wm) M ∧
     BitTable m Block.nautilBit ∧ Disjoint bl bp bf bm ∧
+    Apart bf (intOfZ (Ptrofs.unsigned fofs)) bm (intOfZ (Ptrofs.unsigned mofs)) M ∧
     ptn.size = n ∧ (∀ x < n, lab[x]! < n) ∧ (∀ x < n, ptn[x]! < 2147483648) ∧
     ptn[n - 1]! ≤ level ∧
     n < 2147483648 ∧ level < 2147483648 ∧ 0 < M ∧ M < 2147483648 ∧ n ≤ 64 * M
@@ -40,7 +41,9 @@ def fmptnSpec (bl : block) (lofs : ptrofs) (bp : block) (pofs : ptrofs) (bf : bl
     ArrayAt m' .Mint64 bm (intOfZ (Ptrofs.unsigned mofs)) (longs wm') M ∧
     SetRep (fun w => bv64 (wf' w)) M (fmptn lab ptn level n).1 ∧
     SetRep (fun w => bv64 (wm' w)) M (fmptn lab ptn level n).2 ∧
-    Unch m m' (fun b => b = bf ∨ b = bm) ∧ Alloc.KeepA m m'
+    Unch m m' (fun b => b = bf ∨ b = bm) ∧
+    Rest m m' bf (intOfZ (Ptrofs.unsigned fofs)) bm (intOfZ (Ptrofs.unsigned mofs)) M ∧
+    Alloc.KeepA m m'
 
 /-- The temporaries on entry. -/
 def entryTemps (bl : block) (lofs : ptrofs) (bp : block) (pofs : ptrofs) (bf : block)
@@ -63,7 +66,7 @@ theorem fmptn_satisfies {xi : ExternalCalls} (bl : block) (lofs : ptrofs) (bp : 
     · exact .nil _
     · exact Nextelement.norepet_of_nodup (by decide)
     · exact Nextelement.disjoint_of (by decide)
-  · rintro args m₀ ⟨rfl, hlarr, hparr, hfarr, hmarr, hbit, hd, hps, hls, hpl, hlast, hn, hlev, hM,
+  · rintro args m₀ ⟨rfl, hlarr, hparr, hfarr, hmarr, hbit, hd, hfm, hps, hls, hpl, hlast, hn, hlev, hM,
       hM2, hnM⟩
     rw [triple_iff_wp]
     rintro e le m ⟨rfl, rfl, rfl⟩
@@ -76,7 +79,7 @@ theorem fmptn_satisfies {xi : ExternalCalls} (bl : block) (lofs : ptrofs) (bp : 
     intro le1 m1 harr1 hu1 hO1 ho1
     wp_step
     refine Set.wp_emptySet' (vals := Set.longs wm) (by decide) (by decide) (by decide)
-      (hmarr.unch hu1 (Ne.symm hd.fm)) hM hM2
+      (hmarr.acrossF hu1 hO1 hfm) hM hM2
       (by rw [ho1 _ (by decide) (by decide)]
           simp (config := {decide := true}) only [entryTemps, temps_gso, temps_gss])
       (by rw [ho1 _ (by decide) (by decide)]
@@ -105,17 +108,18 @@ theorem fmptn_satisfies {xi : ExternalCalls} (bl : block) (lofs : ptrofs) (bp : 
                    simp (config := {decide := true}) only [entryTemps, temps_gso, temps_gss]
         hmcr := by rw [hT _ (by decide) (by decide) (by decide) (by decide) (by decide)]
                    simp (config := {decide := true}) only [entryTemps, temps_gso, temps_gss]
-        farr := harr1.unch hu2 hd.fm
+        farr := harr1.acrossM hu2 hO2 hfm
         marr := harr2
         frep := Set.setRep_zero hnM
         mrep := Set.setRep_zero hnM
         bit := (hbit.unch hu1 hd.bf).unch hu2 hd.bm
         Mlt := hM2, nM := hnM }
-    refine wp_loop_fmptn hf hs hd rfl hps hlast (temps_gss _ _ _) ?_
-    intro le' m' wf' wm' hf' hs' hu' hk' ho'
+    refine wp_loop_fmptn hf hs hd hfm rfl hps hlast (temps_gss _ _ _) ?_
+    intro le' m' wf' wm' hf' hs' hu' hr' hk' ho'
     exact ⟨m', Nextelement.free_empty m', rfl, wf', wm', hs'.farr, hs'.marr, hs'.frep, hs'.mrep,
       ((hu1.mono fun b hb => .inl hb).trans (hu2.mono fun b hb => .inr hb)).trans hu',
+      ((Rest.fix hu1 hO1).trans (Rest.mcr hu2 hO2)).trans hr',
       ((Alloc.KeepA.of_outside hu1 hO1 hfarr.base_nonneg).trans (Alloc.KeepA.of_outside hu2 hO2
-        (hmarr.unch hu1 (Ne.symm hd.fm)).base_nonneg)).trans hk'⟩
+        (hmarr.acrossF hu1 hO1 hfm).base_nonneg)).trans hk'⟩
 
 end NautyVerified.Proofs.Fmptn
