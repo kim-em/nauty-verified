@@ -373,6 +373,7 @@ import NautyVerified.Proofs.Sparse.Refine.Count.Sort
 import NautyVerified.Proofs.Sparse.Refine.Count.Install
 import NautyVerified.Proofs.Sparse.Refine.Count.Tail
 import NautyVerified.Proofs.Sparse.Refine.Count.Inner
+import NautyVerified.Proofs.Sparse.Refine.Count.Cell
 import NautyVerified.Proofs.Sparse.Refine.Wide
 import NautyVerified.Proofs.Sparse.Refine.DistPass
 import NautyVerified.Proofs.Sparse.Refine.Queue
