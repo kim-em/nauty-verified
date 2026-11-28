@@ -123,7 +123,8 @@ theorem wp_fpnTarget {f : function} {Q : Post} {e : env} {le : temp_env} {m : me
         (fun _ => .Vint (ir ((maketargetcell ctx st.lab st.ptn level 100 (-1)).1 : Int))) 1 →
       Unch m m' (fun z => S.Chg z ∨ ¬ Mem.valid_block m z ∨ IsWork m z ∨ z = bt ∨ z = bz ∨
         z = bc) →
-      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) → WorkMono m m' → Q.normal E0 e le m')
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) → WorkMono m m' →
+      (∀ z ∈ [bt, bz, bc], Keep m m' z) → Q.normal E0 e le m')
     (hQn : nc = n → Q.normal E0 e le m) :
     Wp xi ge f Firstpathnode.target Q e le m := by
   have hnl := h.nlt
@@ -147,7 +148,7 @@ theorem wp_fpnTarget {f : function} {Q : Post} {e : env} {le : temp_env} {m : me
   refine wp_nodeTarget h hvU hvT hloc hlocS htc hez hec hge ht hz hc hlab hptn hlev hl1 hln
     (hintE := .Eunop .Oneg (ci 1 tint) tint) (hint := -1) rfl rfl (by decide) (by omega)
     ⟨x, hx, hgt⟩ ?_
-  intro m₁ h₁ hws hzv hcv hu₁ hg₁ hw₁
+  intro m₁ h₁ hws hzv hcv hu₁ hg₁ hw₁ hK₁
   simp only [seqPost, Post.after, E0_append]
   wp_step; wp_step
   have hzl : Mem.load .Mint32 m₁ bz (zOfInt 0) = some (.Vint (ir
@@ -161,5 +162,6 @@ theorem wp_fpnTarget {f : function} {Q : Post} {e : env} {le : temp_env} {m : me
     (hu₁.trans (hu'.mono fun z hz => .inl (by subst hz; exact ⟨by simp [SLoc.blocks], by sep_ne h.distinct, by sep_ne h.distinct⟩))) (fun z hz => hg' z (hg₁ z hz))
     (hw₁.trans hg₁ (WorkMono.of_unch h₁.work hu' (by simp only [workG]; sep_all h.distinct)
       fun z hz e => h₁.work_not hz (e ▸ by simp [SLoc.blocks])))
+    (fun z hz => (hK₁ z hz).trans (Alloc.Keep.unch hu' (hb z hz)))
 
 end NautyVerified.Proofs.Search

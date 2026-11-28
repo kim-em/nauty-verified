@@ -88,6 +88,7 @@ theorem wp_nodeVisit {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_en
       Unch m m' (fun z => S.Chg z ∨ ¬ Mem.valid_block m z ∨ IsWork m z ∨ z = bnc ∨
         z = bq ∨ z = bk) →
       (∀ z, Mem.valid_block m z → Mem.valid_block m' z) → WorkMono m m' →
+      (∀ z ∈ [bnc, bq, bk], Keep m m' z) →
       Q.normal E0 e le m') :
     Wp xi ge f dorefCall Q e le m := by
   have hv := h.valid_all hvU hvT
@@ -302,8 +303,43 @@ theorem wp_nodeVisit {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_en
       (pN fS oS fun hc => Alloc.Malloced.valid (dS.mal hc))
       (pN fB oB fun hc => Alloc.Malloced.valid (dB.mal hc)) hsc hst har hinv
   have hqarr' : ArrayAt m' .Mint32 bq 0 (fun _ => .Vint (ir 0)) 1 := hqarr
+  have hKl : ∀ z ∈ [bnc, bq, bk], Keep m m' z := by
+    have k1' : ∀ z, z ∉ S.blocks → Mem.valid_block m z → ¬ IsWork m z → Keep m m₁ z :=
+      fun z hzS hzv hzw => Keep.unch hu1 (by
+        rintro (e | e | ⟨hc, e⟩ | hnv)
+        · exact hzS (e ▸ by simp [SLoc.blocks])
+        · exact hzS (e ▸ by simp [SLoc.blocks])
+        · exact hzw (e ▸ iN hc)
+        · exact hnv hzv)
+    simp only [List.pairwise_cons, List.mem_cons, List.mem_nil_iff, or_false, forall_eq_or_imp,
+      forall_eq, List.Pairwise.nil, and_true, false_implies, implies_true] at hloc
+    intro z hz
+    simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
+    rcases hz with rfl | rfl | rfl
+    · exact ((k1' _ hl1'.1 hl1'.2.1 hl1'.2.2).trans (hbn ▸ hk2 L.bn (by simp))).trans (hkA3 _)
+    · refine ((k1' _ hl2'.1 hl2'.2.1 hl2'.2.2).trans (Keep.unch hu2 ?_)).trans (hkA3 _)
+      rintro ((e | e | e | e | e) | e | h6)
+      · exact hl2'.1 (e.trans hbl ▸ by simp [SLoc.blocks])
+      · exact hl2'.1 (e.trans hbp ▸ by simp [SLoc.blocks])
+      · exact hloc.1.1 (e.trans hbn).symm
+      · exact hl2'.1 (e.trans hbc ▸ by simp [SLoc.blocks])
+      · exact hl2'.1 (e.trans hba ▸ by simp [SLoc.blocks])
+      · exact hloc.2 (e.trans hbk)
+      · unfold dyn3Set at h6
+        rcases h6 with e | e | e | e | e | e | ⟨hc, e⟩ | ⟨hc, e⟩ | ⟨hc, e⟩ | hnv
+        · exact hl2'.1 (e ▸ by simp [SLoc.blocks])
+        · exact hl2'.1 (e ▸ by simp [SLoc.blocks])
+        · exact hl2'.1 (e ▸ by simp [SLoc.blocks])
+        · exact hl2'.1 (e ▸ by simp [SLoc.blocks])
+        · exact hl2'.1 (e ▸ by simp [SLoc.blocks])
+        · exact hl2'.1 (e ▸ by simp [SLoc.blocks])
+        · exact hl2'.2.2 (e ▸ iW hc)
+        · exact hl2'.2.2 (e ▸ iS hc)
+        · exact hl2'.2.2 (e ▸ iB hc)
+        · exact hnv (hg1 _ hl2'.2.1)
+    · exact ((k1' _ hl3'.1 hl3'.2.1 hl3'.2.2).trans (hbk ▸ hk2 L.bk (by simp))).trans (hkA3 _)
   refine hQ m' hSA hnc' hk' hqarr' (hU.mono fun z hz => ?_) hgrow
-    (WorkMono.of_four dW dS dB dN dW' dS' dB' dN' (back fW) (back fS) (back fB) fN')
+    (WorkMono.of_four dW dS dB dN dW' dS' dB' dN' (back fW) (back fS) (back fB) fN') hKl
   rcases hz with h6 | hN | hx
   · unfold dyn3Set at h6
     rcases h6 with e | e | e | e | e | e | ⟨hc, e⟩ | ⟨hc, e⟩ | ⟨hc, e⟩ | hnv

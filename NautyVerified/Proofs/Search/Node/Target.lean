@@ -83,6 +83,7 @@ theorem wp_nodeTarget {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_e
       Unch m m' (fun z => S.Chg z ∨ ¬ Mem.valid_block m z ∨ IsWork m z ∨ z = bt ∨ z = bz ∨
         z = bc) →
       (∀ z, Mem.valid_block m z → Mem.valid_block m' z) → WorkMono m m' →
+      (∀ z ∈ [bt, bz, bc], Keep m m' z) →
       Q.normal E0 e le m') :
     Wp xi ge f (mtcCall hintE) Q e le m := by
   have hv := h.valid_all hvU hvT
@@ -198,7 +199,7 @@ theorem wp_nodeTarget {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_e
     simp only [ite_true, cop]
     rfl
   · rintro t v m' ⟨⟨rfl, hT, hZ, hC, cW', bW', cS', bS', cB', bB', dW', dS', dB', fW, fS, fB, hU,
-      pWS', pWB', pSB', -⟩, hgrow⟩
+      pWS', pWB', pSB', hKl⟩, hgrow⟩
     have hX : ∀ z ∈ S.blocks, ¬ (z = bt ∨ z = bz ∨ z = bc) := by
       rintro z hzm (e | e | e)
       · exact tS (e ▸ hzm)
@@ -230,7 +231,7 @@ theorem wp_nodeTarget {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_e
         | exact cSn (e ▸ hgS)
         | (rcases hg with rfl | rfl <;> exact absurd e (by decide))
     refine hQ m' hS' hT hZ hC (hU.mono fun z hz => ?_) hgrow
-      (WorkMono.of_three dW dS dB dN dW' dS' dB' fW fS fB hU (hpG _ (.inl rfl)) (hpG _ (.inr rfl)))
+      (WorkMono.of_three dW dS dB dN dW' dS' dB' fW fS fB hU (hpG _ (.inl rfl)) (hpG _ (.inr rfl))) hKl
     rcases hz with h6 | hx
     · unfold dyn3Set at h6
       rcases h6 with e | e | e | e | e | e | ⟨hc, e⟩ | ⟨hc, e⟩ | ⟨hc, e⟩ | hnv

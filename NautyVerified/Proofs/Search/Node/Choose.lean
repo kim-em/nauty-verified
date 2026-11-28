@@ -162,6 +162,7 @@ theorem wp_chooseOff {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_en
       Unch m m' (fun z => S.Chg z ∨ ¬ Mem.valid_block m z ∨ IsWork m z ∨ z = bt ∨ z = bz ∨
         z = bc) →
       (∀ z, Mem.valid_block m z → Mem.valid_block m' z) → WorkMono m m' →
+      (∀ z ∈ [bt, bz, bc], Keep m m' z) →
       (∀ x, x ≠ idOf 709 → x ≠ idOf 710 → x ≠ idOf 711 → PTree.get x le' = PTree.get x le) →
       Q.normal E0 e le' m') :
     Wp xi ge f chooseOff Q e le m := by
@@ -221,13 +222,14 @@ theorem wp_chooseOff {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_en
         Unch m m₂ (fun z => S.Chg z ∨ ¬ Mem.valid_block m z ∨ IsWork m z ∨ z = bt ∨ z = bz ∨
           z = bc) →
         (∀ z, Mem.valid_block m z → Mem.valid_block m₂ z) → WorkMono m m₂ →
+        (∀ z ∈ [bt, bz, bc], Keep m m₂ z) →
         chooseTarget false ctx 100 level nc st =
           (((maketargetcell ctx st.lab st.ptn level 100 hint).1 : Int),
            (maketargetcell ctx st.lab st.ptn level 100 hint).2.1,
            (maketargetcell ctx st.lab st.ptn level 100 hint).2.2,
            { st₂ with tctotal := st₂.tctotal + (maketargetcell ctx st.lab st.ptn level 100 hint).2.2 }) →
         Wp xi ge f (Set.sk tcTotal) Q e le2 m₂ := by
-      intro hint st₂ m₂ hh st₂t h₂ hT hZ hC hU₂ hg₂ hw₂ hct
+      intro hint st₂ m₂ hh st₂t h₂ hT hZ hC hU₂ hg₂ hw₂ hK₂ hct
       obtain ⟨_, hsz⟩ := mtc_bounds ctx st.lab st.ptn level 100 hint hI.ptnSize hlast hh hx hgt
       wp_step; wp_step
       refine wp_tctotal h₂ g12 hez (ld hZ) (by omega) ?_
@@ -246,6 +248,12 @@ theorem wp_chooseOff {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_en
         (hU₂.trans (hu₃.mono fun z hz => .inl (by subst hz; exact ⟨by simp [SLoc.blocks], by sep_ne h.distinct, by sep_ne h.distinct⟩))) (fun z hz => hg₃ z (hg₂ z hz))
         (hw₂.trans hg₂ (WorkMono.of_unch h₂.work hu₃ (by simp only [workG]; sep_all h.distinct)
           fun z hz e => h₂.work_not hz (e ▸ by simp [SLoc.blocks])))
+        (fun z hz => (hK₂ z hz).trans (Keep.unch hu₃ (by
+          simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
+          rcases hz with rfl | rfl | rfl
+          · exact nst.1
+          · exact nst.2.1
+          · exact nst.2.2)))
         (fun x h1 h2 h3 => by rw [ho2 x h2, ho1 x h3])
       exact this
     by_cases hcc : st.compCanon < 0
@@ -260,7 +268,7 @@ theorem wp_chooseOff {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_en
       wp_step; wp_step; wp_step
       refine wp_nodeTarget h hvU hvT hloc hlocS htc2 hez hec hgeT ht hz ⟨_, hc⟩ hlab2 hptn2 hlev2 hl1 hln
         hhint rfl hft.1 hft.2 ⟨x, hx, hgt⟩ ?_
-      intro m₁ h₁ hT hZ hC hU₁ hg₁ hw₁
+      intro m₁ h₁ hT hZ hC hU₁ hg₁ hw₁ hK₁
       obtain ⟨hpos, -⟩ := mtc_bounds ctx st.lab st.ptn level 100 st.firsttc[level]! hI.ptnSize hlast
         hft.2 hx hgt
       simp only [seqPost, Post.after, E0_append]
@@ -278,7 +286,8 @@ theorem wp_chooseOff {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_en
         (hU₁.trans (hu₂.mono fun z hz => .inl (by simp at hz; subst hz; exact ⟨by simp [SLoc.blocks], by sep_ne h.distinct, by sep_ne h.distinct⟩)))
         (fun z hz => hg₂ z (hg₁ z hz))
         (hw₁.trans hg₁ (WorkMono.of_unch h₁.work hu₂ (by simp only [workG]; sep_all h.distinct)
-          fun z hz e => h₁.work_not hz (by simp at e; exact e ▸ by simp [SLoc.blocks]))) ?_
+          fun z hz e => h₁.work_not hz (by simp at e; exact e ▸ by simp [SLoc.blocks])))
+        (fun z hz => (hK₁ z hz).trans (Keep.unch hu₂ fun hm => nE z hz (by simpa using hm))) ?_
       rw [chooseTarget_false_eq, ite_eq_left hcho]
       simp only [offHint, hcc, ite_true, true_and]
       split <;> rfl
@@ -288,9 +297,9 @@ theorem wp_chooseOff {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_en
       refine wp_nodeTarget (hint := -1) h hvU hvT hloc hlocS htc2 hez hec hgeT ht hz ⟨_, hc⟩ hlab2 hptn2
         hlev2 hl1 hln (by simp [Exec.evalExpr, typeof, cop]) rfl (by decide) (by omega)
         ⟨x, hx, hgt⟩ ?_
-      intro m₁ h₁ hT hZ hC hU₁ hg₁ hw₁
+      intro m₁ h₁ hT hZ hC hU₁ hg₁ hw₁ hK₁
       simp only [seqPost, Post.after, E0_append]
-      refine fin (-1) st m₁ (by omega) rfl h₁ hT hZ hC hU₁ hg₁ hw₁ ?_
+      refine fin (-1) st m₁ (by omega) rfl h₁ hT hZ hC hU₁ hg₁ hw₁ hK₁ ?_
       rw [chooseTarget_false_eq, ite_eq_left hcho]
       simp only [offHint, hcc, ite_false, false_and]
   · rw [decide_eq_false hcho]
@@ -299,7 +308,8 @@ theorem wp_chooseOff {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_en
     have hct : chooseTarget false ctx 100 level nc st = ((-1 : Int), VSet.empty, 0, st) := by
       rw [chooseTarget_false_eq, ite_eq_right hcho]
     have := hQ le1 m (by rw [hct]; exact h) (by rw [hct]; exact hc) (fun hh => absurd hh hcho) ht hz
-      (Unch.refl _ _) (fun _ hz => hz) (WorkMono.refl m) fun x h1 h2 h3 => ho1 x h3
+      (Unch.refl _ _) (fun _ hz => hz) (WorkMono.refl m) (fun z _ => Keep.refl m z)
+      fun x h1 h2 h3 => ho1 x h3
     exact this
 
 end NautyVerified.Proofs.Search
