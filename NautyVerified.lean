@@ -308,6 +308,8 @@ import NautyVerified.Proofs.Sparse.Prep
 import NautyVerified.Proofs.Sparse.Testcanlab.Satisfies
 import NautyVerified.Proofs.Sparse.Updatecan.Rows
 import NautyVerified.Proofs.Sparse.Updatecan.Satisfies
+import NautyVerified.Proofs.Sparse.Check
+import NautyVerified.Proofs.Sparse.Freedyn
 import NautyVerified.Proofs.Sparse.Testcanlab.Rows
 import NautyVerified.Proofs.Alloc.DynL
 import NautyVerified.Proofs.Sparse.Sort.Ins
