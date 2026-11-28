@@ -88,4 +88,23 @@ theorem Carry.step {m₀ m m' : mem} {S : SLoc} {ctx : Ctx n} {st : Search n} {p
     exact (Keep.unch hu (keep _ (.inr (.inr rfl)) c.uaV (fun hw => h.work_not hw hbU)
       (locS _ hbU) (fun e => btS (e ▸ hbU)))).perm _ _ c.uaP
 
+/-- `Carry` across a store to blocks a search call may change, outside the work
+arrays' globals. -/
+theorem Carry.chg {m₀ m m' : mem} {S : SLoc} {ctx : Ctx n} {st : Search n} {pre nsp : Bool}
+    {chain₀ chain : List (block × block)} {level : Nat} {ncw tcw : val} {nd bt : block} {L : OLocs}
+    (hLS : ∀ z ∈ L.list, z ∉ S.blocks) (h : SearchAt m S ctx st pre nsp)
+    (c : Carry m₀ m S chain₀ chain level ncw tcw nd bt L)
+    {W : block → Prop} (hu : Unch m m' W) (hg : ∀ z, Mem.valid_block m z → Mem.valid_block m' z)
+    (hW : ∀ z, W z → S.Chg z ∧ z ∉ workG) (hbt : ∃ vals, ArrayAt m .Mint64 bt 0 vals S.M) :
+    Carry m₀ m' S chain₀ chain level ncw tcw nd bt L ∧ WorkMono m m' ∧
+      (∃ vals, ArrayAt m' .Mint64 bt 0 vals S.M) ∧ Keep m m' bt := by
+  obtain ⟨btS, -, -, -, -⟩ := c.ntc
+  have hb : ¬ W bt := fun hw => btS (hW _ hw).1.1
+  obtain ⟨vals, hv⟩ := hbt
+  have hbt' : ∃ vals, ArrayAt m' .Mint64 bt 0 vals S.M := ⟨vals, hv.unch hu hb⟩
+  obtain ⟨c', wm⟩ := c.unch hLS h hu hg
+    (fun z hz => .inl ⟨(hW z hz).1.1, (hW z hz).1.2.1, (hW z hz).1.2.2, (hW z hz).2⟩) hbt'
+    (Keep.unch hu hb)
+  exact ⟨c', wm, hbt', Keep.unch hu hb⟩
+
 end NautyVerified.Proofs.Search
