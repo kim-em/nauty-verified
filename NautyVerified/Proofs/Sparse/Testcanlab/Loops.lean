@@ -39,7 +39,7 @@ instance (x : ident) : Decidable (LoopLocal x) := by unfold LoopLocal; infer_ins
 structure LoopCtx {n : Nat} (m : mem) (le : temp_env) (G : Hex.SparseGraph n) (be : block)
     (eo : ptrofs) (R : Rows n) (cbe : block) (ceo : ptrofs) (ev : Nat → val) (bW : block)
     (lab : Array Nat) (D VI VL : Nat) : Prop where
-  hce : PTree.get id.ce le = some (.Vptr cbe ceo)
+  hce : PTree.get id.ce le = some (cePtr R.neighbors.size cbe ceo)
   he : PTree.get id.e le = some (.Vptr be eo)
   hdi : PTree.get id.di le = some (.Vint (ir D))
   hvi : PTree.get id.vi le = some (.Vlong (lr VI))
@@ -96,7 +96,8 @@ theorem eval_ceat {n : Nat} {m : mem} {le : temp_env} {G : Hex.SparseGraph n} {b
   have hnd := h.nde31
   have hVD := h.hVD
   rw [← h.cev k hk]
-  refine eval_idx_l h.cearr (by omega) (by simp only [Exec.evalExpr]; exact h.hce) rfl rfl rfl _ _
+  refine eval_idx_l h.cearr (by omega)
+    (by simp only [Exec.evalExpr]; rw [h.hce, cePtr_pos (by omega)]) rfl rfl rfl _ _
     (by omega) ?_ rfl
   simp only [Exec.evalExpr, h.hvi, hj, typeof, cop, Sparse.lr_add]
 

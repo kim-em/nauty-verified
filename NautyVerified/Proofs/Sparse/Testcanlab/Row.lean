@@ -39,7 +39,7 @@ structure Frame {n : Nat} (m : mem) (le : temp_env) (G : Hex.SparseGraph n) (bv 
   he : PTree.get id.e le = some (.Vptr be eo)
   hcv : PTree.get id.cv le = some (.Vptr cbv cvo)
   hcd : PTree.get id.cd le = some (.Vptr cbd cdofs)
-  hce : PTree.get id.ce le = some (.Vptr cbe ceo)
+  hce : PTree.get id.ce le = some (cePtr R.neighbors.size cbe ceo)
   hlab : PTree.get id.lab le = some (.Vptr bl lofs)
   hsr : PTree.get id.samerows le = some (.Vptr bs so)
   hn : PTree.get id.n le = some (.Vint (ir n))

@@ -246,7 +246,7 @@ theorem wp_dynalloc1F {e : env} {f : function} {Q : Post} {le : temp_env} {m : m
       Unch m m' (fun z => z = bc ∨ (0 < cap ∧ z = b) ∨ (¬ Mem.valid_block m b' ∧ z = b')) →
       FieldFrame m m' bc po so →
       ((cap' = cap ∧ b' = b ∧ m' = m) ∨
-        (¬ Mem.valid_block m b' ∧ cap < cap' ∧ Zeros m' b' (c * cap'))) →
+        (¬ Mem.valid_block m b' ∧ cap < n ∧ Zeros m' b' (c * cap'))) →
       (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
       (∀ k, k ≠ t1 → k ≠ t2 → PTree.get k le' = PTree.get k le) →
       Q.normal E0 e le' m')

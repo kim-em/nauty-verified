@@ -79,15 +79,15 @@ def entryTemps (bsg : block) (sofs : ptrofs) (bc : block) (cofs : ptrofs) (bl : 
 
 /-- `SG_VDE(p, v, d, e)`. -/
 theorem wp_vde {f : function} {Q : Post} {le : temp_env} {m : mem} {p v d e : ident} {bsg : block} {sofs : ptrofs}
-    {bv : block} {vo : ptrofs} {bd : block} {dofs : ptrofs} {be : block} {eo : ptrofs}
+    {bv : block} {vo : ptrofs} {bd : block} {dofs : ptrofs} {ve : val}
     (hp : PTree.get p le = some (.Vptr bsg sofs)) (hpv : p ≠ v) (hpd : p ≠ d)
     (hv : Mem.load .Mint64 m bsg (fofs sofs 8) = some (.Vptr bv vo))
     (hd : Mem.load .Mint64 m bsg (fofs sofs 24) = some (.Vptr bd dofs))
-    (he : Mem.load .Mint64 m bsg (fofs sofs 32) = some (.Vptr be eo))
+    (he : Mem.load .Mint64 m bsg (fofs sofs 32) = some ve)
     (hQ : Q.normal E0 empty_env
-      (PTree.set e (.Vptr be eo) (PTree.set d (.Vptr bd dofs) (PTree.set v (.Vptr bv vo) le))) m) :
+      (PTree.set e ve (PTree.set d (.Vptr bd dofs) (PTree.set v (.Vptr bv vo) le))) m) :
     Wp xi sge f (vde p v d e) Q empty_env le m := by
-  let le1 := PTree.set e (.Vptr be eo) (PTree.set d (.Vptr bd dofs) (PTree.set v (.Vptr bv vo) le))
+  let le1 := PTree.set e ve (PTree.set d (.Vptr bd dofs) (PTree.set v (.Vptr bv vo) le))
   refine wp_loop (I := fun _ t e' le' m' => t = E0 ∧ e' = empty_env ∧ le' = le ∧ m' = m)
     (J := fun _ t e' le' m' => t = E0 ∧ e' = empty_env ∧ le' = le1 ∧ m' = m) ?_ ?_ (n := 0)
     ⟨rfl, rfl, rfl, rfl⟩
@@ -153,7 +153,7 @@ theorem testcanlab_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (so
     refine wp_vde (bsg := bc) (sofs := cofs)
       (by simp (config := {decide := true}) only [entryTemps, temps_gso, temps_gss])
       (by decide) (by decide) hca.v hca.d hca.e ?_
-    let leV := PTree.set id.ce (.Vptr cbe ceo) (PTree.set id.cd (.Vptr cbd cdofs)
+    let leV := PTree.set id.ce (cePtr R.neighbors.size cbe ceo) (PTree.set id.cd (.Vptr cbd cdofs)
       (PTree.set id.cv (.Vptr cbv cvo) (PTree.set id.e (.Vptr be eo) (PTree.set id.d (.Vptr bd dofs)
         (PTree.set id.v (.Vptr bv vo) le0)))))
     have hnV : PTree.get id.n leV = some (.Vint (ir n)) := by

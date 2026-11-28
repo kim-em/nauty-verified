@@ -82,17 +82,17 @@ theorem wp_setField {Q : Post} {le : temp_env} {m : mem} {f : ident} {ty : Cfron
 
 /-- `SWG_VDE(p, v, d, e, w)`. -/
 theorem wp_vdew {Q : Post} {le : temp_env} {m : mem} {p v d e w : ident} {bsg : block} {sofs : ptrofs}
-    {bv : block} {vo : ptrofs} {bd : block} {dofs : ptrofs} {be : block} {eo : ptrofs}
+    {bv : block} {vo : ptrofs} {bd : block} {dofs : ptrofs} {ve : val}
     (hp : PTree.get p le = some (.Vptr bsg sofs)) (hpv : p ≠ v) (hpd : p ≠ d) (hpe : p ≠ e)
     (hv : Mem.load .Mint64 m bsg (fofs sofs 8) = some (.Vptr bv vo))
     (hd : Mem.load .Mint64 m bsg (fofs sofs 24) = some (.Vptr bd dofs))
-    (he : Mem.load .Mint64 m bsg (fofs sofs 32) = some (.Vptr be eo))
+    (he : Mem.load .Mint64 m bsg (fofs sofs 32) = some ve)
     (hw : Mem.load .Mint64 m bsg (fofs sofs 40) = some Vnullptr)
     (hQ : Q.normal E0 empty_env (PTree.set w Vnullptr
-      (PTree.set e (.Vptr be eo) (PTree.set d (.Vptr bd dofs) (PTree.set v (.Vptr bv vo) le)))) m) :
+      (PTree.set e ve (PTree.set d (.Vptr bd dofs) (PTree.set v (.Vptr bv vo) le)))) m) :
     Wp xi sge F (vdew p v d e w) Q empty_env le m := by
   let le1 := PTree.set w Vnullptr
-    (PTree.set e (.Vptr be eo) (PTree.set d (.Vptr bd dofs) (PTree.set v (.Vptr bv vo) le)))
+    (PTree.set e ve (PTree.set d (.Vptr bd dofs) (PTree.set v (.Vptr bv vo) le)))
   refine wp_loop (I := fun _ t e' le' m' => t = E0 ∧ e' = empty_env ∧ le' = le ∧ m' = m)
     (J := fun _ t e' le' m' => t = E0 ∧ e' = empty_env ∧ le' = le1 ∧ m' = m) ?_ ?_ (n := 0)
     ⟨rfl, rfl, rfl, rfl⟩
@@ -118,8 +118,9 @@ theorem wp_vdew {Q : Post} {le : temp_env} {m : mem} {p v d e w : ident} {bsg : 
     apply wp_break
     simpa only [E0_append] using hQ
 
-/-- The blocks `updatecan_sg` writes. -/
-def Wr (bc cbv cbd cbe : block) (z : block) : Prop := z = bc ∨ z = cbv ∨ z = cbd ∨ z = cbe
+/-- The blocks `updatecan_sg` writes; `ce` only when the store has neighbour entries (`N`). -/
+def Wr (bc cbv cbd cbe : block) (N : Nat) (z : block) : Prop :=
+  z = bc ∨ z = cbv ∨ z = cbd ∨ (0 < N ∧ z = cbe)
 
 /-- The blocks `updatecan_sg` only reads. -/
 def Rd (bsg bv bd be bl : block) (z : block) : Prop := z = bsg ∨ z = bv ∨ z = bd ∨ z = be ∨ z = bl
@@ -139,20 +140,22 @@ def updatecanSpec {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sofs : ptrofs
     (∀ j < n, lab[j]! < n) ∧ (∀ a b, a < n → b < n → lab[a]! = lab[b]! → a = b) ∧
     (∀ p < n, ∃ j < n, lab[j]! = p) ∧
     Alloc.DynAt m Block.work1 Block.work1Sz 4 capW bW ∧ 0 < n ∧ n < 2147483648 ∧
-    (∀ z, Rd bsg bv bd be bl z ∨ Wr bc cbv cbd cbe z → Mem.valid_block m z ∧ z ≠ Block.work1 ∧
+    (∀ z, Rd bsg bv bd be bl z ∨ Wr bc cbv cbd cbe R.neighbors.size z → Mem.valid_block m z ∧ z ≠ Block.work1 ∧
       z ≠ Block.work1Sz ∧ (0 < capW → z ≠ bW)) ∧
-    (∀ z, Wr bc cbv cbd cbe z → ¬ Rd bsg bv bd be bl z) ∧
-    bc ≠ cbv ∧ bc ≠ cbd ∧ bc ≠ cbe ∧ cbv ≠ cbd ∧ cbv ≠ cbe ∧ cbd ≠ cbe
+    (∀ z, Wr bc cbv cbd cbe R.neighbors.size z → ¬ Rd bsg bv bd be bl z) ∧
+    bc ≠ cbv ∧ bc ≠ cbd ∧ (0 < R.neighbors.size → bc ≠ cbe) ∧ cbv ≠ cbd ∧
+    (0 < R.neighbors.size → cbv ≠ cbe) ∧ (0 < R.neighbors.size → cbd ≠ cbe)
   post _ m t _ m' := t = E0 ∧ ∃ capW' bW', Alloc.DynAt m' Block.work1 Block.work1Sz 4 capW' bW' ∧
     n ≤ capW' ∧ ((capW' = capW ∧ bW' = bW) ∨ ¬ Mem.valid_block m bW') ∧
     CanonAt m' bc cofs (Hex.GraphIso.Nauty.Sparse.updatecan (Graph.ofGraph G) R lab sr) n
       cbv cvo cbd cdofs cbe ceo ∧
     Mem.load .Mint32 m' bc (fofs cofs 16) = some (.Vint (ir n)) ∧
     Mem.load .Mint64 m' bc (fofs cofs 0) = some (.Vlong (lr G.neighbors.size)) ∧
-    Unch m m' (fun z => Wr bc cbv cbd cbe z ∨ z = Block.work1 ∨ z = Block.work1Sz ∨
+    Unch m m' (fun z => Wr bc cbv cbd cbe R.neighbors.size z ∨ z = Block.work1 ∨ z = Block.work1Sz ∨
       (0 < capW ∧ z = bW) ∨ (¬ Mem.valid_block m bW' ∧ z = bW')) ∧
     (∀ z, Mem.valid_block m z → Mem.valid_block m' z) ∧
-    Alloc.Keep m m' bc ∧ Alloc.Keep m m' cbv ∧ Alloc.Keep m m' cbd ∧ Alloc.Keep m m' cbe
+    Alloc.Keep m m' bc ∧ Alloc.Keep m m' cbv ∧ Alloc.Keep m m' cbd ∧
+    (0 < R.neighbors.size → Alloc.Keep m m' cbe)
 
 def entryTemps (bsg : block) (sofs : ptrofs) (bc : block) (cofs : ptrofs) (bl : block) (lofs : ptrofs)
     (sr M n : Nat) : temp_env :=
@@ -338,7 +341,7 @@ theorem updatecan_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sof
     refine wp_vdew (bsg := bc) (sofs := cofs)
       (by simp (config := {decide := true}) only [entryTemps, temps_gso, temps_gss])
       (by decide) (by decide) (by decide) hca.v hca.d hca.e hca.w ?_
-    let leV := PTree.set id.cwt Vnullptr (PTree.set id.ce (.Vptr cbe ceo) (PTree.set id.cd (.Vptr cbd cdofs)
+    let leV := PTree.set id.cwt Vnullptr (PTree.set id.ce (cePtr R.neighbors.size cbe ceo) (PTree.set id.cd (.Vptr cbd cdofs)
       (PTree.set id.cv (.Vptr cbv cvo) (PTree.set id.wt Vnullptr (PTree.set id.e (.Vptr be eo)
         (PTree.set id.d (.Vptr bd dofs) (PTree.set id.v (.Vptr bv vo) le0)))))))
     have hnV : PTree.get id.n leV = some (.Vint (ir n)) := by
@@ -349,7 +352,7 @@ theorem updatecan_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sof
     intro le1 m1 capW1 bW1 hDW1 hnW hu1 hor1 hg1 ho1
     have hcW1 : 0 < capW1 := by omega
     have hvW : Mem.valid_block m Block.work1 := Alloc.valid_of_access hDW.bpW
-    have hext : ∀ z, Rd bsg bv bd be bl z ∨ Wr bc cbv cbd cbe z →
+    have hext : ∀ z, Rd bsg bv bd be bl z ∨ Wr bc cbv cbd cbe R.neighbors.size z →
         ¬ (z = Block.work1Sz ∨ z = Block.work1 ∨ (0 < capW ∧ z = bW) ∨
           (¬ Mem.valid_block m bW1 ∧ z = bW1)) ∧ z ≠ bW1 := fun z hz =>
       ⟨Alloc.not_dynSet (hsep z hz).1 (hsep z hz).2.2.1 (hsep z hz).2.1 (hsep z hz).2.2.2,
@@ -363,8 +366,8 @@ theorem updatecan_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sof
       simp (config := {decide := true}) only [leV, le0, entryTemps, temps_gso, temps_gss]
     have hnL : PTree.get id.n le1 = some (.Vint (ir n)) := by
       rw [hget1 _ (by decide) (by decide)]; exact hnV
-    have eBc : Rd bsg bv bd be bl bc ∨ Wr bc cbv cbd cbe bc := .inr (.inl rfl)
-    have eBsg : Rd bsg bv bd be bl bsg ∨ Wr bc cbv cbd cbe bsg := .inl (.inl rfl)
+    have eBc : Rd bsg bv bd be bl bc ∨ Wr bc cbv cbd cbe R.neighbors.size bc := .inr (.inl rfl)
+    have eBsg : Rd bsg bv bd be bl bsg ∨ Wr bc cbv cbd cbe R.neighbors.size bsg := .inl (.inl rfl)
     have hbcg : bc ≠ bsg := fun h => hWR bc (.inl rfl) (.inl h)
     -- canong->nv = n
     wp_step
@@ -388,7 +391,7 @@ theorem updatecan_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sof
       hDW1.keep hu23 (fun h => (hsep bc eBc).2.1 h.symm) (fun h => (hsep bc eBc).2.2.1 h.symm)
         (fun _ => Alloc.Keep.unch hu23 (fun h => hbcW1 h.symm))
     have tr : ∀ {z : block} {chunk : memory_chunk} {base : Int} {vals : Nat → val} {k : Nat},
-        (Rd bsg bv bd be bl z ∨ Wr bc cbv cbd cbe z) → z ≠ bc → ArrayAt m chunk z base vals k →
+        (Rd bsg bv bd be bl z ∨ Wr bc cbv cbd cbe R.neighbors.size z) → z ≠ bc → ArrayAt m chunk z base vals k →
         ArrayAt m3 chunk z base vals k := fun hz hzc h =>
       (h.unch hu1 (hext _ hz).1).unch hu23 hzc
     have hRd : ∀ z, Rd bsg bv bd be bl z → z ≠ bc := fun z hz h => hWR bc (.inl rfl) (h ▸ hz)
@@ -404,17 +407,19 @@ theorem updatecan_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sof
     let g := Graph.ofGraph G
     have hget4 : ∀ x, x ≠ id.i → x ≠ idOf 703 → x ≠ idOf 704 → PTree.get x le4 = PTree.get x leV :=
       fun x h1 h2 h3 => by rw [ho4 x h1, hget1 x h2 h3]
-    have eR : ∀ {z}, Rd bsg bv bd be bl z → Rd bsg bv bd be bl z ∨ Wr bc cbv cbd cbe z := fun h => .inl h
-    have eW : ∀ {z}, Wr bc cbv cbd cbe z → Rd bsg bv bd be bl z ∨ Wr bc cbv cbd cbe z := fun h => .inr h
+    have eR : ∀ {z}, Rd bsg bv bd be bl z → Rd bsg bv bd be bl z ∨ Wr bc cbv cbd cbe R.neighbors.size z := fun h => .inl h
+    have eW : ∀ {z}, Wr bc cbv cbd cbe R.neighbors.size z → Rd bsg bv bd be bl z ∨ Wr bc cbv cbd cbe R.neighbors.size z := fun h => .inr h
     have t4 : ∀ {z : block} {chunk : memory_chunk} {base : Int} {vals : Nat → val} {k : Nat}
-        (hz : Rd bsg bv bd be bl z ∨ Wr bc cbv cbd cbe z), z ≠ bc → ArrayAt m chunk z base vals k →
+        (hz : Rd bsg bv bd be bl z ∨ Wr bc cbv cbd cbe R.neighbors.size z), z ≠ bc → ArrayAt m chunk z base vals k →
         ArrayAt m4 chunk z base vals k := fun hz hzc h => (tr hz hzc h).unch hu4 (hext _ hz).2
-    have wcv : Wr bc cbv cbd cbe cbv := .inr (.inl rfl)
-    have wcd : Wr bc cbv cbd cbe cbd := .inr (.inr (.inl rfl))
-    have wce : Wr bc cbv cbd cbe cbe := .inr (.inr (.inr rfl))
+    have wcv : Wr bc cbv cbd cbe R.neighbors.size cbv := .inr (.inl rfl)
+    have wcd : Wr bc cbv cbd cbe R.neighbors.size cbd := .inr (.inr (.inl rfl))
     have hcv4 := t4 (eW wcv) hbc1.symm hcvarr
     have hcd4 := t4 (eW wcd) hbc2.symm hcdarr
-    have hce4 := t4 (eW wce) hbc3.symm hcearr
+    have hce4 : ArrayAt m4 .Mint32 cbe (intOfZ (Ptrofs.unsigned ceo)) ev R.neighbors.size := by
+      rcases Nat.eq_zero_or_pos R.neighbors.size with h0 | hN
+      · rw [h0]; exact arrayAt_empty _ _ _ _ _
+      · exact t4 (eW (.inr (.inr (.inr ⟨hN, rfl⟩)))) (fun h => hbc3 hN h.symm) hcearr
     have hW4 : Mem.load .Mint64 m4 Block.work1 (zOfInt 0) = some (.Vptr bW1 Ptrofs.zero) := by
       rw [hu4.load _ _ _ (fun h => (hDW3.bne hcW1).2 h.symm)]; exact hDW3.ptr hcW1
     have gv : ∀ {x : ident} {w : val}, x ≠ id.i → x ≠ idOf 703 → x ≠ idOf 704 → PTree.get x leV = some w →
@@ -432,8 +437,6 @@ theorem updatecan_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sof
           (by simp (config := {decide := true}) only [leV, temps_gso, temps_gss])
         hcd := gv (by decide) (by decide) (by decide)
           (by simp (config := {decide := true}) only [leV, temps_gso, temps_gss])
-        hce := gv (by decide) (by decide) (by decide)
-          (by simp (config := {decide := true}) only [leV, temps_gso, temps_gss])
         hlab := gv (by decide) (by decide) (by decide)
           (by simp (config := {decide := true}) only [leV, le0, entryTemps, temps_gso, temps_gss])
         hn := gv (by decide) (by decide) (by decide) hnV
@@ -442,12 +445,15 @@ theorem updatecan_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sof
         earr := t4 (eR (.inr (.inr (.inr (.inl rfl))))) (hRd be (.inr (.inr (.inr (.inl rfl))))) hgr.earr
         larr := t4 (eR (.inr (.inr (.inr (.inr rfl))))) (hRd bl (.inr (.inr (.inr (.inr rfl))))) hlarr
         hls := hls, wptr := hW4, warr := hwarr4, n31 := hn31 }
+    have hceV : PTree.get id.ce le4 = some (cePtr R.neighbors.size cbe ceo) :=
+      gv (by decide) (by decide) (by decide)
+        (by simp (config := {decide := true}) only [leV, temps_gso, temps_gss])
     have hsrV : PTree.get id.samerows le4 = some (.Vint (ir sr)) := gv (by decide) (by decide) (by decide)
       (by simp (config := {decide := true}) only [leV, le0, entryTemps, temps_gso, temps_gss])
-    have hsepR : ∀ z, (z = cbv ∨ z = cbd ∨ z = cbe) → z ≠ bv ∧ z ≠ bd ∧ z ≠ be ∧ z ≠ bl ∧
+    have hsepR : ∀ z, (z = cbv ∨ z = cbd ∨ (0 < R.neighbors.size ∧ z = cbe)) → z ≠ bv ∧ z ≠ bd ∧ z ≠ be ∧ z ≠ bl ∧
         z ≠ Block.work1 ∧ z ≠ bW1 := by
       intro z hz
-      have hw : Wr bc cbv cbd cbe z := .inr hz
+      have hw : Wr bc cbv cbd cbe R.neighbors.size z := .inr hz
       have hnr := hWR z hw
       exact ⟨fun h => hnr (.inr (.inl h)), fun h => hnr (.inr (.inr (.inl h))),
         fun h => hnr (.inr (.inr (.inr (.inl h)))), fun h => hnr (.inr (.inr (.inr (.inr h)))),
@@ -469,8 +475,8 @@ theorem updatecan_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sof
       (∀ q < p, vv' (sr + q) = .Vlong (lr (st q)) ∧ dv' (sr + q) = .Vint (ir (g.degree lab[sr + q]!))) ∧
       (∀ e < base R sr, ev' e = ev e) ∧
       (∀ q < p, ∀ j < g.degree lab[sr + q]!, ev' (st q + j) = nbv G lab g.offsets[lab[sr + q]!]! j) ∧
-      Unch m4 m' (fun z => z = cbv ∨ z = cbd ∨ z = cbe) ∧
-      Alloc.Keep m4 m' cbv ∧ Alloc.Keep m4 m' cbd ∧ Alloc.Keep m4 m' cbe ∧
+      Unch m4 m' (fun z => z = cbv ∨ z = cbd ∨ (0 < R.neighbors.size ∧ z = cbe)) ∧
+      Alloc.Keep m4 m' cbv ∧ Alloc.Keep m4 m' cbd ∧ (0 < R.neighbors.size → Alloc.Keep m4 m' cbe) ∧
       (∀ z, Mem.valid_block m4 z → Mem.valid_block m' z) ∧
       ∀ x, x ≠ id.i → ¬ RowLocal x → PTree.get x le' = PTree.get x le5
     let I := fun (v : Nat) (t : trace) (e' : env) (le' : temp_env) (m' : mem) => t = E0 ∧
@@ -487,7 +493,7 @@ theorem updatecan_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sof
       ⟨rfl, rfl, 0, Nat.zero_le _, rfl, by rw [temps_gss]; simp, vv, dv, ev,
         by rw [temps_gso _ _ (by decide)]; exact hk5, hcv4, hcd4, hce4, fun i _ => ⟨rfl, rfl⟩,
         fun q hq => absurd hq (by omega), fun _ _ => rfl, fun q hq => absurd hq (by omega), Unch.refl _ _,
-        Alloc.Keep.refl _ _, Alloc.Keep.refl _ _, Alloc.Keep.refl _ _, fun _ h => h, fun x hx _ => temps_gso _ _ hx⟩
+        Alloc.Keep.refl _ _, Alloc.Keep.refl _ _, fun _ => Alloc.Keep.refl _ _, fun _ h => h, fun x hx _ => temps_gso _ _ hx⟩
     · rintro v t e' le' m' ⟨rfl, rfl, p, hp, rfl, hi, vv', dv', ev', hk', hcv', hcd', hce', P1, P2, P3, P4,
         hu', hK1, hK2, hK3, hg', ho'⟩
       have hf' := (hf5.mem hu' (fun h => (hsepR _ h).1 rfl) (fun h => (hsepR _ h).2.1 rfl)
@@ -504,12 +510,13 @@ theorem updatecan_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sof
         apply wp_skip
         have hKD : st p + g.degree lab[sr + p]! ≤ R.neighbors.size := by
           rw [← hstq]; exact Nat.le_trans (hst_le (by omega)) hfit
-        refine wp_row hf' hi hpn hk' hcv' hcd' hce' hKD hnd hsepR ⟨hc12, hc13, hc23⟩ ?_
+        refine wp_row hf' hi hpn hk' (by rw [ho' _ (by decide) (by decide), ho5 _ (by decide)]; exact hceV)
+          hcv' hcd' hce' hKD hnd hsepR ⟨hc12, fun h => ⟨hc13 h, hc23 h⟩⟩ ?_
         intro le'' m'' ev'' hcv'' hcd'' hce'' hlow hrow hk'' hu'' hK1' hK2' hK3' hg'' ho''
         refine ⟨by simp, rfl, p, by omega, rfl, by rw [ho'' _ (by decide)]; exact hi,
           upd vv' (sr + p) (.Vlong (lr (st p))), upd dv' (sr + p) (.Vint (ir (g.degree lab[sr + p]!))), ev'',
           hk'', hcv'', hcd'', hce'', fun i hi' => ?_, fun q hq => ?_, fun e he => ?_,
-          fun q hq j hj => ?_, hu'.trans hu'', hK1.trans hK1', hK2.trans hK2', hK3.trans hK3',
+          fun q hq j hj => ?_, hu'.trans hu'', hK1.trans hK1', hK2.trans hK2', fun h => (hK3 h).trans (hK3' h),
           fun z h => hg'' _ (hg' _ h),
           fun x hx hx' => by rw [ho'' x hx', ho' x hx hx']⟩
         · rw [upd_ne _ _ (by omega), upd_ne _ _ (by omega)]; exact P1 i hi'
@@ -527,11 +534,11 @@ theorem updatecan_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sof
         have hp' : p = n - sr := by omega
         subst hp'
         refine ⟨m', Isautom.free_empty _, ?_⟩
-        have hbcS : ¬ (bc = cbv ∨ bc = cbd ∨ bc = cbe) := by
-          rintro (h | h | h)
+        have hbcS : ¬ (bc = cbv ∨ bc = cbd ∨ (0 < R.neighbors.size ∧ bc = cbe)) := by
+          rintro (h | h | ⟨h0, h⟩)
           · exact hbc1 h
           · exact hbc2 h
-          · exact hbc3 h
+          · exact hbc3 h0 h
         have hS1 := (hext bc eBc).1
         -- a load from `canong` survives from `m` to `m'`
         have fld : ∀ {k : Int} {v : val}, (k = 8 ∨ (24 ≤ k ∧ k ≤ 40)) →
@@ -552,7 +559,9 @@ theorem updatecan_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sof
             v := fld (.inl rfl) hca.v
             nvW := acc (Mem.store_valid_access_1 _ _ _ _ _ _ hst2 _ _ _ _ (hu1.access _ _ _ _ hS1 hca.nvW))
             d := fld (.inr ⟨by decide, by decide⟩) hca.d
-            e := fld (.inr ⟨by decide, by decide⟩) hca.e
+            e := by
+              rw [(Hex.GraphIso.Nauty.Sparse.updatecan_sizes _ R lab sr).2]
+              exact fld (.inr ⟨by decide, by decide⟩) hca.e
             w := fld (.inr ⟨by decide, by decide⟩) hca.w
             rows := ⟨vv', dv', ev', hcv', hcd',
               by rw [(Hex.GraphIso.Nauty.Sparse.updatecan_sizes _ R lab sr).2]; exact hce',
@@ -565,13 +574,13 @@ theorem updatecan_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sof
           rw [Mem.load_store_same _ _ _ _ _ _ hst2]; rfl
         have hnde : Mem.load .Mint64 m' bc (fofs cofs 0) = some (.Vlong (lr G.neighbors.size)) := by
           rw [hu'.load _ _ _ hbcS, hu4.load _ _ _ hbcW1, Mem.load_store_same _ _ _ _ _ _ hst3]; rfl
-        have hWS : ∀ z, (z = cbv ∨ z = cbd ∨ z = cbe) → z ≠ Block.work1 ∧ z ≠ Block.work1Sz ∧ z ≠ bW1 :=
+        have hWS : ∀ z, (z = cbv ∨ z = cbd ∨ (0 < R.neighbors.size ∧ z = cbe)) → z ≠ Block.work1 ∧ z ≠ Block.work1Sz ∧ z ≠ bW1 :=
           fun z hz => ⟨(hsep z (.inr (.inr hz))).2.1, (hsep z (.inr (.inr hz))).2.2.1, (hext z (.inr (.inr hz))).2⟩
         have hDWf : Alloc.DynAt m' Block.work1 Block.work1Sz 4 capW1 bW1 :=
           (hDW3.keep hu4 (fun h => (hDW3.bne hcW1).2 h.symm) (fun h => (hDW3.bne hcW1).1 h.symm)
             (fun _ => hk4)).keep hu' (fun h => (hWS _ h).1 rfl) (fun h => (hWS _ h).2.1 rfl)
             (fun _ => Alloc.Keep.unch hu' fun h => (hWS _ h).2.2 rfl)
-        have kc : ∀ {z}, (z = cbv ∨ z = cbd ∨ z = cbe) → z ≠ bc → Alloc.Keep m4 m' z →
+        have kc : ∀ {z}, (z = cbv ∨ z = cbd ∨ (0 < R.neighbors.size ∧ z = cbe)) → z ≠ bc → Alloc.Keep m4 m' z →
             Alloc.Keep m m' z := fun hz hzc hk =>
           (((Alloc.Keep.unch hu1 (hext _ (.inr (.inr hz))).1).trans
             (Alloc.Keep.unch hu23 hzc)).trans (Alloc.Keep.unch hu4 (hext _ (.inr (.inr hz))).2)).trans hk
@@ -582,7 +591,7 @@ theorem updatecan_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sof
             (Alloc.Keep.store hst3 (by simp only [intOfZ_Ptrofs_unsigned]; omega))).trans
             (Alloc.Keep.unch hu4 hbcW1)).trans (Alloc.Keep.unch hu' hbcS)),
           kc (.inl rfl) (fun h => hbc1 h.symm) hK1, kc (.inr (.inl rfl)) (fun h => hbc2 h.symm) hK2,
-          kc (.inr (.inr rfl)) (fun h => hbc3 h.symm) hK3⟩
+          fun hN => kc (.inr (.inr ⟨hN, rfl⟩)) (fun h => hbc3 hN h.symm) (hK3 hN)⟩
         refine (((hu1.mono fun z hz => ?_).trans (hu23.mono fun z hz => .inl (.inl hz))).trans
           (hu4.mono fun z hz => ?_)).trans (hu'.mono fun z hz => .inl (.inr hz))
         · rcases hz with h | h | h | h

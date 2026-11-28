@@ -62,7 +62,7 @@ theorem sparse_init (xi : ExternalCalls) : sparseRep.InitFn xi sparseRep.init :=
   refine ⟨_, Satisfies.grow (Sparse.Init.init_satisfies G bg gofs gl.bv gl.vo gl.bd gl.dofs gl.be
     gl.eo gout bc cofs hout lab ptn act bopt oofs bs so (.Vint (ir M))),
     ⟨hargs, hg, hsi, h72, by rw [fofs_zero]; exact hopt, e0 ▸ hs.writable 0 (by decide), hc.n0,
-      by have := hc.nlt; omega, hok.1, hok.2, (pw_ab hd (a := bg) (by simp) (by simp)).symm,
+      by have := hc.nlt; omega, hok, (pw_ab hd (a := bg) (by simp) (by simp)).symm,
       (List.pairwise_cons.1 (pw_right hd)).1 bs (by simp)⟩, ?_⟩
   rintro t v m' ⟨⟨rfl, capV, bV, capD, bD, capE, bE, -, -, -, -, -, -, nV, nD, nE, -, -, -, hcan, -,
     -, hstld, hstW, hu, -, kbc, kbs⟩, hval⟩
@@ -78,8 +78,9 @@ theorem sparse_init (xi : ExternalCalls) : sparseRep.InitFn xi sparseRep.init :=
     · exact .inr (.inr (.inl h))
   have hPs : ∀ p ∈ ([] : List Slot), p ∈ sparseSlots := fun _ h => absurd h List.not_mem_nil
   refine ⟨rfl, ⟨hs.base_nonneg, hs.fits, fun i hi => ?_, fun i hi => ?_⟩,
-    ⟨bV, Ptrofs.zero, bD, Ptrofs.zero, bE, Ptrofs.zero⟩,
-    ⟨hcan, h72, by simp only [sparseOps, Sparse.Graph.blank, Array.size_replicate]; exact hok.1⟩,
+    { bv := bV, vo := Ptrofs.zero, bd := bD, dofs := Ptrofs.zero, be := bE, eo := Ptrofs.zero,
+      es := esOf (Sparse.Graph.ofGraph G).blank.neighbors.size bE },
+    ⟨hcan, h72, rfl⟩,
     fun z hz => ?_,
     sparse_step hw hval hu [] [] (fun _ h => absurd h List.not_mem_nil) hPs (by decide) hW hout
       (fun _ h => absurd h List.not_mem_nil) (fun _ h => absurd h List.not_mem_nil)
@@ -89,13 +90,14 @@ theorem sparse_init (xi : ExternalCalls) : sparseRep.InitFn xi sparseRep.init :=
         (by decide) (by decide)) fun z hz _ => ?_⟩
   · rw [show i = 0 by omega, e0]; exact hstld
   · rw [show i = 0 by omega, e0]; exact hstW
-  · change z ∈ [bc, bV, bD, bE] at hz
-    simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
-    rcases hz with rfl | rfl | rfl | rfl
+  · change z ∈ bc :: bV :: bD :: esOf (Sparse.Graph.ofGraph G).blank.neighbors.size bE at hz
+    simp only [List.mem_cons] at hz
+    rcases hz with rfl | rfl | rfl | hz
     · exact .inl rfl
     · exact .inr nV
     · exact .inr nD
-    · exact .inr nE
+    · obtain ⟨hp, rfl⟩ := mem_esOf hz
+      exact .inr (nE (by simpa [Sparse.Graph.blank, Sparse.Graph.ofGraph] using hp))
   · simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
     rcases hz with rfl | rfl
     · exact kbc

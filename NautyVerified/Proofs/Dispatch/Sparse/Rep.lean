@@ -16,7 +16,8 @@ refinement through the fresh `Sparse.refine`.
 `sparseRep`: `dispatch_sparse`'s procedures in the sparse program, the graph
 as the `sparsegraph` struct with its `v`, `d`, `e` arrays (`SparseGraphAt`,
 the arrays' blocks in `GLoc`), the canonical store as `canong`'s struct
-(`CanonAt`, its arrays in `CLoc`), the scratch state as nausparse.c's six
+(`CanonAt`, its arrays in `CLoc`; with no edges `e` is `NULL` and its block
+is not one of the store's, `CArrs.es`), the scratch state as nausparse.c's six
 `DYNALLSTAT` pairs `vmark1`, `vmark2`, `work1` to `work4` with the two mark
 invariants (`MarksAt`), the table as nausparse.c's `bit`, the workspace as the
 `snwork` pair, `init = init_sg`.
@@ -70,7 +71,7 @@ def ofSparseSt {n : Nat} (r : Sparse.RefineSt n) : RefineSt n :=
   Gr := Sparse.Graph
   Store := Sparse.Rows
   StoreOk {n} g c := c.offsets.size = n + 1 ∧ c.neighbors.size = g.neighbors.size
-  GraphOk g := 0 < g.neighbors.size ∧ g.neighbors.size < 2147483648
+  GraphOk g := g.neighbors.size < 2147483648
   blank g := g.blank
   refine g level lab ptn active numcells := ofSparseSt (Sparse.refine g level lab ptn active numcells)
   targetcell := Sparse.targetcell
@@ -122,6 +123,23 @@ structure Arrs where
   be : block
   eo : ptrofs
 
+/-- The arrays of `canong`, and `es`, the `e` block as a list: empty when the
+store has no neighbour entries (`e` is then `NULL`). -/
+structure CArrs extends Arrs where
+  es : List block
+
+/-- The `e` block list of a store with `N` neighbour entries. -/
+def esOf (N : Nat) (be : block) : List block := if N = 0 then [] else [be]
+
+theorem mem_esOf {N : Nat} {be z : block} (h : z ∈ esOf N be) : 0 < N ∧ z = be := by
+  unfold esOf at h
+  by_cases h0 : N = 0
+  · rw [if_pos h0] at h; exact absurd h List.not_mem_nil
+  · rw [if_neg h0, List.mem_singleton] at h; exact ⟨by omega, h⟩
+
+theorem esOf_mem {N : Nat} (be : block) (h : 0 < N) : be ∈ esOf N be := by
+  unfold esOf; rw [if_neg (by omega)]; exact List.mem_singleton_self _
+
 /-- The graph `g` at `bg`: a `sparsegraph` holding a `Hex.SparseGraph` whose view
 is `g`; its edge array has at least one readable entry (`sparse_main`
 allocates one for an edgeless graph). -/
@@ -132,10 +150,10 @@ def sparseGraphRep {n : Nat} (m : mem) (gl : Arrs) (bg : block) (gofs : ptrofs) 
     Mem.valid_access m .Mint32 gl.be (Ptrofs.unsigned gl.eo) .Readable
 
 /-- The store `c` at `bc`, its first `sr` rows meaningful. -/
-def sparseCanonRep {n : Nat} (m : mem) (cl : Arrs) (bc : block) (cofs : ptrofs) (c : Sparse.Rows n)
+def sparseCanonRep {n : Nat} (m : mem) (cl : CArrs) (bc : block) (cofs : ptrofs) (c : Sparse.Rows n)
     (sr : Nat) : Prop :=
   CanonAt m bc cofs c sr cl.bv cl.vo cl.bd cl.dofs cl.be cl.eo ∧
-    intOfZ (Ptrofs.unsigned cofs) + 72 < 2 ^ 64 ∧ 0 < c.neighbors.size
+    intOfZ (Ptrofs.unsigned cofs) + 72 < 2 ^ 64 ∧ cl.es = esOf c.neighbors.size cl.be
 
 /-- `canong` before `init_sg`. -/
 def sparseCanonPre (m : mem) (bc : block) (cofs : ptrofs) : Prop :=
@@ -192,9 +210,9 @@ def sparseRep : DispatchRep sparseGe sparseOps where
   IsWork m z := InUse m sparseSlots z
   Tables m := BitTable m BIT
   GLoc := Arrs
-  CLoc := Arrs
+  CLoc := CArrs
   graphBlocks gl bg := [bg, gl.bv, gl.bd, gl.be]
-  canonBlocks cl bc := [bc, cl.bv, cl.bd, cl.be]
+  canonBlocks cl bc := bc :: cl.bv :: cl.bd :: cl.es
   GraphRep m gl bg gofs g _ := sparseGraphRep m gl bg gofs g
   CanonRep m cl bc cofs _ c sr := sparseCanonRep m cl bc cofs c sr
   CanonPre m bc cofs _ _ := sparseCanonPre m bc cofs
@@ -228,7 +246,8 @@ def sparseRep : DispatchRep sparseGe sparseOps where
     exact ⟨G, hG, hs.unch hu (hb _ (by simp)) (hb _ (by simp)) (hb _ (by simp)) (hb _ (by simp)),
       hu.access _ _ _ _ (hb _ (by simp)) ha⟩
   canon_unch h hu hb :=
-    ⟨h.1.unch hu (hb _ (by simp)) (hb _ (by simp)) (hb _ (by simp)) (hb _ (by simp)), h.2⟩
+    ⟨h.1.unch hu (hb _ (by simp)) (hb _ (by simp)) (hb _ (by simp))
+      (fun hp => hb _ (by rw [h.2.2]; simp [esOf_mem _ hp])), h.2⟩
   canon_le h hle := by
     obtain ⟨hc, h72, hn⟩ := h
     obtain ⟨vv, dv, ev, a1, a2, a3, hr⟩ := hc.rows
@@ -242,20 +261,22 @@ def sparseRep : DispatchRep sparseGe sparseOps where
     · exact arrayAt_valid hs.darr hn
     · exact Alloc.valid_of_access ha
   canon_valid h hn _ z hz := by
-    obtain ⟨hc, -, hne⟩ := h
+    obtain ⟨hc, -, hes⟩ := h
     obtain ⟨vv, dv, ev, a1, a2, a3, -⟩ := hc.rows
-    simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
-    rcases hz with rfl | rfl | rfl | rfl
+    simp only [List.mem_cons] at hz
+    rcases hz with rfl | rfl | rfl | hz
     · exact Alloc.valid_of_access hc.ndeW
     · exact arrayAt_valid a1 hn
     · exact arrayAt_valid a2 hn
-    · exact arrayAt_valid a3 hne
+    · rw [hes] at hz
+      obtain ⟨hp, rfl⟩ := mem_esOf hz
+      exact arrayAt_valid a3 hp
   init_null h := absurd h init_ne
 
 @[simp] theorem sparseRep_graphBlocks (gl : sparseRep.GLoc) (bg : block) :
     sparseRep.graphBlocks gl bg = [bg, gl.bv, gl.bd, gl.be] := rfl
 @[simp] theorem sparseRep_canonBlocks (cl : sparseRep.CLoc) (bc : block) :
-    sparseRep.canonBlocks cl bc = [bc, cl.bv, cl.bd, cl.be] := rfl
+    sparseRep.canonBlocks cl bc = bc :: cl.bv :: cl.bd :: cl.es := rfl
 
 /-! ### The scratch state across a call -/
 

@@ -56,7 +56,7 @@ theorem eval_invat {n : Nat} {m : mem} {le : temp_env} {G : Hex.SparseGraph n} {
 theorem wp_copy {n : Nat} {Q : Post} {le : temp_env} {m : mem} {G : Hex.SparseGraph n} {be : block}
     {eo : ptrofs} {bW : block} {lab : Array Nat} {cbe : block} {ceo : ptrofs} {ev : Nat → val}
     {N D K VL : Nat}
-    (hce : PTree.get id.ce le = some (.Vptr cbe ceo))
+    (hce : PTree.get id.ce le = some (cePtr N cbe ceo))
     (hcearr : ArrayAt m .Mint32 cbe (intOfZ (Ptrofs.unsigned ceo)) ev N)
     (he : PTree.get id.e le = some (.Vptr be eo))
     (hearr : ArrayAt m .Mint32 be (intOfZ (Ptrofs.unsigned eo)) (eVals G) G.neighbors.size)
@@ -66,11 +66,12 @@ theorem wp_copy {n : Nat} {Q : Post} {le : temp_env} {m : mem} {G : Hex.SparseGr
     (hVL : VL + D ≤ G.neighbors.size) (hKD : K + D ≤ N) (hN : N < 2147483648)
     (hwp : Mem.load .Mint64 m Block.work1 (zOfInt 0) = some (.Vptr bW Ptrofs.zero))
     (hwarr : ArrayAt m .Mint32 bW 0 (fun p => .Vint (ir (((inverse n lab)[p]! : Nat) : Int))) n)
-    (hn : n < 2147483648) (hsep : cbe ≠ be ∧ cbe ≠ bW ∧ cbe ≠ Block.work1)
+    (hn : n < 2147483648) (hsep : 0 < N → cbe ≠ be ∧ cbe ≠ bW ∧ cbe ≠ Block.work1)
     (hQ : ∀ le' m' ev', ArrayAt m' .Mint32 cbe (intOfZ (Ptrofs.unsigned ceo)) ev' N →
       (∀ e, e < K → ev' e = ev e) → (∀ j < D, ev' (K + j) = nbv G lab VL j) →
       PTree.get id.k le' = some (.Vlong (lr (K + D))) →
-      Unch m m' (· = cbe) → Alloc.Keep m m' cbe → (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
+      Unch m m' (fun z => 0 < N ∧ z = cbe) → Alloc.Keep m m' cbe →
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
       (∀ x, x ≠ id.j → x ≠ id.k → x ≠ id.t2 → PTree.get x le' = PTree.get x le) →
       Q.normal E0 empty_env le' m') :
     Wp xi sge F (jloop copyBody) Q empty_env le m := by
@@ -79,7 +80,8 @@ theorem wp_copy {n : Nat} {Q : Post} {le : temp_env} {m : mem} {G : Hex.SparseGr
   let Mk := fun (q : Nat) (le' : temp_env) (m' : mem) => ∃ ev', ArrayAt m' .Mint32 cbe
       (intOfZ (Ptrofs.unsigned ceo)) ev' N ∧ (∀ e, e < K → ev' e = ev e) ∧
       (∀ j < q, ev' (K + j) = nbv G lab VL j) ∧ PTree.get id.k le' = some (.Vlong (lr (K + q))) ∧
-      Unch m m' (· = cbe) ∧ Alloc.Keep m m' cbe ∧ (∀ z, Mem.valid_block m z → Mem.valid_block m' z) ∧ Fr le'
+      Unch m m' (fun z => 0 < N ∧ z = cbe) ∧ Alloc.Keep m m' cbe ∧
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) ∧ Fr le'
   let I := fun (v : Nat) (t : trace) (e' : env) (le' : temp_env) (m' : mem) => t = E0 ∧
     e' = empty_env ∧ ∃ q, q ≤ D ∧ v = D - q ∧ PTree.get id.j le' = some (.Vlong (lr q)) ∧ Mk q le' m'
   let J := fun (v : Nat) (t : trace) (e' : env) (le' : temp_env) (m' : mem) => t = E0 ∧
@@ -102,16 +104,18 @@ theorem wp_copy {n : Nat} {Q : Post} {le : temp_env} {m : mem} {G : Hex.SparseGr
     by_cases hqD : q < D
     · rw [ite_eq_left (by simpa using hqD)]
       apply wp_skip
+      have hN0 : 0 < N := by omega
+      have hs := hsep hN0
       have hce' : PTree.get id.ce le' = some (.Vptr cbe ceo) := by
-        rw [ho _ (by decide) (by decide) (by decide)]; exact hce
+        rw [ho _ (by decide) (by decide) (by decide), hce, cePtr_pos hN0]
       have he' : PTree.get id.e le' = some (.Vptr be eo) := by
         rw [ho _ (by decide) (by decide) (by decide)]; exact he
       have hvli' : PTree.get id.vli le' = some (.Vlong (lr VL)) := by
         rw [ho _ (by decide) (by decide) (by decide)]; exact hvli
-      have hearr' := hearr.unch hu (fun h => hsep.1 h.symm)
+      have hearr' := hearr.unch hu (fun h => hs.1 h.2.symm)
       have hwp' : Mem.load .Mint64 m' Block.work1 (zOfInt 0) = some (.Vptr bW Ptrofs.zero) := by
-        rw [hu.load _ _ _ (fun h => hsep.2.2 h.symm)]; exact hwp
-      have hwarr' := hwarr.unch hu (fun h => hsep.2.1 h.symm)
+        rw [hu.load _ _ _ (fun h => hs.2.2 h.2.symm)]; exact hwp
+      have hwarr' := hwarr.unch hu (fun h => hs.2.1 h.2.symm)
       wp_step; wp_step; wp_step; wp_step
       apply wp_set_eval
       simp only [Exec.evalExpr, hk']
@@ -139,7 +143,7 @@ theorem wp_copy {n : Nat} {Q : Post} {le : temp_env} {m : mem} {G : Hex.SparseGr
       intro m'' harr'' hu' hk'' hg'
       refine ⟨by simp, rfl, q, hqD, rfl, hj2, upd ev' (K + q) (nbv G lab VL q), harr'',
         fun e he => by rw [upd_ne _ _ (by omega)]; exact hlow e he, fun j hj => ?_,
-        by rw [temps_gss]; push_cast; rfl, hu.trans hu', hkp.trans hk'',
+        by rw [temps_gss]; push_cast; rfl, hu.trans (hu'.mono fun z hz => ⟨hN0, hz⟩), hkp.trans hk'',
         fun z h => hg' _ (hg _ h), fun x h1 h2 h3 => ?_⟩
       · by_cases hjq : j = q
         · subst hjq; exact upd_same _ _ _

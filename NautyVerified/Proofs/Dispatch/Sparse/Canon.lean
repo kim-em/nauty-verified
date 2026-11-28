@@ -61,30 +61,49 @@ theorem pw4s {a b c d : block} (h : [a, b, c, d].Pairwise (· ≠ ·)) :
 theorem sparse_testcanlab (xi : ExternalCalls) : sparseRep.TestcanlabFn xi sparseRep.testcanlab := by
   refine ⟨_, by simp [Genv.find_funct, sparseRep, Sparse.funct_testcanlab], type_testcanlabS,
     fun g gl bg gofs c cl bc cofs bl lofs lab bs so M => ?_⟩
-  refine Satisfies.of_pre fun args m ⟨hargs, hc, ⟨G, hG, hg, _⟩, _, ⟨hca, _, _⟩, _, hl, hls, hlsm,
+  refine Satisfies.of_pre fun args m ⟨hargs, hc, ⟨G, hG, hg, _⟩, _, ⟨hca, _, hes⟩, _, hl, hls, hlsm,
     hsurj, hinj, ⟨sv, hs⟩, hsep⟩ => ?_
   subst hG
+  -- the `e` block for `testcanlab_sg`: the store's, or with no edges (`e` is `NULL`) the graph's
+  let cbe := if c.neighbors.size = 0 then gl.be else cl.be
+  let ceo := if c.neighbors.size = 0 then gl.eo else cl.eo
+  have hca' := hca.rebeIf gl.be gl.eo
+  have hcbe : cbe ∈ sparseRep.graphBlocks gl bg ++ sparseRep.canonBlocks cl bc := by
+    by_cases h0 : c.neighbors.size = 0
+    · simp [cbe, h0]
+    · have : cl.be ∈ cl.es := hes ▸ esOf_mem _ (by omega)
+      simp [cbe, h0, this]
   have hw := hc.work
   obtain ⟨cap, b, st, mk, hM⟩ := hw.2.2.1
   obtain ⟨capW, bW, dW⟩ := hw.1.dyn (W1, W1S, 4) (by simp [sparseSlots])
   have hd := hsep.distinct
   have hAB := pw_left hd
-  have hbs_e : bs ≠ cl.be := (pw_ab hd (b := bs) (by simp) (by simp)).symm
+  have hbs_e : bs ≠ cbe := (pw_ab hd (b := bs) hcbe (by simp)).symm
   have hbs_ge : bs ≠ gl.be := (pw_ab hd (b := bs) (by simp) (by simp)).symm
   have hWu : 0 < capW → InUse m sparseSlots bW := fun h => ⟨_, by simp [sparseSlots], _, h, dW⟩
   have hbW : 0 < capW → 0 < cap → bW ≠ b := fun h1 h2 =>
     slot_sep hw (p := (W1, W1S, 4)) (q := (VM1, VM1S, 2)) (by simp [sparseSlots])
       (by simp [sparseSlots]) (by decide) h1 h2 dW hM.dyn
   refine ⟨_, Satisfies.grow (Sparse.Testcanlab.testcanlab_satisfies G bg gofs gl.bv gl.vo gl.bd
-    gl.dofs gl.be gl.eo c bc cofs cl.bv cl.vo cl.bd cl.dofs cl.be cl.eo lab bl lofs bs so sv M capW
+    gl.dofs gl.be gl.eo c bc cofs cl.bv cl.vo cl.bd cl.dofs cbe ceo lab bl lofs bs so sv M capW
     bW cap b st mk),
-    ⟨hargs, hg, hca, hl, hls, hlsm, fun a a' ha ha' h => hinj a ha a' ha' h, hsurj, hs, dW, hM, hc.n0,
+    ⟨hargs, hg, hca', hl, hls, hlsm, fun a a' ha ha' h => hinj a ha a' ha' h, hsurj, hs, dW, hM, hc.n0,
       by have := hc.nlt; omega, ?_, hbs_e, hbs_ge,
       fun h => ⟨inUse_L hw (hWu h), inUse_L hw (hWu h), inUse_L hw (hWu h), hbW h⟩,
       fun h => ⟨inUse_L hw (vm1_inUse hM h), inUse_L hw (vm1_inUse hM h)⟩⟩, ?_⟩
   · intro z hz
     have hz' : z ∈ sparseRep.graphBlocks gl bg ++ sparseRep.canonBlocks cl bc ++ [bl, bs] := by
-      rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> simp
+      rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
+      · simp
+      · simp
+      · simp
+      · simp
+      · simp
+      · simp
+      · simp
+      · exact List.mem_append_left _ hcbe
+      · simp
+      · simp
     obtain ⟨hv, hgl, -, hne⟩ := sep_z hsep hz'
     exact ⟨hv, ng hgl, ng hgl, ng hgl, ng hgl, ng hgl, fun h0 => hne (vm1_inUse hM h0),
       fun h0 => hne (hWu h0)⟩
@@ -134,29 +153,49 @@ theorem sparse_testcanlab (xi : ExternalCalls) : sparseRep.TestcanlabFn xi spars
 theorem sparse_updatecan (xi : ExternalCalls) : sparseRep.UpdatecanFn xi sparseRep.updatecan := by
   refine ⟨_, by simp [Genv.find_funct, sparseRep, Sparse.funct_updatecan], type_updatecanS,
     fun g gl bg gofs c cl bc cofs bl lofs lab sr M => ?_⟩
-  refine Satisfies.of_pre fun args m ⟨hargs, hc, ⟨G, hG, hg, _⟩, _, ⟨hca, h72, hne⟩, hok, hl, hls,
+  refine Satisfies.of_pre fun args m ⟨hargs, hc, ⟨G, hG, hg, _⟩, _, ⟨hca, h72, hes⟩, hok, hl, hls,
     hlsm, hsurj, hinj, _, hsep, hfit⟩ => ?_
   subst hG
   have hw := hc.work
   obtain ⟨capW, bW, dW⟩ := hw.1.dyn (W1, W1S, 4) (by simp [sparseSlots])
   have hd := hsep.distinct
   have hAB := pw_left hd
-  have hB := pw4s (pw_right hAB)
+  have hbeC : 0 < c.neighbors.size → cl.be ∈ cl.es := fun hp => hes ▸ esOf_mem _ hp
+  have hC := pw_right hAB
+  simp only [sparseRep_canonBlocks, List.pairwise_cons, List.mem_cons] at hC
+  have hB1 : bc ≠ cl.bv := hC.1 _ (.inl rfl)
+  have hB2 : bc ≠ cl.bd := hC.1 _ (.inr (.inl rfl))
+  have hB3 : 0 < c.neighbors.size → bc ≠ cl.be := fun hp => hC.1 _ (.inr (.inr (hbeC hp)))
+  have hB4 : cl.bv ≠ cl.bd := hC.2.1 _ (.inl rfl)
+  have hB5 : 0 < c.neighbors.size → cl.bv ≠ cl.be := fun hp => hC.2.1 _ (.inr (hbeC hp))
+  have hB6 : 0 < c.neighbors.size → cl.bd ≠ cl.be := fun hp => hC.2.2.1 _ (hbeC hp)
+  have hWC : ∀ z, Sparse.Updatecan.Wr bc cl.bv cl.bd cl.be c.neighbors.size z →
+      z ∈ sparseRep.canonBlocks cl bc := by
+    rintro z (rfl | rfl | rfl | ⟨hp, rfl⟩)
+    · simp
+    · simp
+    · simp
+    · exact List.mem_cons_of_mem _ (List.mem_cons_of_mem _ (List.mem_cons_of_mem _ (hbeC hp)))
   have hWu : 0 < capW → InUse m sparseSlots bW := fun h => ⟨_, by simp [sparseSlots], _, h, dW⟩
   have hmem : ∀ z, Sparse.Updatecan.Rd bg gl.bv gl.bd gl.be bl z ∨
-      Sparse.Updatecan.Wr bc cl.bv cl.bd cl.be z →
+      Sparse.Updatecan.Wr bc cl.bv cl.bd cl.be c.neighbors.size z →
       z ∈ sparseRep.graphBlocks gl bg ++ sparseRep.canonBlocks cl bc ++ [bl] := by
-    rintro z ((rfl | rfl | rfl | rfl | rfl) | (rfl | rfl | rfl | rfl)) <;> simp
+    rintro z ((rfl | rfl | rfl | rfl | rfl) | hz)
+    · simp
+    · simp
+    · simp
+    · simp
+    · simp
+    · exact List.mem_append_left _ (List.mem_append_right _ (hWC z hz))
   refine ⟨_, Satisfies.grow (Sparse.Updatecan.updatecan_satisfies G bg gofs gl.bv gl.vo gl.bd
     gl.dofs gl.be gl.eo c bc cofs cl.bv cl.vo cl.bd cl.dofs cl.be cl.eo lab bl lofs sr M capW bW),
     ⟨hargs, hg, hca, hok.1, hfit, by omega, hl, hls, hlsm, fun a a' ha ha' h => hinj a ha a' ha' h,
-      hsurj, dW, hc.n0, by have := hc.nlt; omega, fun z hz => ?_, ?_, hB.1, hB.2.1, hB.2.2.1,
-      hB.2.2.2.1, hB.2.2.2.2.1, hB.2.2.2.2.2⟩, ?_⟩
+      hsurj, dW, hc.n0, by have := hc.nlt; omega, fun z hz => ?_, ?_, hB1, hB2, hB3, hB4, hB5, hB6⟩,
+      ?_⟩
   · obtain ⟨hv, hgl, -, hne⟩ := sep_z hsep (hmem z hz)
     exact ⟨hv, ng hgl, ng hgl, fun h0 => hne (hWu h0)⟩
   · rintro z hwz hrz
-    have hzB : z ∈ [bc, cl.bv, cl.bd, cl.be] := by
-      rcases hwz with rfl | rfl | rfl | rfl <;> simp
+    have hzB := hWC z hwz
     rcases hrz with h | h | h | h | h
     · exact pw_ab hAB (a := bg) (by simp) hzB h.symm
     · exact pw_ab hAB (a := gl.bv) (by simp) hzB h.symm
@@ -165,22 +204,21 @@ theorem sparse_updatecan (xi : ExternalCalls) : sparseRep.UpdatecanFn xi sparseR
     · exact pw_ab hd (b := bl) (List.mem_append_right _ hzB) (by simp) h
   · rintro t v m' ⟨⟨rfl, capW', bW', dW', -, rW, hcan, -, -, hu, -, kbc, kv, kd, ke⟩, hval⟩
     have hsz := Sparse.updatecan_sizes (Sparse.Graph.ofGraph G) c lab sr
-    have hW : ∀ z, (Sparse.Updatecan.Wr bc cl.bv cl.bd cl.be z ∨ z = W1 ∨ z = W1S ∨
-        (0 < capW ∧ z = bW) ∨ (¬ Mem.valid_block m bW' ∧ z = bW')) →
+    have hW : ∀ z, (Sparse.Updatecan.Wr bc cl.bv cl.bd cl.be c.neighbors.size z ∨ z = W1 ∨
+        z = W1S ∨ (0 < capW ∧ z = bW) ∨ (¬ Mem.valid_block m bW' ∧ z = bW')) →
         z ∈ [W1, W1S] ∨ InUse m [(W1, W1S, 4)] z ∨ ¬ Mem.valid_block m z ∨
-          z ∈ [bc, cl.bv, cl.bd, cl.be] := by
+          z ∈ sparseRep.canonBlocks cl bc := by
       rintro z (h | rfl | rfl | ⟨h0, rfl⟩ | ⟨h0, rfl⟩)
-      · refine .inr (.inr (.inr ?_))
-        rcases h with rfl | rfl | rfl | rfl <;> simp
+      · exact .inr (.inr (.inr (hWC z h)))
       · exact .inl (by simp)
       · exact .inl (by simp)
       · exact .inr (.inl ⟨(W1, W1S, 4), by simp, _, h0, dW⟩)
       · exact .inr (.inr (.inl h0))
-    have hout : ∀ z, z ∈ [bc, cl.bv, cl.bd, cl.be] → Mem.valid_block m z →
+    have hout : ∀ z, z ∈ sparseRep.canonBlocks cl bc → Mem.valid_block m z →
         z ∉ sparseWGlobs ∧ ¬ InUse m sparseSlots z :=
       fun z hz _ => sep_out hsep (List.mem_append_left _ (List.mem_append_right _ hz))
     have hPs : ∀ p ∈ [(W1, W1S, 4)], p ∈ sparseSlots := by decide
-    refine ⟨rfl, ⟨hcan, h72, by rw [hsz.2]; exact hne⟩, ⟨by rw [hsz.1]; exact hok.1,
+    refine ⟨rfl, ⟨hcan, h72, by rw [hsz.2]; exact hes⟩, ⟨by rw [hsz.1]; exact hok.1,
       by rw [hsz.2]; exact hok.2⟩,
       sparse_step hw hval hu [W1, W1S] [(W1, W1S, 4)] (by decide) hPs (by decide) hW hout ?_ ?_
         (marks1_keep hw hu (by decide) hPs hW hout (by decide) (by decide) (by decide) (by decide))
@@ -192,11 +230,13 @@ theorem sparse_updatecan (xi : ExternalCalls) : sparseRep.UpdatecanFn xi sparseR
     · intro p hp q hq _ _ _ _ _ _ _ _
       rw [List.mem_singleton] at hp hq; rw [hp, hq]
     · intro z hz _
-      simp only [sparseRep_canonBlocks, List.mem_cons, List.mem_nil_iff, or_false] at hz
-      rcases hz with rfl | rfl | rfl | rfl
+      simp only [sparseRep_canonBlocks, List.mem_cons] at hz
+      rcases hz with rfl | rfl | rfl | hz
       · exact kbc
       · exact kv
       · exact kd
-      · exact ke
+      · rw [hes] at hz
+        obtain ⟨hp, rfl⟩ := mem_esOf hz
+        exact ke hp
 
 end NautyVerified.Proofs.Dispatch

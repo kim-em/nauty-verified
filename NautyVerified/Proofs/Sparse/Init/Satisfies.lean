@@ -15,8 +15,9 @@ HexGraphIso's `Graph.blank` with no meaningful rows (`CanonAt … blank 0 …`),
 which is what `updatecan_sg` and `testcanlab_sg` start from; no zero fill
 is needed for that.
 
-`init_sg` leaves `canong.e` `NULL` when `nde = 0` (`DYNALLOC1` of size 0
-does nothing), so the specification asks for at least one edge.
+With `nde = 0` the third `DYNALLOC1` does nothing: `canong.e` stays `NULL`
+(`cePtr`), its capacity 0, and the facts about the new `e` block hold only
+when there are edges.
 -/
 
 namespace NautyVerified.Proofs.Sparse.Init
@@ -70,15 +71,16 @@ def initSpec {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sofs : ptrofs) (bv
     intOfZ (Ptrofs.unsigned cofs) + 72 < 2 ^ 64 ∧
     Mem.load .Mint32 m bo (fofs oofs 0) = some (.Vint (ir 1)) ∧
     Mem.valid_access m .Mint32 bst (Ptrofs.unsigned stofs) .Writable ∧
-    0 < n ∧ n < 2147483648 ∧ 0 < G.neighbors.size ∧ G.neighbors.size < 2147483648 ∧
+    0 < n ∧ n < 2147483648 ∧ G.neighbors.size < 2147483648 ∧
     bc ≠ bsg ∧ bc ≠ bst
   post _ m t _ m' := t = E0 ∧ ∃ capV bV capD bD capE bE,
     FieldDyn m' bc (fo cofs 8) (fo cofs 48) 8 capV bV ∧
     FieldDyn m' bc (fo cofs 24) (fo cofs 56) 4 capD bD ∧
     FieldDyn m' bc (fo cofs 32) (fo cofs 64) 4 capE bE ∧
     n ≤ capV ∧ n ≤ capD ∧ G.neighbors.size ≤ capE ∧
-    ¬ Mem.valid_block m bV ∧ ¬ Mem.valid_block m bD ∧ ¬ Mem.valid_block m bE ∧
-    bV ≠ bD ∧ bV ≠ bE ∧ bD ≠ bE ∧
+    ¬ Mem.valid_block m bV ∧ ¬ Mem.valid_block m bD ∧
+    (0 < G.neighbors.size → ¬ Mem.valid_block m bE) ∧
+    bV ≠ bD ∧ (0 < G.neighbors.size → bV ≠ bE) ∧ (0 < G.neighbors.size → bD ≠ bE) ∧
     CanonAt m' bc cofs (Graph.ofGraph G).blank 0 bV Ptrofs.zero bD Ptrofs.zero bE Ptrofs.zero ∧
     Mem.load .Mint32 m' bc (fofs cofs 16) = some (.Vint (ir n)) ∧
     Mem.load .Mint64 m' bc (fofs cofs 0) = some (.Vlong (lr G.neighbors.size)) ∧
@@ -154,7 +156,7 @@ theorem init_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sofs : p
     · exact .nil _
     · exact Nextelement.norepet_of_nodup (by decide)
     · exact Nextelement.disjoint_of (by decide)
-  · rintro args m₀ ⟨rfl, hgr, hsi, hw, hgc, hstW, hn0, hn31, hd0, hd31, hcg, hcs⟩
+  · rintro args m₀ ⟨rfl, hgr, hsi, hw, hgc, hstW, hn0, hn31, hd31, hcg, hcs⟩
     rw [triple_iff_wp]
     rintro e le m ⟨rfl, rfl, rfl⟩
     rw [sparse.fn.init_sg.fn_body_eq, body_eq]
@@ -266,11 +268,14 @@ theorem init_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sofs : p
       (fun m' hu => eval_fld hsg2' (lval_nde _ _) rfl (by rw [hu.load _ _ _ (nS0 hcg.symm)]; exact hnde2))
       hcE hd31 (by omega) (by decide) (by decide) ?_
     intro le3 m3 capE bE hE3 hnE hu3 hf3 hor3 hg3 hle3
-    have hEp : 0 < capE := by omega
-    have hEnew : ¬ Mem.valid_block m2 bE := by
+    have hEnew : 0 < capE → ¬ Mem.valid_block m2 bE := fun hEp => by
       rcases hor3 with ⟨h, -⟩ | ⟨h, -⟩
       · omega
       · exact h
+    have hEz : G.neighbors.size = 0 → capE = 0 := fun h0 => by
+      rcases hor3 with ⟨h, -⟩ | ⟨-, h, -⟩
+      · exact h
+      · omega
     have hV3 : FieldDyn m3 bc (fo cofs 8) (fo cofs 48) 8 capV bV :=
       hV2.after hf3 hu3 (fun h => absurd h (Nat.lt_irrefl 0))
         (apart hw _ (by decide) (by decide) (by decide) (by decide) (by decide))
@@ -333,13 +338,13 @@ theorem init_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sofs : p
     have hcs' : ¬ bc = bst := hcs
     have hVs : bV ≠ bst := fun h => hVnew (h ▸ hst0)
     have hDs : bD ≠ bst := fun h => hDnew (h ▸ hbst1)
-    have hEs : bE ≠ bst := fun h => hEnew (h ▸ hbst2)
+    have hEs : 0 < capE → bE ≠ bst := fun hEp h => hEnew hEp (h ▸ hbst2)
     have hV6 : FieldDyn m6 bc (fo cofs 8) (fo cofs 48) 8 capV bV :=
       ((hV3.store hst4 (apart hw _ (by decide) (by decide) (by decide) (by decide) (by decide)) (apart hw _ (by decide) (by decide) (by decide) (by decide) (by decide))).store hst5 (apart hw _ (by decide) (by decide) (by decide) (by decide) (by decide)) (apart hw _ (by decide) (by decide) (by decide) (by decide) (by decide))).unch hu6 hcs' (fun _ => hVs)
     have hD6 : FieldDyn m6 bc (fo cofs 24) (fo cofs 56) 4 capD bD :=
       ((hD3.store hst4 (apart hw _ (by decide) (by decide) (by decide) (by decide) (by decide)) (apart hw _ (by decide) (by decide) (by decide) (by decide) (by decide))).store hst5 (apart hw _ (by decide) (by decide) (by decide) (by decide) (by decide)) (apart hw _ (by decide) (by decide) (by decide) (by decide) (by decide))).unch hu6 hcs' (fun _ => hDs)
     have hE6 : FieldDyn m6 bc (fo cofs 32) (fo cofs 64) 4 capE bE :=
-      ((hE3.store hst4 (apart hw _ (by decide) (by decide) (by decide) (by decide) (by decide)) (apart hw _ (by decide) (by decide) (by decide) (by decide) (by decide))).store hst5 (apart hw _ (by decide) (by decide) (by decide) (by decide) (by decide)) (apart hw _ (by decide) (by decide) (by decide) (by decide) (by decide))).unch hu6 hcs' (fun _ => hEs)
+      ((hE3.store hst4 (apart hw _ (by decide) (by decide) (by decide) (by decide) (by decide)) (apart hw _ (by decide) (by decide) (by decide) (by decide) (by decide))).store hst5 (apart hw _ (by decide) (by decide) (by decide) (by decide) (by decide)) (apart hw _ (by decide) (by decide) (by decide) (by decide) (by decide))).unch hu6 hcs' hEs
     have hw48 : intOfZ (Ptrofs.unsigned cofs) + 48 < 2 ^ 64 := by omega
     have hw6 : Mem.load .Mint64 m6 bc (fofs cofs 40) = some Vnullptr := by
       rw [hu6.load _ _ _ hcs']
@@ -359,14 +364,23 @@ theorem init_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sofs : p
       · exact .inr (.inr fun h => h1 (hg _ h))
     obtain ⟨vv, hvv⟩ := Alloc.malloced_array (hV6.mal hVp) .Mint64 8 rfl rfl n (Nat.mul_le_mul_left 8 hnV)
     obtain ⟨dv, hdv⟩ := Alloc.malloced_array (hD6.mal hDp) .Mint32 4 rfl rfl n (Nat.mul_le_mul_left 4 hnD)
-    obtain ⟨ev, hev⟩ := Alloc.malloced_array (hE6.mal hEp) .Mint32 4 rfl rfl G.neighbors.size
-      (Nat.mul_le_mul_left 4 hnE)
+    obtain ⟨ev, hev⟩ : ∃ ev, ArrayAt m6 .Mint32 bE (intOfZ (Ptrofs.unsigned Ptrofs.zero)) ev
+        G.neighbors.size := by
+      rcases Nat.eq_zero_or_pos G.neighbors.size with h0 | hp
+      · rw [h0]; exact ⟨fun _ => Vundef, arrayAt_empty _ _ _ _ _⟩
+      · exact Alloc.malloced_array (hE6.mal (by omega)) .Mint32 4 rfl rfl G.neighbors.size
+          (Nat.mul_le_mul_left 4 hnE)
+    have hEe : Mem.load .Mint64 m6 bc (fofs cofs 32) = some (cePtr G.neighbors.size bE Ptrofs.zero) := by
+      rcases Nat.eq_zero_or_pos G.neighbors.size with h0 | hp
+      · rw [h0, cePtr_zero]; exact hE6.null (hEz h0)
+      · rw [cePtr_pos hp]; exact hE6.ptr (by omega)
     have hbsz : (Graph.ofGraph G).blank.neighbors.size = G.neighbors.size := by
       simp [Graph.blank, Graph.ofGraph]
     have hb0 : base (Graph.ofGraph G).blank 0 = 0 := rfl
     refine ⟨m6, Isautom.free_empty _, rfl, capV, bV, capD, bD, capE, bE, hV6, hD6, hE6, hnV, hnD, hnE,
-      hVnew, fun h => hDnew (hg1 _ h), fun h => hEnew (hg2 _ (hg1 _ h)),
-      fun h => hDnew (h ▸ hbV1), fun h => hEnew (h ▸ hg2 _ hbV1), fun h => hEnew (h ▸ hbD2),
+      hVnew, fun h => hDnew (hg1 _ h), fun hp h => hEnew (by omega) (hg2 _ (hg1 _ h)),
+      fun h => hDnew (h ▸ hbV1), fun hp h => hEnew (by omega) (h ▸ hg2 _ hbV1),
+      fun hp h => hEnew (by omega) (h ▸ hbD2),
       ?_, ?_, ?_, Mem.load_store_same _ _ _ _ _ _ hst6,
       Mem.store_valid_access_1 _ _ _ _ _ _ hst6 _ _ _ _ hstW5, ?_, ?_, ?_, ?_⟩
     · exact
@@ -375,7 +389,7 @@ theorem init_satisfies {n : Nat} (G : Hex.SparseGraph n) (bsg : block) (sofs : p
           nvW := hu6.access _ _ _ _ hcs' (Mem.store_valid_access_1 _ _ _ _ _ _ hst5 _ _ _ _
             (Mem.store_valid_access_1 _ _ _ _ _ _ hst4 _ _ _ _ hnvW3))
           d := hD6.ptr hDp
-          e := hE6.ptr hEp
+          e := by rw [hbsz]; exact hEe
           w := hw6
           rows := ⟨vv, dv, ev, hvv, hdv, by rw [hbsz]; exact hev,
             ⟨Nat.zero_le _, fun _ h => absurd h (Nat.not_lt_zero _), fun _ h => absurd h (Nat.not_lt_zero _),

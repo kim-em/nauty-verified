@@ -39,7 +39,6 @@ structure Frame {n : Nat} (m : mem) (le : temp_env) (G : Hex.SparseGraph n) (bv 
   hwt : PTree.get id.wt le = some Vnullptr
   hcv : PTree.get id.cv le = some (.Vptr cbv cvo)
   hcd : PTree.get id.cd le = some (.Vptr cbd cdofs)
-  hce : PTree.get id.ce le = some (.Vptr cbe ceo)
   hlab : PTree.get id.lab le = some (.Vptr bl lofs)
   hn : PTree.get id.n le = some (.Vint (ir n))
   varr : ArrayAt m .Mint64 bv (intOfZ (Ptrofs.unsigned vo)) (vVals G) n
@@ -67,7 +66,6 @@ theorem Frame.temps (h : Frame m le G bv vo bd dofs be eo cbv cvo cbd cdofs cbe 
     hwt := by rw [hle _ (by decide) (by decide)]; exact h.hwt
     hcv := by rw [hle _ (by decide) (by decide)]; exact h.hcv
     hcd := by rw [hle _ (by decide) (by decide)]; exact h.hcd
-    hce := by rw [hle _ (by decide) (by decide)]; exact h.hce
     hlab := by rw [hle _ (by decide) (by decide)]; exact h.hlab
     hn := by rw [hle _ (by decide) (by decide)]; exact h.hn }
 
@@ -90,13 +88,14 @@ theorem wp_row {n : Nat} {Q : Post} {m : mem} {le : temp_env} {G : Hex.SparseGra
     (hf : Frame m le G bv vo bd dofs be eo cbv cvo cbd cdofs cbe ceo lab bl lofs bW)
     (hi : PTree.get id.i le = some (.Vint (ir c))) (hc : c < n)
     (hk : PTree.get id.k le = some (.Vlong (lr K)))
+    (hce : PTree.get id.ce le = some (cePtr N cbe ceo))
     (hcvarr : ArrayAt m .Mint64 cbv (intOfZ (Ptrofs.unsigned cvo)) vv n)
     (hcdarr : ArrayAt m .Mint32 cbd (intOfZ (Ptrofs.unsigned cdofs)) dv n)
     (hcearr : ArrayAt m .Mint32 cbe (intOfZ (Ptrofs.unsigned ceo)) ev N)
     (hKD : K + (Graph.ofGraph G).degree lab[c]! ≤ N) (hN : N < 2147483648)
-    (hsep : ∀ z, (z = cbv ∨ z = cbd ∨ z = cbe) → z ≠ bv ∧ z ≠ bd ∧ z ≠ be ∧ z ≠ bl ∧
+    (hsep : ∀ z, (z = cbv ∨ z = cbd ∨ (0 < N ∧ z = cbe)) → z ≠ bv ∧ z ≠ bd ∧ z ≠ be ∧ z ≠ bl ∧
       z ≠ Block.work1 ∧ z ≠ bW)
-    (hcc : cbv ≠ cbd ∧ cbv ≠ cbe ∧ cbd ≠ cbe)
+    (hcc : cbv ≠ cbd ∧ (0 < N → cbv ≠ cbe ∧ cbd ≠ cbe))
     (hQ : ∀ le' m' ev', ArrayAt m' .Mint64 cbv (intOfZ (Ptrofs.unsigned cvo)) (upd vv c (.Vlong (lr K))) n →
       ArrayAt m' .Mint32 cbd (intOfZ (Ptrofs.unsigned cdofs))
         (upd dv c (.Vint (ir ((Graph.ofGraph G).degree lab[c]!)))) n →
@@ -105,8 +104,8 @@ theorem wp_row {n : Nat} {Q : Post} {m : mem} {le : temp_env} {G : Hex.SparseGra
       (∀ j < (Graph.ofGraph G).degree lab[c]!,
         ev' (K + j) = nbv G lab (Graph.ofGraph G).offsets[lab[c]!]! j) →
       PTree.get id.k le' = some (.Vlong (lr (K + (Graph.ofGraph G).degree lab[c]!))) →
-      Unch m m' (fun z => z = cbv ∨ z = cbd ∨ z = cbe) →
-      Alloc.Keep m m' cbv → Alloc.Keep m m' cbd → Alloc.Keep m m' cbe →
+      Unch m m' (fun z => z = cbv ∨ z = cbd ∨ (0 < N ∧ z = cbe)) →
+      Alloc.Keep m m' cbv → Alloc.Keep m m' cbd → (0 < N → Alloc.Keep m m' cbe) →
       (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
       (∀ x, ¬ RowLocal x → PTree.get x le' = PTree.get x le) → Q.normal E0 empty_env le' m') :
     Wp xi sge F row Q empty_env le m := by
@@ -115,7 +114,7 @@ theorem wp_row {n : Nat} {Q : Post} {m : mem} {le : temp_env} {G : Hex.SparseGra
   have hgd : (Graph.ofGraph G).degree lab[c]! ≤ n := degree_lt G hlc
   have hs1 := hsep cbv (.inl rfl)
   have hs2 := hsep cbd (.inr (.inl rfl))
-  have hs3 := hsep cbe (.inr (.inr rfl))
+  have hs3 := fun hN : 0 < N => hsep cbe (.inr (.inr ⟨hN, rfl⟩))
   -- cv[i] = k
   wp_step; wp_step; wp_step
   refine wp_idx_store (chunk := .Mint64) (bo := cbv) (ofs := cvo) hcvarr hn31
@@ -125,7 +124,7 @@ theorem wp_row {n : Nat} {Q : Post} {m : mem} {le : temp_env} {G : Hex.SparseGra
   have hf1 := hf.mem hu1 (fun h => hs1.1 h.symm) (fun h => hs1.2.1 h.symm) (fun h => hs1.2.2.1 h.symm)
     (fun h => hs1.2.2.2.1 h.symm) (fun h => hs1.2.2.2.2.1 h.symm) (fun h => hs1.2.2.2.2.2 h.symm)
   have hcd1 := hcdarr.unch hu1 (fun h => hcc.1 h.symm)
-  have hce1 := hcearr.unch hu1 (fun h => hcc.2.1 h.symm)
+  have hce1 := hcearr.unchN hu1 (fun hN h => (hcc.2 hN).1 h.symm)
   -- dli = cd[i] = d[lab[i]]
   wp_step; wp_step; wp_step; wp_step; wp_step
   apply wp_set_eval
@@ -149,7 +148,7 @@ theorem wp_row {n : Nat} {Q : Post} {m : mem} {le : temp_env} {G : Hex.SparseGra
   have hf3 := hf2.mem hu2 (fun h => hs2.1 h.symm) (fun h => hs2.2.1 h.symm) (fun h => hs2.2.2.1 h.symm)
     (fun h => hs2.2.2.2.1 h.symm) (fun h => hs2.2.2.2.2.1 h.symm) (fun h => hs2.2.2.2.2.2 h.symm)
   have hcv2 := hcv1.unch hu2 (fun h => hcc.1 h)
-  have hce2 := hce1.unch hu2 (fun h => hcc.2.2 h.symm)
+  have hce2 := hce1.unchN hu2 (fun hN h => (hcc.2 hN).2 h.symm)
   -- vli = v[lab[i]]
   wp_step; wp_step; wp_step
   apply wp_set_eval
@@ -169,18 +168,21 @@ theorem wp_row {n : Nat} {Q : Post} {m : mem} {le : temp_env} {G : Hex.SparseGra
     offsets_le G (Nat.le_succ lab[c]!) (show lab[c]! + 1 ≤ n by omega)
   have hhi : (Graph.ofGraph G).offsets[lab[c]! + 1]! ≤ G.neighbors.size := offsets_last G (show lab[c]! + 1 ≤ n by omega)
   have hdeg : (Graph.ofGraph G).degree lab[c]! = (Graph.ofGraph G).offsets[lab[c]! + 1]! - (Graph.ofGraph G).offsets[lab[c]!]! := rfl
-  refine wp_copy (D := (Graph.ofGraph G).degree lab[c]!) hf4.hce hce2 hf4.he hf4.earr (temps_gss _ _ _)
+  have hce4 : PTree.get id.ce le3 = some (cePtr N cbe ceo) := by
+    rw [temps_gso _ _ (by decide), temps_gso _ _ (by decide), temps_gso _ _ (by decide)]; exact hce
+  refine wp_copy (D := (Graph.ofGraph G).degree lab[c]!) hce4 hce2 hf4.he hf4.earr (temps_gss _ _ _)
     (by rw [temps_gso _ _ (by decide)]; exact temps_gss _ _ _)
     (by rw [temps_gso _ _ (by decide), temps_gso _ _ (by decide), temps_gso _ _ (by decide)]; exact hk)
-    (by omega) hKD hN hf4.wptr hf4.warr hn31 ⟨hs3.2.2.1, hs3.2.2.2.2.2, hs3.2.2.2.2.1⟩ ?_
+    (by omega) hKD hN hf4.wptr hf4.warr hn31
+    (fun hN => ⟨(hs3 hN).2.2.1, (hs3 hN).2.2.2.2.2, (hs3 hN).2.2.2.2.1⟩) ?_
   intro le5 m5 ev' hce5 hlow hrow hk5 hu5 hkp5 hg5 ho5
-  refine hQ le5 m5 ev' (hcv2.unch hu5 (fun h => hcc.2.1 h)) (hcd2.unch hu5 (fun h => hcc.2.2 h)) hce5
+  refine hQ le5 m5 ev' (hcv2.unch hu5 (fun h => (hcc.2 h.1).1 h.2)) (hcd2.unch hu5 (fun h => (hcc.2 h.1).2 h.2)) hce5
     hlow hrow hk5 ?_
-    ((hk1.trans (Alloc.Keep.unch hu2 (fun h => hcc.1 h))).trans (Alloc.Keep.unch hu5 (fun h => hcc.2.1 h)))
+    ((hk1.trans (Alloc.Keep.unch hu2 (fun h => hcc.1 h))).trans (Alloc.Keep.unch hu5 (fun h => (hcc.2 h.1).1 h.2)))
     (((Alloc.Keep.unch hu1 (fun h => hcc.1 h.symm)).trans hk2).trans
-      (Alloc.Keep.unch hu5 (fun h => hcc.2.2 h)))
-    (((Alloc.Keep.unch hu1 (fun h => hcc.2.1 h.symm)).trans
-      (Alloc.Keep.unch hu2 (fun h => hcc.2.2 h.symm))).trans hkp5)
+      (Alloc.Keep.unch hu5 (fun h => (hcc.2 h.1).2 h.2)))
+    (fun hN => ((Alloc.Keep.unch hu1 (fun h => (hcc.2 hN).1 h.symm)).trans
+      (Alloc.Keep.unch hu2 (fun h => (hcc.2 hN).2 h.symm))).trans hkp5)
     (fun z h => hg5 _ (hg2 _ (hg1 _ h))) ?_
   · exact ((hu1.mono fun z hz => .inl hz).trans (hu2.mono fun z hz => .inr (.inl hz))).trans
       (hu5.mono fun z hz => .inr (.inr hz))
