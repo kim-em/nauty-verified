@@ -300,7 +300,7 @@ theorem TcChain.head_valid {m : mem} {M : Nat} {prev : block} {ch : List (block 
 `userautomproc`'s and `tcnode0`, blocks not valid before, work blocks, and the
 target cell. -/
 abbrev stepSet (m : mem) (S : SLoc) (btc : block) (z : block) : Prop :=
-  (z ∈ S.blocks ∧ z ≠ S.bUA ∧ z ≠ Block.tcnode0) ∨ ¬ Mem.valid_block m z ∨ IsWork m z ∨ z = btc
+  S.Chg z ∨ ¬ Mem.valid_block m z ∨ IsWork m z ∨ z = btc
 
 theorem perm_unch {m m' : mem} {W : block → Prop} (hu : Unch m m' W) {b : block} (hb : ¬ W b)
     (h : Mem.perm m b (zOfInt 0) .Cur .Nonempty) : Mem.perm m' b (zOfInt 0) .Cur .Nonempty := by

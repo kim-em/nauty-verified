@@ -434,7 +434,7 @@ theorem wp_otherIter {k : Nat} {G : Colored n k} {Em : Bool → Nat → Nat → 
   refine wp_nodeChild (hRec _ chain) h2' c2.tcc c2.tco hlen hcb hl2 (by omega) hok c2.uaV c2.uaP
     hE.enc c2.ncv (hE.glob _ (by decide)) hI.lab hI.ptn hI.lev
     (by rw [tcParent_succ hl1 c.own]; exact hI.this) ?_
-  intro t m3 h3 hEm hC3 hF3 hW3
+  intro t m3 h3 hEm hC3 hF3 hW3 _
   obtain ⟨c', hTc3, hTo3, -, htk3, hold3⟩ := hC3
   have c3 := c2.child hLS h2' hF3 hW3 hTc3 hTo3 htk3 hold3
   have htw3 := htw2.unch hF3.nset c2.own_out

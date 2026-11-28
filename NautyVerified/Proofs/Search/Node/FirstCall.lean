@@ -1,6 +1,7 @@
 import NautyVerified.Proofs.Search.Node.FirstLoopAt
 import NautyVerified.Proofs.Search.Node.ProcFacts
 import NautyVerified.Proofs.Search.Processnode.Cmp
+import NautyVerified.Proofs.Search.Node.UaFrame
 
 /-!
 # The recursive calls of `firstpathnode0`'s child loop
@@ -54,6 +55,7 @@ theorem wp_fpnCall {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_env}
         ∀ p ∈ chain', p ∈ chain ∨ (¬ Mem.valid_block m p.1 ∧ ¬ Mem.valid_block m p.2)) →
       NodeFrame m m' S chain (level + 1) →
       (∀ z, IsWork m' z → IsWork m z ∨ ¬ Mem.valid_block m z) →
+      (∀ tg sh, (hexNode true ctx (level + 1) (nc + 1) st).1 = .unwind tg sh → tg < level + 1) →
       Q.normal t e (PTree.set dense.id.«rtnlevel»
         (.Vint (ir (exitValue (level + 1) (hexNode true ctx (level + 1) (nc + 1) st).1).1))
         (PTree.set (idOf 716)
@@ -78,12 +80,12 @@ theorem wp_fpnCall {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_env}
       ir_add]
     push_cast
     rfl
-  · rintro t v m' ⟨hv, hS', hE, hC, hF, hW⟩
+  · rintro t v m' ⟨hv, hS', hE, hC, hF, hW, hT⟩
     subst hv
     simp only [set_opttemp]
     apply wp_set_eval
     simp only [Exec.evalExpr, temps_gss, Refine.tv, append_E0]
-    refine hQ t m' hS' hE ?_ hF hW
+    refine hQ t m' hS' hE ?_ hF hW hT
     obtain ⟨c', h1, h2, h3, h4, h5⟩ := hC
     exact ⟨c', h1, h2, h3, by simpa using h4, h5⟩
 
@@ -221,11 +223,6 @@ theorem tcParent_own {n : Nat} {L : LCtx n} {m : mem} {ch : List (block × block
   rw [ite_eq_right (by omega), show L.level + 1 - 2 = L.level - 1 by omega, h.own]
   rfl
 
-/-- A node's frame keeps `userautomproc`'s block readable. -/
-def UAKeep (S : SLoc) : Prop :=
-  ∀ {m m' : mem} {ch : List (block × block)} {level : Nat}, NodeFrame m m' S ch level →
-    Mem.perm m S.bUA (zOfInt 0) .Cur .Nonempty → Mem.perm m' S.bUA (zOfInt 0) .Cur .Nonempty
-
 /-- The node's child result and the state after it: `afterChildFirst` on the first path. -/
 abbrev childRes {n : Nat} (ctx : Ctx n) (level nc tc tv tv1 : Nat) (st : Search n) :
     Exit × Search n :=
@@ -262,7 +259,6 @@ theorem wp_fpnCallIf {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_en
     (htv1 : PTree.get dense.id.«tv1» le = some (.Vint (ir tv1)))
     (htcn : PTree.get dense.id.«tcnode_this» le = some (.Vptr L.bnd Ptrofs.zero))
     {cc : Lib.Integers.int} (hcc : PTree.get dense.id.«childcount» le = some (.Vint cc))
-    (huk : UAKeep L.S)
     (hQ : ∀ t le' m' ch', LoopAt L m' (childAfter L.ctx L.level L.nc L.tc tv tv1 st) false
         (exitValue (L.level + 1) (childRes L.ctx L.level L.nc L.tc tv tv1 st).1).2 cell ch' →
       Emits t (Em (tv == tv1) (L.level + 1) (L.nc + 1) (child true L.level L.tc tv st)) →
@@ -271,6 +267,7 @@ theorem wp_fpnCallIf {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_en
       (∀ x, x ≠ dense.id.«rtnlevel» → x ≠ idOf 716 → x ≠ idOf 717 → x ≠ dense.id.«childcount» →
         PTree.get x le' = PTree.get x le) →
       (∃ c, PTree.get dense.id.«childcount» le' = some (.Vint c)) →
+      (∀ tg sh, (childRes L.ctx L.level L.nc L.tc tv tv1 st).1 = .unwind tg sh → tg < L.level + 1) →
       Q.normal t e le' m') :
     Wp xi ge f (Set.sk callIf) Q e le m := by
   have hc := h.chain
@@ -296,13 +293,12 @@ theorem wp_fpnCallIf {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_en
     wp_step
     refine wp_fpnCall hRecF h.search.preTrue hc.chain hc.ok hc.len hcb hln hncl hNok h.vU h.pU
       hen hncv g1 hlab hptn hlev htcn' ?_
-    intro t m₁ hS₁ hE₁ hC₁ hF₁ hW₁
+    intro t m₁ hS₁ hE₁ hC₁ hF₁ hW₁ hT₁
     obtain ⟨ch', c1, c2, c3, c4, c5⟩ := hC₁
-    have h₁ := h.call hS₁ c1 c2 c3 c4 c5 hF₁ hW₁ (hF₁.2 _ h.vU) (huk hF₁ h.pU) hl1
+    have h₁ := h.call hS₁ c1 c2 c3 c4 c5 hF₁ hW₁ (hF₁.2 _ h.vU) (NodeFrame.perm_bUA h.search hc.ok hF₁ h.vU h.pU) hl1
     simp only [seqPost, Post.after, firstAfter]
     have hd := h.search.distinct
-    have scal : ∀ b ∈ [Block.gcaFirst, Block.stabvertex], b ∈ L.S.blocks ∧ b ≠ L.S.bUA ∧
-        b ≠ Block.tcnode0 := by
+    have scal : ∀ b ∈ [Block.gcaFirst, Block.stabvertex], L.S.Chg b := by
       intro b hb
       simp only [List.mem_cons, List.mem_nil_iff, or_false] at hb
       rcases hb with rfl | rfl
@@ -328,7 +324,7 @@ theorem wp_fpnCallIf {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_en
     refine hQ t _ m₃ ch' h₃ hE₁
       (by simp (config := {decide := true}) only [temps_gso, temps_gss])
       (fun x h1 h2 h3 h4 => by simp only [temps_gso _ _ h4, temps_gso _ _ h1, temps_gso _ _ h2])
-      ⟨_, temps_gss _ _ _⟩
+      ⟨_, temps_gss _ _ _⟩ hT₁
   · have hb : (tv == tv1) = false := by simpa using heq
     rw [decide_eq_false (by omega)]
     simp only [show Cfrontend.Cop.bool_val (Val.of_bool false) tint m = some false from rfl,
@@ -340,9 +336,9 @@ theorem wp_fpnCallIf {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_en
     wp_step
     refine wp_nodeChild hRecO h.search hc.chain hc.ok hc.len hcb hln hncl hNok h.vU h.pU
       hen hncv g2 hlab hptn hlev htcn' ?_
-    intro t m₁ hS₁ hE₁ hC₁ hF₁ hW₁
+    intro t m₁ hS₁ hE₁ hC₁ hF₁ hW₁ hT₁
     obtain ⟨ch', c1, c2, c3, c4, c5⟩ := hC₁
-    have h₁ := h.call hS₁ c1 c2 c3 c4 c5 hF₁ hW₁ (hF₁.2 _ h.vU) (huk hF₁ h.pU) hl1
+    have h₁ := h.call hS₁ c1 c2 c3 c4 c5 hF₁ hW₁ (hF₁.2 _ h.vU) (NodeFrame.perm_bUA h.search hc.ok hF₁ h.vU h.pU) hl1
     simp only [seqPost, Post.after]
     wp_step; wp_step
     apply wp_set_eval
@@ -351,6 +347,6 @@ theorem wp_fpnCallIf {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_en
     refine hQ t _ m₁ ch' h₁ (by simpa using hE₁)
       (by simp (config := {decide := true}) only [temps_gso, temps_gss])
       (fun x h1 h2 h3 h4 => by simp only [temps_gso _ _ h4, temps_gso _ _ h1, temps_gso _ _ h3])
-      ⟨_, temps_gss _ _ _⟩
+      ⟨_, temps_gss _ _ _⟩ hT₁
 
 end NautyVerified.Proofs.Search

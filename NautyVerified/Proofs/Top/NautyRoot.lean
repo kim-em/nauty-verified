@@ -66,7 +66,7 @@ theorem wp_tRoot {n : Nat} {Q : Post} {le : temp_env} {m : mem}
       show PTree.get dense.id.«nauty:tcnode0» (nEnv bI) = none from rfl, find_tcnode0,
       Exec.derefLoc, Cfrontend.Ctypes.access_mode, Refine.tv, Refine.pi, typeof, cop]
     rfl
-  · rintro t v m' ⟨hv, hS', hE, hC, hF, hW⟩
+  · rintro t v m' ⟨hv, hS', hE, hC, hF, hW, -⟩
     subst hv
     simp only [set_opttemp, seqPost, Post.after]
     apply wp_set_eval
