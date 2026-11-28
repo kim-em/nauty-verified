@@ -1,13 +1,13 @@
 import NautyVerified.Proofs.Targetcell.Satisfies
-import NautyVerified.Proofs.Sparse.Bestcell.Spec
+import NautyVerified.Proofs.Sparse.Bestcell.Satisfies
 
 /-!
 # `targetcell_sg` meets its specification
 
 `targetcellSpec`: with a hint below `n`, nausparse.c's `targetcell_sg`
 returns HexGraphIso's `Sparse.targetcell (ofGraph G) lab ptn level tcLevel hint`,
-calling `bestcell_sg` through its specification when `level ≤ tc_level`
-(`targetcell_satisfies` takes that specification's proof as an argument).
+calling `bestcell_sg` through its specification (`Bestcell.bestcell_satisfies`)
+when `level ≤ tc_level`.
 The hint test and the scan are naugraph.c's, proved once for both programs
 (`Targetcell.wp_hintTest`, `Targetcell.wp_scan`).
 
@@ -101,9 +101,7 @@ theorem targetcell_satisfies {xi : ExternalCalls} {n : Nat} (G : Hex.SparseGraph
     (sofs : ptrofs) (bv : block) (vo : ptrofs) (bd : block) (dofs : ptrofs) (be : block)
     (eo : ptrofs) (bl : block) (lofs : ptrofs) (lab : Array Nat) (bp : block) (pofs : ptrofs)
     (ptn : Array Nat) (level tcLevel : Nat) (dg : Lib.Integers.int) (hint : Int) (M : Nat)
-    (c : Fin 4 → Nat) (b : Fin 4 → block)
-    (hbest : Satisfies xi sge (.Internal sparse.fn.«nausparse:bestcell_sg»)
-      (bestcellSpec G bsg sofs bv vo bd dofs be eo bl lofs lab bp pofs ptn level tcLevel M c b)) :
+    (c : Fin 4 → Nat) (b : Fin 4 → block) :
     Satisfies xi sge (.Internal F)
       (targetcellSpec G bsg sofs bv vo bd dofs be eo bl lofs lab bp pofs ptn level tcLevel dg hint M
         c b) := by
@@ -172,7 +170,8 @@ theorem targetcell_satisfies {xi : ExternalCalls} {n : Nat} (G : Hex.SparseGraph
           (targs := [tptr tulong, tptr tint, tptr tint, tint, tint, tint, tint]) (tres := tint)
           (cc := Common.AST.cc_default) _
           (bestcellSpec G bsg sofs bv vo bd dofs be eo bl lofs lab bp pofs ptn level tcLevel M c b)
-          hbest rfl
+          (Bestcell.bestcell_satisfies G bsg sofs bv vo bd dofs be eo bl lofs lab bp pofs ptn level tcLevel
+            M c b) rfl
           (by simp only [Exec.evalExpr, Exec.lvalOfVar,
             show PTree.get sparse.id.«nausparse:bestcell_sg» (empty_env : env) = none from rfl,
             find_bestcell, Exec.derefLoc, Cfrontend.Ctypes.access_mode])

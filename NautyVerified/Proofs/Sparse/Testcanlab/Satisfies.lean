@@ -78,7 +78,7 @@ def entryTemps (bsg : block) (sofs : ptrofs) (bc : block) (cofs : ptrofs) (bl : 
         (create_undef_temps F.fn_temps))))))
 
 /-- `SG_VDE(p, v, d, e)`. -/
-theorem wp_vde {Q : Post} {le : temp_env} {m : mem} {p v d e : ident} {bsg : block} {sofs : ptrofs}
+theorem wp_vde {f : function} {Q : Post} {le : temp_env} {m : mem} {p v d e : ident} {bsg : block} {sofs : ptrofs}
     {bv : block} {vo : ptrofs} {bd : block} {dofs : ptrofs} {be : block} {eo : ptrofs}
     (hp : PTree.get p le = some (.Vptr bsg sofs)) (hpv : p ≠ v) (hpd : p ≠ d)
     (hv : Mem.load .Mint64 m bsg (fofs sofs 8) = some (.Vptr bv vo))
@@ -86,7 +86,7 @@ theorem wp_vde {Q : Post} {le : temp_env} {m : mem} {p v d e : ident} {bsg : blo
     (he : Mem.load .Mint64 m bsg (fofs sofs 32) = some (.Vptr be eo))
     (hQ : Q.normal E0 empty_env
       (PTree.set e (.Vptr be eo) (PTree.set d (.Vptr bd dofs) (PTree.set v (.Vptr bv vo) le))) m) :
-    Wp xi sge F (vde p v d e) Q empty_env le m := by
+    Wp xi sge f (vde p v d e) Q empty_env le m := by
   let le1 := PTree.set e (.Vptr be eo) (PTree.set d (.Vptr bd dofs) (PTree.set v (.Vptr bv vo) le))
   refine wp_loop (I := fun _ t e' le' m' => t = E0 ∧ e' = empty_env ∧ le' = le ∧ m' = m)
     (J := fun _ t e' le' m' => t = E0 ∧ e' = empty_env ∧ le' = le1 ∧ m' = m) ?_ ?_ (n := 0)

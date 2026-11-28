@@ -340,6 +340,7 @@ import NautyVerified.Proofs.Sparse.Distvals.Satisfies
 import NautyVerified.Proofs.Sparse.Refine.Pieces
 import NautyVerified.Proofs.Sparse.Targetcell.Syntax
 import NautyVerified.Proofs.Sparse.Bestcell.Spec
+import NautyVerified.Proofs.Sparse.Bestcell.Satisfies
 import NautyVerified.Proofs.Sparse.Bestcell.Syntax
 import NautyVerified.Proofs.Sparse.Targetcell.Satisfies
 import NautyVerified.Proofs.Sparse.Bestcell.Model
