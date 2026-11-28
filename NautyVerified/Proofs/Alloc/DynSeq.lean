@@ -68,7 +68,8 @@ theorem wp_dynSeq {e : env} {f : function} {Q : Post} {msg : ident} {len : Int} 
       Exec.evalExpr ge e le' m' d.sz = some (.Vint (ir d.n))) →
     (∀ le' m' (cb : Nat → Nat × block),
       (∀ i (h : i < ds.length), DynAt m' ds[i].bp ds[i].bs ds[i].c (cb i).1 (cb i).2 ∧
-        ds[i].n ≤ (cb i).1 ∧ ¬ Mem.valid_block m (cb i).2) →
+        ds[i].n ≤ (cb i).1 ∧ ¬ Mem.valid_block m (cb i).2 ∧
+        Zeros m' (cb i).2 (ds[i].c * (cb i).1)) →
       (∀ i j, i < j → j < ds.length → (cb i).2 ≠ (cb j).2) →
       Unch m m' (fun z => z ∈ DynD.globals ds ∨ ¬ Mem.valid_block m z) →
       (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
@@ -87,7 +88,7 @@ theorem wp_dynSeq {e : env} {f : function} {Q : Post} {msg : ident} {len : Int} 
     obtain ⟨hbs, ⟨hbp, hg'⟩⟩ := hg
     simp only [dynSeq, List.foldr_cons]
     wp_step
-    refine wp_dynalloc1G (hnil := hnil) (b := d.bs) hd.gs hd.gp hd.c (hD d (by simp) d.bs)
+    refine wp_dynalloc1Z (hnil := hnil) (b := d.bs) hd.gs hd.gp hd.c (hD d (by simp) d.bs)
       (fun m' hu => hsz d (by simp) le m' _ hu (fun z hz => ?_)) hd.ty hd.nlt
       hd.cn ?_
     · rcases hz with rfl | ⟨h, -⟩
@@ -99,7 +100,11 @@ theorem wp_dynSeq {e : env} {f : function} {Q : Post} {msg : ident} {len : Int} 
     have hb1m : ¬ Mem.valid_block m b1 := by
       rcases hb1 with ⟨h, -⟩ | h
       · omega
-      · exact h
+      · exact h.1
+    have hz1 : Zeros m1 b1 (d.c * cap1) := by
+      rcases hb1 with ⟨h, -⟩ | h
+      · omega
+      · exact h.2
     have hb1v : Mem.valid_block m1 b1 := Malloced.valid (hD1.mal (by omega))
     -- the other pairs' globals are untouched
     have nS : ∀ d' ∈ ds, ∀ z, (z = d'.bs ∨ z = d'.bp) → ¬ (z = d.bs ∨ z = d.bp ∨ (0 < 0 ∧ z = d.bs) ∨
@@ -156,11 +161,11 @@ theorem wp_dynSeq {e : env} {f : function} {Q : Post} {msg : ident} {len : Int} 
           simp only [ite_true, List.getElem_cons_zero]
           exact ⟨hD1.keep hu2 (nS2 _ hvbp (fun h => hbp _ h rfl))
             (nS2 _ hvbs (fun h => hbs _ (.inr h) rfl))
-            (fun _ => Keep.unch hu2 (nS2 _ hb1v hb1g)), hc1, hb1m⟩
+            (fun _ => Keep.unch hu2 (nS2 _ hb1v hb1g)), hc1, hb1m, hz1.unch hu2 (nS2 _ hb1v hb1g)⟩
         | succ j =>
           simp only [Nat.succ_ne_zero, ite_false, Nat.add_sub_cancel, List.getElem_cons_succ]
-          obtain ⟨h1, h2, h3⟩ := hcb j (by simpa using hi)
-          exact ⟨h1, h2, fun h => h3 (hg1 _ h)⟩
+          obtain ⟨h1, h2, h3, h4⟩ := hcb j (by simpa using hi)
+          exact ⟨h1, h2, fun h => h3 (hg1 _ h), h4⟩
       · intro i j hij hj
         cases i with
         | zero =>
@@ -169,7 +174,7 @@ theorem wp_dynSeq {e : env} {f : function} {Q : Post} {msg : ident} {len : Int} 
           | succ j =>
             simp only [ite_true, Nat.succ_ne_zero, ite_false, Nat.add_sub_cancel]
             intro h
-            exact (hcb j (by simpa using hj)).2.2 (h ▸ hb1v)
+            exact (hcb j (by simpa using hj)).2.2.1 (h ▸ hb1v)
         | succ i =>
           cases j with
           | zero => omega

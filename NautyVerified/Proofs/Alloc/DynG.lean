@@ -20,7 +20,8 @@ open NautyVerified NautyVerified.Logic NautyVerified.Program NautyVerified.Word 
 
 variable {xi : ExternalCalls}
 
-theorem wp_dynalloc1G {e : env} {f : function} {Q : Post} {le : temp_env} {m : mem}
+/-- `wp_dynalloc1G`, also reporting that a newly allocated block is zero-filled. -/
+theorem wp_dynalloc1Z {e : env} {f : function} {Q : Post} {le : temp_env} {m : mem}
     {gs gp t1 t2 msg : Common.AST.ident} {elt : Cfrontend.Ctypes.type} {msgLen : Int}
     {bs bp b : block} {c cap n : Nat}
     (hgs : Genv.find_symbol ge.genv_genv gs = some bs)
@@ -32,7 +33,7 @@ theorem wp_dynalloc1G {e : env} {f : function} {Q : Post} {le : temp_env} {m : m
     (hty : typeof szE = tint) (hn : n < 2147483648) (hcn : c * n < 2 ^ 62)
     (hQ : ∀ le' m' cap' b', DynAt m' bp bs c cap' b' → n ≤ cap' →
       Unch m m' (fun z => z = bs ∨ z = bp ∨ (0 < cap ∧ z = b) ∨ (¬ Mem.valid_block m b' ∧ z = b')) →
-      ((cap' = cap ∧ b' = b) ∨ ¬ Mem.valid_block m b') →
+      ((cap' = cap ∧ b' = b) ∨ (¬ Mem.valid_block m b' ∧ Zeros m' b' (c * cap'))) →
       (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
       (∀ k, k ≠ t1 → k ≠ t2 → PTree.get k le' = PTree.get k le) →
       Q.normal E0 e le' m')
@@ -83,7 +84,7 @@ theorem wp_dynalloc1G {e : env} {f : function} {Q : Post} {le : temp_env} {m : m
         cast_int_long_ir (a := n) ⟨by omega, by omega⟩, lr_mul])
       (by simp [Common.Globalenvs.Genv.find_funct, funct_zalloc]) rfl
       ⟨rfl, by rw [Nat.mul_comm]; exact hcn⟩ ?_
-    rintro t v m3 ⟨rfl, b', rfl, hfr, -⟩
+    rintro t v m3 ⟨rfl, b', rfl, hfr, hz3⟩
     simp only [set_opttemp, E0_append]
     apply wp_set_eval
     simp only [Exec.evalExpr, temps_gss, typeof, cop]
@@ -143,7 +144,10 @@ theorem wp_dynalloc1G {e : env} {f : function} {Q : Post} {le : temp_env} {m : m
       apply Mem.store_valid_block_1 _ _ _ _ _ _ hst2
       unfold Mem.valid_block at hz ⊢
       rw [hnb1]; exact hz
-    refine hQ _ m4 n b' hD' (Nat.le_refl _) ?_ (.inr hnew) hgrow ?_
+    refine hQ _ m4 n b' hD' (Nat.le_refl _) ?_
+      (.inr ⟨hnew, by
+        rw [Nat.mul_comm]
+        exact (Zeros.of_bytes hz3).unch (Unch.store hst4 rfl) hbp'⟩) hgrow ?_
     · exact (((hu1.mono fun z hz => .inr (.inr (.inl hz))).trans
         (Unch.store hst2 (.inl rfl))).trans (hfr.unch.mono fun z hz => .inr (.inr (.inr ⟨hz ▸ hnew, hz⟩)))).trans
         (Unch.store hst4 (.inr (.inl rfl)))
@@ -152,5 +156,26 @@ theorem wp_dynalloc1G {e : env} {f : function} {Q : Post} {le : temp_env} {m : m
   · rw [ite_eq_right (by simpa using hnc)]
     apply wp_skip
     exact hQ le m cap b hD (by omega) (Unch.refl _ _) (.inl ⟨rfl, rfl⟩) (fun _ h => h) (fun _ _ _ => rfl)
+
+theorem wp_dynalloc1G {e : env} {f : function} {Q : Post} {le : temp_env} {m : mem}
+    {gs gp t1 t2 msg : Common.AST.ident} {elt : Cfrontend.Ctypes.type} {msgLen : Int}
+    {bs bp b : block} {c cap n : Nat}
+    (hgs : Genv.find_symbol ge.genv_genv gs = some bs)
+    (hgp : Genv.find_symbol ge.genv_genv gp = some bp)
+    (hc : intOfZ (Cfrontend.Ctypes.sizeof ge.genv_cenv elt) = c)
+    (hD : DynAt m bp bs c cap b)
+    {szE : expr} (hx : ∀ m', Unch m m' (fun z => z = bs ∨ (0 < cap ∧ z = b)) →
+      Exec.evalExpr ge e le m' szE = some (.Vint (ir n)))
+    (hty : typeof szE = tint) (hn : n < 2147483648) (hcn : c * n < 2 ^ 62)
+    (hQ : ∀ le' m' cap' b', DynAt m' bp bs c cap' b' → n ≤ cap' →
+      Unch m m' (fun z => z = bs ∨ z = bp ∨ (0 < cap ∧ z = b) ∨ (¬ Mem.valid_block m b' ∧ z = b')) →
+      ((cap' = cap ∧ b' = b) ∨ ¬ Mem.valid_block m b') →
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
+      (∀ k, k ≠ t1 → k ≠ t2 → PTree.get k le' = PTree.get k le) →
+      Q.normal E0 e le' m')
+    (hnil : NoShadow e := by exact NautyVerified.Proofs.Alloc.noShadow_empty) :
+    Wp xi ge f (dynalloc1 gs gp elt szE t1 t2 msg msgLen) Q e le m :=
+  wp_dynalloc1Z (msgLen := msgLen) hgs hgp hc hD hx hty hn hcn
+    (fun le' m' cap' b' h1 h2 h3 h4 h5 h6 => hQ le' m' cap' b' h1 h2 h3 (h4.imp id (·.1)) h5 h6) hnil
 
 end NautyVerified.Proofs.Alloc

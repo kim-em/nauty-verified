@@ -47,10 +47,39 @@ theorem loadbytes_sub {m : mem} {b : block} {N : Nat}
     rw [he, he2]; simp [hx]
   exact (List.mem_replicate.1 this).2
 
+/-- Every aligned element of the first `N` bytes of `b` loads as zero bytes. Unlike
+`Mem.loadbytes`, this survives `Unch` for any set not containing `b`. -/
+def Zeros (m : mem) (b : block) (N : Nat) : Prop :=
+  ∀ chunk (c : Nat), csize chunk = c → intOfZ (align_chunk chunk) = c → ∀ i : Nat, c * i + c ≤ N →
+    Mem.load chunk m b (elemOfs chunk 0 i) = some (decode_val chunk (List.replicate c zb))
+
+theorem Zeros.unch {m m' : mem} {b : block} {N : Nat} (h : Zeros m b N) {S : block → Prop}
+    (hu : Unch m m' S) (hb : ¬ S b) : Zeros m' b N :=
+  fun chunk c hc ha i hi => by rw [hu.load _ _ _ hb]; exact h chunk c hc ha i hi
+
+theorem Zeros.mono {m : mem} {b : block} {N N' : Nat} (h : Zeros m b N) (hle : N' ≤ N) :
+    Zeros m b N' :=
+  fun chunk c hc ha i hi => h chunk c hc ha i (by omega)
+
+theorem Zeros.of_bytes {m : mem} {b : block} {N : Nat}
+    (hz : Mem.loadbytes m b (zOfInt 0) (zOfInt N) = some (List.replicate N zb)) : Zeros m b N := by
+  intro chunk c hc ha i hi
+  have hofs : elemOfs chunk 0 i = zOfInt ((c * i : Nat) : Int) := by
+    simp only [elemOfs, hc]; congr 1; push_cast; omega
+  have halign : ZArith.BinInt.Z.divide (align_chunk chunk) (zOfInt ((c * i : Nat) : Int)) :=
+    ⟨zOfInt i, by
+      apply intOfZ_injective
+      simp only [intOfZ_mul, intOfZ_zOfInt, ha]; push_cast; rw [Int.mul_comm]⟩
+  rw [hofs]
+  have hsub := loadbytes_sub hz (c * i) c hi
+  have hsc : zOfInt (c : Int) = size_chunk chunk := by
+    apply intOfZ_injective; rw [intOfZ_zOfInt]; exact hc.symm
+  rw [hsc] at hsub
+  rw [Mem.loadbytes_load _ _ _ _ _ hsub halign]
+
 /-- The first `n` elements of a zero-filled `Freeable` block, as an array of
 the value `v` that zero bytes decode to. -/
-theorem zero_array {m : mem} {b : block} {N : Nat}
-    (hz : Mem.loadbytes m b (zOfInt 0) (zOfInt N) = some (List.replicate N zb))
+theorem Zeros.array {m : mem} {b : block} {N : Nat} (hz : Zeros m b N)
     (hperm : ∀ ofs : Int, 0 ≤ ofs → ofs < N → Mem.perm m b (zOfInt ofs) .Cur .Freeable)
     (hN : N < 2 ^ 62) (chunk : memory_chunk) (c : Nat) (hc : csize chunk = c)
     (ha : intOfZ (align_chunk chunk) = c) (v : val)
@@ -71,12 +100,7 @@ theorem zero_array {m : mem} {b : block} {N : Nat}
     have : c * n < 2 ^ 64 := by omega
     have : ((c * n : Nat) : Int) = (c : Int) * n := by push_cast; rfl
     omega
-  · rw [hofs]
-    have hsub := loadbytes_sub hz (c * i) c (hle i hi)
-    have hsc : zOfInt (c : Int) = size_chunk chunk := by
-      apply intOfZ_injective; rw [intOfZ_zOfInt]; exact hc.symm
-    rw [hsc] at hsub
-    rw [Mem.loadbytes_load _ _ _ _ _ hsub (halign i), hv]
+  · rw [hz chunk c hc ha i (hle i hi), hv]
   · rw [hofs]
     refine ⟨fun o ho => ?_, halign i⟩
     have h1 : ((c * i : Nat) : Int) ≤ intOfZ o := by
@@ -87,6 +111,17 @@ theorem zero_array {m : mem} {b : block} {N : Nat}
     have := hperm (intOfZ o) (by omega) (by have := hle i hi; omega)
     rw [zOfInt_intOfZ] at this
     exact Mem.perm_implies _ _ _ _ _ _ this (.perm_F_any _)
+
+/-- The first `n` elements of a zero-filled `Freeable` block, as an array of
+the value `v` that zero bytes decode to. -/
+theorem zero_array {m : mem} {b : block} {N : Nat}
+    (hz : Mem.loadbytes m b (zOfInt 0) (zOfInt N) = some (List.replicate N zb))
+    (hperm : ∀ ofs : Int, 0 ≤ ofs → ofs < N → Mem.perm m b (zOfInt ofs) .Cur .Freeable)
+    (hN : N < 2 ^ 62) (chunk : memory_chunk) (c : Nat) (hc : csize chunk = c)
+    (ha : intOfZ (align_chunk chunk) = c) (v : val)
+    (hv : decode_val chunk (List.replicate c zb) = v) (n : Nat) (hn : c * n ≤ N) :
+    ArrayAt m chunk b 0 (fun _ => v) n :=
+  (Zeros.of_bytes hz).array hperm hN chunk c hc ha v hv n hn
 
 theorem zero_ints {m : mem} {b : block} {N : Nat}
     (hz : Mem.loadbytes m b (zOfInt 0) (zOfInt N) = some (List.replicate N zb))

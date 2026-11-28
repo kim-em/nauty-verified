@@ -11,7 +11,7 @@ import NautyVerified.Proofs.Search.Ops
 `n + 2` ints), sized by the globals `nauty:m` and `nauty:n`. `tAlloc_eq`:
 the stage `tAlloc` is their run followed by `tTc`. `wp_tAlloc`: from capacity
 0, the run leaves each pair allocated with at least its size in a block not
-valid before (`Alloc.wp_dynSeq`).
+valid before, zero-filled (`Alloc.wp_dynSeq`).
 -/
 
 namespace NautyVerified.Proofs.Top
@@ -77,7 +77,7 @@ theorem wp_tAlloc {Q : Post} {le : temp_env} {m : mem} {M n : Nat}
     (hQ : ∀ le' m' (cb : Nat → Nat × block),
       (∀ i (h : i < (allocDs M n).length), DynAt m' (allocDs M n)[i].bp (allocDs M n)[i].bs
         (allocDs M n)[i].c (cb i).1 (cb i).2 ∧ (allocDs M n)[i].n ≤ (cb i).1 ∧
-        ¬ Mem.valid_block m (cb i).2) →
+        ¬ Mem.valid_block m (cb i).2 ∧ Alloc.Zeros m' (cb i).2 ((allocDs M n)[i].c * (cb i).1)) →
       (∀ i j, i < j → j < (allocDs M n).length → (cb i).2 ≠ (cb j).2) →
       Unch m m' (fun z => z ∈ DynD.globals (allocDs M n) ∨ ¬ Mem.valid_block m z) →
       (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
