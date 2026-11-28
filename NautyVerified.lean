@@ -346,3 +346,4 @@ import NautyVerified.Proofs.Sparse.Bestcell.Model
 import NautyVerified.Proofs.Sparse.Refine.Ops
 import NautyVerified.Proofs.Sparse.Refine.Nontrivial.Model
 import NautyVerified.Proofs.Sparse.Refine.Select
+import NautyVerified.Proofs.Sparse.Refine.Trivial.Model
