@@ -352,3 +352,7 @@ import NautyVerified.Proofs.Sparse.Refine.Trivial.Model
 import NautyVerified.Proofs.Sparse.Refine.Count.Model
 import NautyVerified.Proofs.Sparse.Refine.MainLoop
 import NautyVerified.Proofs.Sparse.Refine.DistLoop
+import NautyVerified.Proofs.Sparse.Refine.Nontrivial.Scan
+import NautyVerified.Proofs.Sparse.Refine.Nontrivial.Clear
+import NautyVerified.Proofs.Sparse.Refine.Nontrivial.Mark
+import NautyVerified.Proofs.Sparse.Refine.Nontrivial.Edges
