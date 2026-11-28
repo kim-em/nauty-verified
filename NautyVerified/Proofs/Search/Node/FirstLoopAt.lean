@@ -1,5 +1,6 @@
 import NautyVerified.Proofs.Search.Node.FirstShape
 import NautyVerified.Proofs.Search.Node.TcFrame
+import NautyVerified.Proofs.Search.Node.OtherFrame
 
 /-!
 # The memory of `firstpathnode0`'s child loop
@@ -420,5 +421,351 @@ theorem LoopAt.step {L : LCtx n} {m : mem} {st : Search n} {pre nsp : Bool} {cel
           · exact hz h.vU
           · exact h.search.work_not hz (by simp [SLoc.blocks])
           · exact (hok.apart _ hmem).2.1 (hz ▸ by simp [SLoc.blocks])) h.pU }
+
+/-! ### For any dispatch representation
+
+`LCtxG D n`, `ChainAtG`, `LoopAtG`: `LCtx`, `ChainAt` and `LoopAt` with the
+representation locations `gl`, `cl` and the graph `G` of `D` in place of the
+dense context. -/
+
+section Generic
+
+open NautyVerified.Proofs.Dispatch (Ops DispatchRep)
+
+variable {ge : genv} [E : NautyEnv ge] {O : Ops}
+
+/-- `LCtx` for `D`. -/
+structure LCtxG (D : DispatchRep ge O) (n : Nat) where
+  S : SLoc
+  gl : D.GLoc
+  cl : D.CLoc
+  G : O.Gr n
+  m₀ : mem
+  chain₀ : List (block × block)
+  level : Nat
+  nc : Nat
+  tc : Nat
+  tcsize : Nat
+  bnc : block
+  bq : block
+  bk : block
+  bc : block
+  bz : block
+  bnd : block
+  btc : block
+
+variable {D : DispatchRep ge O}
+
+/-- The node's `int` locals. -/
+abbrev LCtxG.locals (L : LCtxG D n) : List block := [L.bnc, L.bq, L.bk, L.bc, L.bz]
+
+theorem SLoc.mem_litG {S : SLoc} {gl : D.GLoc} {cl : D.CLoc} {z : block} (hz : z ∈ S.litG) :
+    z ∈ S.blocksG D gl cl :=
+  (S.litG_sub D gl cl).subset hz
+
+theorem SLoc.tcnode0_mem {S : SLoc} {gl : D.GLoc} {cl : D.CLoc} :
+    E.tcnode0 ∈ S.blocksG D gl cl :=
+  SLoc.mem_litG (by simp [SLoc.litG])
+
+theorem SLoc.bUA_mem {S : SLoc} {gl : D.GLoc} {cl : D.CLoc} : S.bUA ∈ S.blocksG D gl cl :=
+  SLoc.mem_litG (by simp [SLoc.litG])
+
+/-- `ChainAt` for `D`. -/
+structure ChainAtG (L : LCtxG D n) (m : mem) (ch : List (block × block)) : Prop where
+  chain : TcChain m L.S.M E.tcnode0 ch
+  ok : TcOkG D m L.S L.gl L.cl ch
+  len : L.level ≤ ch.length
+  own : ch[L.level - 1]? = some (L.bnd, L.btc)
+  take : ch.take (L.level - 1) = L.chain₀.take (L.level - 1)
+  fresh : ∀ p ∈ ch, p ∈ L.chain₀ ∨ (¬ Mem.valid_block L.m₀ p.1 ∧ ¬ Mem.valid_block L.m₀ p.2)
+  apart : ∀ p ∈ ch, p.1 ∉ L.locals ∧ p.2 ∉ L.locals
+  lvl : 1 ≤ L.level
+
+/-- `LoopAt` for `D`. -/
+structure LoopAtG (L : LCtxG D n) (m : mem) (st : SearchState n (O.Canon n)) (pre nsp : Bool)
+    (cell : VSet n) (ch : List (block × block)) : Prop where
+  search : SearchAtG D m L.S L.gl L.cl L.G st pre nsp
+  cell : ∃ tw, ArrayAt m .Mint64 L.btc 0 (longs tw) L.S.M ∧
+    SetRep (fun w => bv64 (tw w)) L.S.M cell
+  nc : ArrayAt m .Mint32 L.bnc 0 (fun _ => .Vint (ir L.nc)) 1
+  tc : ArrayAt m .Mint32 L.bc 0 (fun _ => .Vint (ir L.tc)) 1
+  tz : ArrayAt m .Mint32 L.bz 0 (fun _ => .Vint (ir L.tcsize)) 1
+  q : ∃ v, ArrayAt m .Mint32 L.bq 0 v 1
+  k : ∃ v, ArrayAt m .Mint32 L.bk 0 v 1
+  chain : ChainAtG L m ch
+  frame : NodeFrameG D L.m₀ m L.S L.gl L.cl L.chain₀ L.level
+  work : ∀ z, IsWorkG D m z → IsWorkG D L.m₀ z ∨ ¬ Mem.valid_block L.m₀ z
+  locals : ∀ z ∈ L.locals, Mem.valid_block m z ∧ z ∉ L.S.blocksG D L.gl L.cl ∧ ¬ IsWorkG D m z
+  fre : ∀ z ∈ L.locals, Mem.valid_access m .Mint32 z (zOfInt 0) .Freeable
+  vU : Mem.valid_block m L.S.bUA
+  pU : Mem.perm m L.S.bUA (zOfInt 0) .Cur .Nonempty
+
+theorem ChainAtG.old_idx {L : LCtxG D n} {m : mem} {ch : List (block × block)}
+    (h : ChainAtG L m ch) {i : Nat} {p : block × block} (hi : ch[i]? = some p)
+    (hil : L.level - 1 ≤ i) {z : block} (hz : z = p.1 ∨ z = p.2) :
+    (∃ j q, L.chain₀[j]? = some q ∧ L.level - 1 ≤ j ∧ (z = q.1 ∨ z = q.2)) ∨
+      ¬ Mem.valid_block L.m₀ z := by
+  rcases h.fresh p (List.mem_of_getElem? hi) with hp | ⟨h1, h2⟩
+  · obtain ⟨j, hj⟩ := List.mem_iff_getElem?.1 hp
+    refine .inl ⟨j, p, hj, ?_, hz⟩
+    refine Nat.le_of_not_lt fun hlt => ?_
+    have hj' : ch[j]? = some p := by
+      have := congrArg (·[j]?) h.take
+      simp only [List.getElem?_take] at this
+      rw [ite_eq_left (by omega), ite_eq_left (by omega), hj] at this
+      exact this
+    have := flat_idx h.ok.pairwise hi hj' hz hz
+    omega
+  · exact .inr (by rcases hz with rfl | rfl <;> assumption)
+
+theorem ChainAtG.entry_frame {L : LCtxG D n} {m : mem} {ch : List (block × block)}
+    (h : ChainAtG L m ch) {i : Nat} {p : block × block} (hi : ch[i]? = some p)
+    (hil : L.level - 1 ≤ i) {z : block} (hz : z = p.1 ∨ z = p.2) :
+    NSetG D L.m₀ L.S L.gl L.cl L.chain₀ L.level z := by
+  rcases h.old_idx hi hil hz with ⟨j, q, hj, hjl, hq⟩ | hnv
+  · rcases hq with rfl | rfl
+    · exact .inr (.inr (.inr (.inr (.inl ⟨j, q, hj, by omega, rfl⟩))))
+    · exact .inr (.inr (.inr (.inr (.inr ⟨j, q, hj, by omega, rfl⟩))))
+  · exact .inr (.inl hnv)
+
+theorem LoopAtG.call_sub {L : LCtxG D n} {m : mem} {st : SearchState n (O.Canon n)}
+    {pre nsp : Bool} {cell : VSet n} {ch : List (block × block)}
+    (h : LoopAtG L m st pre nsp cell ch) {z : block}
+    (hz : NSetG D m L.S L.gl L.cl ch (L.level + 1) z) :
+    NSetG D L.m₀ L.S L.gl L.cl L.chain₀ L.level z := by
+  have hg := h.frame.2
+  rcases hz with hz | hz | hz | hz | ⟨i, p, hi, hil, rfl⟩ | ⟨i, p, hi, hil, rfl⟩
+  · exact .inl hz
+  · exact .inr (.inl fun hv => hz (hg _ hv))
+  · rcases h.work z hz with hw | hw
+    · exact .inr (.inr (.inl hw))
+    · exact .inr (.inl hw)
+  · exact .inr (.inr (.inr (.inl hz)))
+  · exact h.chain.entry_frame hi (by omega) (.inl rfl)
+  · exact h.chain.entry_frame hi (by omega) (.inr rfl)
+
+theorem LoopAtG.step_sub {L : LCtxG D n} {m : mem} {st : SearchState n (O.Canon n)}
+    {pre nsp : Bool} {cell : VSet n} {ch : List (block × block)}
+    (h : LoopAtG L m st pre nsp cell ch) {z : block}
+    (hz : L.S.ChgG D L.gl L.cl z ∨ ¬ Mem.valid_block m z ∨ IsWorkG D m z ∨ z = L.btc) :
+    NSetG D L.m₀ L.S L.gl L.cl L.chain₀ L.level z := by
+  have hg := h.frame.2
+  rcases hz with hz | hz | hz | rfl
+  · exact .inl hz
+  · exact .inr (.inl fun hv => hz (hg _ hv))
+  · rcases h.work z hz with hw | hw
+    · exact .inr (.inr (.inl hw))
+    · exact .inr (.inl hw)
+  · exact h.chain.entry_frame h.chain.own (Nat.le_refl _) (.inr rfl)
+
+theorem not_NSetG {m : mem} {S : SLoc} {gl : D.GLoc} {cl : D.CLoc}
+    {ch : List (block × block)} {level : Nat} {z : block}
+    (h1 : z ∉ S.blocksG D gl cl) (h2 : Mem.valid_block m z) (h3 : ¬ IsWorkG D m z)
+    (h4 : ∀ i p, ch[i]? = some p → level ≤ i + 2 → z ≠ p.1)
+    (h5 : ∀ i p, ch[i]? = some p → level ≤ i + 1 → z ≠ p.2) :
+    ¬ NSetG D m S gl cl ch level z := by
+  rintro (hz | hz | hz | rfl | ⟨i, p, hi, hil, rfl⟩ | ⟨i, p, hi, hil, rfl⟩)
+  · exact h1 hz.1
+  · exact hz h2
+  · exact h3 hz
+  · exact h1 SLoc.tcnode0_mem
+  · exact h4 i p hi hil rfl
+  · exact h5 i p hi hil rfl
+
+theorem ChainAtG.local_safe {L : LCtxG D n} {m : mem} {ch : List (block × block)}
+    (h : ChainAtG L m ch) {z : block} (hz : z ∈ L.locals) (h1 : z ∉ L.S.blocksG D L.gl L.cl)
+    (h2 : Mem.valid_block m z) (h3 : ¬ IsWorkG D m z) (level : Nat) :
+    ¬ NSetG D m L.S L.gl L.cl ch level z :=
+  not_NSetG h1 h2 h3 (fun _ p hi _ e => (h.apart p (List.mem_of_getElem? hi)).1 (e ▸ hz))
+    (fun _ p hi _ e => (h.apart p (List.mem_of_getElem? hi)).2 (e ▸ hz))
+
+/-- The node's own target cell is not changed by a child. -/
+theorem ChainAtG.cell_safe {L : LCtxG D n} {m : mem} {ch : List (block × block)}
+    (h : ChainAtG L m ch) : ¬ NSetG D m L.S L.gl L.cl ch (L.level + 1) L.btc := by
+  have hmem := List.mem_of_getElem? h.own
+  obtain ⟨-, a2, -, a4⟩ := h.ok.apart _ hmem
+  refine not_NSetG a2 (h.ok.valid _ hmem).2 a4 (fun i p hi _ e => ?_) (fun i p hi hil e => ?_)
+  · have := flat_idx h.ok.pairwise hi h.own (.inl e) (.inr rfl)
+    subst this
+    rw [h.own] at hi; cases hi
+    exact flat_ne h.ok.pairwise hmem e.symm
+  · have := flat_idx h.ok.pairwise hi h.own (.inr e) (.inr rfl)
+    have := h.lvl; omega
+
+/-- A recursive call at `level + 1` keeps `LoopAtG`. -/
+theorem LoopAtG.call {L : LCtxG D n} {m : mem} {st : SearchState n (O.Canon n)} {pre nsp : Bool}
+    {cell : VSet n} {ch : List (block × block)} (h : LoopAtG L m st pre nsp cell ch)
+    {m' : mem} {s' : SearchState n (O.Canon n)} {nsp' : Bool} {ch' : List (block × block)}
+    (hS : SearchAtG D m' L.S L.gl L.cl L.G s' false nsp')
+    (hc1 : TcChain m' L.S.M E.tcnode0 ch') (hc2 : TcOkG D m' L.S L.gl L.cl ch')
+    (hc3 : L.level + 1 ≤ ch'.length) (hc4 : ch'.take L.level = ch.take L.level)
+    (hc5 : ∀ p ∈ ch', p ∈ ch ∨ (¬ Mem.valid_block m p.1 ∧ ¬ Mem.valid_block m p.2))
+    (hF : NodeFrameG D m m' L.S L.gl L.cl ch (L.level + 1))
+    (hW : ∀ z, IsWorkG D m' z → IsWorkG D m z ∨ ¬ Mem.valid_block m z)
+    (hvU : Mem.valid_block m' L.S.bUA) (hpU : Mem.perm m' L.S.bUA (zOfInt 0) .Cur .Nonempty)
+    (hl1 : 1 ≤ L.level) :
+    LoopAtG L m' s' false nsp' cell ch' := by
+  have hu := hF.nset
+  have hg := hF.2
+  have hloc : ∀ z ∈ L.locals, ¬ NSetG D m L.S L.gl L.cl ch (L.level + 1) z := fun z hz =>
+    have ⟨a, b, c⟩ := h.locals z hz
+    h.chain.local_safe hz b a c _
+  have hfre := fun z hz => hu.access _ _ _ _ (hloc z hz) (h.fre z hz)
+  simp only [List.mem_cons, List.mem_nil_iff, or_false] at hloc
+  obtain ⟨tw, hta, htr⟩ := h.cell
+  obtain ⟨vq, hq⟩ := h.q
+  obtain ⟨vk, hk⟩ := h.k
+  have hown : ch'[L.level - 1]? = some (L.bnd, L.btc) := by
+    have := congrArg (·[L.level - 1]?) hc4
+    simp only [List.getElem?_take] at this
+    rw [ite_eq_left (by omega), ite_eq_left (by omega)] at this
+    rw [this]; exact h.chain.own
+  refine
+    { search := hS
+      cell := ⟨tw, hta.unch hu h.chain.cell_safe, htr⟩
+      nc := h.nc.unch hu (hloc _ (.inl rfl))
+      tc := h.tc.unch hu (hloc _ (.inr (.inr (.inr (.inl rfl)))))
+      tz := h.tz.unch hu (hloc _ (.inr (.inr (.inr (.inr rfl)))))
+      q := ⟨vq, hq.unch hu (hloc _ (.inr (.inl rfl)))⟩
+      k := ⟨vk, hk.unch hu (hloc _ (.inr (.inr (.inl rfl))))⟩
+      chain :=
+        { chain := hc1, ok := hc2, len := by omega, own := hown
+          take := by
+            have := congrArg (List.take (L.level - 1)) hc4
+            simp only [List.take_take] at this
+            rw [show min (L.level - 1) L.level = L.level - 1 by omega] at this
+            rw [this]; exact h.chain.take
+          fresh := fun p hp => by
+            rcases hc5 p hp with hp | ⟨h1, h2⟩
+            · exact h.chain.fresh p hp
+            · exact .inr ⟨fun hv => h1 (h.frame.2 _ hv), fun hv => h2 (h.frame.2 _ hv)⟩
+          apart := fun p hp => by
+            rcases hc5 p hp with hp | ⟨h1, h2⟩
+            · exact h.chain.apart p hp
+            · exact ⟨fun hz => h1 (h.locals _ hz).1, fun hz => h2 (h.locals _ hz).1⟩
+          lvl := hl1 }
+      frame := ⟨h.frame.nset.trans (hu.mono fun z hz => h.call_sub hz),
+        fun z hz => hg z (h.frame.2 z hz)⟩
+      work := fun z hz => by
+        rcases hW z hz with hw | hw
+        · exact h.work z hw
+        · exact .inr fun hv => hw (h.frame.2 _ hv)
+      locals := fun z hz => by
+        obtain ⟨a, b, c⟩ := h.locals z hz
+        refine ⟨hg z a, b, fun hw => ?_⟩
+        rcases hW z hw with hw | hw
+        · exact c hw
+        · exact hw a
+      fre := hfre
+      vU := hvU
+      pU := hpU }
+
+/-- `stepSet` for `D`. -/
+abbrev stepSetG (D : DispatchRep ge O) (m : mem) (S : SLoc) (gl : D.GLoc) (cl : D.CLoc)
+    (btc : block) (z : block) : Prop :=
+  S.ChgG D gl cl z ∨ ¬ Mem.valid_block m z ∨ IsWorkG D m z ∨ z = btc
+
+/-- The list's blocks other than the target cell are not in a step's set. -/
+theorem ChainAtG.not_step {L : LCtxG D n} {m : mem} {ch : List (block × block)}
+    (hc0 : ChainAtG L m ch) {st : SearchState n (O.Canon n)} {pre nsp : Bool}
+    (hS : SearchAtG D m L.S L.gl L.cl L.G st pre nsp) :
+    ∀ z ∈ tcBlocks E.tcnode0 ch, z ≠ L.btc → ¬ stepSetG D m L.S L.gl L.cl L.btc z := by
+  have hok := hc0.ok
+  intro z hz hne
+  simp only [tcBlocks, List.mem_cons] at hz
+  rintro (⟨hzS, -, h3⟩ | hz' | hz' | rfl)
+  · rcases hz with rfl | hz
+    · exact h3 rfl
+    · obtain ⟨p, hp, hzp⟩ := List.mem_flatMap.1 hz
+      obtain ⟨a1, a2, -, -⟩ := hok.apart p hp
+      simp only [List.mem_cons, List.mem_nil_iff, or_false] at hzp
+      rcases hzp with rfl | rfl
+      · exact a1 hzS
+      · exact a2 hzS
+  · rcases hz with rfl | hz
+    · exact hz' hc0.chain.head_valid
+    · obtain ⟨p, hp, hzp⟩ := List.mem_flatMap.1 hz
+      simp only [List.mem_cons, List.mem_nil_iff, or_false] at hzp
+      rcases hzp with rfl | rfl
+      · exact hz' (hok.valid p hp).1
+      · exact hz' (hok.valid p hp).2
+  · rcases hz with rfl | hz
+    · exact hS.work_not hz' SLoc.tcnode0_mem
+    · obtain ⟨p, hp, hzp⟩ := List.mem_flatMap.1 hz
+      obtain ⟨-, -, a3, a4⟩ := hok.apart p hp
+      simp only [List.mem_cons, List.mem_nil_iff, or_false] at hzp
+      rcases hzp with rfl | rfl
+      · exact a3 hz'
+      · exact a4 hz'
+  · exact hne rfl
+
+/-- One of the node's own steps keeps `LoopAtG`. -/
+theorem LoopAtG.step {L : LCtxG D n} {m : mem} {st : SearchState n (O.Canon n)} {pre nsp : Bool}
+    {cell : VSet n} {ch : List (block × block)} (h : LoopAtG L m st pre nsp cell ch)
+    {m' : mem} {st' : SearchState n (O.Canon n)} {pre' nsp' : Bool} {cell' : VSet n}
+    (hS : SearchAtG D m' L.S L.gl L.cl L.G st' pre' nsp')
+    (hu : Unch m m' (stepSetG D m L.S L.gl L.cl L.btc))
+    (hg : ∀ z, Mem.valid_block m z → Mem.valid_block m' z)
+    (hW : ∀ z, IsWorkG D m' z → IsWorkG D m z ∨ ¬ Mem.valid_block m z)
+    (hc : ∃ tw, ArrayAt m' .Mint64 L.btc 0 (longs tw) L.S.M ∧
+      SetRep (fun w => bv64 (tw w)) L.S.M cell')
+    (hkc : Alloc.Keep m m' L.btc) :
+    LoopAtG L m' st' pre' nsp' cell' ch := by
+  have hloc : ∀ z ∈ L.locals, ¬ stepSetG D m L.S L.gl L.cl L.btc z := by
+    intro z hz
+    obtain ⟨a, b, c⟩ := h.locals z hz
+    rintro (⟨hz', -⟩ | hz' | hz' | rfl)
+    · exact b hz'
+    · exact hz' a
+    · exact c hz'
+    · exact (h.chain.apart _ (List.mem_of_getElem? h.chain.own)).2 hz
+  have hfre := fun z hz => hu.access _ _ _ _ (hloc z hz) (h.fre z hz)
+  simp only [List.mem_cons, List.mem_nil_iff, or_false] at hloc
+  obtain ⟨vq, hq⟩ := h.q
+  obtain ⟨vk, hk⟩ := h.k
+  have hc0 := h.chain
+  have hok := hc0.ok
+  have hmem := List.mem_of_getElem? hc0.own
+  refine
+    { search := hS
+      cell := hc
+      nc := h.nc.unch hu (hloc _ (.inl rfl))
+      tc := h.tc.unch hu (hloc _ (.inr (.inr (.inr (.inl rfl)))))
+      tz := h.tz.unch hu (hloc _ (.inr (.inr (.inr (.inr rfl)))))
+      q := ⟨vq, hq.unch hu (hloc _ (.inr (.inl rfl)))⟩
+      k := ⟨vk, hk.unch hu (hloc _ (.inr (.inr (.inl rfl))))⟩
+      chain :=
+        { hc0 with
+          chain := TcChain.setCell hu (by obtain ⟨tw, ha, -⟩ := hc; exact ⟨_, ha⟩) hkc hc0.chain
+            (hc0.not_step h.search)
+            (fun e => (hok.apart _ hmem).2.1 (e ▸ SLoc.tcnode0_mem))
+            (fun p hp e => by
+              have ⟨i, hi⟩ := List.mem_iff_getElem?.1 hp
+              have := flat_idx hok.pairwise hi hc0.own (.inl e.symm) (.inr rfl)
+              subst this; rw [hc0.own] at hi; cases hi
+              exact flat_ne hok.pairwise hmem e)
+          ok := hok.mono hg hW }
+      frame := ⟨h.frame.nset.trans (hu.mono fun z hz => h.step_sub hz),
+        fun z hz => hg z (h.frame.2 z hz)⟩
+      work := fun z hz => by
+        rcases hW z hz with hw | hw
+        · exact h.work z hw
+        · exact .inr fun hv => hw (h.frame.2 _ hv)
+      locals := fun z hz => by
+        obtain ⟨a, b, c⟩ := h.locals z hz
+        refine ⟨hg z a, b, fun hw => ?_⟩
+        rcases hW z hw with hw | hw
+        · exact c hw
+        · exact hw a
+      fre := hfre
+      vU := hg _ h.vU
+      pU := perm_unch hu (by
+          rintro (⟨-, h2, -⟩ | hz | hz | hz)
+          · exact h2 rfl
+          · exact hz h.vU
+          · exact h.search.work_not hz SLoc.bUA_mem
+          · exact (hok.apart _ hmem).2.1 (hz ▸ SLoc.bUA_mem)) h.pU }
+
+end Generic
 
 end NautyVerified.Proofs.Search
