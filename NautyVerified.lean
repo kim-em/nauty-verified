@@ -294,3 +294,4 @@ import NautyVerified.Proofs.Harness.Main
 import NautyVerified.Proofs.Harness.Facts
 import NautyVerified.Proofs.Search.Node.ProcFacts
 import NautyVerified.Spec.SparseRefine
+import NautyVerified.Proofs.Sparse.Isautom.Satisfies
