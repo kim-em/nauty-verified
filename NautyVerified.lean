@@ -143,6 +143,8 @@ import NautyVerified.Proofs.Search.Node.Long
 import NautyVerified.Proofs.Search.Node.Em
 import NautyVerified.Proofs.Search.Node.Child
 import NautyVerified.Proofs.Search.Node.LoopShape
+import NautyVerified.Proofs.Search.Node.OtherFrame
+import NautyVerified.Proofs.Search.Node.OtherIter
 import NautyVerified.Proofs.Search.Node.TcFrame
 import NautyVerified.Proofs.Search.Node.UaFrame
 import NautyVerified.Proofs.Search.Node.InvSteps
@@ -223,6 +225,7 @@ import NautyVerified.Spec.SearchInfRun
 import NautyVerified.Spec.NodeOk
 import NautyVerified.Spec.Gca
 import NautyVerified.Spec.NodeExit
+import NautyVerified.Spec.NodeBound
 import NautyVerified.Spec.NodeOkOff
 import NautyVerified.Spec.LeafInv
 import NautyVerified.Spec.NodeProc
