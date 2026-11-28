@@ -1,5 +1,6 @@
 import NautyVerified.Proofs.Search.Node.OtherHex
 import NautyVerified.Spec.NodeOkOff
+import NautyVerified.Proofs.Search.Node.GcaSteps
 
 /-!
 # The off-path sweep keeps `SweepOkOff`
@@ -26,6 +27,8 @@ theorem sweepOkOff_next {G : Colored n k} {level numcells tc tv1 tv : Nat} {cell
       (otherChild ctx nautyInfinity tcLevel fuel level numcells tc tv1 tv cell st).2.1
       ((otherChild ctx nautyInfinity tcLevel fuel level numcells tc tv1 tv cell st).2.1.nextElem (some tv))
       (otherChild ctx nautyInfinity tcLevel fuel level numcells tc tv1 tv cell st).2.2 := by
+  obtain ⟨h, hg⟩ := h
+  refine ⟨?_, gcaSw_otherChild hg hdone⟩
   obtain ⟨t, st₀, rfl, hlevel, hok, htarget, hcur, hinv, last, hd, ha⟩ := h
   have htv := hcur tv rfl
   have hln := level_le_of_ok hok
@@ -67,7 +70,7 @@ theorem sweepOkOff_next {G : Colored n k} {level numcells tc tv1 tv : Nat} {cell
     rw [hfd, (ref_fields hcf).1]; exact ha
   -- the continuation, for a pruned cell `cell'`
   have hres : ∀ cell' : VSet n, (∀ v, cell'.mem v = true → cell.mem v = true) →
-      SweepOkOff G level numcells tc (if (tv == tv1) = true then longprune cell' s9.fixedpts s9.autos else cell')
+      SweepOkOff₀ G level numcells tc (if (tv == tv1) = true then longprune cell' s9.fixedpts s9.autos else cell')
         ((if (tv == tv1) = true then longprune cell' s9.fixedpts s9.autos else cell').nextElem (some tv))
         (recover nautyInfinity level (tw (phi (n + 2) nautyInfinity) t s9)) := by
     intro cell' hsub

@@ -1,4 +1,5 @@
 import NautyVerified.Spec.SearchInfRun
+import NautyVerified.Spec.Gca
 
 /-!
 # What nauty.c's search nodes need of HexGraphIso's state
@@ -24,11 +25,16 @@ set_option linter.unusedSimpArgs false
 
 variable {n k : Nat}
 
-/-- The node precondition nauty.c's search nodes need of HexGraphIso's state. -/
-def NodeOk (G : Colored n k) (first : Bool) (level numcells : Nat) (st : Search n) : Prop :=
+/-- The renamed-run part of `NodeOk`. -/
+def NodeOk₀ (G : Colored n k) (first : Bool) (level numcells : Nat) (st : Search n) : Prop :=
   ∃ t st₂, st = tw (phi (n + 2) nautyInfinity) t st₂ ∧ 1 ≤ level ∧ SearchOk G level numcells st₂ ∧
     Inv st₂ ∧ (first = true → OrbId st₂ ∧ AgreeTo (level - 1) t st₂.firsttc) ∧
     (first = false → ∃ last, Depth last st₂ ∧ AgreeTo (last + 1) t st₂.firsttc)
+
+/-- The node precondition nauty.c's search nodes need of HexGraphIso's state: the
+renamed-run part, and off the first path the level counters (`GcaOk`). -/
+def NodeOk (G : Colored n k) (first : Bool) (level numcells : Nat) (st : Search n) : Prop :=
+  NodeOk₀ G first level numcells st ∧ (first = false → GcaOk level st)
 
 /-- A node call satisfying `NodeOk` is the renamed image of HexGraphIso's call. -/
 theorem nodeOk_run {G : Colored n k} {first : Bool} {level numcells : Nat} {st : Search n}
@@ -38,7 +44,7 @@ theorem nodeOk_run {G : Colored n k} {first : Bool} {level numcells : Nat} {st :
       node first ctx nautyInfinity tcLevel fuel level numcells st =
         ((node first ctx (n + 2) tcLevel fuel level numcells st₂).1,
           tw (phi (n + 2) nautyInfinity) t' (node first ctx (n + 2) tcLevel fuel level numcells st₂).2) := by
-  obtain ⟨t, st₂, rfl, hlevel, hok, hinv, hfirst, hoff⟩ := h
+  obtain ⟨⟨t, st₂, rfl, hlevel, hok, hinv, hfirst, hoff⟩, -⟩ := h
   have hpost := Generic.node_sound (infPolicy (G := G) (ctx := ctx) (tcLevel := tcLevel)
     (B := nautyInfinity) hn0 hn) first fuel level numcells st₂ ⟨hlevel, hok⟩
   obtain ⟨-, himp⟩ := hpost
@@ -60,7 +66,7 @@ theorem nodeOk_noFuel {G : Colored n k} {first : Bool} {level numcells : Nat} {s
     (hn0 : 0 < n) (hn : n + 2 < nautyInfinity) (h : NodeOk G first level numcells st)
     (ctx : Ctx n) (tcLevel : Nat) (hlev : level ≤ n) :
     (node first ctx nautyInfinity tcLevel (n + 3 - level) level numcells st).1 ≠ .fuel := by
-  have hlevel : 1 ≤ level := by obtain ⟨_, _, _, h1, _⟩ := h; exact h1
+  have hlevel : 1 ≤ level := by obtain ⟨⟨_, _, _, h1, _⟩, _⟩ := h; exact h1
   obtain ⟨t', st₂, hok, heq⟩ := nodeOk_run hn0 hn h ctx tcLevel (n + 3 - level)
   rw [heq]
   exact node_noFuel first hn0 hlevel hok (by omega)
@@ -69,9 +75,9 @@ theorem nodeOk_noFuel {G : Colored n k} {first : Bool} {level numcells : Nat} {s
 theorem nodeOk_root (G : Colored n k) (hn0 : 0 < n) :
     NodeOk G true 1 (initialPartition G).2.length
       (initialC n (initialPartition G).1 (initialPartition G).2) := by
-  refine ⟨.replicate (n + 2) 0, initial n (initialPartition G).1 (initialPartition G).2,
+  refine ⟨⟨.replicate (n + 2) 0, initial n (initialPartition G).1 (initialPartition G).2,
     initialC_eq _ _ _, Nat.le_refl _, initial_ok G hn0, ⟨by show 1 ≤ n + 1; omega, by simp [initial]⟩,
-    fun _ => ⟨?_, ?_⟩, fun h => absurd h (by decide)⟩
+    fun _ => ⟨?_, ?_⟩, fun h => absurd h (by decide)⟩, fun h => absurd h (by decide)⟩
   · intro v hv
     show (Array.ofFn (n := n) fun i => i.val)[v]! = v
     rw [getElem!_pos _ v (by simpa using hv)]

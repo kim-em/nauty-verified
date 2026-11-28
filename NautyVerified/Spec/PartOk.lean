@@ -150,7 +150,7 @@ theorem PartOk.facts {G : Colored n k} {level numcells : Nat} {st : Search n}
 theorem PartOk.of_nodeOk {G : Colored n k} {first : Bool} {level numcells : Nat} {st : Search n}
     (hn : n + 2 < nautyInfinity) (h : NodeOk G first level numcells st) :
     PartOk G level numcells st := by
-  obtain ⟨t, st₂, rfl, -, hok, -⟩ := h
+  obtain ⟨⟨t, st₂, rfl, -, hok, -⟩, -⟩ := h
   exact PartOk.of_tw hn hok t
 
 /-- Refinement keeps `PartOk`, with the new cell count. -/

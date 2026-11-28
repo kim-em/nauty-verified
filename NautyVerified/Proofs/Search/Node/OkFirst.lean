@@ -1,6 +1,7 @@
 import NautyVerified.Proofs.Search.Node.FirstHex
 import NautyVerified.Proofs.Search.Node.OkOff
 import NautyVerified.Spec.PartOk
+import NautyVerified.Proofs.Search.Node.GcaSteps
 
 /-!
 # `NodeOk` along a first-path node
@@ -27,8 +28,8 @@ set_option linter.unusedSimpArgs false
 
 variable {n k : Nat}
 
-/-- The sweep invariant of a first-path node. -/
-def SweepOkFirst (G : Colored n k) (level numcells tc tv1 : Nat) (cell : VSet n)
+/-- The renamed-run part of `SweepOkFirst`. -/
+def SweepOkFirst₀ (G : Colored n k) (level numcells tc tv1 : Nat) (cell : VSet n)
     (cursor : Option Nat) (st : Search n) : Prop :=
   ∃ t st₂, st = tw (phi (n + 2) nautyInfinity) t st₂ ∧ 1 ≤ level ∧ SearchOk G level numcells st₂ ∧
     Generic.Target (fun st => st) level tc cell st₂ ∧ (∀ v, cursor = some v → cell.mem v = true) ∧
@@ -36,15 +37,22 @@ def SweepOkFirst (G : Colored n k) (level numcells tc tv1 : Nat) (cell : VSet n)
     ((cursor = some tv1 ∧ OrbId st₂ ∧ AgreeTo level t st₂.firsttc) ∨
       (Generic.Past true tv1 cursor ∧ ∃ last, Depth last st₂ ∧ AgreeTo (last + 1) t st₂.firsttc))
 
-/-- A first-path node that is not a leaf starts its sweep in `SweepOkFirst`. -/
-theorem nodeOk_sweepFirst {G : Colored n k} {level numcells : Nat} {st : Search n}
-    (hn0 : 0 < n) (hn : n + 2 < nautyInfinity) (h : NodeOk G true level numcells st)
+/-- The sweep invariant of a first-path node: the renamed-run part, and the level
+counters (`GcaSw`) whenever the cursor is past the first child. -/
+def SweepOkFirst (G : Colored n k) (level numcells tc tv1 : Nat) (cell : VSet n)
+    (cursor : Option Nat) (st : Search n) : Prop :=
+  SweepOkFirst₀ G level numcells tc tv1 cell cursor st ∧
+    ∀ v, cursor = some v → v ≠ tv1 → GcaSw level st
+
+/-- The renamed-run part of `nodeOk_sweepFirst`. -/
+theorem nodeOk_sweepFirst₀ {G : Colored n k} {level numcells : Nat} {st : Search n}
+    (hn0 : 0 < n) (hn : n + 2 < nautyInfinity) (h : NodeOk₀ G true level numcells st)
     (ctx : Ctx n) (tcLevel : Nat) :
     let v := visit ctx level numcells st
     let st₁ := recordFirst level v.2.1 v.2.2
     let ct := chooseTarget true ctx tcLevel level v.1 st₁
     v.1 ≠ n → ∃ tv1, ct.2.1.nextElem none = some tv1 ∧
-      SweepOkFirst G level v.1 ct.1.toNat tv1 ct.2.1 (some tv1) (cheapCheck true level ct.2.2.2) := by
+      SweepOkFirst₀ G level v.1 ct.1.toNat tv1 ct.2.1 (some tv1) (cheapCheck true level ct.2.2.2) := by
   obtain ⟨t, st₀, rfl, hlevel, hok, hinv, hfirst, -⟩ := h
   obtain ⟨horb, ha⟩ := hfirst rfl
   have hln := level_le_of_ok hok
@@ -98,11 +106,24 @@ theorem nodeOk_sweepFirst {G : Colored n k} {level numcells : Nat} {st : Search 
     htarget.of_out hchr.effect, fun w hw => by cases hw; exact VSet.nextElem_mem hv,
     by rw [hk']; exact ⟨hk'le, hi3.2⟩, .inl ⟨rfl, by rw [hk']; exact ho3, by rw [hk']; exact ha3⟩⟩
 
-/-- Each child of a first-path sweep is called in `NodeOk`. -/
-theorem sweepOkFirst_child {G : Colored n k} {level numcells tc tv1 tv : Nat} {cell : VSet n}
-    {st : Search n} (hn0 : 0 < n) (h : SweepOkFirst G level numcells tc tv1 cell (some tv) st)
+/-- A first-path node that is not a leaf starts its sweep in `SweepOkFirst`. -/
+theorem nodeOk_sweepFirst {G : Colored n k} {level numcells : Nat} {st : Search n}
+    (hn0 : 0 < n) (hn : n + 2 < nautyInfinity) (h : NodeOk G true level numcells st)
     (ctx : Ctx n) (tcLevel : Nat) :
-    NodeOk G (tv == tv1) (level + 1) (numcells + 1) (child true level tc tv st) := by
+    let v := visit ctx level numcells st
+    let st₁ := recordFirst level v.2.1 v.2.2
+    let ct := chooseTarget true ctx tcLevel level v.1 st₁
+    v.1 ≠ n → ∃ tv1, ct.2.1.nextElem none = some tv1 ∧
+      SweepOkFirst G level v.1 ct.1.toNat tv1 ct.2.1 (some tv1) (cheapCheck true level ct.2.2.2) :=
+  fun hv => by
+    obtain ⟨tv1, he, hs⟩ := nodeOk_sweepFirst₀ hn0 hn h.1 ctx tcLevel hv
+    exact ⟨tv1, he, hs, fun v hc hne => absurd (Option.some.inj hc).symm hne⟩
+
+/-- The renamed-run part of `sweepOkFirst_child`. -/
+theorem sweepOkFirst_child₀ {G : Colored n k} {level numcells tc tv1 tv : Nat} {cell : VSet n}
+    {st : Search n} (hn0 : 0 < n) (h : SweepOkFirst₀ G level numcells tc tv1 cell (some tv) st)
+    (ctx : Ctx n) (tcLevel : Nat) :
+    NodeOk₀ G (tv == tv1) (level + 1) (numcells + 1) (child true level tc tv st) := by
   obtain ⟨t, st₀, rfl, hlevel, hok, htarget, hcur, hinv, hph⟩ := h
   have hln := level_le_of_ok hok
   have R := reachPolicy G ctx tcLevel hn0
@@ -128,12 +149,20 @@ theorem sweepOkFirst_child {G : Colored n k} {level numcells tc tv1 tv : Nat} {c
       fun h => absurd h (by decide), fun _ => ⟨last, hcd, ?_⟩⟩
     rw [(ref_fields hcf).1]; exact ha
 
-/-- A child step of a first-path sweep that does not end it leaves `SweepOkFirst`. -/
-theorem sweepOkFirst_next {G : Colored n k} {level numcells tc tv1 tv : Nat} {cell : VSet n}
+/-- Each child of a first-path sweep is called in `NodeOk`. -/
+theorem sweepOkFirst_child {G : Colored n k} {level numcells tc tv1 tv : Nat} {cell : VSet n}
+    {st : Search n} (hn0 : 0 < n) (h : SweepOkFirst G level numcells tc tv1 cell (some tv) st)
+    (ctx : Ctx n) (tcLevel : Nat) :
+    NodeOk G (tv == tv1) (level + 1) (numcells + 1) (child true level tc tv st) :=
+  ⟨sweepOkFirst_child₀ hn0 h.1 ctx tcLevel, fun hf =>
+    gcaOk_child (h.2 tv rfl (by simpa using hf)) true tc tv⟩
+
+/-- The renamed-run part of `sweepOkFirst_next`. -/
+theorem sweepOkFirst_next₀ {G : Colored n k} {level numcells tc tv1 tv : Nat} {cell : VSet n}
     {st : Search n} (hn0 : 0 < n) (hn : n + 2 < nautyInfinity)
-    (h : SweepOkFirst G level numcells tc tv1 cell (some tv) st) (ctx : Ctx n) (tcLevel fuel : Nat)
+    (h : SweepOkFirst₀ G level numcells tc tv1 cell (some tv) st) (ctx : Ctx n) (tcLevel fuel : Nat)
     (hdone : (firstChild ctx nautyInfinity tcLevel fuel level numcells tc tv1 tv cell st).1 = .done) :
-    SweepOkFirst G level numcells tc tv1
+    SweepOkFirst₀ G level numcells tc tv1
       (firstChild ctx nautyInfinity tcLevel fuel level numcells tc tv1 tv cell st).2.1
       ((firstChild ctx nautyInfinity tcLevel fuel level numcells tc tv1 tv cell st).2.1.nextElem (some tv))
       (firstChild ctx nautyInfinity tcLevel fuel level numcells tc tv1 tv cell st).2.2 := by
@@ -150,7 +179,7 @@ theorem sweepOkFirst_next {G : Colored n k} {level numcells tc tv1 tv : Nat} {ce
   have hres : ∀ (t' : Array Int) (last : Nat) (s9 : Search n) (cell' : VSet n),
       SearchOut G level level st₀ s9 → Depth last s9 → Inv s9 → AgreeTo (last + 1) t' s9.firsttc →
       (∀ v, cell'.mem v = true → cell.mem v = true) →
-      SweepOkFirst G level numcells tc tv1 cell' (cell'.nextElem (some tv))
+      SweepOkFirst₀ G level numcells tc tv1 cell' (cell'.nextElem (some tv))
         (recover nautyInfinity level (tw (phi (n + 2) nautyInfinity) t' s9)) := by
     intro t' last s9 cell' hout hd9 hi9 ha9 hsub
     have D := depthPolicy ctx (n + 2) tcLevel last
@@ -275,18 +304,39 @@ theorem sweepOkFirst_next {G : Colored n k} {level numcells tc tv1 tv : Nat} {ce
     · refine ⟨t, st₀, rfl, hlevel, hok, htarget, fun v hv => VSet.nextElem_mem hv, hinv,
         .inr ⟨Generic.Past.next (fun _ => hpast rfl tv rfl), last, hd, ha⟩⟩
 
+/-- A child step of a first-path sweep that does not end it leaves `SweepOkFirst`. -/
+theorem sweepOkFirst_next {G : Colored n k} {level numcells tc tv1 tv : Nat} {cell : VSet n}
+    {st : Search n} (hn0 : 0 < n) (hn : n + 2 < nautyInfinity)
+    (h : SweepOkFirst G level numcells tc tv1 cell (some tv) st) (ctx : Ctx n) (tcLevel fuel : Nat)
+    (hdone : (firstChild ctx nautyInfinity tcLevel fuel level numcells tc tv1 tv cell st).1 = .done) :
+    SweepOkFirst G level numcells tc tv1
+      (firstChild ctx nautyInfinity tcLevel fuel level numcells tc tv1 tv cell st).2.1
+      ((firstChild ctx nautyInfinity tcLevel fuel level numcells tc tv1 tv cell st).2.1.nextElem (some tv))
+      (firstChild ctx nautyInfinity tcLevel fuel level numcells tc tv1 tv cell st).2.2 := by
+  refine ⟨sweepOkFirst_next₀ hn0 hn h.1 ctx tcLevel fuel hdone, fun _ _ _ => ?_⟩
+  refine gcaSw_firstChild (fun hne => h.2 tv rfl hne) hdone fun hf heq => ?_
+  obtain ⟨⟨t, st₀, rfl, -, -, -, hcur, -, hph⟩, -⟩ := h
+  rcases hph with ⟨-, horb, -⟩ | ⟨hpast, -⟩
+  · have h1 := horb tv (VSet.mem_lt (hcur tv rfl))
+    have : ((tw (phi (n + 2) nautyInfinity) t st₀).orbits[tv]! == tv) = true := by
+      show (st₀.orbits[tv]! == tv) = true
+      simp [h1]
+    rw [hf] at this; cases this
+  · have := hpast rfl tv rfl
+    omega
+
 /-- The state of an off-path sweep satisfies `PartOk`. -/
 theorem SweepOkOff.part {G : Colored n k} {level numcells tc : Nat} {cell : VSet n}
     {cursor : Option Nat} {st : Search n} (hn : n + 2 < nautyInfinity)
     (h : SweepOkOff G level numcells tc cell cursor st) : PartOk G level numcells st := by
-  obtain ⟨t, st₂, rfl, -, hok, -⟩ := h
+  obtain ⟨⟨t, st₂, rfl, -, hok, -⟩, -⟩ := h
   exact PartOk.of_tw hn hok t
 
 /-- The state of a first-path sweep satisfies `PartOk`. -/
 theorem SweepOkFirst.part {G : Colored n k} {level numcells tc tv1 : Nat} {cell : VSet n}
     {cursor : Option Nat} {st : Search n} (hn : n + 2 < nautyInfinity)
     (h : SweepOkFirst G level numcells tc tv1 cell cursor st) : PartOk G level numcells st := by
-  obtain ⟨t, st₂, rfl, -, hok, -⟩ := h
+  obtain ⟨⟨t, st₂, rfl, -, hok, -⟩, -⟩ := h
   exact PartOk.of_tw hn hok t
 
 /-- The target cell of a sweep is a cell of the partition: its members are in
@@ -294,13 +344,13 @@ range and it starts at `tc`. -/
 theorem SweepOkOff.target {G : Colored n k} {level numcells tc : Nat} {cell : VSet n}
     {cursor : Option Nat} {st : Search n} (h : SweepOkOff G level numcells tc cell cursor st) :
     ∃ st₂, Generic.Target (fun st => st) level tc cell st₂ ∧ st₂.lab = st.lab := by
-  obtain ⟨t, st₂, rfl, -, -, htarget, -⟩ := h
+  obtain ⟨⟨t, st₂, rfl, -, -, htarget, -⟩, -⟩ := h
   exact ⟨st₂, htarget, rfl⟩
 
 theorem SweepOkFirst.target {G : Colored n k} {level numcells tc tv1 : Nat} {cell : VSet n}
     {cursor : Option Nat} {st : Search n} (h : SweepOkFirst G level numcells tc tv1 cell cursor st) :
     ∃ st₂, Generic.Target (fun st => st) level tc cell st₂ ∧ st₂.lab = st.lab := by
-  obtain ⟨t, st₂, rfl, -, -, htarget, -⟩ := h
+  obtain ⟨⟨t, st₂, rfl, -, -, htarget, -⟩, -⟩ := h
   exact ⟨st₂, htarget, rfl⟩
 
 end NautyVerified.Proofs.Search

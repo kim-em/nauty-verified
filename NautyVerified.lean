@@ -115,6 +115,7 @@ import NautyVerified.Proofs.Search.Node.Compare
 import NautyVerified.Proofs.Search.Node.OtherSteps
 import NautyVerified.Proofs.Search.Node.FirstHex
 import NautyVerified.Proofs.Search.Node.OkFirst
+import NautyVerified.Proofs.Search.Node.GcaSteps
 import NautyVerified.Proofs.Search.Node.Prune
 import NautyVerified.Proofs.Search.Node.Realloc
 import NautyVerified.Proofs.Search.Node.ReallocW
@@ -185,6 +186,8 @@ import NautyVerified.Spec.RefineFuel
 import NautyVerified.Spec.SearchInf
 import NautyVerified.Spec.SearchInfRun
 import NautyVerified.Spec.NodeOk
+import NautyVerified.Spec.Gca
+import NautyVerified.Spec.NodeExit
 import NautyVerified.Spec.NodeOkOff
 import NautyVerified.Spec.PartOk
 import NautyVerified.Spec.NtcPlace
@@ -215,3 +218,4 @@ import NautyVerified.Proofs.Harness.PartMain
 import NautyVerified.Proofs.Harness.InputMain
 import NautyVerified.Proofs.Harness.Phases
 import NautyVerified.Proofs.Harness.Main
+import NautyVerified.Proofs.Harness.Facts

@@ -25,16 +25,22 @@ set_option linter.unusedSimpArgs false
 
 variable {n k : Nat}
 
-/-- The sweep invariant of an off-path node. -/
-def SweepOkOff (G : Colored n k) (level numcells tc : Nat) (cell : VSet n) (cursor : Option Nat)
+/-- The renamed-run part of `SweepOkOff`. -/
+def SweepOkOff₀ (G : Colored n k) (level numcells tc : Nat) (cell : VSet n) (cursor : Option Nat)
     (st : Search n) : Prop :=
   ∃ t st₂, st = tw (phi (n + 2) nautyInfinity) t st₂ ∧ 1 ≤ level ∧ SearchOk G level numcells st₂ ∧
     Generic.Target (fun st => st) level tc cell st₂ ∧ (∀ v, cursor = some v → cell.mem v = true) ∧
     Inv st₂ ∧ ∃ last, Depth last st₂ ∧ AgreeTo (last + 1) t st₂.firsttc
 
-/-- An off-path node that reaches its sweep starts it in `SweepOkOff`. -/
-theorem nodeOk_sweepOff {G : Colored n k} {level numcells : Nat} {st : Search n}
-    (hn0 : 0 < n) (hn : n + 2 < nautyInfinity) (h : NodeOk G false level numcells st)
+/-- The sweep invariant of an off-path node: the renamed-run part and the level
+counters (`GcaSw`). -/
+def SweepOkOff (G : Colored n k) (level numcells tc : Nat) (cell : VSet n) (cursor : Option Nat)
+    (st : Search n) : Prop :=
+  SweepOkOff₀ G level numcells tc cell cursor st ∧ GcaSw level st
+
+/-- The renamed-run part of `nodeOk_sweepOff`. -/
+theorem nodeOk_sweepOff₀ {G : Colored n k} {level numcells : Nat} {st : Search n}
+    (hn0 : 0 < n) (hn : n + 2 < nautyInfinity) (h : NodeOk₀ G false level numcells st)
     (ctx : Ctx n) (tcLevel : Nat) :
     let v := visit ctx level numcells st
     let st₁ := compareCodes level v.2.1 v.2.2
@@ -42,7 +48,7 @@ theorem nodeOk_sweepOff {G : Colored n k} {level numcells : Nat} {st : Search n}
     let cl := classify ctx level v.1 ct.2.2.2
     let lx := leafExit cl.1 level cl.2
     lx.1 = .done →
-      SweepOkOff G level v.1 ct.1.toNat ct.2.1 (ct.2.1.nextElem none) (cheapCheck false level lx.2) := by
+      SweepOkOff₀ G level v.1 ct.1.toNat ct.2.1 (ct.2.1.nextElem none) (cheapCheck false level lx.2) := by
   obtain ⟨t, st₀, rfl, hlevel, hok, hinv, -, hoff⟩ := h
   obtain ⟨last, hd, ha⟩ := hoff rfl
   have hln := level_le_of_ok hok
@@ -130,11 +136,27 @@ theorem nodeOk_sweepOff {G : Colored n k} {level numcells : Nat} {st : Search n}
     fun v hv => VSet.nextElem_mem hv, hchi, last, hchd, ?_⟩
   rw [(hrf hchf).1, hf5, (hrf hvf).1]; exact ha
 
+/-- An off-path node that reaches its sweep starts it in `SweepOkOff`. -/
+theorem nodeOk_sweepOff {G : Colored n k} {level numcells : Nat} {st : Search n}
+    (hn0 : 0 < n) (hn : n + 2 < nautyInfinity) (h : NodeOk G false level numcells st)
+    (ctx : Ctx n) (tcLevel : Nat) :
+    let v := visit ctx level numcells st
+    let st₁ := compareCodes level v.2.1 v.2.2
+    let ct := chooseTarget false ctx tcLevel level v.1 st₁
+    let cl := classify ctx level v.1 ct.2.2.2
+    let lx := leafExit cl.1 level cl.2
+    lx.1 = .done →
+      SweepOkOff G level v.1 ct.1.toNat ct.2.1 (ct.2.1.nextElem none) (cheapCheck false level lx.2) :=
+  fun hd => ⟨nodeOk_sweepOff₀ hn0 hn h.1 ctx tcLevel hd,
+    gcaSw_sweepOff ctx tcLevel level numcells st (h.2 rfl) hd⟩
+
 /-- Each child of an off-path sweep is called in `NodeOk`. -/
 theorem sweepOkOff_child {G : Colored n k} {level numcells tc tv : Nat} {cell : VSet n}
     {st : Search n} (hn0 : 0 < n) (h : SweepOkOff G level numcells tc cell (some tv) st)
     (ctx : Ctx n) (tcLevel : Nat) :
     NodeOk G false (level + 1) (numcells + 1) (child false level tc tv st) := by
+  obtain ⟨h, hg⟩ := h
+  refine ⟨?_, fun _ => gcaOk_child hg false tc tv⟩
   obtain ⟨t, st₀, rfl, hlevel, hok, htarget, hcur, hinv, last, hd, ha⟩ := h
   have hln := level_le_of_ok hok
   have R := reachPolicy G ctx tcLevel hn0
