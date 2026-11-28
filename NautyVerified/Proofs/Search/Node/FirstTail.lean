@@ -174,4 +174,181 @@ theorem wp_fpnTail {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
         hQd m' (by simp [tailRes, ht]) (by simpa [tailRes, ht] using h')
   · exact absurd rfl hE
 
+/-! ### For any dispatch representation and search policy -/
+
+section Generic
+
+open NautyVerified.Proofs.Dispatch (Ops DispatchRep)
+
+variable {ge : genv} [E : NautyEnv ge] {O : Ops} {D : DispatchRep ge O}
+  [P : Generic.Policy (SearchState n (O.Canon n)) n (γ := O.Gr n)]
+
+/-- `tailRes` for the policy `P`. -/
+def tailResG (level : Nat) (exit : Exit) (cell : VSet n) (s : SearchState n (O.Canon n)) :
+    Exit × VSet n × SearchState n (O.Canon n) :=
+  match exit with
+  | .fuel => (.fuel, cell, s)
+  | .unwind target short =>
+    if target < level then (.unwind target short, cell, s) else
+      ((.done), (if short then P.shortprune cell s else cell), P.recover nautyInf level s)
+  | .done => (.done, cell, P.recover nautyInf level s)
+
+theorem firstChildG_orb (G : O.Gr n) (tl fuel level nc tc tv1 tv : Nat) (cell : VSet n)
+    (st : SearchState n (O.Canon n)) (ho : (P.orbit st tv == tv) = true) :
+    firstChildG G nautyInf tl fuel level nc tc tv1 tv cell st =
+      let r := Generic.node (tv == tv1) G nautyInf tl fuel (level + 1) (nc + 1)
+        (P.child true level tc tv st)
+      let s := if tv == tv1 then P.afterChildFirst level tv1 r.2 else r.2
+      tailResG level r.1 cell (P.leaveChild tv s) := by
+  simp only [firstChildG, ho, ite_true]
+  rcases (Generic.node (tv == tv1) G nautyInf tl fuel (level + 1) (nc + 1)
+    (P.child true level tc tv st)).1 with _ | ⟨target, short⟩ | _ <;> rfl
+
+/-- `wp_fpnPruneRec` for `D` and `P`. -/
+theorem wp_fpnPruneRecG (Lk : PolicyLink O n) {f : function} {Q : Post} {e : env} {le : temp_env}
+    {m : mem} (L : LCtxG D n) {s : SearchState n (O.Canon n)} {nsp : Bool} {cell : VSet n}
+    {ch : List (block × block)}
+    (h : LoopAtG L m s false nsp cell ch) (hnz : nsp = true → 0 < s.autos.size)
+    (hge : ∀ x ∈ [dense.id.«nauty:needshortprune», dense.id.«nauty:fmptr», dense.id.«nauty:m»,
+      dense.id.«shortprune», dense.id.«nauty:recover»], PTree.get x e = none)
+    (htl : PTree.get dense.id.tcell le = some (.Vptr L.btc Ptrofs.zero))
+    (hptn : PTree.get dense.id.«ptn» le = some (.Vptr L.S.bp L.S.pofs))
+    (hlev : PTree.get dense.id.«level» le = some (.Vint (ir L.level))) (hln : L.level ≤ n)
+    (hQ : ∀ m', LoopAtG L m' (P.recover nautyInf L.level s) false false
+      (if nsp then P.shortprune cell s else cell) ch → Q.normal E0 e le m') :
+    Wp xi ge f (.Ssequence (Set.sk Othernode.prune0) recCall) Q e le m := by
+  simp only [List.forall_mem_cons] at hge
+  obtain ⟨g1, g2, g3, g4, g5, -⟩ := hge
+  obtain ⟨tw, hta, htr⟩ := h.cell
+  have hmem := List.mem_of_getElem? h.chain.own
+  obtain ⟨-, hbS, -, hbW⟩ := h.chain.ok.apart _ hmem
+  have hl1 := h.chain.lvl
+  have hd := h.search.lit
+  wp_step; wp_step; wp_step
+  refine wp_prune0G h.search g1 g2 g3 g4 htl hta htr hbS hbW hnz ?_
+  intro m₁ tw' hS₁ hta' htr' hu₁ hg₁ hk₁
+  have h₁ : LoopAtG L m₁ s false false (if nsp then P.shortprune cell s else cell) ch := by
+    refine h.step hS₁ (hu₁.mono fun z hz => by
+        rcases hz with rfl | rfl
+        · exact .inl ⟨SLoc.mem_litG (by simp [SLoc.litG]), by sep_ne hd, by sep_ne hd⟩
+        · exact .inr (.inr (.inr rfl)))
+      hg₁ (fun z hz => .inl ((h.search.work.unch hu₁ ?_ ?_ ?_ hg₁).2 z hz)) ⟨tw', hta', ?_⟩ hk₁
+    · intro z hz hW
+      rcases hW with rfl | rfl
+      · exact h.search.lit_globs _ (by simp [SLoc.litG]) (D.wglobs_sub _ hz)
+      · exact hbS (SLoc.mem_blocksG_of D (.inr (.inr (.inr (.inr (.inr (D.wglobs_sub _ hz)))))))
+    · refine ⟨fun hW => ?_, fun hW => ?_⟩ <;> rcases hW with hW | hW
+      · exact (by sep_ne hd : E.nautilWorkperm ≠ E.needshortprune) hW
+      · exact hbS (hW ▸ SLoc.mem_litG (by simp [SLoc.litG]))
+      · exact (by sep_ne hd : E.nautilWorkpermSz ≠ E.needshortprune) hW
+      · exact hbS (hW ▸ SLoc.mem_litG (by simp [SLoc.litG]))
+    · intro z hz hW
+      rcases hW with rfl | rfl
+      · exact h.search.work_not hz (SLoc.mem_litG (by simp [SLoc.litG]))
+      · exact hbW hz
+    · cases nsp
+      · simpa using htr'
+      · simpa [Lk.shortprune_eq] using htr'
+  simp only [seqPost, Post.after, E0_append]
+  refine wp_nodeRecoverG h₁.search g5 hptn hlev hl1 hln ?_
+  intro m₂ hS₂ hF₂ hW₂
+  obtain ⟨tw₁, hta₁, htr₁⟩ := h₁.cell
+  have hbS' : ¬ (L.S.ChgG D L.gl L.cl L.btc ∨ ¬ Mem.valid_block m₁ L.btc ∨ IsWorkG D m₁ L.btc) := by
+    obtain ⟨-, a2, -, a4⟩ := h₁.chain.ok.apart _ hmem
+    rintro (⟨h1, -⟩ | h2 | h3)
+    · exact a2 h1
+    · exact h2 (h₁.chain.ok.valid _ hmem).2
+    · exact a4 h3
+  exact hQ m₂ (h₁.step (hS₂.same (Lk.recover_same _ _ _)) (hF₂.1.mono fun z hz => by
+      rcases hz with hz | hz | hz
+      · exact .inl hz
+      · exact .inr (.inl hz)
+      · exact .inr (.inr (.inl hz))) hF₂.2 hW₂ ⟨tw₁, hta₁.unch hF₂.1 hbS', htr₁⟩
+      (Alloc.Keep.unch hF₂.1 hbS'))
+
+set_option maxHeartbeats 4000000 in
+/-- `wp_fpnTail` for `D` and `P`: `tailResG`. -/
+theorem wp_fpnTailG (Lk : PolicyLink O n) {f : function} {Q : Post} {e : env} {le : temp_env}
+    {m : mem} (L : LCtxG D n) {s : SearchState n (O.Canon n)} {cell : VSet n}
+    {ch : List (block × block)} {tv : Nat} {X : Exit}
+    (h : LoopAtG L m s false (exitValue (L.level + 1) X).2 cell ch) (hX : X ≠ .fuel)
+    (htg : ∀ tg sh, X = .unwind tg sh → tg < L.level + 1)
+    (hnz : (exitValue (L.level + 1) X).2 = true → 0 < s.autos.size)
+    (hfr : f.fn_return = tint)
+    (hge : ∀ x ∈ [dense.id.«nauty:fixedpts», dense.id.«nauty:bit», dense.id.«nauty:needshortprune»,
+      dense.id.«nauty:fmptr», dense.id.«nauty:m», dense.id.«shortprune», dense.id.«nauty:recover»],
+      PTree.get x e = none)
+    (htv : PTree.get dense.id.«tv» le = some (.Vint (ir tv))) (hv : tv < n)
+    (hrt : PTree.get dense.id.«rtnlevel» le = some (.Vint (ir (exitValue (L.level + 1) X).1)))
+    (htl : PTree.get dense.id.tcell le = some (.Vptr L.btc Ptrofs.zero))
+    (hptn : PTree.get dense.id.«ptn» le = some (.Vptr L.S.bp L.S.pofs))
+    (hlev : PTree.get dense.id.«level» le = some (.Vint (ir L.level))) (hln : L.level ≤ n)
+    (hQd : ∀ m', (tailResG L.level X cell (P.leaveChild tv s)).1 = .done →
+      LoopAtG L m' (tailResG L.level X cell (P.leaveChild tv s)).2.2 false false
+        (tailResG L.level X cell (P.leaveChild tv s)).2.1 ch →
+      Q.normal E0 e le m')
+    (hQr : ∀ m' target short, X = .unwind target short → target < L.level →
+      LoopAtG L m' (P.leaveChild tv s) false short cell ch →
+      match Mem.free_list m' (blocks_of_env ge e) with
+      | some m'' => Q.ret E0 (.Vint (ir target)) m''
+      | none => False) :
+    Wp xi ge f (.Ssequence (Set.delElementG dense.id.«nauty:fixedpts» dense.id.«nauty:bit»
+        (Refine.tv dense.id.«tv»))
+      (.Ssequence (Set.sk earlyRet) (.Ssequence (Set.sk Othernode.prune0) recCall))) Q e le m := by
+  simp only [List.forall_mem_cons] at hge
+  obtain ⟨g1, g2, g3, g4, g5, g6, g7, -⟩ := hge
+  have hd := h.search.lit
+  have hl1 := h.chain.lvl
+  have hnl := h.search.nlt
+  wp_step
+  refine wp_fixDelG h.search g1 g2 htv hv ?_
+  intro m₁ hS₁ hu₁ hg₁
+  have h₁ : LoopAtG L m₁ (P.leaveChild tv s) false (exitValue (L.level + 1) X).2 cell ch := by
+    rw [Lk.leaveChild_eq]
+    refine h.small hS₁ hu₁ hg₁ (fun z hz => by
+        subst hz; exact ⟨SLoc.mem_litG (by simp [SLoc.litG]), by sep_ne hd, by sep_ne hd⟩)
+      (fun z hz e => by
+        subst e; exact h.search.lit_globs _ (by simp [SLoc.litG]) (D.wglobs_sub _ hz))
+      ⟨by sep_ne hd, by sep_ne hd⟩
+  have hnz' : (exitValue (L.level + 1) X).2 = true → 0 < (P.leaveChild tv s).autos.size := by
+    rw [Lk.leaveChild_eq]; exact hnz
+  simp only [seqPost, Post.after, E0_append]
+  wp_step; wp_step; wp_step
+  simp only [earlyRet]
+  apply wp_if_eval
+  rcases X with _ | ⟨target, short⟩ | _
+  · -- done
+    rw [Processnode.eval_ltI (x := ((L.level + 1 : Nat) : Int)) (y := (L.level : Int))
+      (by simpa [Exec.evalExpr, Refine.tv, exitValue] using hrt) (by simp [Exec.evalExpr, Refine.tv, hlev])
+      rfl rfl ⟨by omega, by omega⟩ ⟨by omega, by omega⟩]
+    rw [decide_eq_false (by omega)]
+    simp only [show Cfrontend.Cop.bool_val (Val.of_bool false) tint m₁ = some false from rfl,
+      Bool.false_eq_true, ite_false]
+    apply wp_skip
+    simp only [E0_append]
+    exact wp_fpnPruneRecG Lk L h₁ (fun h => by simp [exitValue] at h) (by simp [g3, g4, g5, g6, g7])
+      htl hptn hlev hln fun m' h' => hQd m' rfl (by simpa [tailResG, exitValue] using h')
+  · -- unwind
+    simp only [exitValue] at hrt hnz' h₁
+    rw [Processnode.eval_ltI (x := (target : Int)) (y := (L.level : Int))
+      (by simpa [Exec.evalExpr, Refine.tv] using hrt) (by simp [Exec.evalExpr, Refine.tv, hlev])
+      rfl rfl ⟨by omega, by have := htg _ _ rfl; omega⟩ ⟨by omega, by omega⟩]
+    by_cases ht : target < L.level
+    · rw [decide_eq_true (by omega)]
+      simp only [show Cfrontend.Cop.bool_val (Val.of_bool true) tint m₁ = some true from rfl, ite_true]
+      wp_step; wp_step
+      apply wp_return_some_eval
+      simp only [Exec.evalExpr, Refine.tv, hrt, typeof, hfr]
+      exact hQr m₁ target short rfl ht h₁
+    · rw [decide_eq_false (by omega)]
+      simp only [show Cfrontend.Cop.bool_val (Val.of_bool false) tint m₁ = some false from rfl,
+        Bool.false_eq_true, ite_false]
+      apply wp_skip
+      simp only [E0_append]
+      exact wp_fpnPruneRecG Lk L h₁ hnz' (by simp [g3, g4, g5, g6, g7]) htl hptn hlev hln
+        fun m' h' => hQd m' (by simp [tailResG, ht]) (by simpa [tailResG, ht] using h')
+  · exact absurd rfl hX
+
+end Generic
+
 end NautyVerified.Proofs.Search
