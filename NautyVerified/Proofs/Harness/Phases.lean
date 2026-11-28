@@ -84,7 +84,8 @@ theorem wp_phases {n k : Nat} (G : Colored n k) (gens : List (Array Nat))
     (hcgz : ArrayAt m .Mint64 bc 0 (fun _ => .Vlong (lr 0)) (wordsOf n * n))
     (hQ : ∀ t1 t2 m', Reads t1 ((colours G).map (fun c : Nat => (c : Int)) ++ [(es.length : Int)] ++
         edgeIns es es.length) →
-      Writes t2 (gensWords gens n ++ outWords G) → Q.ret (t1 ++ t2) (.Vint (ir 0)) m') :
+      NautyVerified.Proofs.Search.Emits t2 (gensWords gens n ++ outWords G) →
+      Q.ret (t1 ++ t2) (.Vint (ir 0)) m') :
     Wp Statement.xi ge dense.fn.main tInput Q (envOf bst) le m := by
   simp only [List.mem_cons, List.mem_nil_iff, or_false, forall_eq_or_imp, forall_eq] at hnew
   obtain ⟨nst, ncol, nl, np, no, ng, nc⟩ := hnew

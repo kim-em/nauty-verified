@@ -144,8 +144,8 @@ theorem wp_tCall {n k : Nat} (G : Colored n k) (gens : List (Array Nat)) {Q : Po
       .Vptr bl Ptrofs.zero, .Vptr bp Ptrofs.zero, .Vptr bo Ptrofs.zero,
       .Vptr Block.options Ptrofs.zero, .Vptr bst Ptrofs.zero,
       .Vint (ir (wordsOf n)), .Vint (ir n), .Vptr bc Ptrofs.zero] m)
-    (hQ : ∀ t m', Writes t (NautyVerified.Proofs.Search.gensWords gens n ++ outWords G) →
-      Q.ret t (.Vint (ir 0)) m') :
+    (hQ : ∀ t m', NautyVerified.Proofs.Search.Emits t
+      (NautyVerified.Proofs.Search.gensWords gens n ++ outWords G) → Q.ret t (.Vint (ir 0)) m') :
     Wp Statement.xi ge dense.fn.main tCall Q (envOf bst) le m := by
   wp_step; wp_step; wp_step
   refine wp_call (vf := .Vptr Block.densenauty Ptrofs.zero) (cc := cc_default)
@@ -168,6 +168,6 @@ theorem wp_tCall {n k : Nat} (G : Colored n k) (gens : List (Array Nat)) {Q : Po
   · rfl
   rintro t v m' ⟨hw, hlab, horb, hcg, h1, h2, h3, h4, h5, h6, h7, h8, hfree, -⟩
   exact wp_tOut G hfacts hN hMN hn hm hl ho hc hlab horb hcg
-    ⟨h1, h2, h3, h4, h5, h6, h7, h8, hfree⟩ fun t' m'' hw' => hQ _ m'' (hw.append hw')
+    ⟨h1, h2, h3, h4, h5, h6, h7, h8, hfree⟩ fun t' m'' hw' => hQ _ m'' (hw.append hw'.emits)
 
 end NautyVerified.Proofs.Harness

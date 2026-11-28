@@ -4,7 +4,6 @@ import NautyVerified.Proofs.Search.Node.Firstpathnode
 /-!
 # The kill check and the cheap test of `firstpathnode0`
 
-- `Emits.append`: emitted words concatenate along traces;
 - `wp_fpnKill`: `t710 = nauty_kill_request; if (t710) return -12;` in the
   execution whose volatile read returns 0: the trace is that one read, which
   emits nothing;
@@ -29,44 +28,6 @@ set_option linter.unusedSimpArgs false
 
 variable {xi : ExternalCalls} {n : Nat}
 
-theorem writes_app : ∀ t₁ t₂ : List event, Statement.writes (List.append t₁ t₂) =
-    Statement.writes t₁ ++ Statement.writes t₂
-  | [], _ => rfl
-  | ev :: t₁, t₂ => by
-    have ih : Statement.writes (t₁ ++ t₂) = _ := writes_app t₁ t₂
-    show Statement.writes (ev :: List.append t₁ t₂) = _
-    rcases ev with ⟨name, args, res⟩ | _ | _ | _
-    · rcases args with _ | ⟨a, _ | ⟨b, rest⟩⟩
-      · simpa [Statement.writes] using ih
-      · rcases a <;> simp only [Statement.writes] <;> (try split) <;> simp [ih]
-      · simpa [Statement.writes] using ih
-    all_goals simpa [Statement.writes] using ih
-
-theorem reads_app : ∀ t₁ t₂ : List event, Statement.reads (List.append t₁ t₂) =
-    Statement.reads t₁ ++ Statement.reads t₂
-  | [], _ => rfl
-  | ev :: t₁, t₂ => by
-    have ih : Statement.reads (t₁ ++ t₂) = _ := reads_app t₁ t₂
-    show Statement.reads (ev :: List.append t₁ t₂) = _
-    rcases ev with ⟨name, args, res⟩ | _ | _ | _
-    · rcases args with _ | ⟨a, rest⟩
-      · simp only [Statement.reads]; split <;> simp [ih]
-      · simpa [Statement.reads] using ih
-    all_goals simpa [Statement.reads] using ih
-
-theorem Emits.append {t₁ t₂ : trace} {l₁ l₂ : List Int} (h₁ : Emits t₁ l₁) (h₂ : Emits t₂ l₂) :
-    Emits (t₁ ++ t₂) (l₁ ++ l₂) := by
-  obtain ⟨w1, r1, v1⟩ := h₁
-  obtain ⟨w2, r2, v2⟩ := h₂
-  refine ⟨?_, ?_, ?_⟩
-  · exact (writes_app t₁ t₂).trans (by rw [w1, w2])
-  · exact (reads_app t₁ t₂).trans (by rw [r1, r2]; rfl)
-  · intro c i o ev hm
-    rcases List.mem_append.1 hm with hm | hm
-    · exact v1 c i o ev hm
-    · exact v2 c i o ev hm
-
-theorem Emits.nil : Emits [] [] := Writes.nil.emits
 
 /-- The kill flag's volatile read of 0. -/
 abbrev killEv : event := .Event_vload .Mint32 dense.id.«nauty_kill_request» Ptrofs.zero (.EVint Int.zero)

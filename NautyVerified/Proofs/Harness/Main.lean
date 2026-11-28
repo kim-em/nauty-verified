@@ -104,7 +104,7 @@ def IOOnly (t : trace) : Prop :=
 def mainSpec {n k : Nat} (G : Colored n k) (ins : List Int) : FunSpec where
   pre args m := args = [] ∧ Genv.init_mem Init.prog = some m
   post _ _ t v _ := v = .Vint (ir 0) ∧ Statement.reads t = ins.map some ∧
-    Statement.writes t = Statement.expected G ∧ IOOnly t
+    Statement.writes t = Statement.expected G ∧ Statement.VloadsZero t
 
 theorem Reads.ioOnly {t : trace} {l : List Int} (h : Reads t l) : IOOnly t := by
   induction h with
@@ -398,15 +398,17 @@ theorem main_satisfies {n k : Nat} (G : Colored n k) (gens : List (Array Nat)) (
       have eT : tr1 (readEv (lr (n : Int))) ++ E0 ++ (t1 ++ t2) =
           (tr1 (readEv (lr (n : Int))) ++ t1) ++ (t2 ++ E0) := by
         rw [append_E0, append_E0, trace_append_assoc]
-      have hnil : Writes E0 [] := Writes.nil
+      obtain ⟨hw1, hw2, hw3⟩ := hw
       refine ⟨rfl, ?_, ?_, ?_⟩
-      · rw [eT, hR.reads, Harness.Writes.reads hw]
+      · rw [eT, hR.reads, append_E0, hw2]
         show _ ++ ([] : List (Option Int)) = _
         simp [colours, edgeIns, List.map_map, Function.comp_def]
-      · rw [eT, hR.writes, Harness.Writes.writes hw, hgens, expected_eq]
-        show _ ++ ([] : List Int) = _
-        simp
-      · rw [eT]
-        exact (hrd.ioOnly.append hr.ioOnly).append ((Harness.Writes.ioOnly hw).append (Harness.Writes.ioOnly hnil))
+      · rw [eT, hR.writes, append_E0, hw1, hgens, expected_eq]
+      · rw [eT, append_E0]
+        intro c i o ev hm
+        rcases List.mem_append.1 hm with hm | hm
+        · obtain ⟨_, _, _, h⟩ := (hrd.ioOnly.append hr.ioOnly) _ hm
+          cases h
+        · exact hw3 c i o ev hm
 
 end NautyVerified.Proofs.Harness

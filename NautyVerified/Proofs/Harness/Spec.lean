@@ -1,4 +1,4 @@
-import NautyVerified.Proofs.Search.Spec
+import NautyVerified.Proofs.Search.Node.Spec
 import NautyVerified.Proofs.Init.Tables
 import NautyVerified.Statement.Harness
 
@@ -18,7 +18,8 @@ import NautyVerified.Statement.Harness
 - `orbits`, `canong` and the `statsblk` `stats` writable.
 
 Afterwards the trace writes the generators `gens`, in order (`gensWords
-gens`, which is what `emit_generator` writes for them). `gens` is a
+gens`, which is what `emit_generator` writes for them), reads no input and
+reads 0 from every volatile location (`Emits`). `gens` is a
 parameter: it is the list of generators nauty emits (one each time
 `numgenerators` increases), which `main` forwards to its output and the
 caller relates to `Statement.expected`'s first block. Memory holds the
@@ -38,7 +39,7 @@ open NautyVerified NautyVerified.Logic NautyVerified.Program NautyVerified.Word 
 open NautyVerified.Source
 open NautyVerified.Proofs.Set (longs)
 open NautyVerified.Proofs.Graph (GraphAt)
-open NautyVerified.Proofs.Search (FieldAt Writes gensWords)
+open NautyVerified.Proofs.Search (FieldAt Writes Emits gensWords)
 open Hex.GraphIso Hex.GraphIso.Nauty
 
 namespace Block
@@ -119,7 +120,7 @@ def densenautySpec {n k : Nat} (G : Colored n k) (gens : List (Array Nat)) (bg b
     0 < n ∧ n ≤ 65536
   post _ m t _ m' :=
     let r := runColoredTraced G
-    Writes t (gensWords gens n) ∧
+    Emits t (gensWords gens n) ∧
     ArrayAt m' .Mint32 bl 0 (ints r.result.canonlab) n ∧
     ArrayAt m' .Mint32 bo 0 (ints (Statement.finalState G).orbits) n ∧
     (∃ cw, ArrayAt m' .Mint64 bc 0 (longs cw) (wordsOf n * n) ∧
