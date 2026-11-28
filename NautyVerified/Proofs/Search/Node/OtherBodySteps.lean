@@ -11,6 +11,11 @@ import NautyVerified.Proofs.Search.Node.NodePrologue
   configuration has no node callback;
 - `wp_firstNext`: `t714 = nextelement(tcell, M, -1); t715 = t714; tv = t715; tv1 = t715;`
   is the target cell's first element.
+
+`wp_otherKillG`, `wp_codeSetG`, `wp_invstat0G`, `wp_userNodeG` and
+`wp_firstNextG` are the same for any `NautyEnv` (over `SearchAtG D`);
+`NautyEnv.senv_killRequest` and `NautyEnv.volatile_killRequest` give the kill
+flag's volatile read.
 -/
 
 namespace NautyVerified.Proofs.Search
@@ -156,5 +161,150 @@ theorem wp_firstNext {f : function} {Q : Post} {e : env} {le : temp_env} {m : me
     rw [Exec.evalExpr, temps_gso _ _ (show idOf 715 ≠ dense.id.tv by decide), temps_gss]
     simp only [E0_append]
     exact hQ r (Refine.next_eq hrep hspec)
+
+/-! ### For any `NautyEnv` -/
+
+section Generic
+
+open NautyVerified.Proofs.Dispatch (Ops DispatchRep)
+
+variable {ge : genv} [E : NautyEnv ge] {O : Ops} {D : DispatchRep ge O}
+
+theorem _root_.NautyVerified.Program.NautyEnv.senv_killRequest :
+    Senv.find_symbol (Genv.to_senv ge.genv_genv) dense.id.«nauty_kill_request» =
+      some E.killRequest :=
+  E.find_killRequest
+
+theorem senv_volatile {F V : Type} (g : Genv.t F V) (b : block) :
+    Senv.block_is_volatile (Genv.to_senv g) b =
+      match Genv.find_var_info g b with
+      | none => false
+      | some gv => gv.gvar_volatile := rfl
+
+theorem _root_.NautyVerified.Program.NautyEnv.volatile_killRequest :
+    Senv.block_is_volatile (Genv.to_senv ge.genv_genv) E.killRequest = true := by
+  rw [senv_volatile, E.var_killRequest, ← senv_volatile]
+  exact NautyVerified.Proofs.Search.volatile_killRequest
+
+/-- `wp_otherKill` over any `NautyEnv`. -/
+theorem wp_otherKillG {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
+    (hge : PTree.get dense.id.«nauty_kill_request» e = none)
+    (hQ : Q.normal [killEv] e (PTree.set (idOf 708) (.Vint Int.zero) le) m) :
+    Wp xi ge f (.Ssequence
+      (sk (.Sbuiltin (some (idOf 708)) (.EF_vload .Mint32)
+        [tptr (Cfrontend.Ctypes.Tint .I32 .Signed NautyVerified.Proofs.vattr)]
+        [.Eaddrof (.Evar dense.id.«nauty_kill_request»
+            (Cfrontend.Ctypes.Tint .I32 .Signed NautyVerified.Proofs.vattr))
+          (tptr (Cfrontend.Ctypes.Tint .I32 .Signed NautyVerified.Proofs.vattr))]))
+      (.Sifthenelse (.Etempvar (idOf 708) (Cfrontend.Ctypes.Tint .I32 .Signed NautyVerified.Proofs.vattr))
+        (sk (.Sreturn (some (.Eunop .Oneg (ci 12 tint) tint)))) .Sskip)) Q e le m := by
+  wp_step; wp_step; wp_step
+  refine wp_builtin (vargs := [.Vptr E.killRequest Ptrofs.zero]) (t := [killEv])
+    (vres := .Vint Int.zero) (m' := m) ?_ ?_ ?_
+  · simp only [Exec.evalExprlist, Exec.evalExpr, Exec.evalLvalue, Exec.lvalOfVar, hge,
+      E.find_killRequest, typeof]
+    rfl
+  · have hv := volatile_load_vol (ge := Genv.to_senv ge.genv_genv) .Mint32 m E.killRequest
+      Ptrofs.zero dense.id.«nauty_kill_request» (.EVint Int.zero) (.Vint Int.zero)
+      NautyEnv.volatile_killRequest NautyEnv.senv_killRequest (ev_match_int _)
+    exact volatile_load_sem_intro _ _ _ _ _ hv
+  simp only [set_opttemp, seqPost, Post.after]
+  apply wp_if_eval
+  simp only [Exec.evalExpr, temps_gss, typeof]
+  rw [show Cfrontend.Cop.bool_val (.Vint Int.zero)
+    (Cfrontend.Ctypes.Tint .I32 .Signed NautyVerified.Proofs.vattr) m = some false from rfl]
+  simp only [Bool.false_eq_true, ite_false]
+  apply wp_skip
+  exact hQ
+
+omit E in
+/-- `wp_codeSet` over any global environment. -/
+theorem wp_codeSetG {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {bk : block}
+    {c : Nat} (hek : PTree.get dense.id.refcode e = some (bk, tint))
+    (hkv : Mem.load .Mint32 m bk (zOfInt 0) = some (.Vint (ir c))) (hc : c < 32768)
+    (hQ : Q.normal E0 e (PTree.set dense.id.code (.Vint (ir c)) le) m) :
+    Wp xi ge f (sk (.Sset dense.id.«code» (.Ecast (.Ecast (.Evar dense.id.«refcode» tint) tshort)
+      tshort))) Q e le m := by
+  wp_step; wp_step
+  apply wp_set_eval
+  rw [Exec.evalExpr, Exec.evalExpr, eval_local hek hkv]
+  simp only [typeof, cop, sign_ext16_ir (a := (c : Int)) (by omega) (by omega)]
+  exact hQ
+
+omit E in
+/-- `wp_invstat0` over any global environment. -/
+theorem wp_invstat0G {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {bq : block}
+    (heq : PTree.get dense.id.qinvar e = some (bq, tint))
+    (hqv : Mem.load .Mint32 m bq (zOfInt 0) = some (.Vint (ir 0)))
+    (hQ : Q.normal E0 e le m) :
+    Wp xi ge f (sk Othernode.invstat) Q e le m := by
+  wp_step; wp_step
+  apply wp_if_eval
+  rw [Exec.evalExpr, eval_local heq hqv]
+  simp only [Exec.evalExpr, typeof, cop]
+  rw [ir_lt (a := 0) (b := 0) ⟨by decide, by decide⟩ ⟨by decide, by decide⟩]
+  simp only [Int.lt_irrefl, decide_false]
+  exact wp_skip hQ
+
+/-- `wp_userNode` over `SearchAtG D`. -/
+theorem wp_userNodeG {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {S : SLoc}
+    {gl : D.GLoc} {cl : D.CLoc} {G : O.Gr n} {st : SearchState n (O.Canon n)} {pre nsp : Bool}
+    (h : SearchAtG D m S gl cl G st pre nsp)
+    (hE : PTree.get dense.id.«nauty:usernodeproc» e = none) {τ : Cfrontend.Ctypes.type}
+    {call : statement} (hQ : Q.normal E0 e le m) :
+    Wp xi ge f (sk (.Sifthenelse (.Ebinop .One (.Evar dense.id.«nauty:usernodeproc» (tptr τ))
+      (.Ecast (ci 0 tint) (tptr .Tvoid)) tint) call .Sskip)) Q e le m := by
+  wp_step; wp_step
+  apply wp_if_eval
+  simp only [Exec.evalExpr, Exec.lvalOfVar, hE, E.find_usernodeproc, Exec.derefLoc,
+    Cfrontend.Ctypes.access_mode, Mem.loadv, Alloc.Mptr_eq,
+    show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl, h.fixed.usernodeproc.load, typeof]
+  exact wp_skip hQ
+
+/-- `wp_firstNext` over `SearchAtG D`. -/
+theorem wp_firstNextG {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
+    {S : SLoc} {gl : D.GLoc} {cl : D.CLoc} {G : O.Gr n} {st : SearchState n (O.Canon n)}
+    {pre nsp : Bool} (h : SearchAtG D m S gl cl G st pre nsp)
+    (hge : ∀ x ∈ [dense.id.«nextelement», dense.id.«nauty:m»], PTree.get x e = none)
+    {btc : block} (htl : PTree.get dense.id.tcell le = some (.Vptr btc Ptrofs.zero))
+    {tw : Nat → Lib.Integers.int64} (htw : ArrayAt m .Mint64 btc 0 (longs tw) S.M)
+    {cell : VSet n} (hrep : SetRep (fun w => bv64 (tw w)) S.M cell)
+    (hQ : ∀ r : Int, ((cell.nextElem none = none ∧ r = -1) ∨
+        ∃ v : Nat, cell.nextElem none = some v ∧ r = v) →
+      Q.normal E0 e (PTree.set dense.id.«tv1» (.Vint (ir r)) (PTree.set dense.id.«tv» (.Vint (ir r))
+        (PTree.set (idOf 715) (.Vint (ir r)) (PTree.set (idOf 714) (.Vint (ir r)) le)))) m) :
+    Wp xi ge f firstNext Q e le m := by
+  have hM1 := h.M1
+  have hMl := h.Mlt
+  have hnM := h.nM
+  simp only [List.forall_mem_cons] at hge
+  obtain ⟨g1, g2, -⟩ := hge
+  wp_step; wp_step; wp_step; wp_step; wp_step
+  refine wp_call (vf := .Vptr E.nextelement Ptrofs.zero) (targs := [tptr tulong, tint, tint])
+    (tres := tint) (cc := Common.AST.cc_default)
+    (vargs := [.Vptr btc Ptrofs.zero, .Vint (ir S.M), .Vint (ir (-1))]) _
+    (Nextelement.nextSpec btc Ptrofs.zero S.M (Refine.posOf none) tw)
+    (Nextelement.nextelement_satisfies _ _ _ _ _) rfl ?_ ?_
+    (by simp [Common.Globalenvs.Genv.find_funct, E.funct_nextelement]) Isautom.type_nextelement
+    ⟨rfl, by simp [Refine.posOf], by simp [Refine.posOf]; omega, hM1, by omega,
+      Graph.wordsAt_of htw, h.tables.env.left⟩ ?_
+  · simp only [Exec.evalExpr, Exec.lvalOfVar, g1, E.find_nextelement, Exec.derefLoc,
+      Cfrontend.Ctypes.access_mode]
+  · simp only [Exec.evalExprlist, Exec.evalExpr, Exec.lvalOfVar, g2, E.find_m, Exec.derefLoc,
+      Cfrontend.Ctypes.access_mode, Mem.loadv, show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl,
+      h.fixed.mm.load, htl, Refine.tv, typeof, cop]
+    rfl
+  · rintro t' v m' ⟨rfl, rfl, r, rfl, hspec⟩
+    simp only [set_opttemp, seqPost, Post.after, E0_append]
+    apply wp_set_eval
+    simp only [Exec.evalExpr, temps_gss, Refine.tv, typeof, cop]
+    apply wp_set_eval
+    simp only [Exec.evalExpr, temps_gss, Refine.tv]
+    apply wp_set_eval
+    rw [Exec.evalExpr, temps_gso _ _ (show idOf 715 ≠ dense.id.tv by decide), temps_gss]
+    simp only [E0_append]
+    exact hQ r (Refine.next_eq hrep hspec)
+
+end Generic
 
 end NautyVerified.Proofs.Search
