@@ -15,7 +15,8 @@ reading a global looks up the global environment as in `empty_env`.
 beyond `NautyEnv`: that `initstatus` names no global, so `nEnv` shadows none;
 the member offsets of `optionstruct` and of the `dispatchvec` (`_1027`) members
 `freedyn`, `check`, `init` and `cleanup`; and the size and alignment of
-`dispatchvec`, which `nauty()` copies. `TopEnv.dense` is the dense program's
+`dispatchvec`, which `nauty()` copies; the offsets of the `statsblk` members
+only `nauty()` writes. `TopEnv.dense` is the dense program's
 instance (`Top/Fields.lean`); `TopEnv.sparse`, each fact checked by the kernel
 against `sparseGe`, is not a global instance (as `NautyEnv.sparse`).
 -/
@@ -38,6 +39,18 @@ theorem noShadow_nEnv {bI : Common.Values.block} : Alloc.NoShadow (nEnv bI) := b
   by_cases h : i = dense.id.«initstatus»
   · subst h; rw [find_initstatus] at hb; cases hb
   · exact (PTree.gso _ _ h).trans rfl
+
+kernel_rfl field_statsInvapplics : ∀ (b : block) (ofs : ptrofs),
+    Exec.lvalOfField ge (Tstruct dense.id.«_1024» noattr) dense.id.«invapplics» (.Vptr b ofs) =
+      some (b, Ptrofs.add ofs (Ptrofs.repr (zOfInt 64)), .Full)
+
+kernel_rfl field_statsInvsuccesses : ∀ (b : block) (ofs : ptrofs),
+    Exec.lvalOfField ge (Tstruct dense.id.«_1024» noattr) dense.id.«invsuccesses» (.Vptr b ofs) =
+      some (b, Ptrofs.add ofs (Ptrofs.repr (zOfInt 72)), .Full)
+
+kernel_rfl field_statsInvarsuclevel : ∀ (b : block) (ofs : ptrofs),
+    Exec.lvalOfField ge (Tstruct dense.id.«_1024» noattr) dense.id.«invarsuclevel» (.Vptr b ofs) =
+      some (b, Ptrofs.add ofs (Ptrofs.repr (zOfInt 80)), .Full)
 
 /-- The program facts `nauty()`'s proofs use beyond `NautyEnv`. -/
 class TopEnv (ge : outParam genv) where
@@ -117,6 +130,16 @@ class TopEnv (ge : outParam genv) where
   /-- `sizeof` and the block-copy alignment of `dispatchvec`. -/
   sizeof_dispatch : sizeof ge.genv_cenv (Tstruct dense.id._1027 noattr) = zOfInt 88
   align_dispatch : alignof_blockcopy ge.genv_cenv (Tstruct dense.id._1027 noattr) = zOfInt 8
+  /-- The offsets of `statsblk`'s members that only `nauty()` writes. -/
+  field_statsInvapplics : ∀ (b : block) (ofs : ptrofs),
+    Exec.lvalOfField ge (Tstruct dense.id.«_1024» noattr) dense.id.«invapplics» (.Vptr b ofs) =
+      some (b, Ptrofs.add ofs (Ptrofs.repr (zOfInt 64)), .Full)
+  field_statsInvsuccesses : ∀ (b : block) (ofs : ptrofs),
+    Exec.lvalOfField ge (Tstruct dense.id.«_1024» noattr) dense.id.«invsuccesses» (.Vptr b ofs) =
+      some (b, Ptrofs.add ofs (Ptrofs.repr (zOfInt 72)), .Full)
+  field_statsInvarsuclevel : ∀ (b : block) (ofs : ptrofs),
+    Exec.lvalOfField ge (Tstruct dense.id.«_1024» noattr) dense.id.«invarsuclevel» (.Vptr b ofs) =
+      some (b, Ptrofs.add ofs (Ptrofs.repr (zOfInt 80)), .Full)
 
 instance TopEnv.dense : TopEnv ge where
   find_initstatus := NautyVerified.Proofs.Top.find_initstatus
@@ -146,6 +169,9 @@ instance TopEnv.dense : TopEnv ge where
   field_dCleanup := NautyVerified.Proofs.Top.field_dCleanup
   sizeof_dispatch := NautyVerified.Proofs.Top.sizeof_dispatch
   align_dispatch := NautyVerified.Proofs.Top.align_dispatch
+  field_statsInvapplics := NautyVerified.Proofs.Top.field_statsInvapplics
+  field_statsInvsuccesses := NautyVerified.Proofs.Top.field_statsInvsuccesses
+  field_statsInvarsuclevel := NautyVerified.Proofs.Top.field_statsInvarsuclevel
 
 namespace SparseTop
 
@@ -253,6 +279,16 @@ kernel_rfl align_dispatch :
 kernel_rfl find_initstatus :
   Common.Globalenvs.Genv.find_symbol sparseGe.genv_genv dense.id.«initstatus» = none
 
+kernel_rfl field_statsInvapplics : ∀ (b : block) (ofs : ptrofs),
+    Exec.lvalOfField sparseGe (Tstruct dense.id.«_1024» noattr) dense.id.«invapplics» (.Vptr b ofs) =
+      some (b, Ptrofs.add ofs (Ptrofs.repr (zOfInt 64)), .Full)
+kernel_rfl field_statsInvsuccesses : ∀ (b : block) (ofs : ptrofs),
+    Exec.lvalOfField sparseGe (Tstruct dense.id.«_1024» noattr) dense.id.«invsuccesses» (.Vptr b ofs) =
+      some (b, Ptrofs.add ofs (Ptrofs.repr (zOfInt 72)), .Full)
+kernel_rfl field_statsInvarsuclevel : ∀ (b : block) (ofs : ptrofs),
+    Exec.lvalOfField sparseGe (Tstruct dense.id.«_1024» noattr) dense.id.«invarsuclevel» (.Vptr b ofs) =
+      some (b, Ptrofs.add ofs (Ptrofs.repr (zOfInt 80)), .Full)
+
 end SparseTop
 
 /-- The sparse program's facts. -/
@@ -284,6 +320,9 @@ theorem TopEnv.sparse : TopEnv sparseGe where
   field_dCleanup := SparseTop.field_dCleanup
   sizeof_dispatch := SparseTop.sizeof_dispatch
   align_dispatch := SparseTop.align_dispatch
+  field_statsInvapplics := SparseTop.field_statsInvapplics
+  field_statsInvsuccesses := SparseTop.field_statsInvsuccesses
+  field_statsInvarsuclevel := SparseTop.field_statsInvarsuclevel
 
 theorem noShadow_nEnvG {ge : genv} [NautyEnv ge] [T : TopEnv ge] {bI : Common.Values.block} :
     Alloc.NoShadow (ge := ge) (nEnv bI) := by
