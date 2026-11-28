@@ -226,6 +226,13 @@ theorem lr_nat_inj {a b : Nat} (ha : a < 2147483648) (hb : b < 2147483648)
   exact this
 
 /-- Two `DynAt`s of one pair agree on the block when the capacity is positive. -/
+theorem _root_.NautyVerified.Proofs.Alloc.DynAt.same_cap {m : mem} {bp bs : block}
+    {c c' cap cap' : Nat} {b b' : block} (h : DynAt m bp bs c cap b) (h' : DynAt m bp bs c' cap' b') :
+    cap' = cap := by
+  have e := h'.capLd.symm.trans h.capLd
+  simp only [Option.some.injEq, val.Vlong.injEq] at e
+  exact lr_nat_inj h'.capLt h.capLt e
+
 theorem _root_.NautyVerified.Proofs.Alloc.DynAt.same_block {m : mem} {bp bs : block} {c c' cap cap' : Nat} {b b' : block}
     (h : DynAt m bp bs c cap b) (h' : DynAt m bp bs c' cap' b') (hc : 0 < cap) : b' = b := by
   have hcc : cap' = cap := by
