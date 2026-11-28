@@ -83,7 +83,7 @@ theorem wp_nodeVisit {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_en
         (fun _ => .Vint (ir (refine ctx level st.lab st.ptn st.active numcells).numcells)) 1 →
       ArrayAt m' .Mint32 bk 0
         (fun _ => .Vint (ir (refine ctx level st.lab st.ptn st.active numcells).longcode)) 1 →
-      (∃ v, ArrayAt m' .Mint32 bq 0 v 1) →
+      ArrayAt m' .Mint32 bq 0 (fun _ => .Vint (ir 0)) 1 →
       Unch m m' (fun z => z ∈ S.blocks ∨ ¬ Mem.valid_block m z ∨ IsWork m z ∨ z = bnc ∨
         z = bq ∨ z = bk) →
       (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
@@ -301,7 +301,7 @@ theorem wp_nodeVisit {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_en
       (pN fS oS fun hc => Alloc.Malloced.valid (dS.mal hc))
       (pN fB oB fun hc => Alloc.Malloced.valid (dB.mal hc)) hsc hst har hinv
   have hqarr' : ArrayAt m' .Mint32 bq 0 (fun _ => .Vint (ir 0)) 1 := hqarr
-  refine hQ m' hSA hnc' hk' ⟨_, hqarr'⟩ (hU.mono fun z hz => ?_) hgrow
+  refine hQ m' hSA hnc' hk' hqarr' (hU.mono fun z hz => ?_) hgrow
   rcases hz with h6 | hN | hx
   · unfold dyn3Set at h6
     rcases h6 with e | e | e | e | e | e | ⟨hc, e⟩ | ⟨hc, e⟩ | ⟨hc, e⟩ | hnv
