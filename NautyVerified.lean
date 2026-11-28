@@ -312,6 +312,7 @@ import NautyVerified.Proofs.Sparse.Check
 import NautyVerified.Proofs.Sparse.Freedyn
 import NautyVerified.Proofs.Sparse.Testcanlab.Rows
 import NautyVerified.Proofs.Alloc.DynL
+import NautyVerified.Proofs.Alloc.DynF
 import NautyVerified.Proofs.Sparse.Sort.Ins
 import NautyVerified.Proofs.Sparse.Sort.Pivot
 import NautyVerified.Proofs.Sparse.Sort.Finish
