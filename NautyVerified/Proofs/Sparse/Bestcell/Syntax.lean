@@ -138,7 +138,7 @@ abbrev countBody : statement :=
       .Sskip))
 
 /-- The joins of cell `i`. -/
-abbrev joins : statement :=
+abbrev cellJoins : statement :=
   .Ssequence
     (sk (.Sset id.vi (lat id.v firstV)))
     (.Ssequence
@@ -183,7 +183,7 @@ abbrev body : statement :=
                     (sk (.Sifthenelse (.Ebinop .Oeq (tv id.nnt) (ci 0 tint) tint)
                       (sk (.Sreturn (some (tv id.n)))) .Sskip))
                     (.Ssequence (cloop zero)
-                      (.Ssequence (cloop joins)
+                      (.Ssequence (cloop cellJoins)
                         (.Ssequence
                           (sk (.Sset id.j (.Ecast (ci 0 tint) tulong)))
                           (.Ssequence
