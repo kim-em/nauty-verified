@@ -128,8 +128,8 @@ abbrev hexNode {n : Nat} (first : Bool) (ctx : Ctx n) (level numcells : Nat) (st
 
 /-- The tcnode that `level`'s call receives as `tcnode_parent`: `tcnode0` at
 level 1, else node `level - 2` of the list. -/
-def tcParent (chain : List (block × block)) (level : Nat) : block :=
-  if level ≤ 1 then Block.tcnode0 else (chain[level - 2]?.map Prod.fst).getD Block.tcnode0
+def tcParent {ge : genv} [E : NautyEnv ge] (chain : List (block × block)) (level : Nat) : block :=
+  if level ≤ 1 then E.tcnode0 else (chain[level - 2]?.map Prod.fst).getD E.tcnode0
 
 /-- The list's blocks are valid, distinct, and apart from `S` and the work blocks. -/
 structure TcOk (m : mem) (S : SLoc) (chain : List (block × block)) : Prop where
@@ -194,5 +194,118 @@ abbrev othernodeSpecG {n k : Nat} (xi : ExternalCalls) (G : Hex.GraphIso.Colored
     (Em : Bool → Nat → Nat → Search n → List Int) (S : SLoc) (st : Search n)
     (level numcells : Nat) (chain : List (block × block)) : FunSpec :=
   othernodeSpec xi (SearchInf.NodeOk G) Em S ⟨rowsOf G⟩ st level numcells chain
+
+/-! ### For any dispatch representation
+
+The node specification over `SearchAtG D`, against HexGraphIso's
+`Generic.node` for a search policy on `D`'s state (`hexNodeG`); `TcOkG`
+and `NodeFrameG` are `TcOk` and `NodeFrame` for `D`. At `denseRep` with
+HexGraphIso's nauty policy they give the dense forms (`TcOk.toG`,
+`TcOkG.dense`, `NodeFrameG.dense`, `nodeSpec_ofG`, through
+`node_eq_generic`). -/
+
+section Generic
+
+open NautyVerified.Proofs.Dispatch (Ops DispatchRep)
+
+variable {ge : genv} [E : NautyEnv ge] {O : Ops} (D : DispatchRep ge O)
+
+/-- `hexNode` for the policy `P` on `D`'s search state. -/
+abbrev hexNodeG {n : Nat} [P : Generic.Policy (SearchState n (O.Canon n)) n (γ := O.Gr n)]
+    (first : Bool) (G : O.Gr n) (level numcells : Nat) (st : SearchState n (O.Canon n)) :
+    Exit × SearchState n (O.Canon n) :=
+  Generic.node first G nautyInf 100 (nodeFuel n level) level numcells st
+
+/-- `TcOk` for `D`. -/
+structure TcOkG (m : mem) (S : SLoc) (gl : D.GLoc) (cl : D.CLoc) (chain : List (block × block)) :
+    Prop where
+  pairwise : (chain.flatMap fun p => [p.1, p.2]).Pairwise (· ≠ ·)
+  valid : ∀ p ∈ chain, Mem.valid_block m p.1 ∧ Mem.valid_block m p.2
+  apart : ∀ p ∈ chain, p.1 ∉ S.blocksG D gl cl ∧ p.2 ∉ S.blocksG D gl cl ∧
+    ¬ IsWorkG D m p.1 ∧ ¬ IsWorkG D m p.2
+
+/-- `NodeFrame` for `D`. -/
+def NodeFrameG (m m' : mem) (S : SLoc) (gl : D.GLoc) (cl : D.CLoc) (chain : List (block × block))
+    (level : Nat) : Prop :=
+  Unch m m' (fun z => S.ChgG D gl cl z ∨ ¬ Mem.valid_block m z ∨ IsWorkG D m z ∨
+      z = E.tcnode0 ∨
+      (∃ i p, chain[i]? = some p ∧ level ≤ i + 2 ∧ z = p.1) ∨
+      (∃ i p, chain[i]? = some p ∧ level ≤ i + 1 ∧ z = p.2)) ∧
+    ∀ z, Mem.valid_block m z → Mem.valid_block m' z
+
+/-- `nodeSpec` for `D` and the policy `P`. -/
+def nodeSpecG {n : Nat} [P : Generic.Policy (SearchState n (O.Canon n)) n (γ := O.Gr n)]
+    (xi : ExternalCalls) (NodeOk : Bool → Nat → Nat → SearchState n (O.Canon n) → Prop)
+    (Em : Bool → Nat → Nat → SearchState n (O.Canon n) → List Int) (first : Bool) (S : SLoc)
+    (gl : D.GLoc) (cl : D.CLoc) (G : O.Gr n) (st : SearchState n (O.Canon n))
+    (level numcells : Nat) (chain : List (block × block)) : FunSpec where
+  pre args m := args = [.Vptr S.bl S.lofs, .Vptr S.bp S.pofs, .Vint (ir level),
+      .Vint (ir numcells), .Vptr (tcParent chain level) Ptrofs.zero] ∧
+    SearchAtG D m S gl cl G st first false ∧ TcChain m S.M E.tcnode0 chain ∧
+    TcOkG D m S gl cl chain ∧ level - 1 ≤ chain.length ∧ AutomCb xi S.bUA ∧ 1 ≤ level ∧
+    level ≤ n ∧ numcells ≤ n ∧ NodeOk first level numcells st ∧ Mem.valid_block m S.bUA ∧
+    Mem.perm m S.bUA (zOfInt 0) .Cur .Nonempty
+  post _ m t v m' :=
+    let r := hexNodeG first G level numcells st
+    v = .Vint (ir (exitValue level r.1).1) ∧
+    SearchAtG D m' S gl cl G r.2 false (exitValue level r.1).2 ∧
+    Emits t (Em first level numcells st) ∧
+    (∃ chain', TcChain m' S.M E.tcnode0 chain' ∧ TcOkG D m' S gl cl chain' ∧
+      level ≤ chain'.length ∧ chain'.take (level - 1) = chain.take (level - 1) ∧
+      ∀ p ∈ chain', p ∈ chain ∨ (¬ Mem.valid_block m p.1 ∧ ¬ Mem.valid_block m p.2)) ∧
+    NodeFrameG D m m' S gl cl chain level ∧
+    (∀ z, IsWorkG D m' z → IsWorkG D m z ∨ ¬ Mem.valid_block m z) ∧
+    ∀ tg sh, r.1 = .unwind tg sh → tg < level
+
+end Generic
+
+section Dense
+
+open NautyVerified.Proofs.Dispatch
+
+theorem TcOk.toG {m : mem} {S : SLoc} {chain : List (block × block)} (h : TcOk m S chain) :
+    TcOkG denseRep m S () () chain :=
+  ⟨h.pairwise, h.valid, fun p hp =>
+    let ⟨a, b, c, d⟩ := h.apart p hp
+    ⟨fun e => a (SLoc.mem_blocksG.1 e), fun e => b (SLoc.mem_blocksG.1 e),
+      fun e => c (isWork_dense.1 e), fun e => d (isWork_dense.1 e)⟩⟩
+
+theorem TcOkG.dense {m : mem} {S : SLoc} {chain : List (block × block)}
+    (h : TcOkG denseRep m S () () chain) : TcOk m S chain :=
+  ⟨h.pairwise, h.valid, fun p hp =>
+    let ⟨a, b, c, d⟩ := h.apart p hp
+    ⟨fun e => a (SLoc.mem_blocksG.2 e), fun e => b (SLoc.mem_blocksG.2 e),
+      fun e => c (isWork_dense.2 e), fun e => d (isWork_dense.2 e)⟩⟩
+
+theorem NodeFrameG.dense {m m' : mem} {S : SLoc} {chain : List (block × block)} {level : Nat}
+    (h : NodeFrameG denseRep m m' S () () chain level) : NodeFrame m m' S chain level :=
+  ⟨h.1.mono fun _ hz => by
+    rcases hz with hz | hz | hz | hz
+    · exact .inl (SLoc.chgG_dense.1 hz)
+    · exact .inr (.inl hz)
+    · exact .inr (.inr (.inl (isWork_dense.1 hz)))
+    · exact .inr (.inr (.inr hz)), h.2⟩
+
+theorem hexNodeG_dense {n : Nat} (first : Bool) (ctx : Ctx n) (level numcells : Nat) (st : Search n) :
+    hexNodeG (O := denseOps) first ctx level numcells st = hexNode first ctx level numcells st :=
+  (node_eq_generic _ _ _ _ _ _ _ _).symm
+
+theorem nodeSpec_ofG {xi : ExternalCalls} {fd : fundef} {n : Nat}
+    {NodeOk : Bool → Nat → Nat → Search n → Prop} {Em : Bool → Nat → Nat → Search n → List Int}
+    {first : Bool} {S : SLoc} {ctx : Ctx n} {st : Search n} {level numcells : Nat}
+    {chain : List (block × block)}
+    (h : Satisfies xi Program.ge fd
+      (nodeSpecG denseRep xi NodeOk Em first S () () ctx st level numcells chain)) :
+    Satisfies xi Program.ge fd (nodeSpec xi NodeOk Em first S ctx st level numcells chain) := by
+  refine Satisfies.mono ?_ ?_ h
+  · rintro _ _ ⟨ha, hs, hc, hok, h1, hu, h2, h3, h4, h5, h6, h7⟩
+    exact ⟨ha, hs.toG, hc, hok.toG, h1, hu, h2, h3, h4, h5, h6, h7⟩
+  · rintro _ _ _ _ _ ⟨_, hs, _⟩ hp
+    simp only [nodeSpecG, hexNodeG_dense] at hp
+    obtain ⟨hv, hs', hem, ⟨chain', hc', hok', h1, h2, h3⟩, hf, hw, hu⟩ := hp
+    exact ⟨hv, hs'.dense hs.gw, hem, ⟨chain', hc', hok'.dense, h1, h2, h3⟩, hf.dense,
+      workMonoG_dense hw, hu⟩
+
+end Dense
 
 end NautyVerified.Proofs.Search

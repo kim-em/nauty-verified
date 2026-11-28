@@ -49,8 +49,8 @@ theorem prevAt_eq (prev : block) :
       ⟨rest[i]'(by simp at h; omega), List.getElem?_eq_getElem _⟩
     simp [hq]
 
-theorem tcParent_eq {chain : List (block × block)} {level : Nat} (h1 : 1 ≤ level)
-    (hl : level - 1 ≤ chain.length) : tcParent chain level = prevAt Block.tcnode0 chain (level - 1) := by
+theorem tcParent_eq {ge : genv} [E : NautyEnv ge] {chain : List (block × block)} {level : Nat} (h1 : 1 ≤ level)
+    (hl : level - 1 ≤ chain.length) : tcParent chain level = prevAt E.tcnode0 chain (level - 1) := by
   unfold tcParent
   by_cases h : level ≤ 1
   · rw [ite_eq_left h, show level - 1 = 0 by omega]; simp [prevAt]

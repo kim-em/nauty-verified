@@ -159,4 +159,134 @@ theorem SearchAt.setScalars {n : Nat} {m m' : mem} {S : SLoc} {ctx : Ctx n} {st 
     rfl | rfl
   all_goals first | exact nf | exact nv _ (by simp [SLoc.vars])
 
+/-! ### For any dispatch representation
+
+`wrEnv` and `S.wrVG`: the shared globals and `S`'s blocks the search's own
+statements write; besides them it may write the canonical store's blocks.
+`SearchAtG.rebuild`: after changes confined to these (keeping the
+`DYNALLSTAT` blocks' headers, and every valid block valid), new
+`ScalarsG`, `StatsG`, `ArraysG` and `SInvG` give `SearchAtG` again. -/
+
+section Generic
+
+open NautyVerified.Proofs.Dispatch (Ops DispatchRep)
+
+variable {ge : genv} [E : NautyEnv ge] {O : Ops} {D : DispatchRep ge O}
+
+/-- The shared globals the search's own statements write. -/
+abbrev wrEnv : List block :=
+  [E.gcaFirst, E.gcaCanon, E.noncheaplevel, E.allsamelevel, E.eqlevFirst, E.eqlevCanon,
+   E.compCanon, E.samerows, E.canonlevel, E.stabvertex, E.cosetindex, E.needshortprune, E.fmptr]
+
+/-- `S`'s blocks the search's own statements write, besides the store's. -/
+abbrev SLoc.wrVG (S : SLoc) : List block :=
+  [S.bl, S.bp, S.bo, S.bst, S.bws, S.bA, S.bF, S.bWP, S.bFL, S.bCL, S.bFC, S.bCC, S.bTC]
+
+/-- The `DYNALLSTAT` pairs of nauty.c. -/
+abbrev dynPairs : List block :=
+  [E.nautyActive, E.nautyActiveSz, E.nautyFixedpts, E.nautyFixedptsSz, E.nautyWorkperm,
+   E.nautyWorkpermSz, E.nautyFirstlab, E.nautyFirstlabSz, E.nautyCanonlab, E.nautyCanonlabSz,
+   E.nautyFirstcode, E.nautyFirstcodeSz, E.nautyCanoncode, E.nautyCanoncodeSz, E.nautyFirsttc,
+   E.nautyFirsttcSz]
+
+/-- The list entries of `S.blocksG` the search's own statements do not write. -/
+abbrev SLoc.keepG (S : SLoc) : List block :=
+  fixedBlocks ++ dynPairs ++
+    [E.nautilWorkperm, E.nautilWorkpermSz, E.nautyBit, E.nautilBit, E.leftbit, E.tcnode0, S.bg,
+     S.bUA]
+
+theorem SLoc.keepG_perm (S : SLoc) :
+    (S.keepG ++ (wrEnv ++ S.wrVG) ++ [S.bc]).Perm S.litG := by perm_lit
+
+theorem SLoc.wr_mem {S : SLoc} {cl : D.CLoc} {z : block}
+    (hz : z ∈ wrEnv ∨ z ∈ S.wrVG ∨ z ∈ D.canonBlocks cl S.bc) :
+    z ∈ [S.bl, S.bp, S.bo, S.bst] ∨ z ∈ D.canonBlocks cl S.bc ∨
+      z ∈ [S.bws, S.bA, S.bF, S.bWP, S.bFL, S.bCL, S.bFC, S.bCC, S.bTC, S.bUA] ∨ z ∈ envSearch := by
+  simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
+  rcases hz with (rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl) |
+    (rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl) | hz
+  iterate 13 exact .inr (.inr (.inr (by simp)))
+  iterate 4 exact .inl (by simp)
+  iterate 9 exact .inr (.inr (.inl (by simp)))
+  exact .inr (.inl hz)
+
+/-- The blocks of `S.blocksG` the search's own statements do not write lie
+outside a list of written blocks. -/
+theorem SearchAtG.not_wr {n : Nat} {m : mem} {S : SLoc} {gl : D.GLoc} {cl : D.CLoc} {G : O.Gr n}
+    {st : SearchState n (O.Canon n)} {pre nsp : Bool} (h : SearchAtG D m S gl cl G st pre nsp)
+    {L : List block} (hL : ∀ z ∈ L, z ∈ wrEnv ∨ z ∈ S.wrVG ∨ z ∈ D.canonBlocks cl S.bc) :
+    (∀ y ∈ S.keepG, ¬ y ∈ L) ∧ (∀ y ∈ D.globs, ¬ y ∈ L) ∧
+      (∀ z, IsWorkG D m z → ¬ z ∈ L) := by
+  have fE : ∀ y ∈ (fixedBlocks : List block), y ∈ envSearch := by simp
+  have pE : ∀ y ∈ (dynPairs : List block), y ∈ envSearch := by simp
+  have hp := (S.keepG_perm.pairwise_iff (fun h => Ne.symm h)).2 h.lit
+  have hd := (List.pairwise_append.1 (List.pairwise_append.1 hp).1).2.2
+  refine ⟨fun y hy hyL => ?_, fun y hy hyL => ?_, fun z hz hzL => ?_⟩
+  · rcases hL _ hyL with hz | hz | hz
+    · exact hd y hy y (List.mem_append_left _ hz) rfl
+    · exact hd y hy y (List.mem_append_right _ hz) rfl
+    · refine h.canon_ne hz (y := y) ?_ rfl
+      rcases List.mem_append.1 hy with hy | hy
+      · rcases List.mem_append.1 hy with hy | hy
+        · exact .inr (.inr (.inr (.inl (fE y hy))))
+        · exact .inr (.inr (.inr (.inl (pE y hy))))
+      · simp only [List.mem_cons, List.mem_nil_iff, or_false] at hy
+        rcases hy with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
+        iterate 6 exact .inr (.inr (.inr (.inl (by simp))))
+        · exact .inl (D.graphBlocks_head gl S.bg)
+        · exact .inr (.inr (.inl (by simp)))
+  · rcases SLoc.wr_mem (hL _ hyL) with hz | hz | hz | hz
+    · exact h.globs_ne hy (.inr (.inl hz)) rfl
+    · exact h.globs_ne hy (.inr (.inr (.inl hz))) rfl
+    · exact h.globs_ne hy (.inr (.inr (.inr (.inl hz)))) rfl
+    · exact h.globs_ne hy (.inr (.inr (.inr (.inr hz)))) rfl
+  · refine h.work_not hz (SLoc.mem_blocksG_of D ?_)
+    rcases SLoc.wr_mem (hL _ hzL) with hz | hz | hz | hz
+    · exact .inr (.inl hz)
+    · exact .inr (.inr (.inl hz))
+    · exact .inr (.inr (.inr (.inl hz)))
+    · exact .inr (.inr (.inr (.inr (.inl hz))))
+
+theorem SearchAtG.rebuild {n : Nat} {m m' : mem} {S : SLoc} {gl : D.GLoc} {cl : D.CLoc}
+    {G : O.Gr n} {st st' : SearchState n (O.Canon n)} {pre nsp pre' nsp' : Bool}
+    (h : SearchAtG D m S gl cl G st pre nsp) {L : List block} (hu : Unch m m' (· ∈ L))
+    (hL : ∀ z ∈ L, z ∈ wrEnv ∨ z ∈ S.wrVG ∨ z ∈ D.canonBlocks cl S.bc)
+    (hK : ∀ z ∈ [S.bA, S.bF, S.bWP, S.bFL, S.bCL, S.bFC, S.bCC, S.bTC, S.bws], Keep m m' z)
+    (hv : ∀ z, Mem.valid_block m z → Mem.valid_block m' z)
+    (hsc : ScalarsG m' st' nsp') (hst : StatsG m' S st' pre') (har : ArraysG D m' S gl cl G st')
+    (hinv : SInvG O G st') : SearchAtG D m' S gl cl G st' pre' nsp' := by
+  obtain ⟨nK, nG, nW⟩ := h.not_wr hL
+  have nF : ∀ z ∈ fixedBlocks, ¬ z ∈ L := fun z hz =>
+    nK z (List.mem_append_left _ (List.mem_append_left _ hz))
+  have nP : ∀ z ∈ dynPairs, ¬ z ∈ L := fun z hz =>
+    nK z (List.mem_append_left _ (List.mem_append_right _ hz))
+  have nR : ∀ z ∈ [E.nautilWorkperm, E.nautilWorkpermSz, E.nautyBit, E.nautilBit, E.leftbit,
+      E.tcnode0, S.bg, S.bUA], ¬ z ∈ L := fun z hz => nK z (List.mem_append_right _ hz)
+  simp only [List.forall_mem_cons] at nP nR hK
+  have hD := h.dyns
+  obtain ⟨g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, g11, g12, g13, g14, g15, g16, -⟩ := nP
+  obtain ⟨k1, k2, k3, k4, k5, k6, k7, k8, k9, -⟩ := hK
+  have hdy : DynsG D n m' S := { hD with
+    workspace := hD.workspace.keep hu (nG _ D.wsP_mem) (nG _ D.wsS_mem) fun _ => k9
+    active := hD.active.keep hu g1 g2 fun _ => k1
+    fixedpts := hD.fixedpts.keep hu g3 g4 fun _ => k2
+    workperm := hD.workperm.keep hu g5 g6 fun _ => k3
+    firstlab := hD.firstlab.keep hu g7 g8 fun _ => k4
+    canonlab := hD.canonlab.keep hu g9 g10 fun _ => k5
+    firstcode := hD.firstcode.keep hu g11 g12 fun _ => k6
+    canoncode := hD.canoncode.keep hu g13 g14 fun _ => k7
+    firsttc := hD.firsttc.keep hu g15 g16 fun _ => k8 }
+  exact
+    { h with
+      fixed := h.fixed.unch hu nF
+      scalars := hsc
+      stats := hst
+      arrays := har
+      dyns := hdy
+      work := (h.work.unch hu (fun z hz => nG z (D.wglobs_sub z hz)) ⟨nR.1, nR.2.1⟩ nW hv).1
+      tables := h.tables.unch hu nR.2.2.1 nR.2.2.2.1 nR.2.2.2.2.1 fun z hz _ => nG z hz
+      inv := hinv }
+
+end Generic
+
 end NautyVerified.Proofs.Search

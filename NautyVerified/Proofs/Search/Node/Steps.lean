@@ -1,6 +1,7 @@
 import NautyVerified.Proofs.Search.Node.Spec
 import NautyVerified.Proofs.Search.Frame
 import NautyVerified.Proofs.Search.Ops
+import NautyVerified.Proofs.Search.Node.Rebuild
 import NautyVerified.Proofs.Refine.Mash
 
 /-!
@@ -40,11 +41,20 @@ theorem lr_succ (a : Nat) :
 theorem csize32 : csize .Mint32 = 4 := rfl
 theorem csize64 : csize .Mint64 = 8 := rfl
 
-/-- `++stats->numnodes`. -/
-theorem wp_numnodes {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
-    {S : SLoc} {ctx : Ctx n} {st : Search n} {pre nsp : Bool} (h : SearchAt m S ctx st pre nsp)
+/-! ### For any dispatch representation -/
+
+section Generic
+
+open NautyVerified.Proofs.Dispatch (Ops DispatchRep)
+
+variable {ge : genv} [E : NautyEnv ge] {O : Ops} {D : DispatchRep ge O}
+
+/-- `++stats->numnodes`, for `D`. -/
+theorem wp_numnodesG {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
+    {S : SLoc} {gl : D.GLoc} {cl : D.CLoc} {G : O.Gr n} {st : SearchState n (O.Canon n)}
+    {pre nsp : Bool} (h : SearchAtG D m S gl cl G st pre nsp)
     (hge : PTree.get dense.id.«nauty:stats» e = none)
-    (hQ : ∀ m', SearchAt m' S ctx { st with numnodes := st.numnodes + 1 } pre nsp →
+    (hQ : ∀ m', SearchAtG D m' S gl cl G { st with numnodes := st.numnodes + 1 } pre nsp →
       Unch m m' (· = S.bst) → (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
       Q.normal E0 e le m') :
     Wp xi ge f (.Sassign (statsF dense.id.numnodes tulong)
@@ -60,30 +70,38 @@ theorem wp_numnodes {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_env
     simp only [Exec.evalExpr, typeof, cop, lr_succ]
   intro m' hst
   have hu : Unch m m' (· = S.bst) := Unch.store hst rfl
-  refine hQ m' ?_ hu fun z hz => Mem.store_valid_block_1 _ _ _ _ _ _ hst _ hz
-  have hd := h.distinct
+  have hv : ∀ z, Mem.valid_block m z → Mem.valid_block m' z :=
+    fun z hz => Mem.store_valid_block_1 _ _ _ _ _ _ hst _ hz
+  refine hQ m' ?_ hu hv
+  have hd := h.lit
   have hs := h.stats
-  exact
-    { fixed := h.fixed.unch hu (by sep_all hd)
-      scalars := { h.scalars.unch hu (by sep_all hd) with }
-      stats :=
-        { (hs.fix.store hst (by first | omega | (simp only [csize32, csize64]; omega))) with
-          numorbits := hs.numorbits.store_other hst (by simp only [csize32, csize64]; omega)
-          numgenerators := hs.numgenerators.store_other hst (by simp only [csize32, csize64]; omega)
-          numnodes := FieldAt.store_same hst hs.numnodes.writable
-          numbadleaves := hs.numbadleaves.store_other hst (by simp only [csize32, csize64]; omega)
-          maxlevel := fun hp => (hs.maxlevel hp).store_other hst (by simp only [csize32, csize64]; omega)
-          maxlevelW := Mem.store_valid_access_1 _ _ _ _ _ _ hst _ _ _ _ hs.maxlevelW
-          tctotal := hs.tctotal.store_other hst (by simp only [csize32, csize64]; omega)
-          canupdates := hs.canupdates.store_other hst (by simp only [csize32, csize64]; omega)
-          fits := hs.fits }
-      arrays := { h.arrays.unch hu (by sep_all hd) with }
-      dyns := h.dyns.unch hu (by sep_all hd)
-      work := h.work.unch hu (by sep_all hd) fun z hz hm => h.work_not hz (by
-        rw [hm]; simp [SLoc.blocks])
-      tables := h.tables.unch hu (by sep_all hd)
-      distinct := hd
-      inv := { h.inv with }
-      n0 := h.n0, nlt := h.nlt, nM := h.nM, M1 := h.M1, Mlt := h.Mlt }
+  refine h.rebuild (L := [S.bst]) (hu.mono fun z hz => by simp [hz]) (by simp)
+    (fun z hz => Keep.unch hu (by revert z hz; sep_all hd)) hv
+    { h.scalars.unch hu (by sep_all hd) with }
+    { (hs.fix.store hst (by first | omega | (simp only [csize32, csize64]; omega))) with
+      numorbits := hs.numorbits.store_other hst (by simp only [csize32, csize64]; omega)
+      numgenerators := hs.numgenerators.store_other hst (by simp only [csize32, csize64]; omega)
+      numnodes := FieldAt.store_same hst hs.numnodes.writable
+      numbadleaves := hs.numbadleaves.store_other hst (by simp only [csize32, csize64]; omega)
+      maxlevel := fun hp => (hs.maxlevel hp).store_other hst (by simp only [csize32, csize64]; omega)
+      maxlevelW := Mem.store_valid_access_1 _ _ _ _ _ _ hst _ _ _ _ hs.maxlevelW
+      tctotal := hs.tctotal.store_other hst (by simp only [csize32, csize64]; omega)
+      canupdates := hs.canupdates.store_other hst (by simp only [csize32, csize64]; omega)
+      fits := hs.fits }
+    { h.arrays.unch hu (by sep_all hd) (fun z hz e => h.graph_ne hz (.inl (by simp)) e)
+      (fun z hz e => h.canon_ne hz (.inr (.inl (by simp))) e) with }
+    { h.inv with }
+
+end Generic
+
+theorem wp_numnodes {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
+    {S : SLoc} {ctx : Ctx n} {st : Search n} {pre nsp : Bool} (h : SearchAt m S ctx st pre nsp)
+    (hge : PTree.get dense.id.«nauty:stats» e = none)
+    (hQ : ∀ m', SearchAt m' S ctx { st with numnodes := st.numnodes + 1 } pre nsp →
+      Unch m m' (· = S.bst) → (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
+      Q.normal E0 e le m') :
+    Wp xi ge f (.Sassign (statsF dense.id.numnodes tulong)
+      (.Ebinop .Oadd (statsF dense.id.numnodes tulong) (ci 1 tint) tulong)) Q e le m :=
+  wp_numnodesG h.toG hge fun m' h' hu hv => hQ m' (h'.dense h.gw) hu hv
 
 end NautyVerified.Proofs.Search

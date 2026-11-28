@@ -53,10 +53,10 @@ elab "sep_ne " hd:term : tactic => withMainContext do
   | some i, some j =>
     if i < j then
       evalTactic (← `(tactic| exact NautyVerified.Proofs.Refine.pw_ne $hd $(Syntax.mkNumLit (toString i))
-        $(Syntax.mkNumLit (toString j)) (by decide) (by simp [SLoc.blocks])))
+        $(Syntax.mkNumLit (toString j)) (by decide) (by simp [SLoc.blocks, SLoc.litG])))
     else if j < i then
       evalTactic (← `(tactic| exact Ne.symm (NautyVerified.Proofs.Refine.pw_ne $hd $(Syntax.mkNumLit (toString j))
-        $(Syntax.mkNumLit (toString i)) (by decide) (by simp [SLoc.blocks]))))
+        $(Syntax.mkNumLit (toString i)) (by decide) (by simp [SLoc.blocks, SLoc.litG]))))
     else throwError "sep_ne: both sides are entry {i}"
   | _, _ => evalTactic (← `(tactic| first | env_ne | decide))
 
@@ -234,7 +234,7 @@ theorem SearchAt.unch {n : Nat} {m m' : mem} {S : SLoc} {ctx : Ctx n} {st : Sear
   { h with
     fixed := h.fixed.unch hu fun z hz => hS z (by revert z; simp [SLoc.blocks])
     scalars := h.scalars.unch hu fun z hz => hS z (by revert z; simp [SLoc.blocks])
-    stats := h.stats.unch hu (hS _ (by simp [SLoc.blocks]))
+    stats := h.stats.unch hu (hS _ (by simp [SLoc.blocks, SLoc.litG]))
     arrays := h.arrays.unch hu fun z hz => hS z (by revert z; simp [SLoc.blocks])
     dyns := h.dyns.unch hu fun z hz => hS z (by revert z; simp [SLoc.blocks])
     work := h.work.unch hu (fun z hz => hS z (by revert z; simp [SLoc.blocks])) hwk
@@ -383,6 +383,83 @@ theorem SearchAtG.work_not {D : DispatchRep ge O} {n : Nat} {m : mem} {S : SLoc}
     have hcc := d.same_cap dN
     subst e; subst hcc
     exact nN hc
+
+/-! ### Distinctness of the blocks of `S.blocksG`
+
+`SearchAtG.lit`: the list entries of `S.blocksG` (`SLoc.litG`) are pairwise
+distinct, for `sep_ne h.lit`. `SearchAtG.graph_ne`, `canon_ne`, `globs_ne`:
+a block of the graph's or the store's representation, or one of `D`'s
+globals, differs from every block of the other parts of `S.blocksG`. -/
+
+theorem SearchAtG.lit {D : DispatchRep ge O} {n : Nat} {m : mem} {S : SLoc} {gl : D.GLoc}
+    {cl : D.CLoc} {G : O.Gr n} {st : SearchState n (O.Canon n)} {pre nsp : Bool}
+    (h : SearchAtG D m S gl cl G st pre nsp) : S.litG.Pairwise (· ≠ ·) :=
+  h.distinct.sublist (S.litG_sub D gl cl)
+
+theorem ne_of_split {l₁ l₂ l₃ : List block} (h : (l₁ ++ l₂ ++ l₃).Pairwise (· ≠ ·)) {a b : block}
+    (ha : a ∈ l₂) (hb : b ∈ l₁ ∨ b ∈ l₃) : a ≠ b := by
+  have h1 := List.pairwise_append.1 h
+  have h2 := List.pairwise_append.1 h1.1
+  rcases hb with hb | hb
+  · exact (h2.2.2 b hb a ha).symm
+  · exact h1.2.2 a (List.mem_append_right _ ha) b hb
+
+theorem SearchAtG.graph_ne {D : DispatchRep ge O} {n : Nat} {m : mem} {S : SLoc} {gl : D.GLoc}
+    {cl : D.CLoc} {G : O.Gr n} {st : SearchState n (O.Canon n)} {pre nsp : Bool}
+    (h : SearchAtG D m S gl cl G st pre nsp) {z y : block} (hz : z ∈ D.graphBlocks gl S.bg)
+    (hy : y ∈ [S.bl, S.bp, S.bo, S.bst] ∨ y ∈ D.canonBlocks cl S.bc ∨
+      y ∈ [S.bws, S.bA, S.bF, S.bWP, S.bFL, S.bCL, S.bFC, S.bCC, S.bTC, S.bUA] ∨ y ∈ envSearch ∨
+      y ∈ D.globs) : z ≠ y := by
+  have hd : ([] ++ D.graphBlocks gl S.bg ++ ([S.bl, S.bp, S.bo, S.bst] ++ D.canonBlocks cl S.bc ++
+      [S.bws, S.bA, S.bF, S.bWP, S.bFL, S.bCL, S.bFC, S.bCC, S.bTC, S.bUA] ++ envSearch ++
+      D.globs)).Pairwise (· ≠ ·) := by
+    have := h.distinct; simp only [SLoc.blocksG, List.append_assoc] at this ⊢; exact this
+  refine ne_of_split hd hz (.inr ?_)
+  simp only [List.mem_append]
+  rcases hy with hy | hy | hy | hy | hy
+  · exact .inl (.inl (.inl (.inl hy)))
+  · exact .inl (.inl (.inl (.inr hy)))
+  · exact .inl (.inl (.inr hy))
+  · exact .inl (.inr hy)
+  · exact .inr hy
+
+theorem SearchAtG.canon_ne {D : DispatchRep ge O} {n : Nat} {m : mem} {S : SLoc} {gl : D.GLoc}
+    {cl : D.CLoc} {G : O.Gr n} {st : SearchState n (O.Canon n)} {pre nsp : Bool}
+    (h : SearchAtG D m S gl cl G st pre nsp) {z y : block} (hz : z ∈ D.canonBlocks cl S.bc)
+    (hy : y ∈ D.graphBlocks gl S.bg ∨ y ∈ [S.bl, S.bp, S.bo, S.bst] ∨
+      y ∈ [S.bws, S.bA, S.bF, S.bWP, S.bFL, S.bCL, S.bFC, S.bCC, S.bTC, S.bUA] ∨ y ∈ envSearch ∨
+      y ∈ D.globs) : z ≠ y := by
+  have hd : (D.graphBlocks gl S.bg ++ [S.bl, S.bp, S.bo, S.bst] ++ D.canonBlocks cl S.bc ++
+      ([S.bws, S.bA, S.bF, S.bWP, S.bFL, S.bCL, S.bFC, S.bCC, S.bTC, S.bUA] ++ envSearch ++
+      D.globs)).Pairwise (· ≠ ·) := by
+    have := h.distinct; simp only [SLoc.blocksG, List.append_assoc] at this ⊢; exact this
+  refine ne_of_split hd hz ?_
+  simp only [List.mem_append]
+  rcases hy with hy | hy | hy | hy | hy
+  · exact .inl (.inl hy)
+  · exact .inl (.inr hy)
+  · exact .inr (.inl (.inl hy))
+  · exact .inr (.inl (.inr hy))
+  · exact .inr (.inr hy)
+
+theorem SearchAtG.globs_ne {D : DispatchRep ge O} {n : Nat} {m : mem} {S : SLoc} {gl : D.GLoc}
+    {cl : D.CLoc} {G : O.Gr n} {st : SearchState n (O.Canon n)} {pre nsp : Bool}
+    (h : SearchAtG D m S gl cl G st pre nsp) {z y : block} (hz : z ∈ D.globs)
+    (hy : y ∈ D.graphBlocks gl S.bg ∨ y ∈ [S.bl, S.bp, S.bo, S.bst] ∨ y ∈ D.canonBlocks cl S.bc ∨
+      y ∈ [S.bws, S.bA, S.bF, S.bWP, S.bFL, S.bCL, S.bFC, S.bCC, S.bTC, S.bUA] ∨ y ∈ envSearch) :
+    z ≠ y := by
+  have hd : (D.graphBlocks gl S.bg ++ [S.bl, S.bp, S.bo, S.bst] ++ D.canonBlocks cl S.bc ++
+      [S.bws, S.bA, S.bF, S.bWP, S.bFL, S.bCL, S.bFC, S.bCC, S.bTC, S.bUA] ++ envSearch ++
+      D.globs ++ []).Pairwise (· ≠ ·) := by
+    rw [List.append_nil]; exact h.distinct
+  refine ne_of_split hd hz (.inl ?_)
+  simp only [List.mem_append]
+  rcases hy with hy | hy | hy | hy | hy
+  · exact .inl (.inl (.inl (.inl hy)))
+  · exact .inl (.inl (.inl (.inr hy)))
+  · exact .inl (.inl (.inr hy))
+  · exact .inl (.inr hy)
+  · exact .inr hy
 
 theorem SLoc.mem_blocksG_of {S : SLoc} {gl : D.GLoc} {cl : D.CLoc} {z : block}
     (h : z ∈ D.graphBlocks gl S.bg ∨ z ∈ [S.bl, S.bp, S.bo, S.bst] ∨ z ∈ D.canonBlocks cl S.bc ∨

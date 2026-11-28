@@ -623,6 +623,25 @@ def SLoc.blocksG (S : SLoc) (gl : D.GLoc) (cl : D.CLoc) : List block :=
 abbrev SLoc.ChgG (S : SLoc) (gl : D.GLoc) (cl : D.CLoc) (z : block) : Prop :=
   z ∈ S.blocksG D gl cl ∧ z ≠ S.bUA ∧ z ≠ E.tcnode0
 
+/-- The blocks of `S.blocksG` given as list entries: `S`'s own blocks (with the
+first blocks of the graph's and the store's representations) and the shared
+globals, in the dense `SLoc.blocks` order. A sublist of `S.blocksG`
+(`SLoc.litG_sub`), so `sep_ne` decides their distinctness from
+`SearchAtG.lit`. -/
+def SLoc.litG (S : SLoc) : List block :=
+  [S.bg, S.bl, S.bp, S.bo, S.bst, S.bc, S.bws, S.bA, S.bF, S.bWP, S.bFL, S.bCL, S.bFC, S.bCC,
+   S.bTC, S.bUA] ++ envSearch
+
+theorem SLoc.litG_sub (S : SLoc) (gl : D.GLoc) (cl : D.CLoc) :
+    S.litG.Sublist (S.blocksG D gl cl) := by
+  have hg : [S.bg].Sublist (D.graphBlocks gl S.bg) :=
+    List.singleton_sublist.2 (D.graphBlocks_head gl S.bg)
+  have hc : [S.bc].Sublist (D.canonBlocks cl S.bc) :=
+    List.singleton_sublist.2 (D.canonBlocks_head cl S.bc)
+  exact ((((hg.append (List.Sublist.refl [S.bl, S.bp, S.bo, S.bst])).append hc).append
+    (List.Sublist.refl [S.bws, S.bA, S.bF, S.bWP, S.bFL, S.bCL, S.bFC, S.bCC, S.bTC, S.bUA])).append
+    (List.Sublist.refl envSearch)).trans (List.sublist_append_left _ _)
+
 /-- Memory holds HexGraphIso's search state `st` for the graph `G`, through `D`. -/
 structure SearchAtG {n : Nat} (m : mem) (S : SLoc) (gl : D.GLoc) (cl : D.CLoc) (G : O.Gr n)
     (st : SearchState n (O.Canon n)) (pre nsp : Bool) : Prop where
