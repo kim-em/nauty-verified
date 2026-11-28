@@ -383,6 +383,7 @@ theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx :
                   by simp, by simp; omega, by simp, by simp, by simp; omega, a11, a12⟩
               maxlevelLe := by simp only []; omega }
           n0 := h.n0, nlt := h.nlt, nM := h.nM, M1 := h.M1, Mlt := h.Mlt }
-    · exact ⟨hU16.mono fun z hz => .inl (by revert hz; revert z; simp [SLoc.blocks]), hV⟩
+    · exact ⟨hU16.mono fun z hz => .inl ⟨by revert hz; revert z; simp [SLoc.blocks], by revert hz; revert z; sep_all hd,
+          by revert hz; revert z; sep_all hd⟩, hV⟩
 
 end NautyVerified.Proofs.Search.Firstterminal

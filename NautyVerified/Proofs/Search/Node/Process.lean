@@ -68,12 +68,14 @@ theorem wp_nodeProcess {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_
       SearchAt m' S ctx (procExit ctx level nc st).2 false
         (exitValue level (procExit ctx level nc st).1).2 →
       Writes t (procWords ctx level nc st) → SFrame m m' S →
+      (∀ z, IsWork m' z → IsWork m z ∨ ¬ Mem.valid_block m z) →
       match Mem.free_list m' (blocks_of_env ge e) with
       | some m'' => Q.ret t (.Vint (ir (exitValue level (procExit ctx level nc st).1).1)) m''
       | none => False)
     (hDone : ∀ t le' m', (procExit ctx level nc st).1 = .done →
       SearchAt m' S ctx (procExit ctx level nc st).2 false false →
       Writes t (procWords ctx level nc st) → SFrame m m' S →
+      (∀ z, IsWork m' z → IsWork m z ∨ ¬ Mem.valid_block m z) →
       (∀ x, x ≠ idOf 712 → x ≠ dense.id.«rtnlevel» → PTree.get x le' = PTree.get x le) →
       Wp xi ge f rest (Q.after t) e le' m') :
     Wp xi ge f (.Ssequence procCall (.Ssequence (Set.sk earlyRet) rest)) Q e le m := by
@@ -117,7 +119,7 @@ theorem wp_nodeProcess {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_
     apply wp_skip
     simp only [seqPost, Post.after, E0_append]
     rw [hx] at hS''
-    exact hDone t _ m' hx hS'' hW' hF.1 fun x h1 h2 => hle _ x h1 h2
+    exact hDone t _ m' hx hS'' hW' hF.1 hF.2 fun x h1 h2 => hle _ x h1 h2
   · -- an unwind below this level: return its target
     have htg := hlt tg s hx
     simp only [exitValue]
@@ -131,7 +133,7 @@ theorem wp_nodeProcess {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_
     wp_step; wp_step
     apply wp_return_some_eval
     simp only [Exec.evalExpr, hrl, Refine.tv, typeof, hfret, cop]
-    have := hRet t m' (by rw [hx]; simp) hS' hW' hF.1
+    have := hRet t m' (by rw [hx]; simp) hS' hW' hF.1 hF.2
     rw [hx] at this
     simp only [exitValue] at this
     revert this

@@ -8,8 +8,8 @@ import NautyVerified.Statement.Harness
 `genWords g n`: what the harness's `userautomproc` writes for a generator `g`.
 `AutomCb xi b`: block `b` holds that callback.
 
-`SFrame m m' S`: what a search function may change: the blocks of `S`, blocks
-not valid before, and the naugraph.c/nautil.c work blocks in use (`IsWork`).
+`SFrame m m' S`: what a search function may change: the blocks of `S` other
+than the callback's and `tcnode0` (`SLoc.Chg`), blocks not valid before, and the naugraph.c/nautil.c work blocks in use (`IsWork`).
 
 `firstterminalSpec`, `recoverSpec`, `processnodeSpec` state nauty.c's leaf
 functions against HexGraphIso's `firstterminal`, `recover`, and
@@ -72,7 +72,7 @@ def IsWork (m : mem) (z : block) : Prop :=
 
 /-- What a search function may change. -/
 def SFrame (m m' : mem) (S : SLoc) : Prop :=
-  Unch m m' (fun z => z ∈ S.blocks ∨ ¬ Mem.valid_block m z ∨ IsWork m z) ∧
+  Unch m m' (fun z => S.Chg z ∨ ¬ Mem.valid_block m z ∨ IsWork m z) ∧
   ∀ z, Mem.valid_block m z → Mem.valid_block m' z
 
 /-- `firstterminal(lab, level)` on the first path. -/

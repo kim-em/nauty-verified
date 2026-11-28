@@ -78,6 +78,39 @@ theorem PAt.work_ne (c : PCtx m₀ m₁ S e bsr) (h : PAt m₀ m₁ m S ctx bsr 
   · intro hzb; exact c.fresh (hzb ▸ (c.work10 z h1).valid)
   · intro hzb; exact h1 (hzb ▸ c.valid1)
 
+/-- The search's own writable blocks are not the callback's. -/
+theorem SLoc.wr_ne_ua {S : SLoc} (hd : S.blocks.Pairwise (· ≠ ·)) {z : block} (hz : z ∈ S.wr) :
+    z ≠ S.bUA := by
+  simp only [SLoc.wr, wrG, SLoc.wrV, List.mem_append, List.mem_cons, List.mem_nil_iff,
+    or_false] at hz
+  rcases hz with (e | e | e | e | e | e | e | e | e | e | e | e | e) |
+    (e | e | e | e | e | e | e | e | e | e | e | e | e | e) <;> subst e <;> sep_ne hd
+
+/-- The search's own writable blocks are not `tcnode0`. -/
+theorem SLoc.wr_ne_tc {S : SLoc} (hd : S.blocks.Pairwise (· ≠ ·)) {z : block} (hz : z ∈ S.wr) :
+    z ≠ Block.tcnode0 := by
+  simp only [SLoc.wr, wrG, SLoc.wrV, List.mem_append, List.mem_cons, List.mem_nil_iff,
+    or_false] at hz
+  rcases hz with (e | e | e | e | e | e | e | e | e | e | e | e | e) |
+    (e | e | e | e | e | e | e | e | e | e | e | e | e | e) <;> subst e <;> sep_ne hd
+
+/-- A block of `S` the search's own stores may change. -/
+theorem SLoc.wr_chg {S : SLoc} (hd : S.blocks.Pairwise (· ≠ ·)) {z : block} (hz : z ∈ S.wr) :
+    S.Chg z :=
+  ⟨SLoc.wr_sub S _ hz, SLoc.wr_ne_ua hd hz, SLoc.wr_ne_tc hd hz⟩
+
+/-- The work arrays' globals are not the callback's block. -/
+theorem workG_ne_ua {S : SLoc} (hd : S.blocks.Pairwise (· ≠ ·)) {z : block} (hz : z ∈ workG) :
+    z ≠ S.bUA := by
+  simp only [workG, List.mem_cons, List.mem_nil_iff, or_false] at hz
+  rcases hz with e | e | e | e | e | e | e | e <;> subst e <;> sep_ne hd
+
+/-- The work arrays' globals are not `tcnode0`. -/
+theorem workG_ne_tc {S : SLoc} (hd : S.blocks.Pairwise (· ≠ ·)) {z : block} (hz : z ∈ workG) :
+    z ≠ Block.tcnode0 := by
+  simp only [workG, List.mem_cons, List.mem_nil_iff, or_false] at hz
+  rcases hz with e | e | e | e | e | e | e | e <;> subst e <;> sep_ne hd
+
 /-- Across the search's own stores. -/
 theorem PAt.next (c : PCtx m₀ m₁ S e bsr) (h : PAt m₀ m₁ m S ctx bsr st nsp) {L : List block}
     (hu : Unch m m' (· ∈ L)) (hL : ∀ z ∈ L, z ∈ S.wr)
@@ -91,7 +124,8 @@ theorem PAt.next (c : PCtx m₀ m₁ S e bsr) (h : PAt m₀ m₁ m S ctx bsr st 
       (not_wr_all (SLoc.vars_ne h.search.distinct) hL (by decide) (by decide))
       fun z hz hzL => h.search.work_not hz (hb z hzL)
   refine ⟨h.search.rebuild hu hL hK hsc hst har hinv,
-    ⟨h.frame.1.trans (hu.mono fun z hz => .inl (hb z hz)), fun z hz => hv _ (h.frame.2 z hz)⟩,
+    ⟨h.frame.1.trans (hu.mono fun z hz => .inl (SLoc.wr_chg h.search.distinct (hL z hz))),
+      fun z hz => hv _ (h.frame.2 z hz)⟩,
     fun z hz => ?_, fun z hz => hv _ (h.grow1 z hz),
     hu.access _ _ _ _ (fun hz => c.ne_blocks (hb _ hz) rfl) h.srW,
     hu.access _ _ _ _ (fun hz => by
@@ -158,8 +192,8 @@ theorem PAt.call (c : PCtx m₀ m₁ S e bsr) (h : PAt m₀ m₁ m S ctx bsr st 
       · exact h1 (hvm _ (by simp [SLoc.blocks]))
       · exact c.ne_blocks (by simp [SLoc.blocks]) h1) h.ua⟩
   · rcases hW z hz with h1 | h1 | h1 | h1 | h1
-    · exact .inl (SLoc.wr_sub S _ h1)
-    · exact .inl (workG_blocks S h1)
+    · exact .inl (SLoc.wr_chg h.search.distinct h1)
+    · exact .inl ⟨workG_blocks S h1, workG_ne_ua h.search.distinct h1, workG_ne_tc h.search.distinct h1⟩
     · rcases h.work z h1 with h2 | h2
       · exact .inr (.inr (c.work10 z h2))
       · exact .inr (.inl fun hv0 => h2 (c.grow01 _ hv0))

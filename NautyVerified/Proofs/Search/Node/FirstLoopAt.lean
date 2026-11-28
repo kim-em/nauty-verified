@@ -134,7 +134,7 @@ theorem ChainAt.old_idx {L : LCtx n} {m : mem} {ch : List (block × block)} (h :
 
 /-- The blocks a node at `level` may change, from memory `m` and list `ch`. -/
 abbrev frameSet (m : mem) (S : SLoc) (ch : List (block × block)) (level : Nat) (z : block) : Prop :=
-  z ∈ S.blocks ∨ ¬ Mem.valid_block m z ∨ IsWork m z ∨ z = Block.tcnode0 ∨
+  S.Chg z ∨ ¬ Mem.valid_block m z ∨ IsWork m z ∨ z = Block.tcnode0 ∨
     (∃ i p, ch[i]? = some p ∧ level ≤ i + 2 ∧ z = p.1) ∨
     (∃ i p, ch[i]? = some p ∧ level ≤ i + 1 ∧ z = p.2)
 
@@ -169,7 +169,7 @@ theorem LoopAt.call_sub {L : LCtx n} {m : mem} {st : Search n} {pre nsp : Bool} 
 /-- A block changed by one of the node's own steps is within its frame from entry. -/
 theorem LoopAt.step_sub {L : LCtx n} {m : mem} {st : Search n} {pre nsp : Bool} {cell : VSet n}
     {ch : List (block × block)} (h : LoopAt L m st pre nsp cell ch) {z : block}
-    (hz : z ∈ L.S.blocks ∨ ¬ Mem.valid_block m z ∨ IsWork m z ∨ z = L.btc) :
+    (hz : L.S.Chg z ∨ ¬ Mem.valid_block m z ∨ IsWork m z ∨ z = L.btc) :
     frameSet L.m₀ L.S L.chain₀ L.level z := by
   have hg := h.frame.2
   rcases hz with hz | hz | hz | rfl
@@ -199,7 +199,7 @@ theorem not_frameSet {m : mem} {S : SLoc} {ch : List (block × block)} {level : 
     (h4 : ∀ i p, ch[i]? = some p → level ≤ i + 2 → z ≠ p.1)
     (h5 : ∀ i p, ch[i]? = some p → level ≤ i + 1 → z ≠ p.2) : ¬ frameSet m S ch level z := by
   rintro (hz | hz | hz | rfl | ⟨i, p, hi, hil, rfl⟩ | ⟨i, p, hi, hil, rfl⟩)
-  · exact h1 hz
+  · exact h1 hz.1
   · exact hz h2
   · exact h3 hz
   · exact h1 (by simp [SLoc.blocks])
@@ -392,7 +392,7 @@ theorem LoopAt.step {L : LCtx n} {m : mem} {st : Search n} {pre nsp : Bool} {cel
               exact flat_ne hok.pairwise hmem e)
           ok := hok.mono hg hW }
       frame := ⟨h.frame.unch.trans (hu.mono fun z hz => h.step_sub (by
-          rcases hz with ⟨h1, -⟩ | hz | hz | hz
+          rcases hz with h1 | hz | hz | hz
           · exact .inl h1
           · exact .inr (.inl hz)
           · exact .inr (.inr (.inl hz))

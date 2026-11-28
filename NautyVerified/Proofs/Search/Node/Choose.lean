@@ -159,9 +159,9 @@ theorem wp_chooseOff {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_en
         ArrayAt m' .Mint32 bz 0
           (fun _ => .Vint (ir ((chooseTarget false ctx 100 level nc st).2.2.1 : Int))) 1) →
       (∃ v, ArrayAt m' .Mint64 bt 0 v S.M) → (∃ v, ArrayAt m' .Mint32 bz 0 v 1) →
-      Unch m m' (fun z => z ∈ S.blocks ∨ ¬ Mem.valid_block m z ∨ IsWork m z ∨ z = bt ∨ z = bz ∨
+      Unch m m' (fun z => S.Chg z ∨ ¬ Mem.valid_block m z ∨ IsWork m z ∨ z = bt ∨ z = bz ∨
         z = bc) →
-      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) → WorkMono m m' →
       (∀ x, x ≠ idOf 709 → x ≠ idOf 710 → x ≠ idOf 711 → PTree.get x le' = PTree.get x le) →
       Q.normal E0 e le' m') :
     Wp xi ge f chooseOff Q e le m := by
@@ -218,16 +218,16 @@ theorem wp_chooseOff {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_en
           (fun _ => .Vint (ir ((maketargetcell ctx st.lab st.ptn level 100 hint).2.2 : Int))) 1 →
         ArrayAt m₂ .Mint32 bc 0
           (fun _ => .Vint (ir ((maketargetcell ctx st.lab st.ptn level 100 hint).1 : Int))) 1 →
-        Unch m m₂ (fun z => z ∈ S.blocks ∨ ¬ Mem.valid_block m z ∨ IsWork m z ∨ z = bt ∨ z = bz ∨
+        Unch m m₂ (fun z => S.Chg z ∨ ¬ Mem.valid_block m z ∨ IsWork m z ∨ z = bt ∨ z = bz ∨
           z = bc) →
-        (∀ z, Mem.valid_block m z → Mem.valid_block m₂ z) →
+        (∀ z, Mem.valid_block m z → Mem.valid_block m₂ z) → WorkMono m m₂ →
         chooseTarget false ctx 100 level nc st =
           (((maketargetcell ctx st.lab st.ptn level 100 hint).1 : Int),
            (maketargetcell ctx st.lab st.ptn level 100 hint).2.1,
            (maketargetcell ctx st.lab st.ptn level 100 hint).2.2,
            { st₂ with tctotal := st₂.tctotal + (maketargetcell ctx st.lab st.ptn level 100 hint).2.2 }) →
         Wp xi ge f (Set.sk tcTotal) Q e le2 m₂ := by
-      intro hint st₂ m₂ hh st₂t h₂ hT hZ hC hU₂ hg₂ hct
+      intro hint st₂ m₂ hh st₂t h₂ hT hZ hC hU₂ hg₂ hw₂ hct
       obtain ⟨_, hsz⟩ := mtc_bounds ctx st.lab st.ptn level 100 hint hI.ptnSize hlast hh hx hgt
       wp_step; wp_step
       refine wp_tctotal h₂ g12 hez (ld hZ) (by omega) ?_
@@ -243,7 +243,9 @@ theorem wp_chooseOff {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_en
           obtain ⟨ws, hw, hr⟩ := hT
           exact ⟨⟨ws, hw.unch hu₃ nst.1, hr⟩, hZ.unch hu₃ nst.2.1⟩)
         (let ⟨ws, hw, _⟩ := hT; ⟨_, hw.unch hu₃ nst.1⟩) ⟨_, hZ.unch hu₃ nst.2.1⟩
-        (hU₂.trans (hu₃.mono fun z hz => .inl (hz ▸ by simp [SLoc.blocks]))) (fun z hz => hg₃ z (hg₂ z hz))
+        (hU₂.trans (hu₃.mono fun z hz => .inl (by subst hz; exact ⟨by simp [SLoc.blocks], by sep_ne h.distinct, by sep_ne h.distinct⟩))) (fun z hz => hg₃ z (hg₂ z hz))
+        (hw₂.trans hg₂ (WorkMono.of_unch h₂.work hu₃ (by simp only [workG]; sep_all h.distinct)
+          fun z hz e => h₂.work_not hz (e ▸ by simp [SLoc.blocks])))
         (fun x h1 h2 h3 => by rw [ho2 x h2, ho1 x h3])
       exact this
     by_cases hcc : st.compCanon < 0
@@ -258,7 +260,7 @@ theorem wp_chooseOff {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_en
       wp_step; wp_step; wp_step
       refine wp_nodeTarget h hvU hvT hloc hlocS htc2 hez hec hgeT ht hz ⟨_, hc⟩ hlab2 hptn2 hlev2 hl1 hln
         hhint rfl hft.1 hft.2 ⟨x, hx, hgt⟩ ?_
-      intro m₁ h₁ hT hZ hC hU₁ hg₁
+      intro m₁ h₁ hT hZ hC hU₁ hg₁ hw₁
       obtain ⟨hpos, -⟩ := mtc_bounds ctx st.lab st.ptn level 100 st.firsttc[level]! hI.ptnSize hlast
         hft.2 hx hgt
       simp only [seqPost, Post.after, E0_append]
@@ -273,8 +275,10 @@ theorem wp_chooseOff {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_en
         (let ⟨ws, hw, hr⟩ := hT; ⟨ws, hw.unch hu₂ (fun hm => nE bt (by simp) (by simpa using hm)), hr⟩)
         (hZ.unch hu₂ fun hm => nE bz (by simp) (by simpa using hm))
         (hC.unch hu₂ fun hm => nE bc (by simp) (by simpa using hm))
-        (hU₁.trans (hu₂.mono fun z hz => .inl (by simp at hz; exact hz ▸ by simp [SLoc.blocks])))
-        (fun z hz => hg₂ z (hg₁ z hz)) ?_
+        (hU₁.trans (hu₂.mono fun z hz => .inl (by simp at hz; subst hz; exact ⟨by simp [SLoc.blocks], by sep_ne h.distinct, by sep_ne h.distinct⟩)))
+        (fun z hz => hg₂ z (hg₁ z hz))
+        (hw₁.trans hg₁ (WorkMono.of_unch h₁.work hu₂ (by simp only [workG]; sep_all h.distinct)
+          fun z hz e => h₁.work_not hz (by simp at e; exact e ▸ by simp [SLoc.blocks]))) ?_
       rw [chooseTarget_false_eq, ite_eq_left hcho]
       simp only [offHint, hcc, ite_true, true_and]
       split <;> rfl
@@ -284,9 +288,9 @@ theorem wp_chooseOff {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_en
       refine wp_nodeTarget (hint := -1) h hvU hvT hloc hlocS htc2 hez hec hgeT ht hz ⟨_, hc⟩ hlab2 hptn2
         hlev2 hl1 hln (by simp [Exec.evalExpr, typeof, cop]) rfl (by decide) (by omega)
         ⟨x, hx, hgt⟩ ?_
-      intro m₁ h₁ hT hZ hC hU₁ hg₁
+      intro m₁ h₁ hT hZ hC hU₁ hg₁ hw₁
       simp only [seqPost, Post.after, E0_append]
-      refine fin (-1) st m₁ (by omega) rfl h₁ hT hZ hC hU₁ hg₁ ?_
+      refine fin (-1) st m₁ (by omega) rfl h₁ hT hZ hC hU₁ hg₁ hw₁ ?_
       rw [chooseTarget_false_eq, ite_eq_left hcho]
       simp only [offHint, hcc, ite_false, false_and]
   · rw [decide_eq_false hcho]
@@ -295,7 +299,7 @@ theorem wp_chooseOff {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_en
     have hct : chooseTarget false ctx 100 level nc st = ((-1 : Int), VSet.empty, 0, st) := by
       rw [chooseTarget_false_eq, ite_eq_right hcho]
     have := hQ le1 m (by rw [hct]; exact h) (by rw [hct]; exact hc) (fun hh => absurd hh hcho) ht hz
-      (Unch.refl _ _) (fun _ hz => hz) fun x h1 h2 h3 => ho1 x h3
+      (Unch.refl _ _) (fun _ hz => hz) (WorkMono.refl m) fun x h1 h2 h3 => ho1 x h3
     exact this
 
 end NautyVerified.Proofs.Search

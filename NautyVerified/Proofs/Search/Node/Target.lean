@@ -3,6 +3,7 @@ import NautyVerified.Proofs.Search.Node.Fields
 import NautyVerified.Proofs.Search.Node.OtherSteps
 import NautyVerified.Proofs.Maketargetcell.Satisfies
 import NautyVerified.Logic.Grow
+import NautyVerified.Proofs.Search.Step
 
 /-!
 # A search node's `maketargetcell` call
@@ -79,9 +80,9 @@ theorem wp_nodeTarget {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_e
         (fun _ => .Vint (ir ((maketargetcell ctx st.lab st.ptn level 100 hint).2.2 : Int))) 1 →
       ArrayAt m' .Mint32 bc 0
         (fun _ => .Vint (ir ((maketargetcell ctx st.lab st.ptn level 100 hint).1 : Int))) 1 →
-      Unch m m' (fun z => z ∈ S.blocks ∨ ¬ Mem.valid_block m z ∨ IsWork m z ∨ z = bt ∨ z = bz ∨
+      Unch m m' (fun z => S.Chg z ∨ ¬ Mem.valid_block m z ∨ IsWork m z ∨ z = bt ∨ z = bz ∨
         z = bc) →
-      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) → WorkMono m m' →
       Q.normal E0 e le m') :
     Wp xi ge f (mtcCall hintE) Q e le m := by
   have hv := h.valid_all hvU hvT
@@ -212,16 +213,33 @@ theorem wp_nodeTarget {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_e
       · exact cWn (e ▸ hw)
     have hS' := h.realloc hvU hvT dN nW nS nB nN pNW pNS pNB (X := fun z => z = bt ∨ z = bz ∨ z = bc) hU
       hX hXN dW' dS' dB' fW fS fB pWS' pWB' pSB'
+    have hpG : ∀ g, g = Block.nautilWorkperm ∨ g = Block.nautilWorkpermSz →
+        ¬ (dyn3Set m cW bW cS bS cB bB g ∨ g = bt ∨ g = bz ∨ g = bc) := by
+      intro g hg
+      have hgS : g ∈ S.blocks := by rcases hg with rfl | rfl <;> simp [SLoc.blocks]
+      have hgv := hv g hgS
+      unfold dyn3Set
+      rintro ((e | e | e | e | e | e | ⟨hc, e⟩ | ⟨hc, e⟩ | ⟨hc, e⟩ | hnv) | e | e | e)
+      all_goals first
+        | exact hnv hgv
+        | exact nW hc (e ▸ hgS)
+        | exact nS hc (e ▸ hgS)
+        | exact nB hc (e ▸ hgS)
+        | exact tS (e ▸ hgS)
+        | exact zS (e ▸ hgS)
+        | exact cSn (e ▸ hgS)
+        | (rcases hg with rfl | rfl <;> exact absurd e (by decide))
     refine hQ m' hS' hT hZ hC (hU.mono fun z hz => ?_) hgrow
+      (WorkMono.of_three dW dS dB dN dW' dS' dB' fW fS fB hU (hpG _ (.inl rfl)) (hpG _ (.inr rfl)))
     rcases hz with h6 | hx
     · unfold dyn3Set at h6
       rcases h6 with e | e | e | e | e | e | ⟨hc, e⟩ | ⟨hc, e⟩ | ⟨hc, e⟩ | hnv
-      · exact .inl (e ▸ by simp [SLoc.blocks])
-      · exact .inl (e ▸ by simp [SLoc.blocks])
-      · exact .inl (e ▸ by simp [SLoc.blocks])
-      · exact .inl (e ▸ by simp [SLoc.blocks])
-      · exact .inl (e ▸ by simp [SLoc.blocks])
-      · exact .inl (e ▸ by simp [SLoc.blocks])
+      · exact .inl (by subst e; exact ⟨by simp [SLoc.blocks], by sep_ne h.distinct, by sep_ne h.distinct⟩)
+      · exact .inl (by subst e; exact ⟨by simp [SLoc.blocks], by sep_ne h.distinct, by sep_ne h.distinct⟩)
+      · exact .inl (by subst e; exact ⟨by simp [SLoc.blocks], by sep_ne h.distinct, by sep_ne h.distinct⟩)
+      · exact .inl (by subst e; exact ⟨by simp [SLoc.blocks], by sep_ne h.distinct, by sep_ne h.distinct⟩)
+      · exact .inl (by subst e; exact ⟨by simp [SLoc.blocks], by sep_ne h.distinct, by sep_ne h.distinct⟩)
+      · exact .inl (by subst e; exact ⟨by simp [SLoc.blocks], by sep_ne h.distinct, by sep_ne h.distinct⟩)
       · exact .inr (.inr (.inl (e ▸ .inl ⟨cW, hc, dW⟩)))
       · exact .inr (.inr (.inl (e ▸ .inr (.inl ⟨cS, hc, dS⟩))))
       · exact .inr (.inr (.inl (e ▸ .inr (.inr (.inl ⟨cB, hc, dB⟩)))))

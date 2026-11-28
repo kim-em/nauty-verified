@@ -272,7 +272,8 @@ theorem recover_satisfies {n : Nat} (S : SLoc) (ctx : Ctx n) (st : Search n) (le
                   refine ⟨b1, ?_, ?_, b4, ?_, ?_, ?_, ?_, ?_, b10, b11, b12⟩ <;> dsimp only <;>
                     split <;> (try simp only [Int.ofNat_eq_natCast]) <;> omega }
             n0 := h.n0, nlt := h.nlt, nM := h.nM, M1 := h.M1, Mlt := h.Mlt }
-      · refine ⟨⟨hUf.mono fun z hz => .inl (by revert hz; revert z; simp [SLoc.blocks]),
+      · refine ⟨⟨hUf.mono fun z hz => .inl ⟨by revert hz; revert z; simp [SLoc.blocks], by revert hz; revert z; sep_all hd,
+          by revert hz; revert z; sep_all hd⟩,
           fun z hz => hvf _ (hv4 _ (hv3 _ (hv2 _ (hv1 _ hz))))⟩, fun z hz => .inl (IsWork.back h hUf ?_ hz)⟩
         intro z hz
         simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz

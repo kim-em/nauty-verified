@@ -32,6 +32,15 @@ def SStep (m m' : mem) (S : SLoc) : Prop := SFrame m m' S ∧ WorkMono m m'
 /-- The blocks of `S` are valid. -/
 def SValid (m : mem) (S : SLoc) : Prop := ∀ z ∈ S.blocks, Mem.valid_block m z
 
+theorem WorkMono.refl (m : mem) : WorkMono m m := fun _ h => .inl h
+
+theorem WorkMono.trans {m m₁ m₂ : mem} (h₁ : WorkMono m m₁)
+    (hv : ∀ z, Mem.valid_block m z → Mem.valid_block m₁ z) (h₂ : WorkMono m₁ m₂) :
+    WorkMono m m₂ := fun z hz => by
+  rcases h₂ z hz with h | h
+  · exact h₁ z h
+  · exact .inr fun hv0 => h (hv _ hv0)
+
 theorem SStep.refl (m : mem) (S : SLoc) : SStep m m S :=
   ⟨⟨Unch.refl _ _, fun _ h => h⟩, fun _ h => .inl h⟩
 
@@ -121,6 +130,64 @@ theorem WorkMono.of_slots {n : Nat} {m m' : mem} {S : SLoc} {L : List block} (h 
     · exact .inl (.inr (.inr (.inr h)))
     · exact .inr h
 
+/-- `WorkMono` when the four pairs were reallocated: each new block is the old one
+or new since `m`. -/
+theorem WorkMono.of_four {m m' : mem} {cW cS cB cN cW' cS' cB' cN' : Nat}
+    {bW bS bB bN bW' bS' bB' bN' : block}
+    (dW : DynAt m Block.naugraphWorkperm Block.naugraphWorkpermSz 4 cW bW)
+    (dS : DynAt m Block.naugraphWorkset Block.naugraphWorksetSz 8 cS bS)
+    (dB : DynAt m Block.naugraphBucket Block.naugraphBucketSz 4 cB bB)
+    (dN : DynAt m Block.nautilWorkperm Block.nautilWorkpermSz 4 cN bN)
+    (dW' : DynAt m' Block.naugraphWorkperm Block.naugraphWorkpermSz 4 cW' bW')
+    (dS' : DynAt m' Block.naugraphWorkset Block.naugraphWorksetSz 8 cS' bS')
+    (dB' : DynAt m' Block.naugraphBucket Block.naugraphBucketSz 4 cB' bB')
+    (dN' : DynAt m' Block.nautilWorkperm Block.nautilWorkpermSz 4 cN' bN')
+    (fW : (cW' = cW ∧ bW' = bW) ∨ ¬ Mem.valid_block m bW')
+    (fS : (cS' = cS ∧ bS' = bS) ∨ ¬ Mem.valid_block m bS')
+    (fB : (cB' = cB ∧ bB' = bB) ∨ ¬ Mem.valid_block m bB')
+    (fN : (cN' = cN ∧ bN' = bN) ∨ ¬ Mem.valid_block m bN') : WorkMono m m' := by
+  rintro z (⟨c, hc, d⟩ | ⟨c, hc, d⟩ | ⟨c, hc, d⟩ | ⟨c, hc, d⟩)
+  · rcases SlotNext.back dW ⟨_, _, dW', fW⟩ hc d with h | h
+    · exact .inl (.inl h)
+    · exact .inr h
+  · rcases SlotNext.back dS ⟨_, _, dS', fS⟩ hc d with h | h
+    · exact .inl (.inr (.inl h))
+    · exact .inr h
+  · rcases SlotNext.back dB ⟨_, _, dB', fB⟩ hc d with h | h
+    · exact .inl (.inr (.inr (.inl h)))
+    · exact .inr h
+  · rcases SlotNext.back dN ⟨_, _, dN', fN⟩ hc d with h | h
+    · exact .inl (.inr (.inr (.inr h)))
+    · exact .inr h
+
+/-- `WorkMono` when naugraph's three pairs were reallocated and nautil's pair's
+globals are unchanged. -/
+theorem WorkMono.of_three {m m' : mem} {W : block → Prop} {cW cS cB cN cW' cS' cB' : Nat}
+    {bW bS bB bN bW' bS' bB' : block}
+    (dW : DynAt m Block.naugraphWorkperm Block.naugraphWorkpermSz 4 cW bW)
+    (dS : DynAt m Block.naugraphWorkset Block.naugraphWorksetSz 8 cS bS)
+    (dB : DynAt m Block.naugraphBucket Block.naugraphBucketSz 4 cB bB)
+    (dN : DynAt m Block.nautilWorkperm Block.nautilWorkpermSz 4 cN bN)
+    (dW' : DynAt m' Block.naugraphWorkperm Block.naugraphWorkpermSz 4 cW' bW')
+    (dS' : DynAt m' Block.naugraphWorkset Block.naugraphWorksetSz 8 cS' bS')
+    (dB' : DynAt m' Block.naugraphBucket Block.naugraphBucketSz 4 cB' bB')
+    (fW : (cW' = cW ∧ bW' = bW) ∨ ¬ Mem.valid_block m bW')
+    (fS : (cS' = cS ∧ bS' = bS) ∨ ¬ Mem.valid_block m bS')
+    (fB : (cB' = cB ∧ bB' = bB) ∨ ¬ Mem.valid_block m bB')
+    (hu : Unch m m' W) (hp : ¬ W Block.nautilWorkperm) (hs : ¬ W Block.nautilWorkpermSz) :
+    WorkMono m m' := by
+  rintro z (⟨c, hc, d⟩ | ⟨c, hc, d⟩ | ⟨c, hc, d⟩ | ⟨c, hc, d⟩)
+  · rcases SlotNext.back dW ⟨_, _, dW', fW⟩ hc d with h | h
+    · exact .inl (.inl h)
+    · exact .inr h
+  · rcases SlotNext.back dS ⟨_, _, dS', fS⟩ hc d with h | h
+    · exact .inl (.inr (.inl h))
+    · exact .inr h
+  · rcases SlotNext.back dB ⟨_, _, dB', fB⟩ hc d with h | h
+    · exact .inl (.inr (.inr (.inl h)))
+    · exact .inr h
+  · exact .inl (.inr (.inr (.inr (work_slot_unch dN hu hp hs hc d))))
+
 /-- The work arrays' globals. -/
 abbrev workG : List block :=
   [Block.naugraphWorkperm, Block.naugraphWorkpermSz, Block.naugraphWorkset,
@@ -148,7 +215,8 @@ to blocks new since `m`. -/
 theorem SStep.of_unch {n : Nat} {m m' : mem} {S : SLoc} {ctx : Ctx n} {st : Search n}
     {pre nsp : Bool} (h : SearchAt m S ctx st pre nsp)
     {W : block → Prop} (hu : Unch m m' W) (hv : ∀ z, Mem.valid_block m z → Mem.valid_block m' z)
-    (hW : ∀ z, W z → z ∈ S.blocks ∨ ¬ Mem.valid_block m z) (hg : ∀ z ∈ workG, ¬ W z) :
+    (hW : ∀ z, W z → S.Chg z ∨ ¬ Mem.valid_block m z)
+    (hg : ∀ z ∈ workG, ¬ W z) :
     SStep m m' S :=
   ⟨⟨hu.mono fun z hz => by
       rcases hW z hz with h | h
@@ -156,7 +224,7 @@ theorem SStep.of_unch {n : Nat} {m m' : mem} {S : SLoc} {ctx : Ctx n} {st : Sear
       · exact .inr (.inl h), hv⟩,
    WorkMono.of_unch h.work hu hg fun z hz hWz => by
      rcases hW z hWz with h' | h'
-     · exact h.work_not hz h'
+     · exact h.work_not hz h'.1
      · exact h' hz.valid⟩
 
 /-- How a pair's block after a step relates to its block before. -/

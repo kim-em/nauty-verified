@@ -1,5 +1,6 @@
 import NautyVerified.Proofs.Search.Node.Doref
 import NautyVerified.Proofs.Search.Node.ReallocW
+import NautyVerified.Proofs.Search.Step
 
 /-!
 # A node's refinement, with the search state rebuilt
@@ -84,9 +85,9 @@ theorem wp_nodeVisit {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_en
       ArrayAt m' .Mint32 bk 0
         (fun _ => .Vint (ir (refine ctx level st.lab st.ptn st.active numcells).longcode)) 1 →
       ArrayAt m' .Mint32 bq 0 (fun _ => .Vint (ir 0)) 1 →
-      Unch m m' (fun z => z ∈ S.blocks ∨ ¬ Mem.valid_block m z ∨ IsWork m z ∨ z = bnc ∨
+      Unch m m' (fun z => S.Chg z ∨ ¬ Mem.valid_block m z ∨ IsWork m z ∨ z = bnc ∨
         z = bq ∨ z = bk) →
-      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) → WorkMono m m' →
       Q.normal E0 e le m') :
     Wp xi ge f dorefCall Q e le m := by
   have hv := h.valid_all hvU hvT
@@ -302,6 +303,7 @@ theorem wp_nodeVisit {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_en
       (pN fB oB fun hc => Alloc.Malloced.valid (dB.mal hc)) hsc hst har hinv
   have hqarr' : ArrayAt m' .Mint32 bq 0 (fun _ => .Vint (ir 0)) 1 := hqarr
   refine hQ m' hSA hnc' hk' hqarr' (hU.mono fun z hz => ?_) hgrow
+    (WorkMono.of_four dW dS dB dN dW' dS' dB' dN' (back fW) (back fS) (back fB) fN')
   rcases hz with h6 | hN | hx
   · unfold dyn3Set at h6
     rcases h6 with e | e | e | e | e | e | ⟨hc, e⟩ | ⟨hc, e⟩ | ⟨hc, e⟩ | hnv
@@ -310,18 +312,18 @@ theorem wp_nodeVisit {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_en
       | exact .inr (.inr (.inl (e ▸ iS hc)))
       | exact .inr (.inr (.inl (e ▸ iB hc)))
       | exact .inr (.inl hnv)
-      | exact .inl (e ▸ by simp [SLoc.blocks])
+      | exact .inl (by subst e; exact ⟨by simp [SLoc.blocks], by sep_ne h.distinct, by sep_ne h.distinct⟩)
   · rcases hN with e | e | ⟨hc, e⟩ | hnv
-    · exact .inl (e ▸ by simp [SLoc.blocks])
-    · exact .inl (e ▸ by simp [SLoc.blocks])
+    · exact .inl (by subst e; exact ⟨by simp [SLoc.blocks], by sep_ne h.distinct, by sep_ne h.distinct⟩)
+    · exact .inl (by subst e; exact ⟨by simp [SLoc.blocks], by sep_ne h.distinct, by sep_ne h.distinct⟩)
     · exact .inr (.inr (.inl (e ▸ iN hc)))
     · exact .inr (.inl hnv)
   · rcases hx with e | e | e | e | e | e | e
-    · exact .inl (e ▸ by simp [SLoc.blocks])
-    · exact .inl (e ▸ by simp [SLoc.blocks])
+    · exact .inl (by subst e; exact ⟨by simp [SLoc.blocks], by sep_ne h.distinct, by sep_ne h.distinct⟩)
+    · exact .inl (by subst e; exact ⟨by simp [SLoc.blocks], by sep_ne h.distinct, by sep_ne h.distinct⟩)
     · exact .inr (.inr (.inr (.inl e)))
-    · exact .inl (e ▸ by simp [SLoc.blocks])
-    · exact .inl (e ▸ by simp [SLoc.blocks])
+    · exact .inl (by subst e; exact ⟨by simp [SLoc.blocks], by sep_ne h.distinct, by sep_ne h.distinct⟩)
+    · exact .inl (by subst e; exact ⟨by simp [SLoc.blocks], by sep_ne h.distinct, by sep_ne h.distinct⟩)
     · exact .inr (.inr (.inr (.inr (.inr e))))
     · exact .inr (.inr (.inr (.inr (.inl e))))
 

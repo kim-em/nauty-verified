@@ -100,7 +100,8 @@ structure TcOk (m : mem) (S : SLoc) (chain : List (block × block)) : Prop where
 
 /-- What a node at `level` may change. -/
 def NodeFrame (m m' : mem) (S : SLoc) (chain : List (block × block)) (level : Nat) : Prop :=
-  Unch m m' (fun z => z ∈ S.blocks ∨ ¬ Mem.valid_block m z ∨ IsWork m z ∨ z = Block.tcnode0 ∨
+  Unch m m' (fun z => S.Chg z ∨ ¬ Mem.valid_block m z ∨ IsWork m z ∨
+      z = Block.tcnode0 ∨
       (∃ i p, chain[i]? = some p ∧ level ≤ i + 2 ∧ z = p.1) ∨
       (∃ i p, chain[i]? = some p ∧ level ≤ i + 1 ∧ z = p.2)) ∧
     ∀ z, Mem.valid_block m z → Mem.valid_block m' z

@@ -274,6 +274,12 @@ def SLoc.blocks (S : SLoc) : List block :=
    Program.Block.nautyBit, Block.naugraphBit, Block.nautilBit, Block.naugraphBytecount,
    Block.leftbit, Block.mininvarlevel, Block.maxinvarlevel, Block.invararg]
 
+/-- The blocks of `S` a search function may change: all but the harness
+callback's block and the target-cell list's head `tcnode0`, which no callee writes
+(the list itself is framed separately, `TcChain`). -/
+abbrev SLoc.Chg (S : SLoc) (z : block) : Prop :=
+  z ∈ S.blocks ∧ z ≠ S.bUA ∧ z ≠ Block.tcnode0
+
 /-- nauty.c's `DYNALLSTAT` pairs, with the capacities the search needs. -/
 structure Dyns (n : Nat) (m : mem) (S : SLoc) : Prop where
   active : DynAt m Program.Block.nautyActive Program.Block.nautyActiveSz 8 S.capA S.bA

@@ -142,6 +142,7 @@ import NautyVerified.Proofs.Search.Node.Em
 import NautyVerified.Proofs.Search.Node.Child
 import NautyVerified.Proofs.Search.Node.LoopShape
 import NautyVerified.Proofs.Search.Node.TcFrame
+import NautyVerified.Proofs.Search.Node.UaFrame
 import NautyVerified.Proofs.Search.Node.InvSteps
 import NautyVerified.Proofs.Search.Frame
 import NautyVerified.Proofs.Harness.Spec
