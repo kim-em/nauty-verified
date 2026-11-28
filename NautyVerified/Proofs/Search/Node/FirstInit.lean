@@ -149,4 +149,55 @@ theorem HeadAt.stepS {L : LCtx n} {m : mem} {st : Search n} {pre nsp : Bool}
     (fun z hz => by obtain ⟨v, hv⟩ := h.locA z hz; exact ⟨v, hv.unch hu (nloc z hz)⟩)
     (fun z hz => Keep.unch hu (nloc z hz))
 
+/-- A step that changes blocks of `S`, new blocks, work blocks and some of the
+target cell and the locals (`Ls`), keeping their headers and permissions,
+keeps `HeadAt`. -/
+theorem HeadAt.stepL {L : LCtx n} {m : mem} {st : Search n} {pre nsp : Bool}
+    {ch : List (block × block)} (h : HeadAt L m st pre nsp ch)
+    (hfresh : ∀ z ∈ L.locals, ¬ Mem.valid_block L.m₀ z)
+    {m' : mem} {st' : Search n} {pre' nsp' : Bool} {Ls : List block}
+    (hS : SearchAt m' L.S L.ctx st' pre' nsp')
+    (hu : Unch m m' (fun z => L.S.Chg z ∨ ¬ Mem.valid_block m z ∨ IsWork m z ∨ z ∈ Ls))
+    (hLs : ∀ z ∈ Ls, z = L.btc ∨ z ∈ L.locals)
+    (hg : ∀ z, Mem.valid_block m z → Mem.valid_block m' z) (hwm : WorkMono m m')
+    (hK : ∀ z ∈ Ls, Keep m m' z)
+    (hA : ∀ z ∈ Ls, z ∈ L.locals → ∃ v, ArrayAt m' .Mint32 z 0 v 1)
+    (hC : L.btc ∈ Ls → ∃ v, ArrayAt m' .Mint64 L.btc 0 v L.S.M) :
+    HeadAt L m' st' pre' nsp' ch := by
+  have hmem := List.mem_of_getElem? h.chain.own
+  obtain ⟨-, b2, -, b4⟩ := h.chain.ok.apart _ hmem
+  have nW : ∀ z, z ∉ L.S.blocks → Mem.valid_block m z → ¬ IsWork m z → z ∉ Ls →
+      ¬ (L.S.Chg z ∨ ¬ Mem.valid_block m z ∨ IsWork m z ∨ z ∈ Ls) := by
+    rintro z h1 h2 h3 h4 (h' | h' | h' | h')
+    · exact h1 h'.1
+    · exact h' h2
+    · exact h3 h'
+    · exact h4 h'
+  have hcell : ∃ v, ArrayAt m' .Mint64 L.btc 0 v L.S.M := by
+    by_cases hb : L.btc ∈ Ls
+    · exact hC hb
+    · obtain ⟨cv, hcv⟩ := h.cellv
+      exact ⟨cv, hcv.unch hu (nW _ b2 (h.chain.ok.valid _ hmem).2 b4 hb)⟩
+  have hkc : Keep m m' L.btc := by
+    by_cases hb : L.btc ∈ Ls
+    · exact hK _ hb
+    · exact Keep.unch hu (nW _ b2 (h.chain.ok.valid _ hmem).2 b4 hb)
+  refine h.step hfresh hS (hu.mono fun z hz => ?_) hg hwm hcell hkc (fun z hz => ?_) (fun z hz => ?_)
+  · rcases hz with h1 | h1 | h1 | h1
+    · exact .inl (.inl h1)
+    · exact .inl (.inr (.inl h1))
+    · exact .inl (.inr (.inr (.inl h1)))
+    · rcases hLs z h1 with e | e
+      · exact .inl (.inr (.inr (.inr e)))
+      · exact .inr e
+  · by_cases hz' : z ∈ Ls
+    · exact hA z hz' hz
+    · obtain ⟨a, b, c⟩ := h.locals z hz
+      obtain ⟨v, hv⟩ := h.locA z hz
+      exact ⟨v, hv.unch hu (nW z b a c hz')⟩
+  · by_cases hz' : z ∈ Ls
+    · exact hK z hz'
+    · obtain ⟨a, b, c⟩ := h.locals z hz
+      exact Keep.unch hu (nW z b a c hz')
+
 end NautyVerified.Proofs.Search

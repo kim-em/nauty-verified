@@ -168,6 +168,7 @@ import NautyVerified.Proofs.Search.Node.FirstBodySteps
 import NautyVerified.Proofs.Search.Node.FirstHead
 import NautyVerified.Proofs.Search.Node.FirstEntry
 import NautyVerified.Proofs.Search.Node.FirstInit
+import NautyVerified.Proofs.Search.Node.FirstBody
 import NautyVerified.Proofs.Search.Node.TcFrame
 import NautyVerified.Proofs.Search.Node.UaFrame
 import NautyVerified.Proofs.Search.Node.InvSteps
