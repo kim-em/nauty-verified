@@ -107,6 +107,7 @@ import NautyVerified.Proofs.Top.NautyMain
 import NautyVerified.Proofs.Top.NautyTc
 import NautyVerified.Proofs.Top.Opts
 import NautyVerified.Proofs.Top.Ptn
+import NautyVerified.Proofs.Top.NautyInit
 import NautyVerified.Proofs.Search.Node.Spec
 import NautyVerified.Proofs.Search.Node.OtherHex
 import NautyVerified.Proofs.Search.Node.Rebuild
