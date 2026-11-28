@@ -148,6 +148,10 @@ set_option linter.unusedSimpArgs false
 
 variable {xi : ExternalCalls}
 
+section Generic
+
+variable {ge : genv} [E : NautyEnv ge] [T : TopEnv ge]
+
 /-- `ptn` after the first `k` steps of `if (ptn[i] != 0) ptn[i] = NAUTY_INFINITY`. -/
 def normP (h : Array Nat) (k : Nat) : Array Nat :=
   (List.range k).foldl (fun a j => if h[j]! ≠ 0 then a.set! j Search.nautyInf else a) h
@@ -209,9 +213,9 @@ theorem zeros_le (h : Array Nat) : ∀ k, zeros h k ≤ k
 theorem wp_normLoop {Q : Post} {le : temp_env} {m : mem} {bp : block} {n : Nat} (h : Array Nat)
     (hsz : h.size = n) (hn : n < 1073741824) (hh : ∀ j < n, h[j]! < 2147483648)
     (hptn : PTree.get dense.id.«ptn» le = some (.Vptr bp Ptrofs.zero))
-    (hN : IntAt m Search.Block.n n)
+    (hN : IntAt m E.n n)
     (hnc : PTree.get dense.id.«numcells» le = some (.Vint (ir 0)))
-    (harr : ArrayAt m .Mint32 bp 0 (ints h) n) (hbp : bp ≠ Search.Block.n)
+    (harr : ArrayAt m .Mint32 bp 0 (ints h) n) (hbp : bp ≠ E.n)
     (hQ : ∀ le' m', ArrayAt m' .Mint32 bp 0 (ints (normP h n)) n →
       PTree.get dense.id.«numcells» le' = some (.Vint (ir (zeros h n))) →
       Unch m m' (· = bp) → (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
@@ -236,7 +240,7 @@ theorem wp_normLoop {Q : Post} {le : temp_env} {m : mem} {bp : block} {n : Nat} 
   · rintro k le' m' ⟨hk, hi, -, -, hu, -, -⟩
     refine ⟨hk, hi, ?_⟩
     rw [Exec.evalExpr, show Exec.evalExpr ge (nEnv bI) le' m' (Refine.tv dense.id.«i») = _ from hi,
-      Search.eval_gint (e := (nEnv bI)) rfl Search.find_n (hN.unch hu (Ne.symm hbp))]
+      Search.eval_gint (e := (nEnv bI)) rfl E.find_n (hN.unch hu (Ne.symm hbp))]
     simp only [typeof, cop]
     rw [ir_lt (a := k) (b := n) ⟨by omega, by omega⟩ ⟨by omega, by omega⟩]
     simp
@@ -395,12 +399,12 @@ theorem wp_actLoop {Q : Post} {le : temp_env} {m : mem} {bp bA : block} {n M : N
     (hn0 : 0 < n) (hn : n < 1073741824) (hnM : n ≤ 64 * M) (hM : M < 33554432)
     (hptn : PTree.get dense.id.«ptn» le = some (.Vptr bp Ptrofs.zero))
     (harr : ArrayAt m .Mint32 bp 0 (ints (initPtn n Search.nautyInf ends)) n)
-    (hN : IntAt m Search.Block.n n)
-    (hA : Mem.load .Mint64 m Block.nautyActive (zOfInt 0) = some (.Vptr bA Ptrofs.zero))
+    (hN : IntAt m E.n n)
+    (hA : Mem.load .Mint64 m E.nautyActive (zOfInt 0) = some (.Vptr bA Ptrofs.zero))
     (haw : ArrayAt m .Mint64 bA 0 (Set.longs aw) M)
     (hrep : SetRep (fun w => bv64 (aw w)) M (VSet.empty : VSet n))
-    (hbit : Set.BitTable m Block.nautyBit)
-    (hsep : bA ≠ bp ∧ bA ≠ Search.Block.n ∧ bA ≠ Block.nautyActive ∧ bA ≠ Block.nautyBit)
+    (hbit : Set.BitTable m E.nautyBit)
+    (hsep : bA ≠ bp ∧ bA ≠ E.n ∧ bA ≠ E.nautyActive ∧ bA ≠ E.nautyBit)
     (hQ : ∀ le' m' (aw' : Nat → Lib.Integers.int64), ArrayAt m' .Mint64 bA 0 (Set.longs aw') M →
       SetRep (fun w => bv64 (aw' w)) M (initActive n ends) → Unch m m' (· = bA) →
       Alloc.Keep m m' bA → (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
@@ -478,7 +482,7 @@ theorem wp_actLoop {Q : Post} {le : temp_env} {m : mem} {bp bA : block} {n M : N
     wp_step; wp_step; wp_step
     apply wp_if_eval
     rw [Exec.evalExpr, show Exec.evalExpr ge (nEnv bI) le' m' (Refine.tv dense.id.«i») = _ from hi,
-      Search.eval_gint (e := (nEnv bI)) rfl Search.find_n hN']
+      Search.eval_gint (e := (nEnv bI)) rfl E.find_n hN']
     simp only [typeof, cop]
     have hstn : st j ≤ n := by
       rcases Nat.lt_or_ge j ends.length with h | h
@@ -499,10 +503,10 @@ theorem wp_actLoop {Q : Post} {le : temp_env} {m : mem} {bp bA : block} {n M : N
       apply wp_skip
       simp only [seqPost, Post.after, E0_append]
       wp_step
-      have hA' : Mem.load .Mint64 m' Block.nautyActive (zOfInt 0) = some (.Vptr bA Ptrofs.zero) := by
+      have hA' : Mem.load .Mint64 m' E.nautyActive (zOfInt 0) = some (.Vptr bA Ptrofs.zero) := by
         rw [hu.load _ _ _ (Ne.symm hsep.2.2.1)]; exact hA
-      refine Set.wp_addElementGV (ofs := Ptrofs.zero) (c := st j) rfl find_nautyActive hA' haw'
-        (by omega) hi rfl (by omega) (by omega) rfl find_nautyBit
+      refine Set.wp_addElementGV (ofs := Ptrofs.zero) (c := st j) rfl E.find_nautyActive hA' haw'
+        (by omega) hi rfl (by omega) (by omega) rfl E.find_nautyBit
         (hbit.unch hu (Ne.symm hsep.2.2.2)) ?_
       intro m'' haw'' hu'' _ hk'' hg''
       simp only [seqPost, Post.after, E0_append]
@@ -581,21 +585,22 @@ theorem zeros_ptn1 {n : Nat} {ends : List Nat} (hsort : ends.Pairwise (· < ·))
 
 open Hex.GraphIso.Nauty in
 /-- The `ptn` normalisation and the initial active set (`tPtn`), with
-`defaultptn = FALSE` and `active_arg = NULL`. -/
-theorem wp_tPtn {Q : Post} {le : temp_env} {m : mem} {bp bA : block} {n M : Nat}
+`defaultptn = FALSE` and `active_arg = NULL`, in any program. -/
+theorem wp_tPtnG {Q : Post} {le : temp_env} {m : mem} {bp bA : block} {n M : Nat}
+    {bopt bout bua bdg : block}
     {ends : List Nat} {aw : Nat → val}
     (hsort : ends.Pairwise (· < ·)) (hlt : ∀ e ∈ ends, e < n) (hlast : n - 1 ∈ ends)
     (hn0 : 0 < n) (hn : n < 1073741824) (hnM : n ≤ 64 * M) (hM0 : 0 < M) (hM : M < 33554432)
-    (hopt : PTree.get dense.id.«options» le = some (.Vptr Harness.Block.options Ptrofs.zero))
-    (hO : Harness.OptionsAt m)
+    (hopt : PTree.get dense.id.«options» le = some (.Vptr bopt Ptrofs.zero))
+    (hO : OptionsAtG m bopt bout bua bdg)
     (hptn : PTree.get dense.id.«ptn» le = some (.Vptr bp Ptrofs.zero))
     (hact : PTree.get dense.id.«active_arg» le = some nullArg)
     (harr : ArrayAt m .Mint32 bp 0 (ints (Harness.harnessPtn n ends)) n)
-    (hN : IntAt m Search.Block.n n) (hMm : IntAt m Search.Block.m M)
-    (hA : Mem.load .Mint64 m Block.nautyActive (zOfInt 0) = some (.Vptr bA Ptrofs.zero))
+    (hN : IntAt m E.n n) (hMm : IntAt m E.m M)
+    (hA : Mem.load .Mint64 m E.nautyActive (zOfInt 0) = some (.Vptr bA Ptrofs.zero))
     (haw : ArrayAt m .Mint64 bA 0 aw M)
-    (hbit : Set.BitTable m Block.nautyBit)
-    (hsep : ∀ z ∈ [Search.Block.n, Search.Block.m, Block.nautyActive, Block.nautyBit],
+    (hbit : Set.BitTable m E.nautyBit)
+    (hsep : ∀ z ∈ [E.n, E.m, E.nautyActive, E.nautyBit],
       bp ≠ z ∧ bA ≠ z) (hpA : bp ≠ bA)
     (hQ : ∀ le' m', ArrayAt m' .Mint32 bp 0 (ints (initPtn n Search.nautyInf ends)) n →
       PTree.get dense.id.«numcells» le' = some (.Vint (ir ends.length)) →
@@ -614,14 +619,14 @@ theorem wp_tPtn {Q : Post} {le : temp_env} {m : mem} {bp bA : block} {n M : Nat}
   simp only [Nauty.tPtn, Nauty.ptnIf, Set.sk]
   wp_step; wp_step; wp_step
   apply wp_if_eval
-  rw [eval_optF hopt field_oDefaultptn rfl (by decide) (by decide) hO.defaultptn]
+  rw [eval_optFG hopt T.field_oDefaultptn rfl (by decide) (by decide) hO.defaultptn]
   simp only [typeof]
   rw [show Cfrontend.Cop.bool_val (.Vint (ir 0)) tint m = some false from rfl]
   simp only [Bool.false_eq_true, ite_false]
   wp_step; wp_step; wp_step
   have hsub : Exec.evalExpr ge (nEnv bI) le m
       (.Ebinop .Osub (.Evar dense.id.«nauty:n» tint) (ci 1 tint) tint) = some (.Vint (ir (n - 1 : Nat))) := by
-    rw [Exec.evalExpr, Search.eval_gint (e := (nEnv bI)) rfl Search.find_n hN]
+    rw [Exec.evalExpr, Search.eval_gint (e := (nEnv bI)) rfl E.find_n hN]
     simp only [Exec.evalExpr, typeof, cop, ir_sub]
     congr 3; omega
   refine Search.wp_storeV (ofs := Ptrofs.zero) harr (by omega) dense.id.«ptn» hptn _ (n - 1) (by omega)
@@ -659,12 +664,12 @@ theorem wp_tPtn {Q : Post} {le : temp_env} {m : mem} {bp bA : block} {n M : Nat}
   rw [show Cfrontend.Cop.bool_val Vtrue tint m2 = some true from rfl]
   simp only [ite_true]
   have hu12 : Unch m m2 (· = bp) := hu1.trans hu2
-  have hA2 : Mem.load .Mint64 m2 Block.nautyActive (zOfInt 0) = some (.Vptr bA Ptrofs.zero) := by
+  have hA2 : Mem.load .Mint64 m2 E.nautyActive (zOfInt 0) = some (.Vptr bA Ptrofs.zero) := by
     rw [hu12.load _ _ _ (Ne.symm hpa)]; exact hA
   have haw2 : ArrayAt m2 .Mint64 bA 0 aw M := haw.unch hu12 (Ne.symm hpA)
   wp_step
-  refine Set.wp_emptySetGE (by decide) rfl find_nautyActive hA2 (Ne.symm hAa) haw2 hM0 (by omega)
-    (Search.eval_gint (e := (nEnv bI)) rfl Search.find_m (hMm.unch hu12 (Ne.symm hpm))) rfl ?_
+  refine Set.wp_emptySetGE (by decide) rfl E.find_nautyActive hA2 (Ne.symm hAa) haw2 hM0 (by omega)
+    (Search.eval_gint (e := (nEnv bI)) rfl E.find_m (hMm.unch hu12 (Ne.symm hpm))) rfl ?_
   intro le3 m3 haw3 hu3 _ hk3 hg3 ho3
   simp only [seqPost, Post.after, E0_append]
   have hu23 : Unch m m3 (fun z => z = bp ∨ z = bA) :=
@@ -684,5 +689,37 @@ theorem wp_tPtn {Q : Post} {le : temp_env} {m : mem} {bp bA : block} {n M : Nat}
   · rw [ho4 _ (by decide), ho3 _ (by decide) (by decide)]; exact hnc2
   · intro x h1 h2 h3 h4
     rw [ho4 _ h1, ho3 _ h3 h4, ho2 _ h1 h2, temps_gso _ _ h2]
+
+end Generic
+
+open Hex.GraphIso.Nauty in
+/-- The `ptn` normalisation and the initial active set (`tPtn`), with
+`defaultptn = FALSE` and `active_arg = NULL`, for the dense harness's options. -/
+theorem wp_tPtn {Q : Post} {le : temp_env} {m : mem} {bp bA : block} {n M : Nat}
+    {ends : List Nat} {aw : Nat → val}
+    (hsort : ends.Pairwise (· < ·)) (hlt : ∀ e ∈ ends, e < n) (hlast : n - 1 ∈ ends)
+    (hn0 : 0 < n) (hn : n < 1073741824) (hnM : n ≤ 64 * M) (hM0 : 0 < M) (hM : M < 33554432)
+    (hopt : PTree.get dense.id.«options» le = some (.Vptr Harness.Block.options Ptrofs.zero))
+    (hO : Harness.OptionsAt m)
+    (hptn : PTree.get dense.id.«ptn» le = some (.Vptr bp Ptrofs.zero))
+    (hact : PTree.get dense.id.«active_arg» le = some nullArg)
+    (harr : ArrayAt m .Mint32 bp 0 (ints (Harness.harnessPtn n ends)) n)
+    (hN : IntAt m Search.Block.n n) (hMm : IntAt m Search.Block.m M)
+    (hA : Mem.load .Mint64 m Block.nautyActive (zOfInt 0) = some (.Vptr bA Ptrofs.zero))
+    (haw : ArrayAt m .Mint64 bA 0 aw M)
+    (hbit : Set.BitTable m Block.nautyBit)
+    (hsep : ∀ z ∈ [Search.Block.n, Search.Block.m, Block.nautyActive, Block.nautyBit],
+      bp ≠ z ∧ bA ≠ z) (hpA : bp ≠ bA)
+    (hQ : ∀ le' m', ArrayAt m' .Mint32 bp 0 (ints (initPtn n Search.nautyInf ends)) n →
+      PTree.get dense.id.«numcells» le' = some (.Vint (ir ends.length)) →
+      (∃ aw' : Nat → Lib.Integers.int64, ArrayAt m' .Mint64 bA 0 (Set.longs aw') M ∧
+        SetRep (fun w => bv64 (aw' w)) M (initActive n ends)) →
+      Alloc.Keep m m' bA →
+      Unch m m' (fun z => z = bp ∨ z = bA) → (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
+      (∀ x, x ≠ dense.id.«i» → x ≠ dense.id.«numcells» → x ≠ dense.id.«es___1» → x ≠ idOf 731 →
+        PTree.get x le' = PTree.get x le) →
+      Wp xi ge dense.fn.nauty Nauty.tInit Q (nEnv bI) le' m') :
+    Wp xi ge dense.fn.nauty Nauty.tPtn Q (nEnv bI) le m :=
+  wp_tPtnG hsort hlt hlast hn0 hn hnM hM0 hM hopt hO.toG hptn hact harr hN hMm hA haw hbit hsep hpA hQ
 
 end NautyVerified.Proofs.Top
