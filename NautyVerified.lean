@@ -394,3 +394,5 @@ import NautyVerified.Proofs.Sparse.Refine.Trivial.Fix
 import NautyVerified.Proofs.Sparse.Refine.Trivial.Cell
 import NautyVerified.Proofs.Sparse.Refine.Trivial.CellLoop
 import NautyVerified.Proofs.Sparse.Refine.Trivial.Edge
+import NautyVerified.Proofs.Sparse.Refine.Trivial.ResetK2
+import NautyVerified.Proofs.Sparse.Refine.Trivial.Pass
