@@ -130,6 +130,7 @@ import NautyVerified.Proofs.Search.Node.FirstLocal
 import NautyVerified.Proofs.Search.Node.FirstMisc
 import NautyVerified.Proofs.Search.Node.FirstShape
 import NautyVerified.Proofs.Search.Node.FirstLoopAt
+import NautyVerified.Proofs.Search.Node.FirstCall
 import NautyVerified.Proofs.Search.Node.Target
 import NautyVerified.Proofs.Search.Node.Choose
 import NautyVerified.Proofs.Search.Node.Process
