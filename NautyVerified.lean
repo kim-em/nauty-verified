@@ -261,6 +261,7 @@ import NautyVerified.Spec.Testcanlab
 import NautyVerified.Spec.RefineFuel
 import NautyVerified.Spec.SearchInf
 import NautyVerified.Spec.SearchInfRun
+import NautyVerified.Spec.SparseInfRefine
 import NautyVerified.Spec.NodeOk
 import NautyVerified.Spec.Gca
 import NautyVerified.Spec.NodeExit
