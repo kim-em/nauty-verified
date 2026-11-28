@@ -153,6 +153,7 @@ import NautyVerified.Proofs.Search.Node.OtherIter
 import NautyVerified.Proofs.Search.Node.OtherLoop
 import NautyVerified.Proofs.Search.Node.OtherBodySteps
 import NautyVerified.Proofs.Search.Node.FirstLoop
+import NautyVerified.Proofs.Search.Node.FirstEnd
 import NautyVerified.Proofs.Search.Node.TcFrame
 import NautyVerified.Proofs.Search.Node.UaFrame
 import NautyVerified.Proofs.Search.Node.InvSteps
