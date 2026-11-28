@@ -302,6 +302,9 @@ structure NodeLaws (L : PolicyLink O n) (G : O.Gr n) where
   /-- `breakout`'s arguments in a first-path sweep. -/
   first_args : ∀ {level nc tc tv1 tv cell st}, SweepFirst level nc tc tv1 cell (some tv) st →
     tv < n ∧ tc < n ∧ ∃ j, tc ≤ j ∧ j < n ∧ st.lab[j]! = tv
+  /-- `SweepOkFirst.orb_tv1`: at the sweep's first vertex the orbit test passes. -/
+  first_orb : ∀ {level nc tc tv1 cell st}, SweepFirst level nc tc tv1 cell (some tv1) st →
+    (P.orbit st tv1 == tv1) = true
   /-- `nodeOk_sweepOff`. -/
   off_start : ∀ {level nc st}, NodeOk false level nc st →
     let v := P.visit G level nc st
@@ -410,6 +413,14 @@ def denseLaws (G : Colored n k) (ctx : Ctx n) (hn0 : 0 < n) (hn : n + 2 < nautyI
     obtain ⟨o, ho, e⟩ := hs
     rw [List.mem_range] at ho
     exact ⟨VSet.mem_lt hm, by omega, tc + o, by omega, by omega, by rw [← hlab]; exact e⟩
+  first_orb {_ _ _ tv1 _ _} h := by
+    obtain ⟨⟨t, st₀, rfl, -, -, -, hcur, -, hph⟩, -⟩ := h
+    rcases hph with ⟨-, horb, -⟩ | ⟨hpast, -⟩
+    · have h1 := horb tv1 (VSet.mem_lt (hcur tv1 rfl))
+      show (st₀.orbits[tv1]! == tv1) = true
+      simp [h1]
+    · have := hpast rfl tv1 rfl
+      omega
   off_start h := nodeOk_sweepOff hn0 hn h ctx 100
   off_child h := sweepOkOff_child hn0 h ctx 100
   off_next fuel h hd := by
