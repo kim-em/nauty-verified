@@ -1,11 +1,12 @@
 import NautyVerified.Proofs.Harness.Phases
+import NautyVerified.Statement.Dense
 
 /-!
 # `dense_main`'s `main`, relative to `densenautySpec`
 
 `main_satisfies`: from the program's initial memory, reading the numbers
-`ins` that encode `G` (`EncodesB`, `Statement.Encodes` with the edge list
-short enough for an `int` count), `main` returns 0 with a trace whose reads
+`ins` that encode `G` (`Statement.Encodes`: each edge once, in one
+orientation, so the edge count fits in an `int`), `main` returns 0 with a trace whose reads
 are `ins` and whose writes are `Statement.expected G`, given that
 `densenauty` satisfies `densenautySpec` for the generators `gens` whose
 words are `expected`'s first block, and the facts `ResultFacts G` about
@@ -25,13 +26,74 @@ open NautyVerified.Proofs.Search (Writes gensWords)
 open NautyVerified.Proofs.Alloc (Fresh zb)
 open Hex.GraphIso Hex.GraphIso.Nauty
 
-/-- `Statement.Encodes`, with an edge list whose length fits in an `int`. -/
-def EncodesB {n k : Nat} (G : Colored n k) (ins : List Int) : Prop :=
-  ∃ es : List (Fin n × Fin n), es.length < 2147483648 ∧
-    ins = [(n : Int)] ++ (List.finRange n).map (fun v => ((G.coloring.cells.get v).val : Int)) ++
-      [(es.length : Int)] ++ es.flatMap (fun e => [(e.1.val : Int), (e.2.val : Int)]) ∧
-    (∀ e ∈ es, e.1 ≠ e.2) ∧
-    ∀ u v : Fin n, G.graph.adj u v = true ↔ ((u, v) ∈ es ∨ (v, u) ∈ es)
+
+/-- The pairs `(u, v)` with `u < v < n`. -/
+def pairsBelow : Nat → List (Nat × Nat)
+  | 0 => []
+  | v + 1 => pairsBelow v ++ (List.range v).map (fun u => (u, v))
+
+theorem length_pairsBelow : ∀ n, 2 * (pairsBelow n).length = n * (n - 1)
+  | 0 => rfl
+  | v + 1 => by
+    simp only [pairsBelow, List.length_append, List.length_map, List.length_range]
+    have := length_pairsBelow v
+    rw [Nat.mul_add, this]
+    cases v with
+    | zero => rfl
+    | succ w =>
+      simp only [Nat.add_sub_cancel] at this ⊢
+      have e1 : (w + 1 + 1) * (w + 1) = (w + 1) * (w + 1) + (w + 1) := Nat.succ_mul _ _
+      have e2 : (w + 1) * (w + 1) = (w + 1) * w + (w + 1) := Nat.mul_succ _ _
+      omega
+
+theorem mem_pairsBelow {u v : Nat} : ∀ n, u < v → v < n → (u, v) ∈ pairsBelow n
+  | 0, _, h => absurd h (Nat.not_lt_zero _)
+  | w + 1, h1, h2 => by
+    simp only [pairsBelow, List.mem_append, List.mem_map, List.mem_range]
+    by_cases hv : v = w
+    · subst hv; exact .inr ⟨u, h1, rfl⟩
+    · exact .inl (mem_pairsBelow w h1 (by omega))
+
+/-- An edge as the pair of its endpoints in increasing order. -/
+def normPair {n : Nat} (e : Fin n × Fin n) : Nat × Nat :=
+  (min e.1.val e.2.val, max e.1.val e.2.val)
+
+/-- An edge list without repeats, reversals or loops has at most `n (n - 1) / 2`
+entries. -/
+theorem length_edges_le {n : Nat} (es : List (Fin n × Fin n)) (hnd : es.Nodup)
+    (hloop : ∀ e ∈ es, e.1 ≠ e.2) (hrev : ∀ u v, (u, v) ∈ es → (v, u) ∉ es) :
+    2 * es.length ≤ n * (n - 1) := by
+  have hnd' : (es.map normPair).Nodup := by
+    unfold List.Nodup at hnd ⊢
+    rw [List.pairwise_map]
+    refine hnd.imp_of_mem fun {a b} ha hb hab h => ?_
+    simp only [normPair, Prod.mk.injEq] at h
+    have la := hloop a ha; have lb := hloop b hb
+    have ha1 : a.1.val ≠ a.2.val := fun h => la (Fin.ext h)
+    have key : (a.1.val = b.1.val ∧ a.2.val = b.2.val) ∨ (a.1.val = b.2.val ∧ a.2.val = b.1.val) := by
+      omega
+    rcases key with ⟨k1, k2⟩ | ⟨k1, k2⟩
+    · exact hab (Prod.ext (Fin.ext k1) (Fin.ext k2))
+    · apply hrev a.1 a.2 ha
+      have : (a.2, a.1) = b := Prod.ext (Fin.ext k2) (Fin.ext k1)
+      rw [this]; exact hb
+  have hsub : es.map normPair ⊆ pairsBelow n := by
+    intro p hp
+    obtain ⟨e, he, rfl⟩ := List.mem_map.1 hp
+    have h1 : e.1.val ≠ e.2.val := fun h => hloop e he (Fin.ext h)
+    exact mem_pairsBelow n (by omega) (by have := e.1.isLt; have := e.2.isLt; omega)
+  have := hnd'.length_le_of_subset hsub
+  rw [List.length_map] at this
+  have := length_pairsBelow n
+  omega
+
+/-- The edge count of an encoding fits in an `int`. -/
+theorem length_edges_lt {n : Nat} (es : List (Fin n × Fin n)) (hnd : es.Nodup)
+    (hloop : ∀ e ∈ es, e.1 ≠ e.2) (hrev : ∀ u v, (u, v) ∈ es → (v, u) ∉ es)
+    (hmax : n ≤ 65536) : es.length < 2147483648 := by
+  have h := length_edges_le es hnd hloop hrev
+  have : n * (n - 1) ≤ 65536 * 65535 := Nat.mul_le_mul hmax (by omega)
+  omega
 
 /-- Every event of `t` is a call of `nv_read` or `nv_write` (so `t` has no
 volatile loads). -/
@@ -159,7 +221,8 @@ theorem expected_eq {n k : Nat} (G : Colored n k) :
 
 set_option maxRecDepth 100000 in
 theorem main_satisfies {n k : Nat} (G : Colored n k) (gens : List (Array Nat)) (ins : List Int)
-    (hins : EncodesB G ins) (hn0 : 0 < n) (hmax : n ≤ 65536) (hk : k < 2147483648)
+    (hins : Statement.Encodes G ins) (hn0 : 0 < n) (hmax : n ≤ Statement.maxN)
+    (hkmax : k ≤ Statement.maxN)
     (hfacts : ResultFacts G) (hgens : gensWords gens n = autosWords G)
     (hdn : ∀ bg bl bp bo bst bc, Satisfies Statement.xi ge (.Internal dense.fn.densenauty)
       (densenautySpec G gens bg bl bp bo bst bc)) :
@@ -187,7 +250,10 @@ theorem main_satisfies {n k : Nat} (G : Colored n k) (gens : List (Array Nat)) (
     rw [triple_iff_wp]
     rintro e le m ⟨bst, rfl, rfl, hm₀, hS, hnb, hvb, hfree⟩
     rw [dense.fn.main.fn_body_eq, body_eq]
-    obtain ⟨es, hne, rfl, -, hadj⟩ := hins
+    obtain ⟨es, rfl, hnd, hrev, hloop, hadj⟩ := hins
+    have hmax : n ≤ 65536 := hmax
+    have hk : k < 2147483648 := by have : k ≤ 65536 := hkmax; omega
+    have hne := length_edges_lt es hnd hloop hrev hmax
     have hN : n < 2147483648 := by omega
     have hE : ∀ x, x ≠ dense.id.stats → PTree.get x (envOf bst) = none := fun x hx => by
       rw [PTree.gso _ _ hx]; rfl

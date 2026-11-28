@@ -220,6 +220,13 @@ fixtures checked (Petersen, coloured Petersen, an edgeless graph, five random
 graphs). The representation predicates are written per function during Phase
 5 (as `WordsAt`, `LeftbitTable`, `LoopInv` for `nextelement`).
 
+Input bounds (decision taken with Kim): `Encodes` lists each edge of `G`
+exactly once, in one orientation, without loops (`es.Nodup`, no reversed
+pair), so the edge count is at most `n (n - 1) / 2 < 2^31` for `n ≤ maxN` and
+fits the harness's `int`; `densenauty_binary_correct` also assumes `k ≤ maxN`,
+so the colours and the `c <= maxc` loop stay within `int`. No other numeric
+hypotheses on the input.
+
 ## Phase 5: dense specs (the bulk)
 
 Pattern per C function: a CompCert4Lean-logic `FunSpec` whose pre/post are

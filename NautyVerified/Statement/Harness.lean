@@ -172,11 +172,12 @@ def xi : CompCert4Lean.Common.ExternalCalls.ExternalCalls where
 
 /-- The numbers `dense_main` reads encode `G`: `n`, the colour of each vertex,
 the number of edges, and each edge as its two (distinct) endpoints. Every edge
-of `G` appears, in either orientation, possibly more than once. -/
+of `G` appears exactly once, in one orientation. -/
 def Encodes {n k : Nat} (G : Colored n k) (ins : List Int) : Prop :=
   ∃ es : List (Fin n × Fin n),
     ins = [(n : Int)] ++ (List.finRange n).map (fun v => ((G.coloring.cells.get v).val : Int)) ++
       [(es.length : Int)] ++ es.flatMap (fun e => [(e.1.val : Int), (e.2.val : Int)]) ∧
+    es.Nodup ∧ (∀ u v, (u, v) ∈ es → (v, u) ∉ es) ∧
     (∀ e ∈ es, e.1 ≠ e.2) ∧
     ∀ u v : Fin n, G.graph.adj u v = true ↔ ((u, v) ∈ es ∨ (v, u) ∈ es)
 

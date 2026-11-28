@@ -33,7 +33,7 @@ abbrev Compiled (tp : X86.Asm.program) : Prop :=
   Build.compile Source.dense.fresh Source.dense.program = .ok tp
 
 theorem densenauty_binary_correct {n k : Nat} (G : Colored n k) (hn : 0 < n) (hmax : n ≤ maxN)
-    {ins : List Int} (hins : Encodes G ins) {tp : X86.Asm.program} (hc : Compiled tp) :
+    (hk : k ≤ maxN) {ins : List Int} (hins : Encodes G ins) {tp : X86.Asm.program} (hc : Compiled tp) :
     ∀ beh, program_behaves (X86.Asm.semantics Build.config xi tp) beh → Consistent ins beh →
       ∃ t, beh = .Terminates t (Lib.Integers.Int.repr .Z0) ∧ writes t = expected G := by
   sorry
