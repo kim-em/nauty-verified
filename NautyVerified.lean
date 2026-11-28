@@ -327,3 +327,6 @@ import NautyVerified.Proofs.Dispatch.Doref
 import NautyVerified.Spec.SparseInts
 import NautyVerified.Proofs.Sparse.Ints.Satisfies
 import NautyVerified.Proofs.Sparse.Refine.Syntax
+import NautyVerified.Proofs.Sparse.Refine.Blocks
+import NautyVerified.Proofs.Sparse.Refine.Marks2
+import NautyVerified.Proofs.Sparse.Refine.Model
