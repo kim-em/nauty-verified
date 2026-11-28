@@ -162,6 +162,10 @@ structure Fixed (n : Nat) (m : mem) (S : SLoc) : Prop where
   mininv : ∃ v, FieldAt m .Mint32 Block.mininvarlevel 0 (.Vint v)
   maxinv : ∃ v, FieldAt m .Mint32 Block.maxinvarlevel 0 (.Vint v)
   invarg : ∃ v, FieldAt m .Mint32 Block.invararg 0 (.Vint v)
+  /-- `dispatch.freedyn` (`naugraph_freedyn`) and `dispatch.cleanup` (`NULL`), read by
+  `nauty()` after the search. -/
+  dFreedyn : FieldAt m .Mint64 Block.dispatch 56 (.Vptr Block.naugraphFreedyn Ptrofs.zero)
+  dCleanup : FieldAt m .Mint64 Block.dispatch 80 Vnullptr
 
 /-- nauty.c's static `int`s hold `st`'s fields. -/
 structure Scalars {n : Nat} (m : mem) (st : Search n) (nsp : Bool) : Prop where

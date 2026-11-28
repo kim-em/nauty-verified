@@ -25,15 +25,12 @@ open NautyVerified.Proofs.Search (FieldAt)
 open NautyVerified.Source
 
 namespace Block
-def naugraphFreedyn : Common.Values.block := PArith.BinPos.Pos.of_nat 277
 def naugraphCheck : Common.Values.block := PArith.BinPos.Pos.of_nat 133
 def nautilCheck : Common.Values.block := PArith.BinPos.Pos.of_nat 217
 def nautilFreedyn : Common.Values.block := PArith.BinPos.Pos.of_nat 141
 def nautyFreedyn : Common.Values.block := PArith.BinPos.Pos.of_nat 183
 end Block
 
-kernel_rfl find_naugraphFreedyn :
-  Genv.find_symbol ge.genv_genv dense.id.naugraph_freedyn = some Block.naugraphFreedyn
 kernel_rfl find_naugraphCheck :
   Genv.find_symbol ge.genv_genv dense.id.naugraph_check = some Block.naugraphCheck
 kernel_rfl find_nautilCheck :
@@ -46,8 +43,6 @@ kernel_rfl funct_naugraphCheck :
   Genv.find_funct_ptr ge.genv_genv Block.naugraphCheck = some (.Internal dense.fn.naugraph_check)
 kernel_rfl funct_nautilCheck :
   Genv.find_funct_ptr ge.genv_genv Block.nautilCheck = some (.Internal dense.fn.nautil_check)
-kernel_rfl funct_naugraphFreedyn :
-  Genv.find_funct_ptr ge.genv_genv Block.naugraphFreedyn = some (.Internal dense.fn.naugraph_freedyn)
 kernel_rfl funct_nautilFreedyn :
   Genv.find_funct_ptr ge.genv_genv Block.nautilFreedyn = some (.Internal dense.fn.nautil_freedyn)
 kernel_rfl funct_nautyFreedyn :
@@ -115,7 +110,7 @@ def dispatchVals : List val :=
   [.Vptr Search.Block.isautomFn Ptrofs.zero, .Vptr Search.Block.testcanlabFn Ptrofs.zero,
    .Vptr Search.Block.updatecanFn Ptrofs.zero, .Vptr Refine.Block.refine Ptrofs.zero,
    .Vptr Refine.Block.refine1 Ptrofs.zero, .Vptr Search.Block.cheapautomFn Ptrofs.zero,
-   .Vptr Search.Block.targetcellFn Ptrofs.zero, .Vptr Block.naugraphFreedyn Ptrofs.zero,
+   .Vptr Search.Block.targetcellFn Ptrofs.zero, .Vptr Search.Block.naugraphFreedyn Ptrofs.zero,
    .Vptr Block.naugraphCheck Ptrofs.zero, .Vlong (lr 0), .Vlong (lr 0)]
 
 theorem dispatchGraph_load {m : mem} (hm : Genv.init_mem prog = some m) :
@@ -136,7 +131,7 @@ theorem dispatchGraph_load {m : mem} (hm : Genv.init_mem prog = some m) :
   rw [Refine.find_refine1] at f4
   rw [Search.find_cheapautomFn] at f5
   rw [Search.find_targetcellFn] at f6
-  rw [find_naugraphFreedyn] at f7
+  rw [Search.find_naugraphFreedyn] at f7
   rw [find_naugraphCheck] at f8
   cases f0; cases f1; cases f2; cases f3; cases f4; cases f5; cases f6; cases f7; cases f8
   intro i hi

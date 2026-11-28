@@ -82,6 +82,8 @@ def longpruneFn : Common.Values.block := PArith.BinPos.Pos.of_nat 171
 def dorefFn : Common.Values.block := PArith.BinPos.Pos.of_nat 126
 def permsetFn : Common.Values.block := PArith.BinPos.Pos.of_nat 300
 def dispatchGraph : Common.Values.block := PArith.BinPos.Pos.of_nat 243
+/-- naugraph.c's `naugraph_freedyn` (the dispatch table's `freedyn`). -/
+def naugraphFreedyn : Common.Values.block := PArith.BinPos.Pos.of_nat 277
 end Block
 
 kernel_rfl find_getcanon : Genv.find_symbol ge.genv_genv dense.id.«nauty:getcanon» = some Block.getcanon
@@ -170,6 +172,10 @@ kernel_rfl funct_isautomFn :
   Genv.find_funct_ptr ge.genv_genv Block.isautomFn = some (.Internal dense.fn.«isautom»)
 kernel_rfl funct_testcanlabFn :
   Genv.find_funct_ptr ge.genv_genv Block.testcanlabFn = some (.Internal dense.fn.«testcanlab»)
+kernel_rfl find_naugraphFreedyn :
+  Genv.find_symbol ge.genv_genv dense.id.naugraph_freedyn = some Block.naugraphFreedyn
+kernel_rfl funct_naugraphFreedyn :
+  Genv.find_funct_ptr ge.genv_genv Block.naugraphFreedyn = some (.Internal dense.fn.naugraph_freedyn)
 kernel_rfl funct_updatecanFn :
   Genv.find_funct_ptr ge.genv_genv Block.updatecanFn = some (.Internal dense.fn.«updatecan»)
 kernel_rfl funct_cheapautomFn :
