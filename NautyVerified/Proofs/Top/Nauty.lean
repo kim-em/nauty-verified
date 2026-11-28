@@ -931,10 +931,19 @@ theorem nauty_satisfies {k : Nat} (G : Colored n k) (gens : List (Array Nat))
       rcases hz with rfl | rfl | rfl | rfl | rfl <;> nb
   have hdist : S.blocks.Pairwise (· ≠ ·) := by
     refine blocks_pairwise S rfl ?_ ?_
-    · simp only [S, List.pairwise_cons, List.mem_cons, List.mem_nil_iff, or_false, forall_eq_or_imp,
-        forall_eq, List.Pairwise.nil, and_true, false_implies, implies_true]
-      repeat' (apply And.intro)
-      all_goals sep_ne hP
+    · -- `S`'s data blocks are `hP`'s list without `bI`, `(cb 0).2` and with
+      -- `(cb 1).2`, `(cb 2).2` swapped.
+      have hperm : [bg, bl, bp, bo, bst, bc, bD, bI, (cb 0).2, (cb 2).2, (cb 1).2, (cb 3).2,
+          (cb 4).2, (cb 5).2, (cb 6).2, (cb 7).2, (cb 8).2].Perm [bg, bl, bp, bo, bst, bc, bD, bI,
+          (cb 0).2, (cb 1).2, (cb 2).2, (cb 3).2, (cb 4).2, (cb 5).2, (cb 6).2, (cb 7).2, (cb 8).2] :=
+        List.Perm.append_left [bg, bl, bp, bo, bst, bc, bD, bI, (cb 0).2]
+          (List.Perm.swap (cb 1).2 (cb 2).2 _)
+      have hsub : [bg, bl, bp, bo, bst, bc, bD, (cb 2).2, (cb 1).2, (cb 3).2, (cb 4).2, (cb 5).2,
+          (cb 6).2, (cb 7).2, (cb 8).2].Sublist [bg, bl, bp, bo, bst, bc, bD, bI, (cb 0).2, (cb 2).2,
+          (cb 1).2, (cb 3).2, (cb 4).2, (cb 5).2, (cb 6).2, (cb 7).2, (cb 8).2] :=
+        .cons₂ _ (.cons₂ _ (.cons₂ _ (.cons₂ _ (.cons₂ _ (.cons₂ _ (.cons₂ _
+          (.cons _ (.cons _ (List.Sublist.refl _)))))))))
+      exact (hperm.symm.nodup_iff.1 hP).sublist hsub
     · intro x hx
       apply hPg
       simp only [S, List.mem_cons, List.mem_nil_iff, or_false] at hx ⊢
