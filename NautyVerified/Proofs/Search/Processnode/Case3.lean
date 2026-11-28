@@ -62,7 +62,7 @@ theorem wp_copyCanon {f : function} {Q : Post} {le : temp_env} (c : PCtx m₀ m�
       c.ne_blocks (by simp [SLoc.blocks]) e.symm) ho
   intro z hz
   simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
-  rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
+  rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
   all_goals first | exact hk | exact Keep.unch hu (by sep_ne hd)
 
 /-- The stores recording a better leaf at `level` with `sr` rows agreeing. -/
@@ -204,7 +204,7 @@ theorem wp_record {f : function} {Q : Post} {le : temp_env} {level s : Nat} {res
         by show level < 2147483648; omega, a11, a12⟩ }) ?_
   · intro z hz
     simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
-    rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
+    rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
     all_goals first
       | exact (Keep.unch hU6 (by sep_notin hd)).trans (k7.trans (Keep.unch u8 (by sep_ne hd)))
       | exact Keep.unch hU8 (by sep_notin hd)

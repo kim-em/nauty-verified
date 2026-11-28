@@ -70,7 +70,7 @@ theorem wp_scatterAt {f : function} {Q : Post} {le : temp_env} {ref : ident} {bg
       exact absurd (e ▸ (show S.bWP ∈ S.blocks by simp [SLoc.blocks])) (c.ne_blocks · rfl)) rfl) ho
   intro z hz
   simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
-  rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
+  rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
   all_goals first | exact hk | exact Keep.unch hu (by sep_ne hd)
 
 /-- The code `processnode` gives each classification. -/

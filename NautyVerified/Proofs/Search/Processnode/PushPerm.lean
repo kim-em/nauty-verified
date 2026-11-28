@@ -153,10 +153,12 @@ theorem wp_pushPerm {f : function} {Q : Post} {le : temp_env} {w : Array Nat} {r
       push_cast; rfl
     rw [uf, cf] at hf' hr2
     rw [um, cm] at hm' hr2
+    have hkws : Keep m m3 S.bws :=
+      ((Keep.unch hu1 (by sep_ne hd)).trans (hkeep _ (by simp))).trans (Keep.unch hu3 nb3)
     have hA := AutosAt.push (m' := m3) hs.arrays.autos hM (pair := Hex.GraphIso.Nauty.fmperm w n)
       (by rw [hk]; exact hf'.unch hu3 nb3) (by rw [hk]; exact hm'.unch hu3 nb3) hrf hrm
       (by rw [hk]; exact ((Rest.unch hu1 (by sep_ne hd)).trans hr2).trans (Rest.unch hu3 nb3))
-      (((Keep.unch hu1 (by sep_ne hd)).trans (hkeep _ (by simp))).trans (Keep.unch hu3 nb3))
+      hkws
       (by rw [hk]; exact hp3)
     let W := fun z => z = Block.fmptr ∨ (z = S.bws ∨ z = S.bws ∨ z = Block.nautilWorkpermSz ∨
       z = Block.nautilWorkperm ∨ (0 < cN ∧ z = bN) ∨ (¬ Mem.valid_block m1 b' ∧ z = b'))
@@ -221,6 +223,9 @@ theorem wp_pushPerm {f : function} {Q : Post} {le : temp_env} {w : Array Nat} {r
       · exact .inr (.inr (.inr (.inl fun hv' => hnv (hv1 _ hv'))))
     · intro z hz
       simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
-      rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> exact Keep.unch hu (notW _ (by simp [SLoc.blocks]) (by sep_ne hd) (by sep_ne hd) (by sep_ne hd) (by sep_ne hd))
+      rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
+      all_goals first
+        | exact hkws
+        | exact Keep.unch hu (notW _ (by simp [SLoc.blocks]) (by sep_ne hd) (by sep_ne hd) (by sep_ne hd) (by sep_ne hd))
 
 end NautyVerified.Proofs.Search.Processnode

@@ -48,14 +48,16 @@ theorem Dyns.keepW {n : Nat} {m m' : mem} {S : SLoc} {W : block → Prop} (h : D
       Program.Block.nautyWorkpermSz, Program.Block.nautyFirstlab, Program.Block.nautyFirstlabSz,
       Program.Block.nautyCanonlab, Program.Block.nautyCanonlabSz, Program.Block.nautyFirstcode,
       Program.Block.nautyFirstcodeSz, Program.Block.nautyCanoncode,
-      Program.Block.nautyCanoncodeSz, Program.Block.nautyFirsttc, Program.Block.nautyFirsttcSz],
+      Program.Block.nautyCanoncodeSz, Program.Block.nautyFirsttc, Program.Block.nautyFirsttcSz,
+      Block.naugraphDnwork, Block.naugraphDnworkSz],
       ¬ W z)
-    (hK : ∀ z ∈ [S.bA, S.bF, S.bWP, S.bFL, S.bCL, S.bFC, S.bCC, S.bTC], Keep m m' z) :
+    (hK : ∀ z ∈ [S.bA, S.bF, S.bWP, S.bFL, S.bCL, S.bFC, S.bCC, S.bTC, S.bws], Keep m m' z) :
     Dyns n m' S := by
   simp only [List.forall_mem_cons] at hW hK
-  obtain ⟨g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, g11, g12, g13, g14, g15, g16, -⟩ := hW
-  obtain ⟨k1, k2, k3, k4, k5, k6, k7, k8, -⟩ := hK
+  obtain ⟨g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, g11, g12, g13, g14, g15, g16, g17, g18, -⟩ := hW
+  obtain ⟨k1, k2, k3, k4, k5, k6, k7, k8, k9, -⟩ := hK
   exact { h with
+    workspace := h.workspace.keep hu g17 g18 fun _ => k9
     active := h.active.keep hu g1 g2 fun _ => k1
     fixedpts := h.fixedpts.keep hu g3 g4 fun _ => k2
     workperm := h.workperm.keep hu g5 g6 fun _ => k3
@@ -76,7 +78,7 @@ theorem SearchAt.reallocW {n : Nat} {m m' : mem} {S : SLoc} {ctx : Ctx n} {st st
     {X : block → Prop}
     (hu : Unch m m' (fun z => dyn3Set m cW bW cS bS cB bB z ∨ nautilSet m cN bN z ∨ X z))
     (hX : ∀ z ∈ S.blocks, X z → z ∈ S.wr)
-    (hK : ∀ z ∈ [S.bA, S.bF, S.bWP, S.bFL, S.bCL, S.bFC, S.bCC, S.bTC], Keep m m' z)
+    (hK : ∀ z ∈ [S.bA, S.bF, S.bWP, S.bFL, S.bCL, S.bFC, S.bCC, S.bTC, S.bws], Keep m m' z)
     {cW' cS' cB' cN' : Nat} {bW' bS' bB' bN' : block}
     (dW' : DynAt m' Block.naugraphWorkperm Block.naugraphWorkpermSz 4 cW' bW')
     (dS' : DynAt m' Block.naugraphWorkset Block.naugraphWorksetSz 8 cS' bS')

@@ -194,11 +194,13 @@ theorem Dyns.unch {n : Nat} {m m' : mem} {S : SLoc} {W : block → Prop} (h : Dy
       Program.Block.nautyCanonlab, Program.Block.nautyCanonlabSz, Program.Block.nautyFirstcode,
       Program.Block.nautyFirstcodeSz, Program.Block.nautyCanoncode,
       Program.Block.nautyCanoncodeSz, Program.Block.nautyFirsttc, Program.Block.nautyFirsttcSz,
-      S.bA, S.bF, S.bWP, S.bFL, S.bCL, S.bFC, S.bCC, S.bTC], ¬ W z) : Dyns n m' S := by
+      S.bA, S.bF, S.bWP, S.bFL, S.bCL, S.bFC, S.bCC, S.bTC,
+      Block.naugraphDnwork, Block.naugraphDnworkSz, S.bws], ¬ W z) : Dyns n m' S := by
   simp only [List.forall_mem_cons] at hW
   obtain ⟨g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, g11, g12, g13, g14, g15, g16,
-    b1, b2, b3, b4, b5, b6, b7, b8, -⟩ := hW
+    b1, b2, b3, b4, b5, b6, b7, b8, g17, g18, b9, -⟩ := hW
   exact { h with
+    workspace := h.workspace.keep hu g17 g18 fun _ => Keep.unch hu b9
     active := h.active.keep hu g1 g2 fun _ => Keep.unch hu b1
     fixedpts := h.fixedpts.keep hu g3 g4 fun _ => Keep.unch hu b2
     workperm := h.workperm.keep hu g5 g6 fun _ => Keep.unch hu b3

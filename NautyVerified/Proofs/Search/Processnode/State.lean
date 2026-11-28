@@ -114,7 +114,7 @@ theorem workG_ne_tc {S : SLoc} (hd : S.blocks.Pairwise (· ≠ ·)) {z : block} 
 /-- Across the search's own stores. -/
 theorem PAt.next (c : PCtx m₀ m₁ S e bsr) (h : PAt m₀ m₁ m S ctx bsr st nsp) {L : List block}
     (hu : Unch m m' (· ∈ L)) (hL : ∀ z ∈ L, z ∈ S.wr)
-    (hK : ∀ z ∈ [S.bA, S.bF, S.bWP, S.bFL, S.bCL, S.bFC, S.bCC, S.bTC], Keep m m' z)
+    (hK : ∀ z ∈ [S.bA, S.bF, S.bWP, S.bFL, S.bCL, S.bFC, S.bCC, S.bTC, S.bws], Keep m m' z)
     (hv : ∀ z, Mem.valid_block m z → Mem.valid_block m' z)
     (hsc : Scalars m' st' nsp') (hst : Stats m' S st' false) (har : Arrays m' S ctx st')
     (hinv : SInv st') : PAt m₀ m₁ m' S ctx bsr st' nsp' := by
@@ -162,7 +162,7 @@ blocks new since `m`. -/
 theorem PAt.call (c : PCtx m₀ m₁ S e bsr) (h : PAt m₀ m₁ m S ctx bsr st nsp) {W : block → Prop}
     (hu : Unch m m' W)
     (hW : ∀ z, W z → z ∈ S.wr ∨ z ∈ workG ∨ IsWork m z ∨ ¬ Mem.valid_block m z ∨ z = bsr)
-    (hK : ∀ z ∈ [S.bA, S.bF, S.bWP, S.bFL, S.bCL, S.bFC, S.bCC, S.bTC], Keep m m' z)
+    (hK : ∀ z ∈ [S.bA, S.bF, S.bWP, S.bFL, S.bCL, S.bFC, S.bCC, S.bTC, S.bws], Keep m m' z)
     (hv : ∀ z, Mem.valid_block m z → Mem.valid_block m' z) (hwm : WorkMono m m')
     (hwk : WorkAt n m' S S.blocks)
     (hsc : Scalars m' st' nsp') (hst : Stats m' S st' false) (har : Arrays m' S ctx st')

@@ -198,7 +198,7 @@ theorem wp_pushPtn {f : function} {Q : Post} {le : temp_env} (c : PCtx m₀ m₁
           fun e => c.ne_blocks (by simp [SLoc.blocks]) e.symm⟩)
     intro z hz
     simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
-    rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
+    rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
       exact ((Keep.unch hu1 (by sep_ne hd)).trans (hk2 _)).trans (Keep.unch hu3 (by sep_ne hd))
 
 end NautyVerified.Proofs.Search.Processnode

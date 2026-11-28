@@ -185,7 +185,7 @@ theorem wp_nodeVisit {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_en
   have hKW : Keep m m' S.bWP :=
     ((k1 _ (by simp [SLoc.blocks]) (by simp only [G8, G6, not_or]; refine ⟨⟨?_, ?_, ?_, ?_, ?_, ?_⟩, ?_, ?_⟩ <;> sep_ne hd)).trans
       (hbc ▸ hk2 L.bc (by simp))).trans (hkA3 _)
-  have hKo : ∀ z ∈ [S.bF, S.bFL, S.bCL, S.bFC, S.bCC, S.bTC], Keep m m' z := by
+  have hKo : ∀ z ∈ [S.bF, S.bFL, S.bCL, S.bFC, S.bCC, S.bTC, S.bws], Keep m m' z := by
     intro z hz
     refine Keep.unch hU (kz z (by revert z hz; simp [SLoc.blocks]) ?_ ?_ ?_ ?_ ?_) <;>
       revert z hz <;> sep_all hd
@@ -279,10 +279,10 @@ theorem wp_nodeVisit {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_en
     · subst e; simp [SLoc.wr, SLoc.wrV]
     · exact absurd (e ▸ hz) hl3'.1
     · exact absurd (e ▸ hz) hl2'.1
-  have hK : ∀ z ∈ [S.bA, S.bF, S.bWP, S.bFL, S.bCL, S.bFC, S.bCC, S.bTC], Keep m m' z := by
+  have hK : ∀ z ∈ [S.bA, S.bF, S.bWP, S.bFL, S.bCL, S.bFC, S.bCC, S.bTC, S.bws], Keep m m' z := by
     simp only [List.forall_mem_cons] at hKo ⊢
     exact ⟨hKA, hKo.1, hKW, hKo.2.1, hKo.2.2.1, hKo.2.2.2.1, hKo.2.2.2.2.1, hKo.2.2.2.2.2.1,
-      fun _ h => absurd h (List.not_mem_nil)⟩
+      hKo.2.2.2.2.2.2.1, fun _ h => absurd h (List.not_mem_nil)⟩
   have hsc0 : Scalars m' st false := by
     refine h.scalars.unch hU fun z hz => kz z (by revert z hz; simp [SLoc.blocks]) ?_ ?_ ?_ ?_ ?_ <;>
       revert z hz <;> sep_all hd

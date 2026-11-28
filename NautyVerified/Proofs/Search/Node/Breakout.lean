@@ -121,7 +121,7 @@ theorem wp_nodeBreakout {n : Nat} {f : function} {Q : Post} {e : env} {le : temp
       { h.scalars.unch hU (fun z hz => nb (by revert z hz; simp [SLoc.blocks]) (by revert z hz; sep_all hd) (by revert z hz; sep_all hd) (by revert z hz; sep_all hd)) with } { h.stats.unch hU (nb (by simp [SLoc.blocks]) (by sep_ne hd) (by sep_ne hd) (by sep_ne hd)) with } har hinv
     intro z hz
     simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
-    rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
+    rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
     · exact ka
     all_goals exact Keep.unch hU (nb (by simp [SLoc.blocks]) (by sep_ne hd) (by sep_ne hd) (by sep_ne hd))
 

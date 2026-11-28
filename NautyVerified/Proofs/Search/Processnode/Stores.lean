@@ -25,15 +25,15 @@ variable {n : Nat} {m₀ m₁ m : mem} {S : SLoc} {ctx : Ctx n} {e : env} {bsr :
 
 /-- The `DYNALLSTAT` blocks are kept by a store elsewhere. -/
 theorem keeps_of {m m' : mem} {b : block} (hd : S.blocks.Pairwise (· ≠ ·)) (hu : Unch m m' (· = b))
-    (hb : ∀ z ∈ [S.bA, S.bF, S.bWP, S.bFL, S.bCL, S.bFC, S.bCC, S.bTC], z ≠ b) :
-    ∀ z ∈ [S.bA, S.bF, S.bWP, S.bFL, S.bCL, S.bFC, S.bCC, S.bTC], Keep m m' z :=
+    (hb : ∀ z ∈ [S.bA, S.bF, S.bWP, S.bFL, S.bCL, S.bFC, S.bCC, S.bTC, S.bws], z ≠ b) :
+    ∀ z ∈ [S.bA, S.bF, S.bWP, S.bFL, S.bCL, S.bFC, S.bCC, S.bTC, S.bws], Keep m m' z :=
   fun z hz => Keep.unch hu (hb z hz)
 
 /-- The `DYNALLSTAT` blocks across a store to a global `b` outside them. -/
 macro "keeps " hd:term ", " hu:term : term =>
   `(keeps_of $hd $hu (by
       simp only [List.forall_mem_cons]
-      refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, fun _ h => absurd h List.not_mem_nil⟩ <;> sep_ne $hd))
+      refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, fun _ h => absurd h List.not_mem_nil⟩ <;> sep_ne $hd))
 
 /-- `comp_canon = rhs`. -/
 theorem wp_compCanon {f : function} {Q : Post} {le : temp_env} (c : PCtx m₀ m₁ S e bsr)

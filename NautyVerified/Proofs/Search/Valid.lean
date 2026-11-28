@@ -53,7 +53,7 @@ theorem SearchAt.valid_blocks {n : Nat} {m : mem} {S : SLoc} {ctx : Ctx n} {st :
     rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
     rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
     rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
-    rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
+    rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
   · exact ArrayAt.valid hA.graph.arr hpos
   · exact ArrayAt.valid hA.lab hn
   · exact ArrayAt.valid hA.ptn hn
@@ -138,6 +138,8 @@ theorem SearchAt.valid_blocks {n : Nat} {m : mem} {S : SLoc} {ctx : Ctx n} {st :
   · obtain ⟨_, hv⟩ := hF.mininv; exact hv.valid
   · obtain ⟨_, hv⟩ := hF.maxinv; exact hv.valid
   · obtain ⟨_, hv⟩ := hF.invarg; exact hv.valid
+  · exact dyn_valid_p hD.workspace
+  · exact dyn_valid_s hD.workspace
 
 /-- Every block of `S.blocks`, given `bUA` and `tcnode0`. -/
 theorem SearchAt.valid_all {n : Nat} {m : mem} {S : SLoc} {ctx : Ctx n} {st : Search n}

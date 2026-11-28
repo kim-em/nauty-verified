@@ -137,7 +137,7 @@ theorem wp_topUpdatecan {Q : Post} {le : temp_env} {m : mem} {st : Search n} {ns
       · intro z hz
         exact Keep.unch hu (by
           simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
-          rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
+          rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
             exact notW _ (by simp [SLoc.blocks]) (by sep_ne hd) (by sep_ne hd) (by sep_ne hd))
       · exact hs.arrays.set hu
           (hs.arrays.lab.unch hu (nw _ (by simp [SLoc.blocks]) (by sep_ne hd) (by sep_ne hd) (by sep_ne hd)))

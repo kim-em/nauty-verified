@@ -316,7 +316,7 @@ theorem not_W {S : SLoc} {W : block → Prop} (hv : ∀ a ∈ S.vars, ∀ b ∈ 
 theorem SearchAt.rebuildW {n : Nat} {m m' : mem} {S : SLoc} {ctx : Ctx n} {st st' : Search n}
     {pre nsp pre' nsp' : Bool} (h : SearchAt m S ctx st pre nsp) {W : block → Prop}
     (hu : Unch m m' W) (hW : ∀ z ∈ S.blocks, W z → z ∈ S.wr ∨ z ∈ workG)
-    (hK : ∀ z ∈ [S.bA, S.bF, S.bWP, S.bFL, S.bCL, S.bFC, S.bCC, S.bTC], Keep m m' z)
+    (hK : ∀ z ∈ [S.bA, S.bF, S.bWP, S.bFL, S.bCL, S.bFC, S.bCC, S.bTC, S.bws], Keep m m' z)
     (hsc : Scalars m' st' nsp') (hst : Stats m' S st' pre') (har : Arrays m' S ctx st')
     (hinv : SInv st') (hwk : WorkAt n m' S S.blocks) : SearchAt m' S ctx st' pre' nsp' := by
   have hd := h.distinct
@@ -328,12 +328,14 @@ theorem SearchAt.rebuildW {n : Nat} {m m' : mem} {S : SLoc} {ctx : Ctx n} {st st
         Program.Block.nautyWorkpermSz, Program.Block.nautyFirstlab, Program.Block.nautyFirstlabSz,
         Program.Block.nautyCanonlab, Program.Block.nautyCanonlabSz, Program.Block.nautyFirstcode,
         Program.Block.nautyFirstcodeSz, Program.Block.nautyCanoncode,
-        Program.Block.nautyCanoncodeSz, Program.Block.nautyFirsttc, Program.Block.nautyFirsttcSz],
+        Program.Block.nautyCanoncodeSz, Program.Block.nautyFirsttc, Program.Block.nautyFirsttcSz,
+        Block.naugraphDnwork, Block.naugraphDnworkSz],
         ¬ W z := not_W hv hW (by decide) (by decide) (by decide)
     simp only [List.forall_mem_cons] at hg hK
-    obtain ⟨g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, g11, g12, g13, g14, g15, g16, -⟩ := hg
-    obtain ⟨k1, k2, k3, k4, k5, k6, k7, k8, -⟩ := hK
+    obtain ⟨g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, g11, g12, g13, g14, g15, g16, g17, g18, -⟩ := hg
+    obtain ⟨k1, k2, k3, k4, k5, k6, k7, k8, k9, -⟩ := hK
     exact { hD with
+      workspace := hD.workspace.keep hu g17 g18 fun _ => k9
       active := hD.active.keep hu g1 g2 fun _ => k1
       fixedpts := hD.fixedpts.keep hu g3 g4 fun _ => k2
       workperm := hD.workperm.keep hu g5 g6 fun _ => k3

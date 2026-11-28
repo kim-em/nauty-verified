@@ -119,7 +119,7 @@ theorem wp_orbjoin {f : function} {Q : Post} {le : temp_env} {t : ident} {w : Ar
           fun e => c.ne_blocks (by simp [SLoc.blocks]) e.symm⟩)
   intro z hz
   simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
-  rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
+  rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
     exact (hk1 _).trans (Keep.unch hu2 (by sep_ne hd))
 
 end NautyVerified.Proofs.Search.Processnode

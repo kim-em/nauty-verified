@@ -337,6 +337,8 @@ theorem firstterminal_satisfies {xi : ExternalCalls} {n : Nat} (S : SLoc) (ctx :
               graph := ⟨h.arrays.graph.arr.unch hU16 (by sep_notin hd), h.arrays.graph.rep⟩ }
           dyns :=
             { h.dyns with
+              workspace := h.dyns.workspace.keep hU16 (by sep_notin hd) (by sep_notin hd)
+                fun _ => Keep.unch hU16 (by sep_notin hd)
               active := h.dyns.active.keep hU16 (by sep_notin hd) (by sep_notin hd)
                 fun _ => Keep.unch hU16 (by sep_notin hd)
               fixedpts := h.dyns.fixedpts.keep hU16 (by sep_notin hd) (by sep_notin hd)

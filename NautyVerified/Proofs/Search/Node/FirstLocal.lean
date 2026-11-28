@@ -84,7 +84,7 @@ theorem wp_firsttcStore {f : function} {Q : Post} {e : env} {le : temp_env} {m :
   refine h.rebuild hU (fun z hz => by simp at hz; subst hz; simp [SLoc.wr, SLoc.wrV])
     (fun z hz => by
       simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
-      rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
+      rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
       all_goals first | exact hk | exact Keep.unch hu (by sep_ne hd))
     { h.scalars.unch hu (by sep_all hd) with } { h.stats.unch hu (by sep_ne hd) with }
     (h.arrays.setFirsttc hu hd (by rw [intsZ_set (by omega)]; exact harr)) ?_

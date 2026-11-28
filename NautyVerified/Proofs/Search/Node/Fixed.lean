@@ -62,7 +62,7 @@ theorem SearchAt.setFixed {n : Nat} {m m' : mem} {S : SLoc} {ctx : Ctx n} {st : 
     (h.arrays.setFixed hd hu hf hr) { h.inv with }
   intro z hz
   simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
-  rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
+  rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
   · exact Keep.unch hu (by sep_ne hd)
   · exact hk
   all_goals exact Keep.unch hu (by sep_ne hd)

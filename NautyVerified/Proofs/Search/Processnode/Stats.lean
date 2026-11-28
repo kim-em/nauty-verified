@@ -44,7 +44,7 @@ theorem PAt.stat {m' : mem} {st' : Search n} (c : PCtx m₀ m₁ S e bsr)
     hinv, fun v hv => hv.unch hu fun e => c.ne_blocks (by simp [SLoc.blocks]) e.symm, hu⟩
   intro z hz
   simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
-  rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> exact Keep.unch hu (by sep_ne hd)
+  rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> exact Keep.unch hu (by sep_ne hd)
 
 /-- `stats->maxlevel = level`. -/
 theorem wp_maxlevel {f : function} {Q : Post} {le : temp_env} {level : Nat}

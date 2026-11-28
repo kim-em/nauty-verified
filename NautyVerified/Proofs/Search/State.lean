@@ -101,6 +101,8 @@ structure SLoc where
   /-- The harness's `userautomproc`. -/
   bUA : block
   M : Nat
+  /-- The capacity of naugraph.c's `dnwork` pair, whose block is the workspace. -/
+  capD : Nat
 
 namespace SLoc
 variable (S : SLoc)
@@ -294,7 +296,8 @@ def SLoc.blocks (S : SLoc) : List block :=
    Block.naugraphWorksetSz, Block.naugraphBucket, Block.naugraphBucketSz,
    Block.nautilWorkperm, Block.nautilWorkpermSz,
    Program.Block.nautyBit, Block.naugraphBit, Block.nautilBit, Block.naugraphBytecount,
-   Block.leftbit, Block.mininvarlevel, Block.maxinvarlevel, Block.invararg]
+   Block.leftbit, Block.mininvarlevel, Block.maxinvarlevel, Block.invararg,
+   Block.naugraphDnwork, Block.naugraphDnworkSz]
 
 /-- The blocks of `S` a search function may change: all but the harness
 callback's block and the target-cell list's head `tcnode0`, which no callee writes
@@ -320,6 +323,14 @@ structure Dyns (n : Nat) (m : mem) (S : SLoc) : Prop where
   capFC : n + 2 ≤ S.capFC
   capCC : n + 2 ≤ S.capCC
   capTC : n + 2 ≤ S.capTC
+  /-- The workspace is naugraph.c's `dnwork` (`densenauty` allocates it). -/
+  workspace : DynAt m Block.naugraphDnwork Block.naugraphDnworkSz 8 S.capD S.bws
+  capWs : 2 * wsPairs * S.M ≤ S.capD
+
+/-- The workspace is as `malloc` made it. -/
+theorem Dyns.wsMal {n : Nat} {m : mem} {S : SLoc} (h : Dyns n m S) (hM : 0 < S.M) :
+    Alloc.Malloced m S.bws (8 * S.capD) :=
+  h.workspace.mal (Nat.lt_of_lt_of_le (Nat.mul_pos (by decide) hM) h.capWs)
 
 /-- The tables nauty reads. -/
 structure Tables (m : mem) : Prop where

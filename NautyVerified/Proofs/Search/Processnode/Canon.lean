@@ -147,7 +147,7 @@ theorem wp_updatecan {f : function} {Q : Post} {le : temp_env} (c : PCtx m₀ m�
     · intro z hz
       exact Keep.unch hu (by
         simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
-        rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
+        rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
           exact notW _ (by simp [SLoc.blocks]) (by sep_ne hd) (by sep_ne hd) (by sep_ne hd))
     · have nw := fun z (hz : z ∈ S.blocks) h1 h2 h3 => notW z hz h1 h2 h3
       exact hs.arrays.set hu
@@ -290,7 +290,7 @@ theorem wp_testcanlab {f : function} {Q : Post} {le : temp_env} (c : PCtx m₀ m
     · intro z hz
       exact Keep.unch hu (by
         simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
-        rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
+        rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
           exact notW _ (by simp [SLoc.blocks]) (by sep_ne hd) (by sep_ne hd) (by sep_ne hd)
             (by sep_ne hd))
 
