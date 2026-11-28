@@ -2,6 +2,7 @@ import NautyVerified.Proofs.Alloc.KeepV
 import NautyVerified.Proofs.Maketargetcell.Loops
 import NautyVerified.Proofs.Targetcell.Satisfies
 import NautyVerified.Logic.OfPre
+import NautyVerified.Logic.Grow
 
 /-!
 # `maketargetcell` meets its specification
@@ -81,6 +82,46 @@ def maketargetcellSpecT {n : Nat} (xi : ExternalCalls) (TS : FunSpec) (tc : Nat)
       Unch m₁ m' (fun z => z = bt ∨ z = bz ∨ z = bc) ∧ Alloc.KeepA m₁ m') ∧
     ∀ z ∈ [bt, bz, bc], Keep m m' z
 
+/-- `maketargetcellSpecT`, with every block valid after `targetcell`'s return
+still valid when `maketargetcell` returns (its own code only stores). -/
+def maketargetcellSpecV {n : Nat} (xi : ExternalCalls) (TS : FunSpec) (tc : Nat) (bg : block)
+    (gofs : ptrofs) (bl : block) (lofs : ptrofs) (lab : Array Nat) (bp : block) (pofs : ptrofs)
+    (ptn : Array Nat) (level : Nat) (bt : block) (tofs : ptrofs) (tvals : Nat → val) (bz : block)
+    (zofs : ptrofs) (zvals : Nat → val) (bc : block) (cofs : ptrofs) (cvals : Nat → val)
+    (tcLevel : Nat) (dg : Lib.Integers.int) (hint : Int) (M : Nat) (bf : block) : FunSpec where
+  pre := (maketargetcellSpecT (n := n) xi TS tc bg gofs bl lofs lab bp pofs ptn level bt tofs tvals
+    bz zofs zvals bc cofs cvals tcLevel dg hint M bf).pre
+  post args m t v m' := (maketargetcellSpecT (n := n) xi TS tc bg gofs bl lofs lab bp pofs ptn level
+      bt tofs tvals bz zofs zvals bc cofs cvals tcLevel dg hint M bf).post args m t v m' ∧
+    ∃ m₁, TS.post (tcArgs bg gofs bl lofs bp pofs level tcLevel dg hint M n) m E0
+        (.Vint (ir (tc : Int))) m₁ ∧
+      Unch m₁ m' (fun z => z = bt ∨ z = bz ∨ z = bc) ∧ Alloc.KeepA m₁ m' ∧
+      ∀ z, Mem.valid_block m₁ z → Mem.valid_block m' z
+
+omit En in
+/-- A statement keeps the valid blocks valid: its postcondition may assume it. -/
+theorem wp_grow {xi : ExternalCalls} {f : function} {s : statement} {Q : Post} {e : env}
+    {le : temp_env} {m : mem}
+    (h : Wp xi ge f s
+      { normal := fun t e' le' m' => (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
+          Q.normal t e' le' m'
+        brk := fun t e' le' m' => (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
+          Q.brk t e' le' m'
+        cont := fun t e' le' m' => (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
+          Q.cont t e' le' m'
+        ret := fun t v m' => (∀ z, Mem.valid_block m z → Mem.valid_block m' z) → Q.ret t v m' }
+      e le m) :
+    Wp xi ge f s Q e le m := by
+  intro k e' le' m' hP
+  obtain ⟨he, hle, hm⟩ := hP
+  subst e' le' m'
+  rcases h k e le m ⟨rfl, rfl, rfl⟩ with ⟨t, l, m₁, hs, hq⟩ | ⟨t, l, m₁, hs, hq⟩ |
+      ⟨t, l, m₁, hs, hq⟩ | ⟨t, v, m₁, hs, hq⟩
+  · exact .inl ⟨t, l, m₁, hs, hq fun z hz => steps_valid hs z hz⟩
+  · exact .inr (.inl ⟨t, l, m₁, hs, hq fun z hz => steps_valid hs z hz⟩)
+  · exact .inr (.inr (.inl ⟨t, l, m₁, hs, hq fun z hz => steps_valid hs z hz⟩))
+  · exact .inr (.inr (.inr ⟨t, v, m₁, hs, hq fun z hz => steps_valid hs z hz⟩))
+
 def entryTempsT (bf : block) (bg : block) (gofs : ptrofs) (bl : block) (lofs : ptrofs) (bp : block)
     (pofs : ptrofs) (level : Nat) (bt : block) (tofs : ptrofs) (bz : block) (zofs : ptrofs)
     (bc : block) (cofs : ptrofs) (tcLevel : Nat) (dg : Lib.Integers.int) (hint : Int) (M n : Nat) :
@@ -94,14 +135,14 @@ def entryTempsT (bf : block) (bg : block) (gofs : ptrofs) (bl : block) (lofs : p
               (PTree.set id.lab (.Vptr bl lofs) (PTree.set id.g (.Vptr bg gofs)
                 (create_undef_temps Source.dense.fn.maketargetcell.fn_temps)))))))))))))
 
-theorem maketargetcell_satisfiesT {xi : ExternalCalls} {n : Nat} (TS : FunSpec) (tc : Nat)
+theorem maketargetcell_satisfiesV {xi : ExternalCalls} {n : Nat} (TS : FunSpec) (tc : Nat)
     (bg : block) (gofs : ptrofs) (bl : block) (lofs : ptrofs)
     (lab : Array Nat) (bp : block) (pofs : ptrofs) (ptn : Array Nat) (level : Nat) (bt : block)
     (tofs : ptrofs) (tvals : Nat → val) (bz : block) (zofs : ptrofs) (zvals : Nat → val)
     (bc : block) (cofs : ptrofs) (cvals : Nat → val) (tcLevel : Nat) (dg : Lib.Integers.int)
     (hint : Int) (M : Nat) (bf : block) :
     Satisfies xi ge (.Internal Source.dense.fn.maketargetcell)
-      (maketargetcellSpecT (n := n) xi TS tc bg gofs bl lofs lab bp pofs ptn level bt tofs tvals bz
+      (maketargetcellSpecV (n := n) xi TS tc bg gofs bl lofs lab bp pofs ptn level bt tofs tvals bz
         zofs zvals bc cofs cvals tcLevel dg hint M bf) := by
   refine satisfies_internal (Entry := fun _ m₀ e le m => e = empty_env ∧
     le = entryTempsT bf bg gofs bl lofs bp pofs level bt tofs bz zofs bc cofs tcLevel dg hint M n ∧
@@ -206,15 +247,15 @@ theorem maketargetcell_satisfiesT {xi : ExternalCalls} {n : Nat} (TS : FunSpec) 
     have st := hsep bt (.inl rfl)
     -- `EMPTYSET(tcell, m);`
     wp_step
-    refine Set.wp_emptySet' (by decide) (by decide) (by decide) (htarr1.unch hu2 tz) hM1 (by omega)
-      (by rw [g3 _ (by decide) (by decide) (by decide)]; exact etcell)
-      (by rw [g3 _ (by decide) (by decide) (by decide)]; exact em) ?_
-    intro le4 m3 htarr3 hu3 hout3 ho4
+    refine wp_grow (Set.wp_emptySet' (by decide) (by decide) (by decide) (htarr1.unch hu2 tz) hM1
+      (by omega) (by rw [g3 _ (by decide) (by decide) (by decide)]; exact etcell)
+      (by rw [g3 _ (by decide) (by decide) (by decide)]; exact em) ?_)
+    intro le4 m3 htarr3 hu3 hout3 ho4 hg3
     have g4 : ∀ x, x ≠ id.es → x ≠ id.t4 → x ≠ id.j → x ≠ id.i → x ≠ id.t3 →
         PTree.get x le4 = PTree.get x E := fun x h1 h2 h3 h4 h5 => by rw [ho4 x h1 h2, g3 x h3 h4 h5]
     -- `for (k = i; k <= j; ++k) ADDELEMENT(tcell, lab[k]);`
     wp_step
-    refine wp_kloop (by rw [g4 _ (by decide) (by decide) (by decide) (by decide) (by decide)]; exact elb)
+    refine wp_grow <| wp_kloop (by rw [g4 _ (by decide) (by decide) (by decide) (by decide) (by decide)]; exact elb)
       ((hlarr1.unch hu2 (hsep bz (.inr (.inl rfl))).1.symm).unch hu3 st.1.symm)
       hlsm (by omega) hnM (by omega) st.1.symm
       (by rw [g4 _ (by decide) (by decide) (by decide) (by decide) (by decide)]; exact etcell) htarr3
@@ -222,7 +263,7 @@ theorem maketargetcell_satisfiesT {xi : ExternalCalls} {n : Nat} (TS : FunSpec) 
       ((hbit1.unch hu2 (hsep bz (.inr (.inl rfl))).2.2.symm).unch hu3 st.2.2.symm)
       st.2.2.symm (show tc ≤ e by omega) sp.2.1 (by rw [ho4 _ (by decide) (by decide)]; exact hi3)
       (by rw [ho4 _ (by decide) (by decide)]; exact hj3) ?_
-    intro le5 m4 ws4 htarr4 hW4 hu4 hout4 ho5
+    intro le5 m4 ws4 htarr4 hW4 hu4 hout4 ho5 hg4
     -- `*cellpos = i;`
     have hcarr4 := ((hcarr1.unch hu2 zc.symm).unch hu3 btc.symm).unch hu4 btc.symm
     obtain ⟨m5, hst5, hcarr5, -⟩ := store_array hcarr4 (show 0 < 1 by decide)
@@ -240,7 +281,7 @@ theorem maketargetcell_satisfiesT {xi : ExternalCalls} {n : Nat} (TS : FunSpec) 
     rw [show Ptrofs.unsigned cofs = elemOfs .Mint32 (intOfZ (Ptrofs.unsigned cofs)) 0 by
       unfold elemOfs
       rw [show csize .Mint32 * ((0 : Nat) : Int) = 0 by simp, Int.add_zero, zOfInt_intOfZ], hst5]
-    refine ⟨m5, Nextelement.free_empty _, rfl, ?_⟩
+    refine ⟨m5, Nextelement.free_empty _, ?_⟩
     -- the postcondition
     have hU15 : Unch m1 m5 (fun z => z = bt ∨ z = bz ∨ z = bc) :=
       (((hu2.mono fun _ h => .inr (.inl h)).trans (hu3.mono fun _ h => .inl h)).trans
@@ -249,15 +290,32 @@ theorem maketargetcell_satisfiesT {xi : ExternalCalls} {n : Nat} (TS : FunSpec) 
       (((Alloc.KeepA.storeArr hzarr1 hst2).trans (Alloc.KeepA.of_outside hu3 hout3
         (htarr1.unch hu2 tz).base_nonneg)).trans (Alloc.KeepA.of_outside hu4 hout4
         htarr3.base_nonneg)).trans (Alloc.KeepA.storeArr hcarr4 hst5)
-    refine ⟨⟨ws4, (htarr4.unch hu5 btc), by simp only [mtcOf, hE3]; exact hW4⟩,
+    have hgv : ∀ z, Mem.valid_block m1 z → Mem.valid_block m5 z := fun z hz =>
+      Mem.store_valid_block_1 _ _ _ _ _ _ hst5 _
+        (hg4 _ (hg3 _ (Mem.store_valid_block_1 _ _ _ _ _ _ hst2 _ hz)))
+    refine ⟨⟨rfl, ⟨ws4, (htarr4.unch hu5 btc), by simp only [mtcOf, hE3]; exact hW4⟩,
       by simp only [mtcOf, hE3]; exact ((hzarr2'.unch hu3 tz.symm).unch hu4 tz.symm).unch hu5 zc,
       hcarr5.congr fun i hi => by simp [upd, mtcOf, show i = 0 by omega],
-      ⟨m1, hpost, hU15, kA⟩, fun z hz => ?_⟩
+      ⟨m1, hpost, hU15, kA⟩, fun z hz => ?_⟩, m1, hpost, hU15, kA, hgv⟩
     simp only [List.mem_cons, List.not_mem_nil, or_false] at hz
     rcases hz with rfl | rfl | rfl
     · exact (Keep.unch hU nt).trans (kA _)
     · exact (Keep.unch hU nz).trans (kA _)
     · exact (Keep.unch hU nc).trans (kA _)
+
+theorem maketargetcell_satisfiesT {xi : ExternalCalls} {n : Nat} (TS : FunSpec) (tc : Nat)
+    (bg : block) (gofs : ptrofs) (bl : block) (lofs : ptrofs)
+    (lab : Array Nat) (bp : block) (pofs : ptrofs) (ptn : Array Nat) (level : Nat) (bt : block)
+    (tofs : ptrofs) (tvals : Nat → val) (bz : block) (zofs : ptrofs) (zvals : Nat → val)
+    (bc : block) (cofs : ptrofs) (cvals : Nat → val) (tcLevel : Nat) (dg : Lib.Integers.int)
+    (hint : Int) (M : Nat) (bf : block) :
+    Satisfies xi ge (.Internal Source.dense.fn.maketargetcell)
+      (maketargetcellSpecT (n := n) xi TS tc bg gofs bl lofs lab bp pofs ptn level bt tofs tvals bz
+        zofs zvals bc cofs cvals tcLevel dg hint M bf) :=
+  fun args m hp k hk =>
+    let ⟨t, v, m', hs, hq, _⟩ := maketargetcell_satisfiesV (n := n) TS tc bg gofs bl lofs lab bp pofs
+      ptn level bt tofs tvals bz zofs zvals bc cofs cvals tcLevel dg hint M bf args m hp k hk
+    ⟨t, v, m', hs, hq⟩
 
 end
 

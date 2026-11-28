@@ -1,4 +1,4 @@
-import NautyVerified.Proofs.Search.Node.Realloc
+import NautyVerified.Proofs.Search.Node.ReallocW
 import NautyVerified.Proofs.Search.Node.Fields
 import NautyVerified.Proofs.Search.Node.OtherSteps
 import NautyVerified.Proofs.Maketargetcell.Satisfies
@@ -246,5 +246,227 @@ theorem wp_nodeTarget {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_e
       · exact .inr (.inr (.inl (e ▸ .inr (.inr (.inl ⟨cB, hc, dB⟩)))))
       · exact .inr (.inl hnv)
     · exact .inr (.inr (.inr hx))
+
+/-! ### For any dispatch representation -/
+
+section Generic
+
+open NautyVerified.Proofs.Dispatch (Ops DispatchRep DispatchC)
+open NautyVerified.Proofs.Maketargetcell (mtcOf)
+
+variable {ge : genv} [E : NautyEnv ge] {O : Ops}
+
+set_option maxHeartbeats 4000000 in
+/-- The node's `maketargetcell` call with `D`'s target-cell procedure: the
+target cell, `*tcellsize` and `*tc` receive `mtcOf` of `O.targetcell`'s
+position, and the search state is unchanged. `htc` is what nautil.c's scan
+needs of that position (a vertex starting a nontrivial cell); for HexGraphIso's
+`targetcell` it is `Spec.Bestcell.targetcell_mem`. The call may change `D`'s
+written globals, its scratch blocks in use and new blocks. -/
+theorem wp_nodeTargetG {D : DispatchC ge O} {n : Nat} {f : function} {Q : Post} {e : env}
+    {le : temp_env} {m : mem} {S : SLoc} {gl : D.GLoc} {cl : D.CLoc} {G : O.Gr n}
+    {st : SearchState n (O.Canon n)} {pre nsp : Bool} {level : Nat}
+    (h : SearchAtG D.toDispatchRep m S gl cl G st pre nsp) (hvU : Mem.valid_block m S.bUA)
+    (hvT : Mem.valid_block m E.tcnode0)
+    {bt bz bc : block}
+    (hloc : [bt, bz, bc].Pairwise (· ≠ ·))
+    (hlocS : ∀ z ∈ [bt, bz, bc], z ∉ S.blocksG D.toDispatchRep gl cl ∧ Mem.valid_block m z ∧
+      ¬ IsWorkG D.toDispatchRep m z)
+    (htcell : PTree.get dense.id.«tcell» le = some (.Vptr bt Ptrofs.zero))
+    (hez : PTree.get dense.id.«tcellsize» e = some (bz, tint))
+    (hec : PTree.get dense.id.«tc» e = some (bc, tint))
+    (hge : ∀ x ∈ [dense.id.«maketargetcell», dense.id.«nauty:g», dense.id.«nauty:tc_level»,
+      dense.id.«nauty:digraph», dense.id.«nauty:dispatch», dense.id.«nauty:m», dense.id.«nauty:n»],
+      PTree.get x e = none)
+    (ht : ∃ v, ArrayAt m .Mint64 bt 0 v S.M) (hz : ∃ v, ArrayAt m .Mint32 bz 0 v 1)
+    (hc : ∃ v, ArrayAt m .Mint32 bc 0 v 1)
+    (hlab : PTree.get dense.id.«lab» le = some (.Vptr S.bl S.lofs))
+    (hptn : PTree.get dense.id.«ptn» le = some (.Vptr S.bp S.pofs))
+    (hlev : PTree.get dense.id.«level» le = some (.Vint (ir level)))
+    (hl1 : 1 ≤ level) (hln : level ≤ n)
+    {hintE : expr} {hint : Int} (hhint : Exec.evalExpr ge e le m hintE = some (.Vint (ir hint)))
+    (hhty : typeof hintE = tint) (hh1 : -1 ≤ hint) (hh2 : hint < n)
+    (htc : O.targetcell G st.lab st.ptn level 100 hint < n ∧
+      level < st.ptn[O.targetcell G st.lab st.ptn level 100 hint]!)
+    (hQ : ∀ m', SearchAtG D.toDispatchRep m' S gl cl G st pre nsp →
+      (∃ ws, ArrayAt m' .Mint64 bt 0 (longs ws) S.M ∧
+        SetRep (fun w => bv64 (ws w)) S.M
+          (mtcOf n st.lab st.ptn level (O.targetcell G st.lab st.ptn level 100 hint)).2.1) →
+      ArrayAt m' .Mint32 bz 0 (fun _ => .Vint (ir
+        ((mtcOf n st.lab st.ptn level (O.targetcell G st.lab st.ptn level 100 hint)).2.2 : Int))) 1 →
+      ArrayAt m' .Mint32 bc 0 (fun _ => .Vint (ir
+        ((mtcOf n st.lab st.ptn level (O.targetcell G st.lab st.ptn level 100 hint)).1 : Int))) 1 →
+      Unch m m' (fun z => S.ChgG D.toDispatchRep gl cl z ∨ ¬ Mem.valid_block m z ∨
+        IsWorkG D.toDispatchRep m z ∨ z = bt ∨ z = bz ∨ z = bc) →
+      (∀ z, Mem.valid_block m z → Mem.valid_block m' z) → WorkMonoG D.toDispatchRep m m' →
+      (∀ z ∈ [bt, bz, bc], Keep m m' z) →
+      Q.normal E0 e le m') :
+    Wp xi ge f (mtcCall hintE) Q e le m := by
+  have hv := h.valid_all hvU hvT
+  have hd := h.lit
+  have hI := h.inv
+  have hnl := h.nlt
+  obtain ⟨tv0, ht⟩ := ht
+  obtain ⟨zv, hz⟩ := hz
+  obtain ⟨cv, hc⟩ := hc
+  simp only [List.forall_mem_cons] at hlocS hge
+  obtain ⟨⟨tS, tV, tW⟩, ⟨zS, zV, zW⟩, ⟨cSn, cV, cWn⟩, -⟩ := hlocS
+  obtain ⟨g1, g2, g3, g4, g5, g6, g7, -⟩ := hge
+  simp only [List.pairwise_cons, List.mem_cons, List.mem_nil_iff, or_false, forall_eq_or_imp,
+    forall_eq, List.Pairwise.nil, and_true, false_implies, implies_true] at hloc
+  have mL : ∀ z ∈ S.litG, z ∈ S.blocksG D.toDispatchRep gl cl := fun z hz =>
+    (S.litG_sub D.toDispatchRep gl cl).subset hz
+  have mG : ∀ z ∈ D.graphBlocks gl S.bg, z ∈ S.blocksG D.toDispatchRep gl cl := fun z hz =>
+    SLoc.mem_blocksG_of D.toDispatchRep (.inl hz)
+  have ne_loc' : ∀ {x z : block}, x ∉ S.blocksG D.toDispatchRep gl cl →
+      z ∈ S.blocksG D.toDispatchRep gl cl → x ≠ z := fun hx hz e => hx (e ▸ hz)
+  have iL : S.bl ∈ S.litG := by simp [SLoc.litG]
+  have iP : S.bp ∈ S.litG := by simp [SLoc.litG]
+  have iBit : E.nautilBit ∈ S.litG := by simp [SLoc.litG]
+  have gsub : (D.graphBlocks gl S.bg).Sublist (S.blocksG D.toDispatchRep gl cl) := by
+    unfold SLoc.blocksG
+    exact ((((List.sublist_append_left _ _).trans (List.sublist_append_left _ _)).trans
+      (List.sublist_append_left _ _)).trans (List.sublist_append_left _ _)).trans
+      (List.sublist_append_left _ _)
+  -- the arguments of `targetcell`
+  have hsep : D.Sep m (D.graphBlocks gl S.bg ++ [S.bl, S.bp]) := by
+    have hA : ∀ z ∈ D.graphBlocks gl S.bg ++ [S.bl, S.bp], z ∈ D.graphBlocks gl S.bg ∨
+        z ∈ [S.bl, S.bp] := fun z hz => List.mem_append.1 hz
+    have hLP : ∀ z ∈ [S.bl, S.bp], z ∈ S.litG := by simp [SLoc.litG]
+    refine ⟨?_, ?_, ?_, ?_, ?_⟩
+    · refine List.pairwise_append.2 ⟨h.distinct.sublist gsub, ?_, ?_⟩
+      · simp only [List.pairwise_cons, List.mem_cons, List.mem_nil_iff, or_false,
+          forall_eq, List.Pairwise.nil, and_true, false_implies,
+          implies_true]
+        sep_ne hd
+      · intro a ha b hb
+        simp only [List.mem_cons, List.mem_nil_iff, or_false] at hb
+        rcases hb with rfl | rfl
+        · exact h.graph_ne ha (.inl (by simp))
+        · exact h.graph_ne ha (.inl (by simp))
+    · intro z hz
+      rcases hA z hz with hz | hz
+      · exact hv z (mG z hz)
+      · exact hv z (mL z (hLP z hz))
+    · intro z hz hw
+      rcases hA z hz with hz | hz
+      · exact h.work.notin z hw (mG z hz)
+      · exact h.work.notin z hw (mL z (hLP z hz))
+    · intro z hz hg
+      rcases hA z hz with hz | hz
+      · exact h.globs_ne hg (.inl hz) rfl
+      · exact h.lit_globs z (hLP z hz) hg
+    · intro z hz
+      rcases hA z hz with hz | hz
+      · exact ⟨h.graph_ne hz (.inr (.inr (.inr (.inl (by simp))))),
+          h.graph_ne hz (.inr (.inr (.inr (.inl (by simp))))),
+          h.graph_ne hz (.inr (.inr (.inr (.inl (by simp)))))⟩
+      · simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
+        rcases hz with rfl | rfl <;> exact ⟨by sep_ne hd, by sep_ne hd, by sep_ne hd⟩
+  have hTS : (D.targetcellSpec G gl S.bg S.gofs S.bl S.lofs st.lab S.bp S.pofs st.ptn level 100
+      (ir 0) hint S.M).pre
+      (Maketargetcell.tcArgs S.bg S.gofs S.bl S.lofs S.bp S.pofs level 100 (ir 0) hint S.M n) m :=
+    ⟨rfl, ⟨h.work.disp, h.tables.disp, h.tables.env, h.n0, hnl, h.M1, h.Mlt, h.nM⟩,
+      h.arrays.graph, h.graphOk, h.arrays.lab, hI.labSmall, hI.labSurj, h.arrays.ptn, hI.ptnSize,
+      fun x hx => by
+        rcases hI.ptnVals x hx with hv' | hv'
+        · omega
+        · rw [hv']; decide,
+      by have := hI.ptnLast; omega, by omega, hh2, by omega, by decide, hsep⟩
+  -- the outputs are none of `S`'s blocks
+  have oS : ∀ z, z = bt ∨ z = bz ∨ z = bc → z ∉ S.blocksG D.toDispatchRep gl cl ∧
+      ¬ IsWorkG D.toDispatchRep m z ∧ Mem.valid_block m z := by
+    rintro z (rfl | rfl | rfl)
+    · exact ⟨tS, tW, tV⟩
+    · exact ⟨zS, zW, zV⟩
+    · exact ⟨cSn, cWn, cV⟩
+  -- what the call of `targetcell` leaves alone
+  have keepT : ∀ z, (z ∈ S.litG ∨ z = bt ∨ z = bz ∨ z = bc) → z ∉ D.globs →
+      ¬ (False ∨ z ∈ D.wglobs ∨ D.IsWork m z ∨ ¬ Mem.valid_block m z) := by
+    rintro z hz hg (hf | hw | hi | hn)
+    · exact hf
+    · exact hg (D.wglobs_sub _ hw)
+    · rcases hz with hz | hz
+      · exact h.work.notin z hi (mL z hz)
+      · exact (oS z hz).2.1 (.inl hi)
+    · rcases hz with hz | hz
+      · exact hn (hv z (mL z hz))
+      · exact hn (oS z hz).2.2
+  have gO : ∀ z, z = bt ∨ z = bz ∨ z = bc → z ∉ D.globs := fun z hz hg =>
+    (oS z hz).1 (SLoc.mem_blocksG_of D.toDispatchRep (.inr (.inr (.inr (.inr (.inr hg))))))
+  obtain ⟨fd, hfd, hty, hsat⟩ := D.targetcell_fn xi
+  refine wp_call (vf := .Vptr E.maketargetcellFn Ptrofs.zero)
+    (targs := [tptr tulong, tptr tint, tptr tint, tint, tptr tulong, tptr tint, tptr tint, tint, tint,
+      tint, tptr (tfun [tptr tulong, tptr tint, tptr tint, tint, tint, tint, tint, tint, tint] tint),
+      tint, tint])
+    (tres := .Tvoid) (cc := Common.AST.cc_default)
+    (vargs := [.Vptr S.bg S.gofs, .Vptr S.bl S.lofs, .Vptr S.bp S.pofs, .Vint (ir level),
+      .Vptr bt Ptrofs.zero, .Vptr bz Ptrofs.zero, .Vptr bc Ptrofs.zero, .Vint (ir ((100 : Nat) : Int)),
+      .Vint (ir 0), .Vint (ir hint), .Vptr D.targetcell Ptrofs.zero, .Vint (ir S.M),
+      .Vint (ir n)]) (.Internal dense.fn.maketargetcell) _
+    (Satisfies.grow (Maketargetcell.maketargetcell_satisfiesV (n := n)
+      (D.targetcellSpec G gl S.bg S.gofs S.bl S.lofs st.lab S.bp S.pofs st.ptn level 100 (ir 0) hint
+        S.M) (O.targetcell G st.lab st.ptn level 100 hint) S.bg S.gofs S.bl S.lofs st.lab S.bp
+      S.pofs st.ptn level bt Ptrofs.zero tv0 bz Ptrofs.zero zv bc Ptrofs.zero cv 100 (ir 0) hint
+      S.M D.targetcell)) rfl ?_ ?_
+    (by simp [Common.Globalenvs.Genv.find_funct, E.funct_maketargetcellFn]) rfl
+    ⟨rfl, ⟨fd, hfd, hty, hsat G gl S.bg S.gofs S.bl S.lofs st.lab S.bp S.pofs st.ptn level 100
+        (ir 0) hint S.M⟩, hTS,
+      fun t v m₁ ⟨e1, e2, hstep⟩ => ⟨e1, e2, _, hstep.unch,
+        keepT _ (.inl iL) (h.lit_globs _ iL), keepT _ (.inl iP) (h.lit_globs _ iP),
+        keepT _ (.inr (.inl rfl)) (gO _ (.inl rfl)),
+        keepT _ (.inr (.inr (.inl rfl))) (gO _ (.inr (.inl rfl))),
+        keepT _ (.inr (.inr (.inr rfl))) (gO _ (.inr (.inr rfl))),
+        keepT _ (.inl iBit) (h.lit_globs _ iBit)⟩,
+      htc.1, htc.2, h.arrays.lab, hI.labSmall, h.arrays.ptn, hI.ptnSize,
+      fun x hx => by
+        rcases hI.ptnVals x hx with hv' | hv'
+        · omega
+        · rw [hv']; decide,
+      by have := hI.ptnLast; omega, by omega, ht, hz, hc, h.tables.env.nautilBit,
+      fun z hz => ⟨ne_loc' (oS z hz).1 (mL _ iL), ne_loc' (oS z hz).1 (mL _ iP),
+        ne_loc' (oS z hz).1 (mL _ iBit)⟩,
+      hloc.1.1, hloc.1.2, hloc.2, h.n0, hnl, h.M1, h.Mlt, h.nM⟩ ?_
+  · simp only [Exec.evalExpr, Exec.lvalOfVar, g1, E.find_maketargetcellFn, Exec.derefLoc,
+      Cfrontend.Ctypes.access_mode]
+  · simp only [Exec.evalExprlist, hhint, hhty]
+    simp only [Exec.evalExpr, Exec.evalLvalue, Exec.lvalOfVar, g2, g3, g4, g5, g6, g7, hez, hec,
+      E.find_g, E.find_tcLevel, E.find_digraph, E.find_dispatch, E.find_m, E.find_n, Exec.derefLoc,
+      Cfrontend.Ctypes.access_mode, Mem.loadv, field_dTargetcell, Alloc.Mptr_eq,
+      show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl, h.fixed.g.load, h.fixed.tcLevel.load,
+      h.fixed.digraph.load, h.fixed.mm.load, h.fixed.nn.load, htcell, hlab, hptn, hlev,
+      typeof, cop]
+    rw [show Ptrofs.unsigned (Ptrofs.add Ptrofs.zero (Ptrofs.repr (zOfInt 48))) = zOfInt 48 from rfl,
+      h.fixed.dTargetcell.load]
+    simp only [ite_true, cop]
+    rfl
+  · rintro t v m' ⟨⟨⟨rfl, hT, hZ, hC, -, hKl⟩, m₁, ⟨-, -, hstep⟩, hU1, -, hg1⟩, hgrow⟩
+    obtain ⟨h₁, hw₁⟩ := h.dstep hvU hvT hstep (fun _ hz => hz.elim)
+    have hX : ∀ z ∈ S.blocksG D.toDispatchRep gl cl, ¬ (z = bt ∨ z = bz ∨ z = bc) :=
+      fun z hzm ho => (oS z ho).1 hzm
+    have hXw : ∀ z, IsWorkG D.toDispatchRep m₁ z → ¬ (z = bt ∨ z = bz ∨ z = bc) := by
+      intro z hz ho
+      rcases hw₁ z hz with h' | h'
+      · exact (oS z ho).2.1 h'
+      · exact h' (oS z ho).2.2
+    have h' := h₁.unch hU1 hX hXw hg1
+    obtain ⟨-, back⟩ := h₁.work.unch hU1
+      (fun z hz ho => hX z (SLoc.mem_blocksG_of D.toDispatchRep
+        (.inr (.inr (.inr (.inr (.inr (D.wglobs_sub _ hz))))))) ho)
+      ⟨fun ho => hX _ (mL _ (by simp [SLoc.litG])) ho, fun ho => hX _ (mL _ (by simp [SLoc.litG])) ho⟩
+      hXw hg1
+    refine hQ m' h' hT hZ hC ?_ hgrow
+      (hw₁.trans hstep.valid fun z hz => .inl (back z hz)) hKl
+    refine (hstep.unch.mono fun z hz => ?_).trans (hU1.mono fun z hz => .inr (.inr (.inr hz)))
+    rcases hz with hf | hw | hi | hn
+    · exact hf.elim
+    · have hg := D.wglobs_sub _ hw
+      exact .inl ⟨SLoc.mem_blocksG_of D.toDispatchRep (.inr (.inr (.inr (.inr (.inr hg))))),
+        h.globs_ne hg (.inr (.inr (.inr (.inl (by simp))))),
+        h.globs_ne hg (.inr (.inr (.inr (.inr (by simp)))))⟩
+    · exact .inr (.inr (.inl (.inl hi)))
+    · exact .inr (.inl hn)
+
+end Generic
 
 end NautyVerified.Proofs.Search
