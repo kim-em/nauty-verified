@@ -26,7 +26,7 @@ pinned `inf = nautyInf`, `tcLevel = 100`:
 
 `TcOk m S chain` says the list's blocks are valid, pairwise distinct, and
 none of them is a block of `S` or a work block. The precondition also asks
-for `userautomproc`'s block `S.bUA` to be valid (it is emit_generator's
+for `userautomproc`'s block `S.bUA` to be valid and readable at offset 0 (it is emit_generator's
 function block, valid from the initial memory): a block a node allocates is
 then not `S.bUA`.
 
@@ -113,7 +113,8 @@ def nodeSpec {n : Nat} (xi : ExternalCalls) (NodeOk : Bool → Nat → Nat → S
       .Vint (ir numcells), .Vptr (tcParent chain level) Ptrofs.zero] ∧
     SearchAt m S ctx st first false ∧ TcChain m S.M Block.tcnode0 chain ∧ TcOk m S chain ∧
     level - 1 ≤ chain.length ∧ AutomCb xi S.bUA ∧ 1 ≤ level ∧ level ≤ n ∧ numcells ≤ n ∧
-    NodeOk first level numcells st ∧ Mem.valid_block m S.bUA
+    NodeOk first level numcells st ∧ Mem.valid_block m S.bUA ∧
+    Mem.perm m S.bUA (zOfInt 0) .Cur .Nonempty
   post _ m t v m' :=
     let r := hexNode first ctx level numcells st
     v = .Vint (ir (exitValue level r.1).1) ∧

@@ -41,7 +41,7 @@ theorem wp_nodeChild {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_en
     (h : SearchAt m S ctx st false false) (hTc : TcChain m S.M Block.tcnode0 chain)
     (hTo : TcOk m S chain) (hlen : level ≤ chain.length) (hcb : AutomCb xi S.bUA)
     (hln : level + 1 ≤ n) (hncl : nc + 1 ≤ n) (hok : NodeOk false (level + 1) (nc + 1) st)
-    (hvU : Mem.valid_block m S.bUA)
+    (hvU : Mem.valid_block m S.bUA) (hua : Mem.perm m S.bUA (zOfInt 0) .Cur .Nonempty)
     {bnc : block} (hen : PTree.get dense.id.numcells e = some (bnc, tint))
     (hncv : Mem.load .Mint32 m bnc (zOfInt 0) = some (.Vint (ir nc)))
     (hge : PTree.get dense.id.«nauty:othernode0» e = none)
@@ -73,7 +73,7 @@ theorem wp_nodeChild {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_en
       .Vint (ir ((nc + 1 : Nat) : Int)), .Vptr (tcParent chain (level + 1)) Ptrofs.zero])
     (.Internal dense.fn.«nauty:othernode0») _ hRec rfl ?_ ?_
     (by simp [Common.Globalenvs.Genv.find_funct, funct_othernodeFn]) rfl
-    ⟨rfl, h, hTc, hTo, by omega, hcb, by omega, hln, hncl, hok, hvU⟩ ?_
+    ⟨rfl, h, hTc, hTo, by omega, hcb, by omega, hln, hncl, hok, hvU, hua⟩ ?_
   · simp only [Exec.evalExpr, Exec.lvalOfVar, hge, find_othernodeFn, Exec.derefLoc,
       Cfrontend.Ctypes.access_mode]
   · simp only [Exec.evalExprlist, Exec.evalExpr, Exec.lvalOfVar, hen, hlab, hptn, hlev, htcn,
