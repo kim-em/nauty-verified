@@ -34,6 +34,7 @@ structure PCtx (m₀ m₁ : mem) (S : SLoc) (e : env) (bsr : block) : Prop where
   work10 : ∀ z, IsWork m₁ z → IsWork m₀ z
   esr : PTree.get dense.id.sr e = some (bsr, tint)
   eg : ∀ x, x ≠ dense.id.sr → PTree.get x e = none
+  eEq : e = PTree.set dense.id.sr (bsr, tint) empty_env
 
 /-- A point of `processnode`'s body. -/
 structure PAt {n : Nat} (m₀ m₁ m : mem) (S : SLoc) (ctx : Ctx n) (bsr : block) (st : Search n)
