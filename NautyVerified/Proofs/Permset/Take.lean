@@ -1,3 +1,4 @@
+import NautyVerified.Program.Env
 import NautyVerified.Proofs.Permset.Syntax
 import NautyVerified.Proofs.Nextelement.Tree
 import NautyVerified.Proofs.Set.Add
@@ -11,6 +12,9 @@ import NautyVerified.Proofs.Set.Add
 
 namespace NautyVerified.Proofs.Permset
 
+variable {ge : CompCert4Lean.Cfrontend.Clight.genv} [E : NautyVerified.Program.NautyEnv ge]
+set_option linter.unusedSectionVars false
+
 open CompCert4Lean CompCert4Lean.Cfrontend.Clight CompCert4Lean.Common.Globalenvs
 open CompCert4Lean.Common.Values CompCert4Lean.Common.ExternalCalls CompCert4Lean.Common.Events
 open CompCert4Lean.Common.Memory CompCert4Lean.Common.AST
@@ -22,7 +26,7 @@ open NautyVerified.Proofs.Nextelement (LeadBit LeftbitTable)
 variable {xi : ExternalCalls}
 
 /-- `bit[e]` for `e` holding `k < 64`. -/
-theorem eval_bitAt {e : env} {le : temp_env} {m : mem} (hbit : BitTable m Block.nautilBit)
+theorem eval_bitAt {e : env} {le : temp_env} {m : mem} (hbit : BitTable m E.nautilBit)
     (he : PTree.get Set.bit e = none) (a : expr) (k : Nat) (hk : k < 64)
     (ha : Exec.evalExpr ge e le m a = some (.Vint (ir k))) (hty : typeof a = tint) :
     Exec.evalExpr ge e le m (bitAt a) = some (.Vlong (lr ((2 ^ (63 - k) : Nat) : Int))) := by
@@ -32,7 +36,7 @@ theorem eval_bitAt {e : env} {le : temp_env} {m : mem} (hbit : BitTable m Block.
     apply addr_elem _ _ .Mint64 rfl (base := 0) (by decide) (by omega)
     have h8 : csize .Mint64 = 8 := rfl
     rw [h8]; omega
-  simp only [Exec.evalExpr, Exec.lvalOfVar, he, find_nautilBit, ha, hty]
+  simp only [Exec.evalExpr, Exec.lvalOfVar, he, E.find_nautilBit, ha, hty]
   simp only [typeof, cop, Exec.derefLoc, Cfrontend.Ctypes.access_mode]
   show Mem.load _ _ _ _ = _
   rw [hbaddr]; exact hbit k hk
@@ -45,7 +49,7 @@ theorem wp_takebit {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
     (t : Common.AST.ident) (ht2 : t ≠ id.setw) (x : Lib.Integers.int64)
     (hsw : PTree.get id.setw le = some (.Vlong x)) (hx : bv64 x ≠ 0)
     (he : PTree.get Nextelement.id.leftbit e = none) (hbe : PTree.get Set.bit e = none)
-    (hlb : LeftbitTable m) (hbit : BitTable m Block.nautilBit)
+    (hlb : LeftbitTable m) (hbit : BitTable m E.nautilBit)
     (hQ : ∀ k le', LeadBit (bv64 x) k → PTree.get id.setw le' = some (.Vlong (clearBit x k)) →
       PTree.get id.b le' = some (.Vint (ir k)) →
       (∀ y, y ≠ t → y ≠ id.b → y ≠ id.setw → PTree.get y le' = PTree.get y le) →

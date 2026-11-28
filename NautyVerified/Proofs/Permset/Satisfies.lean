@@ -1,3 +1,4 @@
+import NautyVerified.Program.Env
 import NautyVerified.Proofs.Permset.One
 import NautyVerified.Proofs.Nextelement.Satisfies
 
@@ -10,6 +11,9 @@ HexGraphIso's `s.permset perm`, changing only `set2`'s block.
 -/
 
 namespace NautyVerified.Proofs.Permset
+
+variable {ge : CompCert4Lean.Cfrontend.Clight.genv} [E : NautyVerified.Program.NautyEnv ge]
+set_option linter.unusedSectionVars false
 
 open CompCert4Lean CompCert4Lean.Cfrontend.Clight CompCert4Lean.Common.Globalenvs
 open CompCert4Lean.Common.Values CompCert4Lean.Common.ExternalCalls CompCert4Lean.Common.Events
@@ -28,8 +32,8 @@ def permsetSpec {n : Nat} (b1 : block) (o1 : ptrofs) (w1 : Nat → Lib.Integers.
     SetRep (fun w => bv64 (w1 w)) M s ∧
     ArrayAt m .Mint64 b2 (intOfZ (Ptrofs.unsigned o2)) v2 M ∧
     ArrayAt m .Mint32 bp (intOfZ (Ptrofs.unsigned po)) (ints perm) n ∧
-    (∀ u < n, perm[u]! < n) ∧ LeftbitTable m ∧ BitTable m Block.nautilBit ∧
-    b2 ≠ b1 ∧ b2 ≠ bp ∧ b2 ≠ Block.nautilBit ∧ b2 ≠ Block.leftbit ∧ 0 < M ∧ M < 33554432
+    (∀ u < n, perm[u]! < n) ∧ LeftbitTable m ∧ BitTable m E.nautilBit ∧
+    b2 ≠ b1 ∧ b2 ≠ bp ∧ b2 ≠ E.nautilBit ∧ b2 ≠ E.leftbit ∧ 0 < M ∧ M < 33554432
   post _ m t _ m' := t = E0 ∧ ∃ w2',
     ArrayAt m' .Mint64 b2 (intOfZ (Ptrofs.unsigned o2)) (longs w2') M ∧
     SetRep (fun w => bv64 (w2' w)) M (s.permset perm) ∧ Unch m m' (· = b2) ∧

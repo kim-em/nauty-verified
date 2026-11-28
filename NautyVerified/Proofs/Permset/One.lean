@@ -1,3 +1,4 @@
+import NautyVerified.Program.Env
 import NautyVerified.Proofs.Permset.Many
 
 /-!
@@ -9,6 +10,9 @@ representing HexGraphIso's `s.permset perm`.
 -/
 
 namespace NautyVerified.Proofs.Permset
+
+variable {ge : CompCert4Lean.Cfrontend.Clight.genv} [E : NautyVerified.Program.NautyEnv ge]
+set_option linter.unusedSectionVars false
 
 open CompCert4Lean CompCert4Lean.Cfrontend.Clight CompCert4Lean.Common.Globalenvs
 open CompCert4Lean.Common.Values CompCert4Lean.Common.ExternalCalls CompCert4Lean.Common.Events
@@ -29,7 +33,7 @@ theorem unsigned_elem0 (o : ptrofs) :
 /-- `*set2 = *set2 | bit[a]` for `a` holding `p < 64`. -/
 theorem wp_orWord0 {f : function} {Q : Post} {le : temp_env} {m : mem} {b2 : block} {o2 : ptrofs}
     {w2 : Nat → Lib.Integers.int64} (harr : ArrayAt m .Mint64 b2 (intOfZ (Ptrofs.unsigned o2)) (longs w2) 1)
-    (hs : PTree.get id.set2 le = some (.Vptr b2 o2)) (hbit : BitTable m Block.nautilBit)
+    (hs : PTree.get id.set2 le = some (.Vptr b2 o2)) (hbit : BitTable m E.nautilBit)
     (a : expr) (p : Nat) (hp : p < 64) (ha : Exec.evalExpr ge empty_env le m a = some (.Vint (ir p)))
     (hty : typeof a = tint)
     (hQ : ∀ m', ArrayAt m' .Mint64 b2 (intOfZ (Ptrofs.unsigned o2)) (longs (addW w2 p)) 1 →

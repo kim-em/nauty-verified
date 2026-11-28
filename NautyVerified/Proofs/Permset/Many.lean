@@ -1,3 +1,4 @@
+import NautyVerified.Program.Env
 import NautyVerified.Proofs.Permset.Word
 import NautyVerified.Proofs.Set.Clear
 
@@ -9,6 +10,9 @@ words of `set1` leaves `set2` representing HexGraphIso's `s.permset perm`.
 -/
 
 namespace NautyVerified.Proofs.Permset
+
+variable {ge : CompCert4Lean.Cfrontend.Clight.genv} [E : NautyVerified.Program.NautyEnv ge]
+set_option linter.unusedSectionVars false
 
 open CompCert4Lean CompCert4Lean.Cfrontend.Clight CompCert4Lean.Common.Globalenvs
 open CompCert4Lean.Common.Values CompCert4Lean.Common.ExternalCalls CompCert4Lean.Common.Events

@@ -113,7 +113,7 @@ theorem updatecan_satisfies {xi : ExternalCalls} {n : Nat} (bg : block) (gofs : 
     have hg1 : GraphAt m1 bg gofs gw grows M := ⟨hg.arr.unch hu1 og, hg.rep⟩
     have hlarr1 := hlarr.unch hu1 ol
     have hbit1 := hbit.unch hu1 obit
-    have hlb1 : LeftbitTable m1 := fun i hi => by rw [hu1.load _ _ _ olb]; exact hlb i hi
+    have hlb1 : LeftbitTable m1 := fun i hi => by erw [hu1.load _ _ _ olb]; exact hlb i hi
     have hw1 : ∃ vals, ArrayAt m1 .Mint32 b' 0 vals n := by
       by_cases hn0 : n = 0
       · subst hn0
@@ -163,7 +163,7 @@ theorem updatecan_satisfies {xi : ExternalCalls} {n : Nat} (bg : block) (gofs : 
             rcases hb' with ⟨_, hbb⟩ | hnv
             · exact (hb0 (by omega)).2.2.2.2 (hbb ▸ hh.symm)
             · exact hnv (hh ▸ hvlb)
-          rw [hu2.load _ _ _ hnS]
+          erw [hu2.load _ _ _ hnS]
           exact hlb1 i hi
         bit := hbit1.unch hu2 (fun ⟨h0, hh⟩ => by
             rcases hb' with ⟨_, hbb⟩ | hnv

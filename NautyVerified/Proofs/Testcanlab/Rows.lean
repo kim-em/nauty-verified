@@ -92,7 +92,7 @@ theorem Frame.unch {n : Nat} {m m' : mem} {le : temp_env} {bg : block} {gofs : p
       · exact h.warr.unch hu (Ne.symm (h.sW (by omega)))
     wptr := fun hn => by rw [hu.load _ _ _ (Ne.symm h.swp)]; exact h.wptr hn
     wsptr := by rw [hu.load _ _ _ (Ne.symm h.sws)]; exact h.wsptr
-    lb := fun i hi => by rw [hu.load _ _ _ (Ne.symm h.slb)]; exact h.lb i hi
+    lb := fun i hi => by erw [hu.load _ _ _ (Ne.symm h.slb)]; exact h.lb i hi
     bit := h.bit.unch hu (Ne.symm h.sbit) }
 
 theorem tclGo_range'_succ {n : Nat} (ctx : Ctx n) (canong : Array (VSet n)) (lab : Array Nat)

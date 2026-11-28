@@ -1,3 +1,4 @@
+import NautyVerified.Program.Env
 import NautyVerified.Proofs.Alloc.DynG
 import NautyVerified.Proofs.Alloc.Dyn3
 
@@ -16,6 +17,9 @@ pair's globals are protected.
 -/
 
 namespace NautyVerified.Proofs.Alloc
+
+variable {ge : CompCert4Lean.Cfrontend.Clight.genv} [E : NautyVerified.Program.NautyEnv ge]
+set_option linter.unusedSectionVars false
 
 open CompCert4Lean CompCert4Lean.Cfrontend.Clight CompCert4Lean.Common.Globalenvs
 open CompCert4Lean.Common.Values CompCert4Lean.Common.ExternalCalls CompCert4Lean.Common.Events
@@ -40,7 +44,7 @@ structure DynD where
   t2 : ident
 
 /-- The descriptors' facts about the program. -/
-structure DynD.Ok (d : DynD) : Prop where
+structure DynD.Ok [NautyVerified.Program.NautyEnv ge] (d : DynD) : Prop where
   gs : Genv.find_symbol ge.genv_genv d.gs = some d.bs
   gp : Genv.find_symbol ge.genv_genv d.gp = some d.bp
   c : intOfZ (Cfrontend.Ctypes.sizeof ge.genv_cenv d.elt) = d.c

@@ -1,3 +1,4 @@
+import NautyVerified.Program.Env
 import NautyVerified.Proofs.Alloc.KeepV
 import NautyVerified.Proofs.Fmptn.Scan
 import NautyVerified.Logic.Rest
@@ -11,6 +12,9 @@ a cell adds, as HexGraphIso's `cellStep`, the vertex of a trivial cell to
 -/
 
 namespace NautyVerified.Proofs.Fmptn
+
+variable {ge : CompCert4Lean.Cfrontend.Clight.genv} [E : NautyVerified.Program.NautyEnv ge]
+set_option linter.unusedSectionVars false
 
 open CompCert4Lean CompCert4Lean.Cfrontend.Clight CompCert4Lean.Common.Globalenvs
 open CompCert4Lean.Common.Values CompCert4Lean.Common.ExternalCalls CompCert4Lean.Common.Events
@@ -32,7 +36,7 @@ structure Sets (m : mem) (le : temp_env) (bf : block) (fofs : ptrofs) (bm : bloc
   marr : ArrayAt m .Mint64 bm (intOfZ (Ptrofs.unsigned mofs)) (longs wm) M
   frep : SetRep (fun w => bv64 (wf w)) M fx
   mrep : SetRep (fun w => bv64 (wm w)) M mc
-  bit : BitTable m Block.nautilBit
+  bit : BitTable m E.nautilBit
   Mlt : M < 2147483648
   nM : n ≤ 64 * M
 
@@ -43,8 +47,8 @@ structure Disjoint (bl bp bf bm : block) : Prop where
   fp : bf ≠ bp
   ml : bm ≠ bl
   mp : bm ≠ bp
-  bf : Block.nautilBit ≠ bf
-  bm : Block.nautilBit ≠ bm
+  bf : E.nautilBit ≠ bf
+  bm : E.nautilBit ≠ bm
 
 theorem Sets.temps {m : mem} {le le' : temp_env} {bf : block} {fofs : ptrofs} {bm : block}
     {mofs : ptrofs} {n M : Nat} {wf wm : Nat → Lib.Integers.int64} {fx mc : VSet n}

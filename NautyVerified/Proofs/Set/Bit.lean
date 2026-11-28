@@ -1,3 +1,4 @@
+import NautyVerified.Program.Env
 import NautyVerified.Proofs.Set.Elem
 
 /-!
@@ -11,6 +12,9 @@ afterwards (`addW`, `delW`); `setRep_del` relates `delW` to `VSet.erase`.
 -/
 
 namespace NautyVerified.Proofs.Set
+
+variable {ge : CompCert4Lean.Cfrontend.Clight.genv} [E : NautyVerified.Program.NautyEnv ge]
+set_option linter.unusedSectionVars false
 
 open CompCert4Lean CompCert4Lean.Cfrontend.Clight CompCert4Lean.Cfrontend.Ctypes
 open CompCert4Lean.Common.Globalenvs

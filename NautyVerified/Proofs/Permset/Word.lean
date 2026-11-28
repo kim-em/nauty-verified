@@ -1,3 +1,4 @@
+import NautyVerified.Program.Env
 import NautyVerified.Proofs.Permset.Take
 import NautyVerified.Logic.Ints
 
@@ -10,6 +11,9 @@ members `u` of `s` with `D u`. `wp_word`: the loop over the set bits of word
 -/
 
 namespace NautyVerified.Proofs.Permset
+
+variable {ge : CompCert4Lean.Cfrontend.Clight.genv} [E : NautyVerified.Program.NautyEnv ge]
+set_option linter.unusedSectionVars false
 
 open CompCert4Lean CompCert4Lean.Cfrontend.Clight CompCert4Lean.Common.Globalenvs
 open CompCert4Lean.Common.Values CompCert4Lean.Common.ExternalCalls CompCert4Lean.Common.Events
@@ -86,12 +90,12 @@ structure Frame {n : Nat} (m : mem) (le : temp_env) (b1 : block) (o1 : ptrofs)
   parr : ArrayAt m .Mint32 bp (intOfZ (Ptrofs.unsigned po)) (ints perm) n
   psmall : ∀ u < n, perm[u]! < n
   lb : LeftbitTable m
-  bit : BitTable m Block.nautilBit
+  bit : BitTable m E.nautilBit
   Mlt : M < 33554432
   b21 : b2 ≠ b1
   b2p : b2 ≠ bp
-  b2bit : b2 ≠ Block.nautilBit
-  b2lb : b2 ≠ Block.leftbit
+  b2bit : b2 ≠ E.nautilBit
+  b2lb : b2 ≠ E.leftbit
 
 theorem Frame.temps {n : Nat} {m : mem} {le le' : temp_env} {b1 : block} {o1 : ptrofs}
     {w1 : Nat → Lib.Integers.int64} {s : VSet n} {bp : block} {po : ptrofs} {perm : Array Nat}

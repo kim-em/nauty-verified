@@ -1,3 +1,4 @@
+import NautyVerified.Program.Env
 import NautyVerified.Proofs.Alloc.Malloc
 import NautyVerified.Logic.Wp
 import NautyVerified.Logic.Simp
@@ -12,6 +13,9 @@ import NautyVerified.Proofs.Nextelement.Satisfies
 -/
 
 namespace NautyVerified.Proofs.Alloc
+
+variable {ge : CompCert4Lean.Cfrontend.Clight.genv} [E : NautyVerified.Program.NautyEnv ge]
+set_option linter.unusedSectionVars false
 
 open CompCert4Lean CompCert4Lean.Cfrontend.Clight CompCert4Lean.Common.Globalenvs
 open CompCert4Lean.Common.Values CompCert4Lean.Common.ExternalCalls CompCert4Lean.Common.Events
@@ -210,10 +214,10 @@ theorem zalloc_satisfies (sz : Nat) :
     rw [dense.fn.nauty_zalloc.fn_body_eq, Z.body_eq]
     wp_step; wp_step; wp_step; wp_step
     refine wp_call _ (mallocSpec sz) (malloc_satisfies sz) rfl
-      (by simp [Exec.evalExpr, Exec.lvalOfVar, empty_env, find_malloc, Exec.derefLoc,
+      (by simp [Exec.evalExpr, Exec.lvalOfVar, empty_env, E.find_malloc, Exec.derefLoc,
         Cfrontend.Ctypes.access_mode]; rfl)
       (by simp (config := {decide := true}) [Exec.evalExprlist, Exec.evalExpr, le0, typeof, cop])
-      (by simp [Common.Globalenvs.Genv.find_funct, funct_malloc]) rfl ⟨rfl, by omega⟩ ?_
+      (by simp [Common.Globalenvs.Genv.find_funct, E.funct_malloc]) rfl ⟨rfl, by omega⟩ ?_
     rintro t v m1 ⟨rfl, b, rfl, hfr⟩
     simp only [set_opttemp, E0_append]
     apply wp_set_eval

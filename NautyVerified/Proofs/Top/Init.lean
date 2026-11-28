@@ -26,27 +26,12 @@ open NautyVerified.Source
 
 namespace Block
 def naugraphCheck : Common.Values.block := PArith.BinPos.Pos.of_nat 133
-def nautilCheck : Common.Values.block := PArith.BinPos.Pos.of_nat 217
-def nautilFreedyn : Common.Values.block := PArith.BinPos.Pos.of_nat 141
-def nautyFreedyn : Common.Values.block := PArith.BinPos.Pos.of_nat 183
 end Block
 
 kernel_rfl find_naugraphCheck :
   Genv.find_symbol ge.genv_genv dense.id.naugraph_check = some Block.naugraphCheck
-kernel_rfl find_nautilCheck :
-  Genv.find_symbol ge.genv_genv dense.id.nautil_check = some Block.nautilCheck
-kernel_rfl find_nautilFreedyn :
-  Genv.find_symbol ge.genv_genv dense.id.nautil_freedyn = some Block.nautilFreedyn
-kernel_rfl find_nautyFreedyn :
-  Genv.find_symbol ge.genv_genv dense.id.nauty_freedyn = some Block.nautyFreedyn
 kernel_rfl funct_naugraphCheck :
   Genv.find_funct_ptr ge.genv_genv Block.naugraphCheck = some (.Internal dense.fn.naugraph_check)
-kernel_rfl funct_nautilCheck :
-  Genv.find_funct_ptr ge.genv_genv Block.nautilCheck = some (.Internal dense.fn.nautil_check)
-kernel_rfl funct_nautilFreedyn :
-  Genv.find_funct_ptr ge.genv_genv Block.nautilFreedyn = some (.Internal dense.fn.nautil_freedyn)
-kernel_rfl funct_nautyFreedyn :
-  Genv.find_funct_ptr ge.genv_genv Block.nautyFreedyn = some (.Internal dense.fn.nauty_freedyn)
 
 /-- A function's block has `Nonempty` permission at offset 0 in the initial memory. -/
 theorem fnPerm {m : mem} (hm : Genv.init_mem prog = some m) {b : block} {f : Cfrontend.Clight.fundef}

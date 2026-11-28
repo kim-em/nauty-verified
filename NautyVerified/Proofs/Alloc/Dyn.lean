@@ -1,3 +1,4 @@
+import NautyVerified.Program.Env
 import NautyVerified.Proofs.Alloc.Zero
 import NautyVerified.Proofs.Alloc.Free
 
@@ -14,6 +15,9 @@ at least the size asked for.
 -/
 
 namespace NautyVerified.Proofs.Alloc
+
+variable {ge : CompCert4Lean.Cfrontend.Clight.genv} [E : NautyVerified.Program.NautyEnv ge]
+set_option linter.unusedSectionVars false
 
 open CompCert4Lean CompCert4Lean.Cfrontend.Clight CompCert4Lean.Common.Globalenvs
 open CompCert4Lean.Common.Values CompCert4Lean.Common.ExternalCalls CompCert4Lean.Common.Events
@@ -108,8 +112,8 @@ theorem valid_of_access {m : mem} {chunk : memory_chunk} {b : block} {ofs : Z} {
 variable {xi : ExternalCalls}
 
 /-- `e` binds no identifier that names a global, so reading a global through
-`e` finds the global. -/
-def NoShadow (e : env) : Prop :=
+`e` finds the global. (The instance argument fixes `ge`.) -/
+def NoShadow [NautyVerified.Program.NautyEnv ge] (e : env) : Prop :=
   ∀ i b, Genv.find_symbol ge.genv_genv i = some b → PTree.get i e = none
 
 theorem noShadow_empty : NoShadow empty_env := fun _ _ _ => rfl
@@ -146,7 +150,7 @@ theorem wp_freeOld {e : env} {f : function} {Q : Post} {le : temp_env} {m : mem}
         .Sskip)) Q e le m := by
   have hnil1 := hnil _ _ hgs
   have hnil2 := hnil _ _ hgp
-  have hnil3 := hnil _ _ find_free
+  have hnil3 := hnil _ _ E.find_free
   have hcap := hD.capLt
   wp_step; wp_step
   apply wp_if_eval
@@ -160,13 +164,13 @@ theorem wp_freeOld {e : env} {f : function} {Q : Post} {le : temp_env} {m : mem}
   · rw [ite_eq_left (by simp [h0])]
     have hpos : 0 < cap := by omega
     wp_step; wp_step
-    refine wp_call (vf := .Vptr Block.free Ptrofs.zero) _ (freeSpec b (c * cap)) (free_satisfies b _) rfl
-      (by simp [Exec.evalExpr, Exec.lvalOfVar, hnil1, hnil2, hnil3, find_free, Exec.derefLoc,
+    refine wp_call (vf := .Vptr E.free Ptrofs.zero) _ (freeSpec b (c * cap)) (free_satisfies b _) rfl
+      (by simp [Exec.evalExpr, Exec.lvalOfVar, hnil1, hnil2, hnil3, E.find_free, Exec.derefLoc,
         Cfrontend.Ctypes.access_mode])
       (by simp [Exec.evalExprlist, Exec.evalExpr, Exec.lvalOfVar, hnil1, hnil2, hnil3, hgp, Exec.derefLoc,
         Cfrontend.Ctypes.access_mode, Mem.loadv, Mptr_eq,
         show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl, hD.ptr hpos, typeof, cop])
-      (by simp [Common.Globalenvs.Genv.find_funct, funct_free]) rfl ⟨rfl, hD.mal hpos⟩ ?_
+      (by simp [Common.Globalenvs.Genv.find_funct, E.funct_free]) rfl ⟨rfl, hD.mal hpos⟩ ?_
     rintro t v m1 ⟨rfl, rfl, hu, hnb⟩
     exact hQ m1 (hu.mono fun z hz => ⟨hpos, hz⟩) hnb
 
@@ -189,7 +193,7 @@ theorem wp_dynalloc1' {e : env} {f : function} {Q : Post} {le : temp_env} {m : m
     Wp xi ge f (dynalloc1 gs gp elt szE t1 t2 msg msgLen) Q e le m := by
   have hnil1 := hnil _ _ hgs
   have hnil2 := hnil _ _ hgp
-  have hnil3 := hnil _ _ find_free
+  have hnil3 := hnil _ _ E.find_free
   wp_step; wp_step
   apply wp_if_eval
   simp only [Exec.evalExpr, hx, hty]
@@ -222,14 +226,14 @@ theorem wp_dynalloc1' {e : env} {f : function} {Q : Post} {le : temp_env} {m : m
       rw [show Cfrontend.Ctypes.sizeof ge.genv_cenv elt = zOfInt c by
         rw [← hc, zOfInt_intOfZ], vptrofs_lr]
     wp_step; wp_step; wp_step; wp_step; wp_step
-    refine wp_call (vf := .Vptr Block.zalloc Ptrofs.zero) (targs := [tulong]) (tres := tptr .Tvoid)
+    refine wp_call (vf := .Vptr E.zalloc Ptrofs.zero) (targs := [tulong]) (tres := tptr .Tvoid)
       (cc := Common.AST.cc_default) _ (zallocSpec (n * c)) (zalloc_satisfies _) rfl
-      (by simp [Exec.evalExpr, Exec.lvalOfVar, hnil1, hnil2, hnil3, hnil _ _ find_zalloc, find_zalloc, Exec.derefLoc,
+      (by simp [Exec.evalExpr, Exec.lvalOfVar, hnil1, hnil2, hnil3, hnil _ _ E.find_zalloc, E.find_zalloc, Exec.derefLoc,
         Cfrontend.Ctypes.access_mode])
       (by simp only [Exec.evalExprlist, Exec.evalExpr, hx, hty]
           simp [typeof, cop, hsz,
         cast_int_long_ir (a := n) ⟨by omega, by omega⟩, lr_mul])
-      (by simp [Common.Globalenvs.Genv.find_funct, funct_zalloc]) rfl
+      (by simp [Common.Globalenvs.Genv.find_funct, E.funct_zalloc]) rfl
       ⟨rfl, by rw [Nat.mul_comm]; exact hcn⟩ ?_
     rintro t v m3 ⟨rfl, b', rfl, hfr, -⟩
     simp only [set_opttemp, E0_append]

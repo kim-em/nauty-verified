@@ -1,3 +1,4 @@
+import NautyVerified.Program.Env
 import NautyVerified.Logic.Wp
 import NautyVerified.Logic.Simp
 import NautyVerified.Exec.Cop
@@ -12,6 +13,9 @@ casts do) to `c + lbv idx`.
 -/
 
 namespace NautyVerified.Proofs.Nextelement
+
+variable {ge : CompCert4Lean.Cfrontend.Clight.genv} [E : NautyVerified.Program.NautyEnv ge]
+set_option linter.unusedSectionVars false
 
 open CompCert4Lean CompCert4Lean.Cfrontend.Clight CompCert4Lean.Common.Globalenvs
 open CompCert4Lean.Common.Values CompCert4Lean.Common.ExternalCalls CompCert4Lean.Common.Events
@@ -32,7 +36,7 @@ theorem wp_leaf {f : function} {Q : Post} {e : env} {le : temp_env} {m} (r : Com
   repeat wp_step
   simp only [hidx, hty]
   simp (config := {decide := true}) [he, typeof, Exec.lvalOfVar, Exec.derefLoc,
-    find_leftbit, Cfrontend.Ctypes.access_mode, load_leftbit hlb _ y hy]
+    E.find_leftbit, Cfrontend.Ctypes.access_mode, load_leftbit hlb _ y hy]
   repeat wp_step
   simp (config := {decide := true}) [typeof]
   repeat wp_step

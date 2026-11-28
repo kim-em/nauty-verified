@@ -10,6 +10,8 @@ import NautyVerified.Word.BitVec
 import NautyVerified.Spec.VSet
 import NautyVerified.Exec.Cop
 import NautyVerified.Program.Dense
+import NautyVerified.Program.Env
+import NautyVerified.Program.Sparse
 import NautyVerified.Word.Machine
 import NautyVerified.Proofs.Nextelement.Leftbit
 import NautyVerified.Proofs.Nextelement.Syntax

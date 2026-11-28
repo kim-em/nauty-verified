@@ -1,3 +1,4 @@
+import NautyVerified.Program.Env
 import NautyVerified.Proofs.Orbjoin.Syntax
 import NautyVerified.Spec.Orbjoin
 import NautyVerified.Logic.Ints
@@ -15,6 +16,9 @@ root `chaseList` finds, and changes no other temporary.
 -/
 
 namespace NautyVerified.Proofs.Orbjoin
+
+variable {ge : CompCert4Lean.Cfrontend.Clight.genv} [E : NautyVerified.Program.NautyEnv ge]
+set_option linter.unusedSectionVars false
 
 open CompCert4Lean CompCert4Lean.Cfrontend.Clight CompCert4Lean.Common.Globalenvs
 open CompCert4Lean.Common.Values CompCert4Lean.Common.ExternalCalls CompCert4Lean.Common.Events

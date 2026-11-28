@@ -1,3 +1,4 @@
+import NautyVerified.Program.Env
 import NautyVerified.Proofs.Set.Add
 import NautyVerified.Proofs.Alloc.Global
 
@@ -14,6 +15,9 @@ distinct from it; besides `Unch` and `Outside` they give `Keep` for `ba`, so a
 -/
 
 namespace NautyVerified.Proofs.Set
+
+variable {ge : CompCert4Lean.Cfrontend.Clight.genv} [E : NautyVerified.Program.NautyEnv ge]
+set_option linter.unusedSectionVars false
 
 open CompCert4Lean CompCert4Lean.Cfrontend.Clight CompCert4Lean.Cfrontend.Ctypes
 open CompCert4Lean.Common.Globalenvs

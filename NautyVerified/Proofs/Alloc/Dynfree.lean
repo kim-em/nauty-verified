@@ -1,3 +1,4 @@
+import NautyVerified.Program.Env
 import NautyVerified.Proofs.Alloc.Keep
 
 /-!
@@ -10,6 +11,9 @@ with a `NULL` pointer, and only the two globals and the old block change.
 -/
 
 namespace NautyVerified.Proofs.Alloc
+
+variable {ge : CompCert4Lean.Cfrontend.Clight.genv} [E : NautyVerified.Program.NautyEnv ge]
+set_option linter.unusedSectionVars false
 
 open CompCert4Lean CompCert4Lean.Cfrontend.Clight CompCert4Lean.Common.Globalenvs
 open CompCert4Lean.Common.Values CompCert4Lean.Common.ExternalCalls CompCert4Lean.Common.Events
@@ -99,7 +103,7 @@ theorem wp_dynfree {e : env} {f : function} {Q : Post} {le : temp_env} {m : mem}
     Wp xi ge f (dynfree gp gs elt) Q e le m := by
   have hnil1 := hnil _ _ hgs
   have hnil2 := hnil _ _ hgp
-  have hnil3 := hnil _ _ find_free
+  have hnil3 := hnil _ _ E.find_free
   wp_step; wp_step; wp_step
   apply wp_if_eval
   simp only [Exec.evalExpr, Exec.lvalOfVar, hnil2, hgp, Exec.derefLoc,
@@ -125,13 +129,13 @@ theorem wp_dynfree {e : env} {f : function} {Q : Post} {le : temp_env} {m : mem}
     rw [hD.ptr hpos]
     simp only [cop, show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl, hwv, ite_true]
     wp_step; wp_step
-    refine wp_call (vf := .Vptr Block.free Ptrofs.zero) _ (freeSpec b (c * cap)) (free_satisfies b _) rfl
-      (by simp [Exec.evalExpr, Exec.lvalOfVar, hnil1, hnil2, hnil3, find_free, Exec.derefLoc,
+    refine wp_call (vf := .Vptr E.free Ptrofs.zero) _ (freeSpec b (c * cap)) (free_satisfies b _) rfl
+      (by simp [Exec.evalExpr, Exec.lvalOfVar, hnil1, hnil2, hnil3, E.find_free, Exec.derefLoc,
         Cfrontend.Ctypes.access_mode])
       (by simp [Exec.evalExprlist, Exec.evalExpr, Exec.lvalOfVar, hnil1, hnil2, hnil3, hgp, Exec.derefLoc,
         Cfrontend.Ctypes.access_mode, Mem.loadv, Mptr_eq,
         show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl, hD.ptr hpos, typeof, cop])
-      (by simp [Common.Globalenvs.Genv.find_funct, funct_free]) rfl ⟨rfl, hmal⟩ ?_
+      (by simp [Common.Globalenvs.Genv.find_funct, E.funct_free]) rfl ⟨rfl, hmal⟩ ?_
     rintro t v m1 ⟨rfl, rfl, hu, hnb⟩
     simp only [seqPost, Post.after, E0_append, set_opttemp]
     have hbs' : ¬ bs = b := fun h => (hD.bne hpos).1 h.symm
@@ -164,7 +168,7 @@ def FreeD.globals (ds : List FreeD) : List block := ds.flatMap fun d => [d.bs, d
 
 /-- What a run of `DYNFREE`s needs: the globals' symbols and `DynAt`, the
 globals distinct, and the allocated blocks distinct and apart from the globals. -/
-structure FreeD.Ok (m : mem) (ds : List FreeD) : Prop where
+structure FreeD.Ok [NautyVerified.Program.NautyEnv ge] (m : mem) (ds : List FreeD) : Prop where
   sym : ∀ d ∈ ds, Genv.find_symbol ge.genv_genv d.gs = some d.bs ∧
     Genv.find_symbol ge.genv_genv d.gp = some d.bp
   dyn : ∀ d ∈ ds, DynAt m d.bp d.bs d.c d.cap d.blk

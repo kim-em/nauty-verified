@@ -202,3 +202,30 @@ kernel_rfl funct_permsetFn :
   Genv.find_funct_ptr ge.genv_genv Block.permsetFn = some (.Internal dense.fn.«permset»)
 
 end NautyVerified.Proofs.Search
+
+namespace NautyVerified.Proofs.Top
+
+open CompCert4Lean CompCert4Lean.Cfrontend.Clight CompCert4Lean.Common.Globalenvs
+open CompCert4Lean.Foundation.Numbers.Rocq.Coq
+open NautyVerified.Program NautyVerified.Source
+
+namespace Block
+def nautilCheck : Common.Values.block := PArith.BinPos.Pos.of_nat 217
+def nautilFreedyn : Common.Values.block := PArith.BinPos.Pos.of_nat 141
+def nautyFreedyn : Common.Values.block := PArith.BinPos.Pos.of_nat 183
+end Block
+
+kernel_rfl find_nautilCheck :
+  Genv.find_symbol ge.genv_genv dense.id.nautil_check = some Block.nautilCheck
+kernel_rfl funct_nautilCheck :
+  Genv.find_funct_ptr ge.genv_genv Block.nautilCheck = some (.Internal dense.fn.nautil_check)
+kernel_rfl find_nautilFreedyn :
+  Genv.find_symbol ge.genv_genv dense.id.nautil_freedyn = some Block.nautilFreedyn
+kernel_rfl funct_nautilFreedyn :
+  Genv.find_funct_ptr ge.genv_genv Block.nautilFreedyn = some (.Internal dense.fn.nautil_freedyn)
+kernel_rfl find_nautyFreedyn :
+  Genv.find_symbol ge.genv_genv dense.id.nauty_freedyn = some Block.nautyFreedyn
+kernel_rfl funct_nautyFreedyn :
+  Genv.find_funct_ptr ge.genv_genv Block.nautyFreedyn = some (.Internal dense.fn.nauty_freedyn)
+
+end NautyVerified.Proofs.Top

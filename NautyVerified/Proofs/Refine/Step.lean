@@ -32,7 +32,7 @@ variable {xi : ExternalCalls}
 
 theorem LeftbitTable.unch {m m' : mem} {S : block → Prop} (h : Nextelement.LeftbitTable m)
     (hu : Unch m m' S) (hb : ¬ S Block.leftbit) : Nextelement.LeftbitTable m' := fun i hi => by
-  rw [hu.load _ _ _ hb]; exact h i hi
+  erw [hu.load _ _ _ hb]; exact h i hi
 
 theorem BytecountTable.unch {m m' : mem} {S : block → Prop} (h : Init.BytecountTable m)
     (hu : Unch m m' S) (hb : ¬ S Block.naugraphBytecount) : Init.BytecountTable m' := fun i hi => by

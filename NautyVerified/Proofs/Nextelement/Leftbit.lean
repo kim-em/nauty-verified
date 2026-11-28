@@ -1,3 +1,4 @@
+import NautyVerified.Program.Env
 import NautyVerified.Word.Machine
 import NautyVerified.Program.Dense
 import NautyVerified.Proofs.Nextelement.Bits
@@ -13,6 +14,9 @@ index below 256.
 
 namespace NautyVerified.Proofs.Nextelement
 
+variable {ge : CompCert4Lean.Cfrontend.Clight.genv} [E : NautyVerified.Program.NautyEnv ge]
+set_option linter.unusedSectionVars false
+
 open CompCert4Lean CompCert4Lean.Common.Values CompCert4Lean.Common.Memory CompCert4Lean.Common.AST
 open CompCert4Lean.Foundation.Numbers.Rocq.Coq
 open CompCert4Lean.Lib.Integers
@@ -20,7 +24,7 @@ open NautyVerified.Word NautyVerified.Program
 
 /-- nauty's `leftbit` table, as it is in memory `m`. -/
 def LeftbitTable (m : mem) : Prop :=
-  ∀ i : Nat, i < 256 → Mem.load .Mint32 m Block.leftbit (zOfInt (4 * (i : Int))) =
+  ∀ i : Nat, i < 256 → Mem.load .Mint32 m E.leftbit (zOfInt (4 * (i : Int))) =
     some (.Vint (Lib.Integers.Int.repr (zOfInt (lbv i))))
 
 theorem ofs_leftbit (ce : Cfrontend.Ctypes.composite_env) (y : Lib.Integers.int64)
@@ -42,7 +46,7 @@ theorem ofs_leftbit (ce : Cfrontend.Ctypes.composite_env) (y : Lib.Integers.int6
 
 theorem load_leftbit {m : mem} (h : LeftbitTable m) (ce : Cfrontend.Ctypes.composite_env)
     (y : Lib.Integers.int64) (hy : (bv64 y).toNat < 256) :
-    Mem.loadv .Mint32 m (.Vptr Block.leftbit (Ptrofs.add Ptrofs.zero
+    Mem.loadv .Mint32 m (.Vptr E.leftbit (Ptrofs.add Ptrofs.zero
       (Ptrofs.mul (Ptrofs.repr (Cfrontend.Ctypes.sizeof ce (.Tint .I32 .Signed
         { attr_volatile := false, attr_alignas := none }))) (Ptrofs.of_int64 y)))) =
       some (.Vint (Lib.Integers.Int.repr (zOfInt (lbv (bv64 y).toNat)))) := by

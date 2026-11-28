@@ -1,3 +1,4 @@
+import NautyVerified.Program.Env
 import NautyVerified.Proofs.Fmptn.Loop
 import NautyVerified.Proofs.Nextelement.Satisfies
 
@@ -12,6 +13,9 @@ changes only the two set blocks and emits no events.
 -/
 
 namespace NautyVerified.Proofs.Fmptn
+
+variable {ge : CompCert4Lean.Cfrontend.Clight.genv} [E : NautyVerified.Program.NautyEnv ge]
+set_option linter.unusedSectionVars false
 
 open CompCert4Lean CompCert4Lean.Cfrontend.Clight CompCert4Lean.Common.Globalenvs
 open CompCert4Lean.Common.Values CompCert4Lean.Common.ExternalCalls CompCert4Lean.Common.Events
@@ -31,7 +35,7 @@ def fmptnSpec (bl : block) (lofs : ptrofs) (bp : block) (pofs : ptrofs) (bf : bl
     ArrayAt m .Mint32 bp (intOfZ (Ptrofs.unsigned pofs)) (ints ptn) n ∧
     ArrayAt m .Mint64 bf (intOfZ (Ptrofs.unsigned fofs)) (longs wf) M ∧
     ArrayAt m .Mint64 bm (intOfZ (Ptrofs.unsigned mofs)) (longs wm) M ∧
-    BitTable m Block.nautilBit ∧ Disjoint bl bp bf bm ∧
+    BitTable m E.nautilBit ∧ Disjoint bl bp bf bm ∧
     Apart bf (intOfZ (Ptrofs.unsigned fofs)) bm (intOfZ (Ptrofs.unsigned mofs)) M ∧
     ptn.size = n ∧ (∀ x < n, lab[x]! < n) ∧ (∀ x < n, ptn[x]! < 2147483648) ∧
     ptn[n - 1]! ≤ level ∧

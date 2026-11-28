@@ -265,7 +265,7 @@ theorem testcanlab_satisfies {xi : ExternalCalls} {n : Nat} (bg : block) (gofs :
         wsmall := Updatecan.invPerm_small lab n hlsz
         wptr := fun hn0 => by rw [hu3.load _ _ _ nWP]; exact hDP2.ptr (by omega)
         wsptr := by rw [hu3.load _ _ _ nWS]; exact hDS'.ptr hcS0
-        lb := fun i hi => by rw [hl3 _ _ _ bLb nLb]; exact hlb i hi
+        lb := fun i hi => by erw [hl3 _ _ _ bLb nLb]; exact hlb i hi
         bit := fun i hi => by rw [hl3 _ _ _ bBit nBit]; exact hbit i hi
         sg := hS.1, sc := hS.2.1, sl := hS.2.2.1
         sW := hS.2.2.2.2.2.2.2

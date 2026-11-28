@@ -5,8 +5,8 @@ import NautyVerified.Proofs.Search.Spec
 
 `sep_ne hd`: closes `a ≠ b` for two entries of a pairwise-distinct block list
 (`hd : l.Pairwise (· ≠ ·)`, `l` unfolding to a list literal), by locating
-both and applying `pw_ne`; constants that are not in the list are compared by
-`decide`.
+both and applying `pw_ne`; blocks that are not in the list are compared by `env_ne` (two blocks
+of the `NautyEnv`) or `decide`.
 
 `FieldAt.unch` and the component lemmas move each part of `SearchAt` across an
 `Unch m m' W` whose blocks avoid that part's block.
@@ -46,7 +46,7 @@ elab "sep_ne " hd:term : tactic => withMainContext do
   let es ← listEntries l
   let idx (x : Expr) : MetaM (Option Nat) := do
     for i in [0:es.size] do
-      if ← withReducible (isDefEq es[i]! x) then return some i
+      if ← withReducibleAndInstances (isDefEq es[i]! x) then return some i
     return none
   match ← idx a, ← idx b with
   | some i, some j =>
@@ -57,7 +57,7 @@ elab "sep_ne " hd:term : tactic => withMainContext do
       evalTactic (← `(tactic| exact Ne.symm (NautyVerified.Proofs.Refine.pw_ne $hd $(Syntax.mkNumLit (toString j))
         $(Syntax.mkNumLit (toString i)) (by decide) (by simp [SLoc.blocks]))))
     else throwError "sep_ne: both sides are entry {i}"
-  | _, _ => evalTactic (← `(tactic| decide))
+  | _, _ => evalTactic (← `(tactic| first | env_ne | decide))
 
 theorem pw_ne {l : List block} (h : l.Pairwise (· ≠ ·)) (i j : Nat) (hij : i < j)
     (hj : j < l.length) : l[i]'(Nat.lt_trans hij hj) ≠ l[j] :=

@@ -1,3 +1,4 @@
+import NautyVerified.Program.Env
 import NautyVerified.Proofs.Fmperm.Loop
 import NautyVerified.Proofs.Nextelement.Satisfies
 
@@ -12,6 +13,9 @@ replace nautil.c's `workperm` array (`DynAt`); nothing else changes.
 
 namespace NautyVerified.Proofs.Fmperm
 
+variable {ge : CompCert4Lean.Cfrontend.Clight.genv} [E : NautyVerified.Program.NautyEnv ge]
+set_option linter.unusedSectionVars false
+
 open CompCert4Lean CompCert4Lean.Cfrontend.Clight CompCert4Lean.Common.Globalenvs
 open CompCert4Lean.Common.Values CompCert4Lean.Common.ExternalCalls CompCert4Lean.Common.Events
 open CompCert4Lean.Common.Memory CompCert4Lean.Common.AST
@@ -23,8 +27,8 @@ open NautyVerified.Proofs.Alloc (DynAt)
 open Hex.GraphIso.Nauty (VSet)
 
 /-- The blocks nautil.c's `workperm` pair occupies. -/
-abbrev WP := Block.nautilWorkperm
-abbrev WPS := Block.nautilWorkpermSz
+abbrev WP := E.nautilWorkperm
+abbrev WPS := E.nautilWorkpermSz
 
 /-- The specification of `fmperm`. -/
 def fmpermSpec (bpm : block) (pofs : ptrofs) (bf : block) (fofs : ptrofs) (bm : block)
@@ -34,12 +38,12 @@ def fmpermSpec (bpm : block) (pofs : ptrofs) (bf : block) (fofs : ptrofs) (bm : 
     ArrayAt m .Mint32 bpm (intOfZ (Ptrofs.unsigned pofs)) (ints perm) n ∧
     ArrayAt m .Mint64 bf (intOfZ (Ptrofs.unsigned fofs)) (longs wf) M ∧
     ArrayAt m .Mint64 bm (intOfZ (Ptrofs.unsigned mofs)) (longs wm) M ∧
-    BitTable m Block.nautilBit ∧ DynAt m WP WPS 4 cap b0 ∧
+    BitTable m E.nautilBit ∧ DynAt m WP WPS 4 cap b0 ∧
     Mem.valid_block m bpm ∧ Mem.valid_block m bf ∧ Mem.valid_block m bm ∧
     Apart bf (intOfZ (Ptrofs.unsigned fofs)) bm (intOfZ (Ptrofs.unsigned mofs)) M ∧
     bf ≠ bpm ∧ bm ≠ bpm ∧
-    (∀ z, z = WP ∨ z = WPS ∨ z = Block.nautilBit → z ≠ bpm ∧ z ≠ bf ∧ z ≠ bm) ∧
-    (0 < cap → b0 ≠ bpm ∧ b0 ≠ bf ∧ b0 ≠ bm ∧ b0 ≠ Block.nautilBit) ∧
+    (∀ z, z = WP ∨ z = WPS ∨ z = E.nautilBit → z ≠ bpm ∧ z ≠ bf ∧ z ≠ bm) ∧
+    (0 < cap → b0 ≠ bpm ∧ b0 ≠ bf ∧ b0 ≠ bm ∧ b0 ≠ E.nautilBit) ∧
     perm.size = n ∧ (∀ x, x < n → perm[x]! < n) ∧
     (∀ x y, x < n → y < n → perm[x]! = perm[y]! → x = y) ∧
     n < 2147483648 ∧ 0 < M ∧ M < 2147483648 ∧ n ≤ 64 * M
@@ -83,7 +87,7 @@ theorem fmperm_satisfies {xi : ExternalCalls} (bpm : block) (pofs : ptrofs) (bf 
     have hnil : ∀ i, PTree.get i (empty_env : env) = none := fun _ => rfl
     have hc4 : 4 * n < 2 ^ 62 := by omega
     wp_step
-    refine Alloc.wp_dynalloc1 find_nautilWorkpermSz find_nautilWorkperm rfl hD
+    refine Alloc.wp_dynalloc1 E.find_nautilWorkpermSz E.find_nautilWorkperm rfl hD
       (by simp (config := {decide := true}) only [entryTemps, temps_gss]) hn hc4 ?_
     intro le1 m1 cap' b' hD' hcap hu1 hb' _ ho1
     -- the caller's blocks are outside what `DYNALLOC1` changed
@@ -96,12 +100,12 @@ theorem fmperm_satisfies {xi : ExternalCalls} (bpm : block) (pofs : ptrofs) (bf 
       · exact hb hv
     have hgWP := hglob WP (.inl rfl)
     have hgWPS := hglob WPS (.inr (.inl rfl))
-    have hgBit := hglob Block.nautilBit (.inr (.inr rfl))
-    have hbitv : Mem.valid_block m Block.nautilBit := by
+    have hgBit := hglob E.nautilBit (.inr (.inr rfl))
+    have hbitv : Mem.valid_block m E.nautilBit := by
       obtain h0 := hbit 0 (by decide)
       exact Alloc.valid_of_access (Mem.load_valid_access _ _ _ _ _ h0)
-    have hbit_out := hout _ hbitv (by decide) (by decide) (fun ⟨h1, h2⟩ => (hb0 h1).2.2.2 h2.symm)
-    have hbD : 0 < cap' → b' ≠ bpm ∧ b' ≠ bf ∧ b' ≠ bm ∧ b' ≠ Block.nautilBit := by
+    have hbit_out := hout _ hbitv (by env_ne) (by env_ne) (fun ⟨h1, h2⟩ => (hb0 h1).2.2.2 h2.symm)
+    have hbD : 0 < cap' → b' ≠ bpm ∧ b' ≠ bf ∧ b' ≠ bm ∧ b' ≠ E.nautilBit := by
       intro hc0
       rcases hb' with ⟨hcc, rfl⟩ | hnv
       · exact hb0 (by omega)

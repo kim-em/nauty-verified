@@ -1,3 +1,4 @@
+import NautyVerified.Program.Env
 import NautyVerified.Proofs.Set.Clear
 import NautyVerified.Spec.Setwords
 
@@ -11,6 +12,9 @@ holding `c`, sets bit `c` of the set `s`, reading nautil.c's `bit` table.
 -/
 
 namespace NautyVerified.Proofs.Set
+
+variable {ge : CompCert4Lean.Cfrontend.Clight.genv} [E : NautyVerified.Program.NautyEnv ge]
+set_option linter.unusedSectionVars false
 
 open CompCert4Lean CompCert4Lean.Cfrontend.Clight CompCert4Lean.Common.Globalenvs
 open CompCert4Lean.Common.Values CompCert4Lean.Common.ExternalCalls CompCert4Lean.Common.Events
@@ -72,7 +76,7 @@ theorem wp_addElement' {s : Common.AST.ident} {a : expr} {f : function} {Q : Pos
     (harr : ArrayAt m .Mint64 ba (intOfZ (Ptrofs.unsigned ofs)) (longs ws) M)
     (hM : M < 2147483648) (hact : PTree.get s le = some (.Vptr ba ofs))
     (htc : Exec.evalExpr ge e le m a = some (.Vint (ir c))) (hty : typeof a = tint) (hc : c < 64 * M) (hc2 : c < 2147483648)
-    (hbit : BitTable m Block.nautilBit) (he : PTree.get bit e = none)
+    (hbit : BitTable m E.nautilBit) (he : PTree.get bit e = none)
     (hQ : ∀ m', ArrayAt m' .Mint64 ba (intOfZ (Ptrofs.unsigned ofs))
         (longs (addW ws c)) M →
       Unch m m' (· = ba) →
@@ -97,12 +101,12 @@ theorem wp_addElement' {s : Common.AST.ident} {a : expr} {f : function} {Q : Pos
   simp only [addElement, setWord, sk]
   wp_step; wp_step
   apply wp_assign_eval
-  simp only [Exec.evalLvalue, Exec.evalExpr, Exec.lvalOfVar, hact, htc, hty, he, find_nautilBit]
+  simp only [Exec.evalLvalue, Exec.evalExpr, Exec.lvalOfVar, hact, htc, hty, he, E.find_nautilBit]
   simp only [typeof, cop, h6, hshr, hand, ite_true]
   simp only [Exec.derefLoc, Cfrontend.Ctypes.access_mode, Exec.assignLoc]
   simp only [cop]
   have hl1 := load_array harr hw (addr_word harr hw hM)
-  have hl2 : Mem.loadv .Mint64 m (.Vptr Block.nautilBit (Ptrofs.add Ptrofs.zero (Ptrofs.mul
+  have hl2 : Mem.loadv .Mint64 m (.Vptr E.nautilBit (Ptrofs.add Ptrofs.zero (Ptrofs.mul
       (Ptrofs.repr (Cfrontend.Ctypes.sizeof ge.genv_cenv tulong))
       (Ptrofs.of_ints (ir ((c % 64 : Nat) : Int)))))) =
       some (.Vlong (lr ((2 ^ (63 - c % 64) : Nat) : Int))) := by
@@ -122,7 +126,7 @@ theorem wp_addElement {s : Common.AST.ident} {a : expr} {f : function} {Q : Post
     (hM : M < 2147483648) (hact : PTree.get s le = some (.Vptr ba ofs))
     (htc : Exec.evalExpr ge e le m a = some (.Vint (ir c))) (hty : typeof a = tint) (hc : c < 64 * M)
     (hc2 : c < 2147483648)
-    (hbit : BitTable m Block.nautilBit) (he : PTree.get bit e = none)
+    (hbit : BitTable m E.nautilBit) (he : PTree.get bit e = none)
     (hQ : ∀ m', ArrayAt m' .Mint64 ba (intOfZ (Ptrofs.unsigned ofs))
         (longs (addW ws c)) M →
       Unch m m' (· = ba) → Q.normal E0 e le m') :

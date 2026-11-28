@@ -1,3 +1,4 @@
+import NautyVerified.Program.Env
 import NautyVerified.Proofs.Orbjoin.Loops
 import NautyVerified.Proofs.Nextelement.Satisfies
 
@@ -12,6 +13,9 @@ outside the `orbits` block, and emits no events.
 -/
 
 namespace NautyVerified.Proofs.Orbjoin
+
+variable {ge : CompCert4Lean.Cfrontend.Clight.genv} [E : NautyVerified.Program.NautyEnv ge]
+set_option linter.unusedSectionVars false
 
 open CompCert4Lean CompCert4Lean.Cfrontend.Clight CompCert4Lean.Common.Globalenvs
 open CompCert4Lean.Common.Values CompCert4Lean.Common.ExternalCalls CompCert4Lean.Common.Events

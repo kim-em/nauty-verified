@@ -78,7 +78,7 @@ theorem Frame.unch {n : Nat} {m m' : mem} {le : temp_env} {bg : block} {gofs : p
       · subst hn; exact ⟨Int.le_refl _, by decide, fun _ h => absurd h (by omega), fun _ h => absurd h (by omega)⟩
       · exact h.warr.unch hu (Ne.symm (h.cW (by omega)))
     wptr := fun hn => by rw [hu.load _ _ _ (Ne.symm h.cwp)]; exact h.wptr hn
-    lb := fun i hi => by rw [hu.load _ _ _ (Ne.symm h.clb)]; exact h.lb i hi
+    lb := fun i hi => by erw [hu.load _ _ _ (Ne.symm h.clb)]; exact h.lb i hi
     bit := h.bit.unch hu (Ne.symm h.cbit) }
 
 theorem type_permset :

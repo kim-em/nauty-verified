@@ -1,3 +1,4 @@
+import NautyVerified.Program.Env
 import NautyVerified.Proofs.Set.Syntax
 import NautyVerified.Logic.PtrArith
 import NautyVerified.Logic.Wp
@@ -12,6 +13,9 @@ changing only its block and the temporaries `es` and `tmp`.
 -/
 
 namespace NautyVerified.Proofs.Set
+
+variable {ge : CompCert4Lean.Cfrontend.Clight.genv} [E : NautyVerified.Program.NautyEnv ge]
+set_option linter.unusedSectionVars false
 
 open CompCert4Lean CompCert4Lean.Cfrontend.Clight CompCert4Lean.Common.Globalenvs
 open CompCert4Lean.Common.Values CompCert4Lean.Common.ExternalCalls CompCert4Lean.Common.Events

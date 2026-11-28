@@ -1,3 +1,4 @@
+import NautyVerified.Program.Env
 import NautyVerified.Proofs.Alloc.KeepV
 import NautyVerified.Proofs.Breakout.Rotate
 import NautyVerified.Proofs.Nextelement.Satisfies
@@ -17,6 +18,9 @@ and emits no events. It reads nautil.c's `bit` table.
 
 namespace NautyVerified.Proofs.Breakout
 
+variable {ge : CompCert4Lean.Cfrontend.Clight.genv} [E : NautyVerified.Program.NautyEnv ge]
+set_option linter.unusedSectionVars false
+
 open CompCert4Lean CompCert4Lean.Cfrontend.Clight CompCert4Lean.Common.Globalenvs
 open CompCert4Lean.Common.Values CompCert4Lean.Common.ExternalCalls CompCert4Lean.Common.Events
 open CompCert4Lean.Common.Memory CompCert4Lean.Common.AST
@@ -32,8 +36,8 @@ def breakoutSpec (bl : block) (lofs : ptrofs) (bp : block) (pofs : ptrofs) (ba :
     ArrayAt m .Mint32 bl (intOfZ (Ptrofs.unsigned lofs)) (ints lab) n ∧
     ArrayAt m .Mint32 bp (intOfZ (Ptrofs.unsigned pofs)) (ints ptn) n ∧
     ArrayAt m .Mint64 ba (intOfZ (Ptrofs.unsigned aofs)) (Set.longs ws) M ∧
-    Set.BitTable m Block.nautilBit ∧
-    bl ≠ bp ∧ bl ≠ ba ∧ bp ≠ ba ∧ Block.nautilBit ≠ ba ∧
+    Set.BitTable m E.nautilBit ∧
+    bl ≠ bp ∧ bl ≠ ba ∧ bp ≠ ba ∧ E.nautilBit ≠ ba ∧
     lab.size = n ∧ ptn.size = n ∧ (∀ x < n, lab[x]! < n) ∧
     (∃ j, tc ≤ j ∧ j < n ∧ lab[j]! = tv) ∧
     n < 2147483648 ∧ level < 2147483648 ∧ 0 < M ∧ M < 2147483648 ∧ n ≤ 64 * M

@@ -1,3 +1,4 @@
+import NautyVerified.Program.Env
 import NautyVerified.Proofs.Fmperm.Clear
 import NautyVerified.Proofs.Set.Add
 import NautyVerified.Spec.Fmperm
@@ -12,6 +13,9 @@ started at `l = i` marks the cycle of `i` exactly as HexGraphIso's `mark`.
 -/
 
 namespace NautyVerified.Proofs.Fmperm
+
+variable {ge : CompCert4Lean.Cfrontend.Clight.genv} [E : NautyVerified.Program.NautyEnv ge]
+set_option linter.unusedSectionVars false
 
 open CompCert4Lean CompCert4Lean.Cfrontend.Clight CompCert4Lean.Common.Globalenvs
 open CompCert4Lean.Common.Values CompCert4Lean.Common.ExternalCalls CompCert4Lean.Common.Events
@@ -45,13 +49,13 @@ structure Frame (m : mem) (le : temp_env) (bpm : block) (pofs : ptrofs) (b : blo
   hperm : PTree.get id.perm le = some (.Vptr bpm pofs)
   hn : PTree.get id.n le = some (.Vint (ir n))
   parr : ArrayAt m .Mint32 bpm (intOfZ (Ptrofs.unsigned pofs)) (ints perm) n
-  wpPtr : 0 < n → Mem.load .Mint64 m Block.nautilWorkperm (zOfInt 0) = some (.Vptr b Ptrofs.zero)
+  wpPtr : 0 < n → Mem.load .Mint64 m E.nautilWorkperm (zOfInt 0) = some (.Vptr b Ptrofs.zero)
   psize : perm.size = n
   psmall : ∀ x, x < n → perm[x]! < n
   pinj : ∀ x y, x < n → y < n → perm[x]! = perm[y]! → x = y
   nlt : n < 2147483648
   bpm_b : 0 < n → bpm ≠ b
-  wp_b : 0 < n → Block.nautilWorkperm ≠ b
+  wp_b : 0 < n → E.nautilWorkperm ≠ b
 
 /-- The `do … while` loop of the cycle walk. -/
 abbrev walk : statement :=
@@ -113,7 +117,7 @@ theorem wp_walk {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {b
     rw [hpl]
     simp only [ints, E0_append]
     wp_step; wp_step
-    refine wp_gstore hge find_nautilWorkperm (by rw [hu.load _ _ _ (h.wp_b (by omega))]; exact h.wpPtr (by omega))
+    refine wp_gstore hge E.find_nautilWorkperm (by rw [hu.load _ _ _ (h.wp_b (by omega))]; exact h.wpPtr (by omega))
       harr h.nlt (tv id.k) (iter p j i0) hcur
       (by simp only [Exec.evalExpr]; rw [temps_gso _ _ (by decide), temps_gss]) rfl
       (ci 1 tint) 1 rfl rfl ?_

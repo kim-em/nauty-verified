@@ -1,3 +1,4 @@
+import NautyVerified.Program.Env
 import NautyVerified.Proofs.Alloc.KeepV
 import NautyVerified.Proofs.Refine.State
 
@@ -10,6 +11,9 @@ work array), as `eval_at`/`wp_store` do for arrays of `ints o`.
 -/
 
 namespace NautyVerified.Proofs.Refine
+
+variable {ge : CompCert4Lean.Cfrontend.Clight.genv} [E : NautyVerified.Program.NautyEnv ge]
+set_option linter.unusedSectionVars false
 
 open CompCert4Lean CompCert4Lean.Cfrontend.Clight CompCert4Lean.Common.Globalenvs
 open CompCert4Lean.Common.Values CompCert4Lean.Common.ExternalCalls CompCert4Lean.Common.Events

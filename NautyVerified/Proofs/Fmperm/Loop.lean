@@ -1,3 +1,4 @@
+import NautyVerified.Program.Env
 import NautyVerified.Proofs.Alloc.KeepV
 import NautyVerified.Proofs.Fmperm.Cycle
 import NautyVerified.Logic.Rest
@@ -10,6 +11,9 @@ sets `fix`, `mcr` and the `workperm` marks into HexGraphIso's `permStep`.
 -/
 
 namespace NautyVerified.Proofs.Fmperm
+
+variable {ge : CompCert4Lean.Cfrontend.Clight.genv} [E : NautyVerified.Program.NautyEnv ge]
+set_option linter.unusedSectionVars false
 
 open CompCert4Lean CompCert4Lean.Cfrontend.Clight CompCert4Lean.Common.Globalenvs
 open CompCert4Lean.Common.Values CompCert4Lean.Common.ExternalCalls CompCert4Lean.Common.Events
@@ -35,7 +39,7 @@ structure St (m : mem) (le : temp_env) (b bf : block) (fofs : ptrofs) (bm : bloc
   mrep : SetRep (fun w => bv64 (wm w)) M s.2.1
   warr : ArrayAt m .Mint32 b 0 (seenVals s.2.2) n
   ssize : s.2.2.size = n
-  bit : BitTable m Block.nautilBit
+  bit : BitTable m E.nautilBit
   Mlt : M < 2147483648
   nM : n ≤ 64 * M
 
@@ -46,11 +50,11 @@ structure Disj (n : Nat) (bpm b bf bm : block) : Prop where
   mp : bm ≠ bpm
   fb : 0 < n → bf ≠ b
   mb : 0 < n → bm ≠ b
-  wf : Block.nautilWorkperm ≠ bf
-  wm : Block.nautilWorkperm ≠ bm
-  bitf : Block.nautilBit ≠ bf
-  bitm : Block.nautilBit ≠ bm
-  bitb : 0 < n → Block.nautilBit ≠ b
+  wf : E.nautilWorkperm ≠ bf
+  wm : E.nautilWorkperm ≠ bm
+  bitf : E.nautilBit ≠ bf
+  bitm : E.nautilBit ≠ bm
+  bitb : 0 < n → E.nautilBit ≠ b
 
 theorem Frame.temps {m : mem} {le le' : temp_env} {bpm : block} {pofs : ptrofs} {b : block}
     {perm : Array Nat} {n : Nat} (h : Frame m le bpm pofs b perm n)
@@ -62,7 +66,7 @@ theorem Frame.temps {m : mem} {le le' : temp_env} {bpm : block} {pofs : ptrofs} 
 
 theorem Frame.unch {m m' : mem} {le : temp_env} {bpm : block} {pofs : ptrofs} {b : block}
     {perm : Array Nat} {n : Nat} (h : Frame m le bpm pofs b perm n) {S : block → Prop}
-    (hu : Unch m m' S) (hp : ¬ S bpm) (hw : ¬ S Block.nautilWorkperm) :
+    (hu : Unch m m' S) (hp : ¬ S bpm) (hw : ¬ S E.nautilWorkperm) :
     Frame m' le bpm pofs b perm n :=
   { h with
     parr := h.parr.unch hu hp
@@ -125,7 +129,7 @@ theorem wp_vertex {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} 
       warr := (hs.warr.unch hu1 (Ne.symm (hd.fb (by omega)))).unch hu2 (Ne.symm (hd.mb (by omega)))
       bit := (hs.bit.unch hu1 hd.bitf).unch hu2 hd.bitm }
   · rw [ite_eq_right (by simp; omega)]
-    have hwe := eval_gat hge find_nautilWorkperm (h.wpPtr (by omega)) hs.warr h.nlt (tv id.i) i0 hi0
+    have hwe := eval_gat hge E.find_nautilWorkperm (h.wpPtr (by omega)) hs.warr h.nlt (tv id.i) i0 hi0
       hi rfl
     wp_step; wp_step
     apply wp_if_eval

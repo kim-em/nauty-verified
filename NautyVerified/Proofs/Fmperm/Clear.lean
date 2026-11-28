@@ -1,3 +1,4 @@
+import NautyVerified.Program.Env
 import NautyVerified.Proofs.Fmperm.Syntax
 import NautyVerified.Proofs.Alloc.Global
 
@@ -9,6 +10,9 @@ entries of `workperm` zero.
 -/
 
 namespace NautyVerified.Proofs.Fmperm
+
+variable {ge : CompCert4Lean.Cfrontend.Clight.genv} [E : NautyVerified.Program.NautyEnv ge]
+set_option linter.unusedSectionVars false
 
 open CompCert4Lean CompCert4Lean.Cfrontend.Clight CompCert4Lean.Common.Globalenvs
 open CompCert4Lean.Common.Values CompCert4Lean.Common.ExternalCalls CompCert4Lean.Common.Events
@@ -24,9 +28,9 @@ def clearedAbove (vals : Nat → val) (j k : Nat) : val := if j ≤ k then .Vint
 
 theorem wp_clearWp {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {b : block}
     {vals : Nat → val} {n : Nat} (hge : PTree.get id.wp e = none)
-    (hp : 0 < n → Mem.load .Mint64 m Block.nautilWorkperm (zOfInt 0) = some (.Vptr b Ptrofs.zero))
+    (hp : 0 < n → Mem.load .Mint64 m E.nautilWorkperm (zOfInt 0) = some (.Vptr b Ptrofs.zero))
     (harr : ArrayAt m .Mint32 b 0 vals n) (hn : n < 2147483648)
-    (hbw : 0 < n → Block.nautilWorkperm ≠ b) (hnv : PTree.get id.n le = some (.Vint (ir n)))
+    (hbw : 0 < n → E.nautilWorkperm ≠ b) (hnv : PTree.get id.n le = some (.Vint (ir n)))
     (hQ : ∀ le' m', ArrayAt m' .Mint32 b 0 (fun _ => .Vint (ir 0)) n →
       Unch m m' (fun z => 0 < n ∧ z = b) → Alloc.Keep m m' b →
       (∀ k, k ≠ id.i → k ≠ id.t5 → PTree.get k le' = PTree.get k le) → Q.normal E0 e le' m') :
@@ -63,7 +67,7 @@ theorem wp_clearWp {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
           (PTree.set id.t5 (.Vint (ir ((v : Int) - 1))) le')) = some (.Vint (ir ((v - 1 : Nat) : Int))) := by
         rw [temps_gss]; congr 3; omega
       wp_step; wp_step
-      refine wp_gstore hge find_nautilWorkperm (by rw [hu.load _ _ _ (fun h => hbw (by omega) h.2)]; exact hp (by omega)) harr' hn (tv id.i) (v - 1) (by omega)
+      refine wp_gstore hge E.find_nautilWorkperm (by rw [hu.load _ _ _ (fun h => hbw (by omega) h.2)]; exact hp (by omega)) harr' hn (tv id.i) (v - 1) (by omega)
         hiv rfl (ci 0 tint) 0 rfl rfl ?_
       intro m'' harr'' hu'' hk''
       refine ⟨v - 1, by omega, by simp, rfl, by omega, hiv, ?_,
