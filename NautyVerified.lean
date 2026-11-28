@@ -324,3 +324,4 @@ import NautyVerified.Proofs.Dispatch.Dense
 import NautyVerified.Proofs.Dispatch.Doref
 import NautyVerified.Spec.SparseInts
 import NautyVerified.Proofs.Sparse.Ints.Satisfies
+import NautyVerified.Proofs.Sparse.Refine.Syntax
