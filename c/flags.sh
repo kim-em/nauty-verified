@@ -11,3 +11,6 @@ NAUTY_ALLOC_FLAG="-Dmalloc=nauty_zalloc"
 # are linked only to resolve references on code paths the pinned options
 # never take.
 NAUTY_SOURCES="nauty nautil naugraph schreier naurng"
+# Translation units of the verified sparse program: nausparse.c in place of
+# naugraph.c, which the sparse program never reaches.
+NAUTY_SPARSE_SOURCES="nauty nautil nausparse schreier naurng"

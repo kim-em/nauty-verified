@@ -1,5 +1,7 @@
 import NautyVerified.Basic
 import NautyVerified.Source.Dense
+import NautyVerified.Source.Sparse
+import NautyVerified.Source.Shared
 import NautyVerified.Build.Compile
 import NautyVerified.Exec.Expr
 import NautyVerified.Logic.Wp
@@ -20,6 +22,8 @@ import NautyVerified.Statement.Compiler
 import NautyVerified.Statement.Compose
 import NautyVerified.Statement.DenseOf
 import NautyVerified.Statement.Final
+import NautyVerified.Statement.Sparse
+import NautyVerified.Statement.SparseFinal
 import NautyVerified.Logic.Array
 import NautyVerified.Logic.Grow
 import NautyVerified.Logic.Ints

@@ -1,1 +1,2 @@
 NautyVerified/Statement/Final.lean
+NautyVerified/Statement/SparseFinal.lean

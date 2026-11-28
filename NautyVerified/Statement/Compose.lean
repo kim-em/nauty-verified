@@ -18,9 +18,10 @@ into a statement about every behaviour of the compiled binary.
 - `follow`: an execution consistent with the input stays on the reference
   execution, so every behaviour consistent with the input terminates as the
   reference does (`behaves_unique`).
-- `binary_of_execution`: through Phase 3's backward simulation
-  (`dense_backward`), every behaviour of the binary consistent with the input
-  is that one.
+- `binary_of_backward`: for any Clight program, through a backward
+  simulation of a binary by it, every behaviour of the binary consistent with
+  the input is that one; `binary_of_execution` is the dense program's case,
+  through Phase 3's `dense_backward`.
 -/
 
 namespace NautyVerified.Statement
@@ -118,13 +119,21 @@ theorem step_norm {ge : genv} {s s' : state} {t : trace} (h : step2 xi ge s t s'
       (external_call_norm hcall)
   | _ => exact h0
 
-/-- The pinned Clight program's semantics. -/
-abbrev L : semantics := semantics2 xi Source.dense.locals
+/-! ## Any Clight program under `xi`
+
+From here to `binary_of_backward` the program `P` is arbitrary: only its
+semantics under `xi` matters. -/
+
+/-- A Clight program's semantics under `xi`. -/
+abbrev LP (P : Cfrontend.Clight.program) : semantics := semantics2 xi P
+
+section
+variable {P : Cfrontend.Clight.program}
 
 /-- Two steps from the same state whose traces agree after `norm` reach the same state. -/
-theorem step_det {s s₁ s₂ : L.state} {t₁ t₂ : trace} (h₁ : L.step L.globalenv s t₁ s₁)
-    (h₂ : L.step L.globalenv s t₂ s₂) (ht : norm t₁ = norm t₂) : s₁ = s₂ :=
-  ((semantics2_determinate xi Source.dense.locals).sd_determ s _ s₁ _ s₂ (step_norm h₁)
+theorem step_det {s s₁ s₂ : (LP P).state} {t₁ t₂ : trace} (h₁ : (LP P).step (LP P).globalenv s t₁ s₁)
+    (h₂ : (LP P).step (LP P).globalenv s t₂ s₂) (ht : norm t₁ = norm t₂) : s₁ = s₂ :=
+  ((semantics2_determinate xi P).sd_determ s _ s₁ _ s₂ (step_norm h₁)
     (ht ▸ step_norm h₂)).2 rfl
 
 /-! ## Traces -/
@@ -200,7 +209,7 @@ theorem VloadsZero.left {t₁ t₂ : trace} (h : VloadsZero (Eapp t₁ t₂)) : 
 theorem VloadsZero.right {t₁ t₂ : trace} (h : VloadsZero (Eapp t₁ t₂)) : VloadsZero t₂ :=
   fun c id o ev hm => h c id o ev (List.mem_append_right (bs := (t₂ : List event)) t₁ hm)
 
-theorem L_determinate : determinate L := semantics2_determinate xi Source.dense.locals
+theorem L_determinate (P : Cfrontend.Clight.program) : determinate (LP P) := semantics2_determinate xi P
 
 theorem intOfZ_signed_inj {x y : Lib.Integers.int64}
     (h : Foundation.Numbers.Rocq.Coq.intOfZ (Lib.Integers.Int64.signed x) =
@@ -211,11 +220,11 @@ theorem intOfZ_signed_inj {x y : Lib.Integers.int64}
 /-- Two first steps from the same state, with the read results of the first
 trace a prefix of the second's (which are all integers) and volatile loads of
 zero: their traces agree after `norm`, so they reach the same state. -/
-theorem first_match {s s₁ s₂ : L.state} {t₁ u₁ : trace} {t₂ u₂ : trace}
-    (h₁ : L.step L.globalenv s t₁ s₁) (h₂ : L.step L.globalenv s u₁ s₂)
+theorem first_match {s s₁ s₂ : (LP P).state} {t₁ u₁ : trace} {t₂ u₂ : trace}
+    (h₁ : (LP P).step (LP P).globalenv s t₁ s₁) (h₂ : (LP P).step (LP P).globalenv s u₁ s₂)
     (hr : reads (Eapp t₁ t₂) <+: reads (Eapp u₁ u₂)) (hnone : none ∉ reads (Eapp u₁ u₂))
     (hv₁ : VloadsZero t₁) (hv₂ : VloadsZero u₁) : norm t₁ = norm u₁ ∧ s₁ = s₂ := by
-  have hm := (L_determinate.sd_determ s t₁ s₁ u₁ s₂ h₁ h₂).1
+  have hm := ((L_determinate P).sd_determ s t₁ s₁ u₁ s₂ h₁ h₂).1
   rw [reads_append, reads_append] at hr
   rw [reads_append] at hnone
   have hn : norm t₁ = norm u₁ := by
@@ -243,23 +252,23 @@ theorem first_match {s s₁ s₂ : L.state} {t₁ u₁ : trace} {t₂ u₂ : tra
     | match_traces_annot => rfl
   exact ⟨hn, step_det h₁ h₂ hn⟩
 
-abbrev LStar := star L.step L.globalenv
+abbrev LPStar (P : Cfrontend.Clight.program) := star (LP P).step (LP P).globalenv
 
 theorem eapp_assoc (a b c : trace) : Eapp (Eapp a b) c = Eapp a (Eapp b c) := List.append_assoc a b c
 
 /-- An execution whose reads are a prefix of the reference execution's, with
 volatile loads of zero, stays on the reference execution. -/
-theorem follow {s s' : L.state} {t : trace} (h : LStar s t s') :
-    ∀ {t₀ : trace} {sF : L.state} {r : Lib.Integers.int}, LStar s t₀ sF → L.final_state sF r →
+theorem follow {s s' : (LP P).state} {t : trace} (h : LPStar P s t s') :
+    ∀ {t₀ : trace} {sF : (LP P).state} {r : Lib.Integers.int}, LPStar P s t₀ sF → (LP P).final_state sF r →
       reads t <+: reads t₀ → none ∉ reads t₀ → VloadsZero t → VloadsZero t₀ →
-      ∃ t₀a t₀b, t₀ = Eapp t₀a t₀b ∧ norm t = norm t₀a ∧ LStar s' t₀b sF := by
+      ∃ t₀a t₀b, t₀ = Eapp t₀a t₀b ∧ norm t = norm t₀a ∧ LPStar P s' t₀b sF := by
   induction h with
   | star_refl s => intro t₀ sF r href _ _ _ _ _; exact ⟨E0, t₀, rfl, rfl, href⟩
   | star_step s1 t1 s2 t2 s3 t hstep hstar htrace ih =>
     intro t₀ sF r href hfin hr hnone hv hv₀
     cases href with
     | star_refl =>
-      exact absurd hstep (L_determinate.sd_final_nostep _ r hfin t1 s2)
+      exact absurd hstep ((L_determinate P).sd_final_nostep _ r hfin t1 s2)
     | star_step _ u1 r2 u2 _ _ hstep' hstar' htrace' =>
       subst htrace htrace'
       obtain ⟨hn, rfl⟩ := first_match hstep hstep' hr hnone hv.left hv₀.left
@@ -272,22 +281,22 @@ theorem follow {s s' : L.state} {t : trace} (h : LStar s t s') :
       rw [norm_append, norm_append, hn, hn2]
 
 /-- A state on the way to a final state does not diverge silently. -/
-theorem not_silent {s sF : L.state} {t : trace} {r : Lib.Integers.int} (h : LStar s t sF)
-    (hfin : L.final_state sF r) (hs : forever_silent L.step L.globalenv s) : False := by
+theorem not_silent {s sF : (LP P).state} {t : trace} {r : Lib.Integers.int} (h : LPStar P s t sF)
+    (hfin : (LP P).final_state sF r) (hs : forever_silent (LP P).step (LP P).globalenv s) : False := by
   induction h with
   | star_refl s =>
     refine forever_silent_casesOn (motive := fun x => x = s → False) ?_ hs rfl
     intro x s2 hstep _ hx
     subst hx
-    exact L_determinate.sd_final_nostep _ r hfin _ _ hstep
+    exact (L_determinate P).sd_final_nostep _ r hfin _ _ hstep
   | star_step s1 u1 r2 u2 s3 _ hstep hstar _ ih =>
     refine forever_silent_casesOn (motive := fun x => x = s1 → False) ?_ hs rfl
     intro x s2 hstep2 hrest hx
     subst hx
-    have hm := (L_determinate.sd_determ _ _ _ _ _ hstep2 hstep).1
+    have hm := ((L_determinate P).sd_determ _ _ _ _ _ hstep2 hstep).1
     have hu : u1 = E0 := by cases hm; rfl
     subst hu
-    have := (L_determinate.sd_determ _ _ _ _ _ hstep2 hstep).2 rfl
+    have := ((L_determinate P).sd_determ _ _ _ _ _ hstep2 hstep).2 rfl
     subst this
     exact ih hfin hrest
 
@@ -310,13 +319,13 @@ theorem range_map_eappinf (T : traceinf) :
 
 /-- A reactive execution has finite prefixes of every length, reading the
 behaviour's first events. -/
-theorem reacts_prefix : ∀ (k : Nat) {s : L.state} {T : traceinf},
-    forever_reactive L.step L.globalenv s T →
-    ∃ t s', LStar s t s' ∧ k ≤ t.length ∧ (List.range t.length).map T = t
+theorem reacts_prefix : ∀ (k : Nat) {s : (LP P).state} {T : traceinf},
+    forever_reactive (LP P).step (LP P).globalenv s T →
+    ∃ t s', LPStar P s t s' ∧ k ≤ t.length ∧ (List.range t.length).map T = t
   | 0, s, T, _ => ⟨E0, s, star.star_refl _, Nat.le_refl _, rfl⟩
   | k + 1, s, T, h => by
     refine forever_reactive_casesOn (motive := fun s T =>
-      ∃ t s', LStar s t s' ∧ k + 1 ≤ t.length ∧ (List.range t.length).map T = t) ?_ h
+      ∃ t s', LPStar P s t s' ∧ k + 1 ≤ t.length ∧ (List.range t.length).map T = t) ?_ h
     intro s1 s2 t1 T' hst hne hrest
     obtain ⟨t2, s3, hst2, hk, hpre⟩ := reacts_prefix k hrest
     refine ⟨Eapp t1 t2, s3, star_trans' hst hst2, ?_, ?_⟩
@@ -324,8 +333,8 @@ theorem reacts_prefix : ∀ (k : Nat) {s : L.state} {T : traceinf},
       rw [length_eapp]; omega
     · rw [length_eapp, range_map_eappinf, hpre]
 where
-  star_trans' {a b c : L.state} {t u : trace} (h₁ : LStar a t b) (h₂ : LStar b u c) :
-      LStar a (Eapp t u) c := by
+  star_trans' {a b c : (LP P).state} {t u : trace} (h₁ : LPStar P a t b) (h₂ : LPStar P b u c) :
+      LPStar P a (Eapp t u) c := by
     induction h₁ with
     | star_refl => exact h₂
     | star_step s1 t1 s2 t2 s3 t hstep _ htr ih =>
@@ -333,10 +342,10 @@ where
 
 /-- Every behaviour of the pinned Clight program consistent with the input is
 the reference execution's termination, with the same writes. -/
-theorem behaves_unique {s₀ sF : L.state} {t₀ : trace} {r₀ : Lib.Integers.int} {ins : List Int}
-    (hinit : L.initial_state s₀) (hstar : LStar s₀ t₀ sF) (hfin : L.final_state sF r₀)
+theorem behaves_unique {s₀ sF : (LP P).state} {t₀ : trace} {r₀ : Lib.Integers.int} {ins : List Int}
+    (hinit : (LP P).initial_state s₀) (hstar : LPStar P s₀ t₀ sF) (hfin : (LP P).final_state sF r₀)
     (hreads : reads t₀ = ins.map some) (hv₀ : VloadsZero t₀)
-    {beh : program_behavior} (hbeh : program_behaves L beh) (hcons : Consistent ins beh) :
+    {beh : program_behavior} (hbeh : program_behaves (LP P) beh) (hcons : Consistent ins beh) :
     ∃ t, beh = .Terminates t r₀ ∧ writes t = writes t₀ := by
   have hnone : none ∉ reads t₀ := by rw [hreads]; simp
   have pre : ∀ {t : trace}, reads t <+: ins.map some → reads t <+: reads t₀ := fun h =>
@@ -344,7 +353,7 @@ theorem behaves_unique {s₀ sF : L.state} {t₀ : trace} {r₀ : Lib.Integers.i
   cases hbeh with
   | program_goes_initially_wrong hno => exact absurd hinit (hno s₀)
   | program_runs s _ hinit' hbehaves =>
-    have hs : s = s₀ := L_determinate.sd_initial_determ _ _ hinit' hinit
+    have hs : s = s₀ := (L_determinate P).sd_initial_determ _ _ hinit' hinit
     subst hs
     cases hbehaves with
     | state_terminates t s' r hst hfinal =>
@@ -352,13 +361,13 @@ theorem behaves_unique {s₀ sF : L.state} {t₀ : trace} {r₀ : Lib.Integers.i
       obtain ⟨a, b, ht0, hn, hrest⟩ := follow hst hstar hfin (pre hr) hnone hv hv₀
       cases hrest with
       | star_refl =>
-        have hr' : r = r₀ := L_determinate.sd_final_determ _ _ _ hfinal hfin
+        have hr' : r = r₀ := (L_determinate P).sd_final_determ _ _ _ hfinal hfin
         subst hr'
         refine ⟨t, rfl, ?_⟩
         have : t₀ = a := by rw [ht0]; exact List.append_nil a
         rw [this, ← writes_normT t, hn, writes_normT]
       | star_step _ _ _ _ _ _ hstep _ _ =>
-        exact absurd hstep (L_determinate.sd_final_nostep _ r hfinal _ _)
+        exact absurd hstep ((L_determinate P).sd_final_nostep _ r hfinal _ _)
     | state_diverges t s' hst hforever =>
       obtain ⟨hr, hv⟩ := hcons
       obtain ⟨a, b, _, _, hrest⟩ := follow hst hstar hfin (pre hr) hnone hv hv₀
@@ -400,6 +409,34 @@ theorem consistent_prefix {ins : List Int} {t : trace} {beh : program_behavior}
     rw [e] at hk
     exact hk
 
+/-- One execution of a Clight program that reads the input and writes `out`
+determines every behaviour, consistent with the input, of a binary whose
+behaviours it backward-simulates. -/
+theorem binary_of_backward {tp : X86.Asm.program} {ins out : List Int}
+    (hsim : backward_simulation (LP P) (X86.Asm.semantics Build.config xi tp))
+    (hex : ∃ s₀ sF t₀, (LP P).initial_state s₀ ∧ LPStar P s₀ t₀ sF ∧
+      (LP P).final_state sF (Lib.Integers.Int.repr .Z0) ∧ reads t₀ = ins.map some ∧
+      VloadsZero t₀ ∧ writes t₀ = out) :
+    ∀ beh, program_behaves (X86.Asm.semantics Build.config xi tp) beh → Consistent ins beh →
+      ∃ t, beh = .Terminates t (Lib.Integers.Int.repr .Z0) ∧ writes t = out := by
+  intro beh hbeh hcons
+  obtain ⟨s₀, sF, t₀, hinit, hstar, hfin, hreads, hv₀, hw⟩ := hex
+  obtain ⟨beh₁, hbeh₁, himp⟩ := backward_simulation_behavior_improves _ _ hsim beh hbeh
+  rcases himp with rfl | ⟨t, rfl, beh', rfl⟩
+  · obtain ⟨t, rfl, hwt⟩ := behaves_unique hinit hstar hfin hreads hv₀ hbeh₁ hcons
+    exact ⟨t, rfl, hwt.trans hw⟩
+  · obtain ⟨_, h, _⟩ := behaves_unique hinit hstar hfin hreads hv₀ hbeh₁ (consistent_prefix hcons)
+    cases h
+
+end
+
+/-! ## The dense program -/
+
+/-- The pinned Clight of the linked dense program, under `xi`. -/
+abbrev L : semantics := LP Source.dense.locals
+
+abbrev LStar := LPStar Source.dense.locals
+
 /-- One execution of the pinned Clight program that reads the input and
 writes `expected G` determines every behaviour of the binary consistent with
 the input. -/
@@ -409,15 +446,7 @@ theorem binary_of_execution {n k : Nat} (G : Colored n k) {ins : List Int} {tp :
       L.final_state sF (Lib.Integers.Int.repr .Z0) ∧ reads t₀ = ins.map some ∧ VloadsZero t₀ ∧
       writes t₀ = expected G) :
     ∀ beh, program_behaves (X86.Asm.semantics Build.config xi tp) beh → Consistent ins beh →
-      ∃ t, beh = .Terminates t (Lib.Integers.Int.repr .Z0) ∧ writes t = expected G := by
-  intro beh hbeh hcons
-  obtain ⟨s₀, sF, t₀, hinit, hstar, hfin, hreads, hv₀, hw⟩ := hex
-  obtain ⟨beh₁, hbeh₁, himp⟩ :=
-    backward_simulation_behavior_improves _ _ (dense_backward tp hc xi) beh hbeh
-  rcases himp with rfl | ⟨t, rfl, beh', rfl⟩
-  · obtain ⟨t, rfl, hwt⟩ := behaves_unique hinit hstar hfin hreads hv₀ hbeh₁ hcons
-    exact ⟨t, rfl, hwt.trans hw⟩
-  · obtain ⟨_, h, _⟩ := behaves_unique hinit hstar hfin hreads hv₀ hbeh₁ (consistent_prefix hcons)
-    cases h
+      ∃ t, beh = .Terminates t (Lib.Integers.Int.repr .Z0) ∧ writes t = expected G :=
+  binary_of_backward (dense_backward tp hc xi) hex
 
 end NautyVerified.Statement

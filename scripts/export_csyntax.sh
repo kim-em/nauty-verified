@@ -23,10 +23,14 @@ export_unit() {  # name source extra-flags...
   rm -rf "$dir"
   echo "exported $name"
 }
-for f in $NAUTY_SOURCES; do
+# The units of the dense and the sparse program, each once.
+units=$(printf '%s\n' $NAUTY_SOURCES $NAUTY_SPARSE_SOURCES | awk '!seen[$0]++')
+for f in $units; do
   # shellcheck disable=SC2086
   export_unit "$f" "$here/c/nauty-2.9.3/$f.c" $NAUTY_FLAGS $NAUTY_ALLOC_FLAG
 done
-# shellcheck disable=SC2086
-export_unit dense_main "$here/c/harness/dense_main.c" $NAUTY_FLAGS $NAUTY_ALLOC_FLAG
+for f in dense_main sparse_main; do
+  # shellcheck disable=SC2086
+  export_unit "$f" "$here/c/harness/$f.c" $NAUTY_FLAGS $NAUTY_ALLOC_FLAG
+done
 export_unit zalloc "$here/c/harness/zalloc.c"

@@ -21,3 +21,7 @@ root = "NautyVerified.Build.Main"
 [[lean_exe]]
 name = "nvInterp"
 root = "NautyVerified.Exec.Main"
+
+[[lean_exe]]
+name = "nvSparseExpected"
+root = "NautyVerified.Tools.SparseExpected"

@@ -21,7 +21,7 @@ jobs:
       - name: Trust check
         run: scripts/check_trust.sh
 
-      - name: Native harness against fixtures
+      - name: Native dense and sparse harnesses against fixtures
         run: scripts/run_native.sh
 
       # CompCert4Lean is slow to build from scratch on a hosted runner, so
@@ -39,5 +39,8 @@ jobs:
           build: true
           use-mathlib-cache: false
 
-      - name: Interpreter on the pinned Clight against fixtures
+      - name: Interpreter on the pinned dense and sparse Clight against fixtures
         run: scripts/run_interp.sh
+
+      - name: HexGraphIso's sparse search against the sparse fixtures
+        run: scripts/run_expected.sh

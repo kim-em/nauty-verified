@@ -20,9 +20,23 @@ import NautyVerified.Source.Rename
 The command adds `prog.sigma.<unit>` and `prog.sigmaG.<unit>` (the renaming
 of each unit, for identifiers in general and for global symbols),
 `prog.id.<key>`, `prog.keys` (the key of each shared identifier, in order),
-`prog.program` with its parts, and `prog.link_eq`:
+`prog.names` (each identifier with its key), `prog.program` with its parts,
+and `prog.link_eq`:
 `linkUnits [(prog.sigma.u₁, prog.sigmaG.u₁, u₁.program), …] = some prog.program`, checked by
 the kernel. It then adds `prog.clight` and `prog.locals` as `c_unit` does.
+
+`c_link prog := u₁ … uₙ extending base` numbers identifiers so that every
+function `prog` shares with the earlier link `base` has the same Clight:
+
+- every key of `base` keeps its identifier (`base.keys`);
+- the other keys are numbered from `base.fresh + gap`, so they stay apart
+  from the temporaries SimplExpr creates, which start at `base.fresh` in
+  every function;
+- `prog.fresh` is `base.fresh`.
+
+A function's Clight depends only on its renamed `Csyntax`, the composites it
+uses and the first temporary, so a unit linked into both programs gets the
+same Clight in both. `prog.keys` is then omitted (the numbering has a gap).
 -/
 
 namespace NautyVerified.Source
@@ -111,15 +125,40 @@ def ofParts (x : List (positive × CGlobdef) × List positive × positive ×
                       prog_types := x.2.2.2, prog_comp_env := env, prog_comp_env_eq := h }
   | .Error _ => none
 
-syntax "c_link " ident " := " ident+ : command
+/-- The value of a constant that `toExpr` built from a list of strings. -/
+partial def stringsOf (e : Expr) : Option (List String) :=
+  match e.getAppFnArgs with
+  | (``List.nil, _) => some []
+  | (``List.cons, #[_, .lit (.strVal s), rest]) => (s :: ·) <$> stringsOf rest
+  | _ => none
+
+/-- Identifiers numbered `base.fresh + linkGap` and above are keys new to an
+extending link. -/
+def linkGap : Nat := 65536
+
+syntax "c_link " ident " := " ident+ (" extending " ident)? : command
 
 elab_rules : command
-  | `(c_link $id := $units*) => do
+  | `(c_link $id := $units* $[extending $ext]?) => do
     let ns ← getCurrNamespace
     let base := ns ++ id.getId
-    -- Shared numbering, by first occurrence.
+    -- Shared numbering: the extended link's keys, then by first occurrence.
     let mut table : Std.HashMap String Nat := {}
     let mut keys : Array String := #[]
+    let mut baseKeys : Nat := 0
+    if let some ext := ext then
+      let extName := ns ++ ext.getId
+      let some info := (← getEnv).find? (extName ++ `keys)
+        | throwError "c_link: {extName}.keys not found"
+      let some ks := info.value?.bind stringsOf
+        | throwError "c_link: {extName}.keys is not a list of strings"
+      for k in ks do
+        keys := keys.push k
+        table := table.insert k keys.size
+      baseKeys := keys.size
+    -- The identifier of the `j`th key (from 0).
+    let idOf (j : Nat) : Nat :=
+      if ext.isNone || j < baseKeys then j + 1 else baseKeys + 1 + linkGap + (j - baseKeys)
     let mut sigmas : Array (PTree.t positive × PTree.t positive) := #[]
     let mut renamed : Array Cfrontend.Csyntax.program := #[]
     for u in units do
@@ -133,7 +172,7 @@ elab_rules : command
           match table[key]? with
           | some j => js := js.push j
           | none =>
-              let j := keys.size + 1
+              let j := idOf keys.size
               table := table.insert key j
               keys := keys.push key
               js := js.push j
@@ -153,11 +192,13 @@ elab_rules : command
       let some x := linkParts acc q | throwError "c_link: CompCert's linker rejects the units"
       let some p := ofParts x | throwError "c_link: linked composites do not build"
       acc := p
-    let names := (keys.toList.zipIdx 1).map fun (s, i) => (i, s)
+    let names := (keys.toList.zipIdx 0).map fun (s, j) => (idOf j, s)
     let nameOf := nameLookup names
-    let fresh := PArith.BinPos.Pos.of_nat (keys.size + 1)
+    let fresh := PArith.BinPos.Pos.of_nat (if ext.isSome then baseKeys + 1 else keys.size + 1)
     emitNames base names
-    addDef (base ++ `keys) (toTypeExpr (List String)) (toExpr keys.toList)
+    if ext.isNone then
+      addDef (base ++ `keys) (toTypeExpr (List String)) (toExpr keys.toList)
+    addDef (base ++ `names) (toTypeExpr (List (Nat × String))) (toExpr names)
     emitProgram base nameOf acc fresh
     let entries ← units.mapM fun u =>
       `(($(rootIdent (base ++ `sigma ++ u.getId)), $(rootIdent (base ++ `sigmaG ++ u.getId)),

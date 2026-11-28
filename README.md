@@ -44,19 +44,21 @@ the zero-filling `c/harness/zalloc.c`; nauty's sources are not modified.
 | Path | Contents |
 | --- | --- |
 | `c/nauty-2.9.3/` | pinned nauty sources |
-| `c/harness/` | `dense_main.c` (the verified program's `main`), `zalloc.c`, `nv_io.h`; `io_stdio.c` for native runs only |
+| `c/harness/` | `dense_main.c` and `sparse_main.c` (the verified programs' `main`), `zalloc.c`, `nv_io.h`; `io_stdio.c` for native runs only |
 | `c/flags.sh` | the one build configuration |
 | `c/csyntax/` | the CompCert frontend's output for each unit (generated, committed) |
 | `NautyVerified/Source/` | the units as Lean terms, their linking, and the pinned Clight |
 | `NautyVerified/Build/` | `nvCompile`, which compiles the linked program |
-| `tests/fixtures/` | graphs (`.json`) and recorded harness output (`.out`) |
+| `tests/fixtures/` | graphs (`.json`) and recorded harness output (`.out` dense, `.sparse.out` sparse) |
 | `scripts/` | native test runner, fixture generators, trust check |
 
 ## Building and testing
 
 ```sh
 lake build                    # Lean development
-scripts/run_native.sh         # native harness against tests/fixtures
+scripts/run_native.sh         # native dense and sparse harnesses against tests/fixtures
+scripts/run_interp.sh         # the pinned Clight in the interpreter against tests/fixtures
+scripts/run_expected.sh       # HexGraphIso's sparse search against the sparse fixtures
 scripts/check_trust.sh        # no axiom, no native_decide, sorry only where listed
 ```
 
@@ -65,7 +67,7 @@ CompCert checkout and OCaml, as for CompCert4Lean's `scripts/compile_c.py`:
 
 ```sh
 scripts/export_csyntax.sh COMPCERT4LEAN_CHECKOUT COMPCERT_CHECKOUT
-scripts/build_binary.sh COMPCERT4LEAN_CHECKOUT COMPCERT_CHECKOUT OUT_DIR --check
+scripts/build_binary.sh COMPCERT4LEAN_CHECKOUT COMPCERT_CHECKOUT OUT_DIR [--sparse] --check
 ```
 
 ## Licence
