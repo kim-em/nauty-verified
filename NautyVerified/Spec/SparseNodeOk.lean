@@ -80,7 +80,7 @@ theorem SparseNodeOk.level_pos {G : Hex.GraphIso.Sparse.Colored n k} {first : Bo
 theorem SparseNodeOk.level_le {G : Hex.GraphIso.Sparse.Colored n k} {first : Bool} {level numcells : Nat}
     {st : SState n} (h : SparseNodeOk G first level numcells st) : level ≤ n := h.1.level_le
 
-theorem sparseNodeOk_root' (G : Hex.GraphIso.Sparse.Colored n k) (hn0 : 0 < n) :
+theorem SparseNodeOk.root (G : Hex.GraphIso.Sparse.Colored n k) (hn0 : 0 < n) :
     let p := Sparse.initialPartitionWith n k G.coloring.cells.toArray Fin.val
     SparseNodeOk G true 1 p.2.length (sparseInitialC (.ofGraph G.graph) p.1 p.2) :=
   ⟨sparseNodeOk_root G hn0, fun _ => rfl, fun h => absurd h (by decide)⟩

@@ -267,6 +267,7 @@ import NautyVerified.Spec.SparseInfOps
 import NautyVerified.Spec.SparseInfRun
 import NautyVerified.Spec.SparseFirstStore
 import NautyVerified.Spec.SparseNodeOk
+import NautyVerified.Spec.SparseSweepOk
 import NautyVerified.Spec.NodeOk
 import NautyVerified.Spec.Gca
 import NautyVerified.Spec.NodeExit
@@ -396,6 +397,8 @@ import NautyVerified.Proofs.Sparse.Refine.Prologue
 import NautyVerified.Proofs.Search.Node.Policy
 import NautyVerified.Proofs.Sparse.Refine.Satisfies
 import NautyVerified.Proofs.Search.Node.Laws
+import NautyVerified.Proofs.Search.Node.SparseOk
+import NautyVerified.Proofs.Search.Node.SparseLaws
 import NautyVerified.Proofs.Sparse.Refine.Trivial.Marks
 import NautyVerified.Proofs.Sparse.Refine.Trivial.Store
 import NautyVerified.Proofs.Sparse.Refine.Trivial.Part
