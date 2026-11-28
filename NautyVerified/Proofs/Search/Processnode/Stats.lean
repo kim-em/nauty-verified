@@ -33,7 +33,7 @@ theorem PAt.stat {m' : mem} {st' : Search n} (c : PCtx m₀ m₁ S e bsr)
     (h : PAt m₀ m₁ m S ctx bsr st nsp) {chunk : memory_chunk} {ofs : Z} {w : val}
     (hst : Mem.store chunk m S.bst ofs w = some m') (hs' : Stats m' S st' false)
     (e1 : scalView st' = scalView st) (e2 : arrView st' = arrView st) (hinv : SInv st') :
-    PAt m₀ m₁ m' S ctx bsr st' nsp ∧ (∀ v, SrAt m bsr v → SrAt m' bsr v) := by
+    PAt m₀ m₁ m' S ctx bsr st' nsp ∧ (∀ v, SrAt m bsr v → SrAt m' bsr v) ∧ Unch m m' (· = S.bst) := by
   have hs := h.search
   have hd := hs.distinct
   have hu : Unch m m' (· = S.bst) := Unch.store hst rfl
@@ -41,7 +41,7 @@ theorem PAt.stat {m' : mem} {st' : Search n} (c : PCtx m₀ m₁ S e bsr)
   refine ⟨PAt.next c h hu' (by simp [SLoc.wr, SLoc.wrV]) ?_
     (fun z hz => Mem.store_valid_block_1 _ _ _ _ _ _ hst _ hz)
     ((hs.scalars.unch hu (by sep_all hd)).cast e1) hs' ((hs.arrays.unch hu (by sep_all hd)).cast e2)
-    hinv, fun v hv => hv.unch hu fun e => c.ne_blocks (by simp [SLoc.blocks]) e.symm⟩
+    hinv, fun v hv => hv.unch hu fun e => c.ne_blocks (by simp [SLoc.blocks]) e.symm, hu⟩
   intro z hz
   simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
   rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> exact Keep.unch hu (by sep_ne hd)
@@ -51,7 +51,7 @@ theorem wp_maxlevel {f : function} {Q : Post} {le : temp_env} {level : Nat}
     (c : PCtx m₀ m₁ S e bsr) (h : PAt m₀ m₁ m S ctx bsr st nsp)
     (hlev : PTree.get dense.id.level le = some (.Vint (ir level))) (hl : level ≤ n)
     (hQ : ∀ m', PAt m₀ m₁ m' S ctx bsr { st with maxlevel := level } nsp →
-      (∀ v, SrAt m bsr v → SrAt m' bsr v) → Q.normal E0 e le m') :
+      (∀ v, SrAt m bsr v → SrAt m' bsr v) → Unch m m' (· = S.bst) → Q.normal E0 e le m') :
     Wp xi ge f (.Sassign (statsF dense.id.maxlevel tint) (tv dense.id.level)) Q e le m := by
   have hs := h.search
   have hfit := hs.stats.fits
@@ -60,7 +60,7 @@ theorem wp_maxlevel {f : function} {Q : Post} {le : temp_env} {level : Nat}
     (w := .Vint (ir level)) (w' := .Vint (ir level)) hlev rfl ?_
   intro m' hst
   have sS := hs.stats
-  obtain ⟨hP, hS⟩ := PAt.stat (st' := { st with maxlevel := level }) c h hst
+  obtain ⟨hP, hS, hU⟩ := PAt.stat (st' := { st with maxlevel := level }) c h hst
     { numorbits := sS.numorbits.store_other hst (by simp only [csize32]; omega)
       numgenerators := sS.numgenerators.store_other hst (by simp only [csize32]; omega)
       numnodes := sS.numnodes.store_other hst (by simp only [csize32, csize64]; omega)
@@ -70,13 +70,13 @@ theorem wp_maxlevel {f : function} {Q : Post} {le : temp_env} {level : Nat}
       tctotal := sS.tctotal.store_other hst (by simp only [csize32, csize64]; omega)
       canupdates := sS.canupdates.store_other hst (by simp only [csize32, csize64]; omega)
       fits := sS.fits } rfl rfl { hs.inv with maxlevelLe := hl }
-  exact hQ m' hP hS
+  exact hQ m' hP hS hU
 
 /-- `stats->numgenerators += 1`. -/
 theorem wp_numgenerators {f : function} {Q : Post} {le : temp_env}
     (c : PCtx m₀ m₁ S e bsr) (h : PAt m₀ m₁ m S ctx bsr st nsp)
     (hQ : ∀ m', PAt m₀ m₁ m' S ctx bsr { st with numgenerators := st.numgenerators + 1 } nsp →
-      (∀ v, SrAt m bsr v → SrAt m' bsr v) → Q.normal E0 e le m') :
+      (∀ v, SrAt m bsr v → SrAt m' bsr v) → Unch m m' (· = S.bst) → Q.normal E0 e le m') :
     Wp xi ge f (.Sassign (statsF dense.id.numgenerators tint)
       (.Ebinop .Oadd (statsF dense.id.numgenerators tint) (ci 1 tint) tint)) Q e le m := by
   have hs := h.search
@@ -92,7 +92,7 @@ theorem wp_numgenerators {f : function} {Q : Post} {le : temp_env}
     push_cast; rfl
   intro m' hst
   have sS := hs.stats
-  obtain ⟨hP, hS⟩ := PAt.stat (st' := { st with numgenerators := st.numgenerators + 1 }) c h hst
+  obtain ⟨hP, hS, hU⟩ := PAt.stat (st' := { st with numgenerators := st.numgenerators + 1 }) c h hst
     { numorbits := sS.numorbits.store_other hst (by simp only [csize32]; omega)
       numgenerators := FieldAt.store_same hst sS.numgenerators.writable
       numnodes := sS.numnodes.store_other hst (by simp only [csize32, csize64]; omega)
@@ -102,13 +102,13 @@ theorem wp_numgenerators {f : function} {Q : Post} {le : temp_env}
       tctotal := sS.tctotal.store_other hst (by simp only [csize32, csize64]; omega)
       canupdates := sS.canupdates.store_other hst (by simp only [csize32, csize64]; omega)
       fits := sS.fits } rfl rfl { hs.inv with }
-  exact hQ m' hP hS
+  exact hQ m' hP hS hU
 
 /-- `stats->canupdates += 1`. -/
 theorem wp_canupdates {f : function} {Q : Post} {le : temp_env}
     (c : PCtx m₀ m₁ S e bsr) (h : PAt m₀ m₁ m S ctx bsr st nsp)
     (hQ : ∀ m', PAt m₀ m₁ m' S ctx bsr { st with canupdates := st.canupdates + 1 } nsp →
-      (∀ v, SrAt m bsr v → SrAt m' bsr v) → Q.normal E0 e le m') :
+      (∀ v, SrAt m bsr v → SrAt m' bsr v) → Unch m m' (· = S.bst) → Q.normal E0 e le m') :
     Wp xi ge f (.Sassign (statsF dense.id.canupdates tulong)
       (.Ebinop .Oadd (statsF dense.id.canupdates tulong) (ci 1 tint) tulong)) Q e le m := by
   have hs := h.search
@@ -123,7 +123,7 @@ theorem wp_canupdates {f : function} {Q : Post} {le : temp_env}
     simp only [Exec.evalExpr, typeof, cop, lr_succ]
   intro m' hst
   have sS := hs.stats
-  obtain ⟨hP, hS⟩ := PAt.stat (st' := { st with canupdates := st.canupdates + 1 }) c h hst
+  obtain ⟨hP, hS, hU⟩ := PAt.stat (st' := { st with canupdates := st.canupdates + 1 }) c h hst
     { numorbits := sS.numorbits.store_other hst (by simp only [csize32, csize64]; omega)
       numgenerators := sS.numgenerators.store_other hst (by simp only [csize32, csize64]; omega)
       numnodes := sS.numnodes.store_other hst (by simp only [csize64]; omega)
@@ -133,13 +133,13 @@ theorem wp_canupdates {f : function} {Q : Post} {le : temp_env}
       tctotal := sS.tctotal.store_other hst (by simp only [csize64]; omega)
       canupdates := FieldAt.store_same hst sS.canupdates.writable
       fits := sS.fits } rfl rfl { hs.inv with }
-  exact hQ m' hP hS
+  exact hQ m' hP hS hU
 
 /-- `stats->numbadleaves += 1`. -/
 theorem wp_numbadleaves {f : function} {Q : Post} {le : temp_env}
     (c : PCtx m₀ m₁ S e bsr) (h : PAt m₀ m₁ m S ctx bsr st nsp)
     (hQ : ∀ m', PAt m₀ m₁ m' S ctx bsr { st with numbadleaves := st.numbadleaves + 1 } nsp →
-      (∀ v, SrAt m bsr v → SrAt m' bsr v) → Q.normal E0 e le m') :
+      (∀ v, SrAt m bsr v → SrAt m' bsr v) → Unch m m' (· = S.bst) → Q.normal E0 e le m') :
     Wp xi ge f (.Sassign (statsF dense.id.numbadleaves tulong)
       (.Ebinop .Oadd (statsF dense.id.numbadleaves tulong) (ci 1 tint) tulong)) Q e le m := by
   have hs := h.search
@@ -154,7 +154,7 @@ theorem wp_numbadleaves {f : function} {Q : Post} {le : temp_env}
     simp only [Exec.evalExpr, typeof, cop, lr_succ]
   intro m' hst
   have sS := hs.stats
-  obtain ⟨hP, hS⟩ := PAt.stat (st' := { st with numbadleaves := st.numbadleaves + 1 }) c h hst
+  obtain ⟨hP, hS, hU⟩ := PAt.stat (st' := { st with numbadleaves := st.numbadleaves + 1 }) c h hst
     { numorbits := sS.numorbits.store_other hst (by simp only [csize32, csize64]; omega)
       numgenerators := sS.numgenerators.store_other hst (by simp only [csize32, csize64]; omega)
       numnodes := sS.numnodes.store_other hst (by simp only [csize64]; omega)
@@ -164,6 +164,6 @@ theorem wp_numbadleaves {f : function} {Q : Post} {le : temp_env}
       tctotal := sS.tctotal.store_other hst (by simp only [csize64]; omega)
       canupdates := sS.canupdates.store_other hst (by simp only [csize64]; omega)
       fits := sS.fits } rfl rfl { hs.inv with }
-  exact hQ m' hP hS
+  exact hQ m' hP hS hU
 
 end NautyVerified.Proofs.Search.Processnode

@@ -42,14 +42,14 @@ kernel_rfl type_fmpermG : type_of_fundef (.Internal dense.fn.«fmperm») =
   tfun [tptr tint, tptr tulong, tptr tulong, tint, tint] .Tvoid
 
 set_option maxHeartbeats 8000000 in
-theorem wp_pushPerm {f : function} {Q : Post} {le : temp_env} {w : Array Nat}
+theorem wp_pushPerm {f : function} {Q : Post} {le : temp_env} {w : Array Nat} {rest : statement}
     (c : PCtx m₀ m₁ S e bsr) (h : PAt m₀ m₁ m S ctx bsr st nsp)
     (hw : ArrayAt m .Mint32 S.bWP 0 (ints w) n) (hwsz : w.size = n) (hws : ∀ i < n, w[i]! < n)
     (hwi : ∀ x y, x < n → y < n → w[x]! = w[y]! → x = y)
     (hQ : ∀ m', PAt m₀ m₁ m' S ctx bsr (pushAuto st (Hex.GraphIso.Nauty.fmperm w n)) nsp →
       ArrayAt m' .Mint32 S.bWP 0 (ints w) n →
-      (∀ v, SrAt m bsr v → SrAt m' bsr v) → Q.normal E0 e le m') :
-    Wp xi ge f (.Ssequence wrapC (.Ssequence (sk fmpermCall) (sk advanceC))) Q e le m := by
+      (∀ v, SrAt m bsr v → SrAt m' bsr v) → Wp xi ge f rest Q e le m') :
+    Wp xi ge f (.Ssequence wrapC (.Ssequence (sk fmpermCall) (.Ssequence (sk advanceC) rest))) Q e le m := by
   have hs := h.search
   have hd := hs.distinct
   have hinv := hs.inv
@@ -142,10 +142,11 @@ theorem wp_pushPerm {f : function} {Q : Post} {le : temp_env} {w : Array Nat}
     have hp2 := hp1.unch hu2 (W2 _ (by simp [SLoc.blocks]) (by sep_ne hd) (by sep_ne hd) (by sep_ne hd))
     have hmm2 := (hs.fixed.mm.unch hu1 (by sep_ne hd)).unch hu2
       (W2 _ (by simp [SLoc.blocks]) (by sep_ne hd) (by sep_ne hd) (by sep_ne hd))
-    wp_step; wp_step
+    wp_step; wp_step; wp_step
     refine wp_gptrSet (c.eg _ (by decide)) find_fmptr hp2.writable
       (eval_advance (c.eg _ (by decide)) (c.eg _ (by decide)) hp2 hmm2 hMl) rfl ?_
     intro m3 hp3 hu3 hv3
+    simp only [seqPost, Post.after, E0_append]
     have nb3 : ¬ S.bws = Block.fmptr := by sep_ne hd
     have cf : S.wb + 8 * ((2 * S.M * k : Nat) : Int) = S.wb + 8 * (2 * S.M * k) := by push_cast; rfl
     have cm : S.wb + 8 * ((2 * S.M * k + S.M : Nat) : Int) = S.wb + 8 * (2 * S.M * k + S.M) := by
