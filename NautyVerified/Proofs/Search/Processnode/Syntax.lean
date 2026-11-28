@@ -709,6 +709,162 @@ abbrev case4 : statement :=
         (.Ebinop .Oadd (statsF dense.id.«numbadleaves» tulong) (ci 1 tint) tulong)))
     .Sbreak)
 
+/-- The end of `processnode`: the new level and the short-prune request. -/
+abbrev tailRest : statement :=
+  (.Ssequence
+    (.Ssequence
+      (sk
+        (.Sifthenelse
+          (.Ebinop .Ogt
+            (.Evar dense.id.«nauty:allsamelevel» tint)
+            (.Evar dense.id.«nauty:eqlev_canon» tint)
+            tint)
+          (sk
+            (.Sset
+              (idOf 714)
+              (.Ecast
+                (.Ebinop .Osub (.Evar dense.id.«nauty:allsamelevel» tint) (ci 1 tint) tint)
+                tint)))
+          (sk (.Sset (idOf 714) (.Ecast (.Evar dense.id.«nauty:eqlev_canon» tint) tint)))))
+      (.Sset dense.id.«save» (tv (idOf 714))))
+    (.Ssequence
+      (.Ssequence
+        (sk
+          (.Sifthenelse
+            (.Ebinop .Ole (.Evar dense.id.«nauty:noncheaplevel» tint) (tv dense.id.«save») tint)
+            (sk
+              (.Sset
+                (idOf 715)
+                (.Ecast
+                  (.Ebinop .Osub (.Evar dense.id.«nauty:noncheaplevel» tint) (ci 1 tint) tint)
+                  tint)))
+            (sk (.Sset (idOf 715) (.Ecast (tv dense.id.«save») tint)))))
+        (.Sset dense.id.«newlevel» (tv (idOf 715))))
+      (.Ssequence
+        (.Ssequence
+          (sk
+            (.Sifthenelse
+              (tv dense.id.«ispruneok»)
+              (sk
+                (.Sset
+                  (idOf 716)
+                  (.Ecast
+                    (.Ebinop .One
+                      (tv dense.id.«newlevel»)
+                      (.Evar dense.id.«nauty:gca_first» tint)
+                      tint)
+                    tbool)))
+              (.Sset (idOf 716) (ci 0 tint))))
+          (.Sifthenelse
+            (tv (idOf 716))
+            (sk (.Sassign (.Evar dense.id.«nauty:needshortprune» tint) (ci 1 tint)))
+            .Sskip))
+        (sk (.Sreturn (some (tv dense.id.«newlevel»)))))))
+
+/-- After the `switch`: the partition's pair and the return level. -/
+abbrev tailC : statement :=
+  (.Ssequence
+    (sk
+      (.Sifthenelse
+        (.Ebinop .One (tv dense.id.«level») (.Evar dense.id.«nauty:noncheaplevel» tint) tint)
+        (.Ssequence
+          (sk (.Sset dense.id.«ispruneok» (ci 1 tint)))
+          (.Ssequence
+            (sk
+              (.Sifthenelse
+                (.Ebinop .Oeq
+                  (.Evar dense.id.«nauty:fmptr» (tptr tulong))
+                  (.Evar dense.id.«nauty:worktop» (tptr tulong))
+                  tint)
+                (sk
+                  (.Sassign
+                    (.Evar dense.id.«nauty:fmptr» (tptr tulong))
+                    (.Ebinop .Osub
+                      (.Evar dense.id.«nauty:fmptr» (tptr tulong))
+                      (.Ebinop .Omul (ci 2 tint) (.Evar dense.id.«nauty:m» tint) tint)
+                      (tptr tulong))))
+                .Sskip))
+            (.Ssequence
+              (sk
+                (.Scall none
+                  (.Evar dense.id.«fmptn»
+                    (tfun
+                      [(tptr tint),
+                       (tptr tint),
+                       tint,
+                       (tptr tulong),
+                       (tptr tulong),
+                       tint,
+                       tint]
+                      .Tvoid))
+                  [(.Etempvar dense.id.«lab» (tptr tint)),
+                   (.Etempvar dense.id.«ptn» (tptr tint)),
+                   (.Evar dense.id.«nauty:noncheaplevel» tint),
+                   (.Evar dense.id.«nauty:fmptr» (tptr tulong)),
+                   (.Ebinop .Oadd
+                     (.Evar dense.id.«nauty:fmptr» (tptr tulong))
+                     (.Evar dense.id.«nauty:m» tint)
+                     (tptr tulong)),
+                   (.Evar dense.id.«nauty:m» tint),
+                   (.Evar dense.id.«nauty:n» tint)]))
+              (sk
+                (.Sassign
+                  (.Evar dense.id.«nauty:fmptr» (tptr tulong))
+                  (.Ebinop .Oadd
+                    (.Evar dense.id.«nauty:fmptr» (tptr tulong))
+                    (.Ebinop .Omul (ci 2 tint) (.Evar dense.id.«nauty:m» tint) tint)
+                    (tptr tulong)))))))
+        (sk (.Sset dense.id.«ispruneok» (ci 0 tint)))))
+    (.Ssequence
+      (.Ssequence
+        (sk
+          (.Sifthenelse
+            (.Ebinop .Ogt
+              (.Evar dense.id.«nauty:allsamelevel» tint)
+              (.Evar dense.id.«nauty:eqlev_canon» tint)
+              tint)
+            (sk
+              (.Sset
+                (idOf 714)
+                (.Ecast
+                  (.Ebinop .Osub (.Evar dense.id.«nauty:allsamelevel» tint) (ci 1 tint) tint)
+                  tint)))
+            (sk (.Sset (idOf 714) (.Ecast (.Evar dense.id.«nauty:eqlev_canon» tint) tint)))))
+        (.Sset dense.id.«save» (tv (idOf 714))))
+      (.Ssequence
+        (.Ssequence
+          (sk
+            (.Sifthenelse
+              (.Ebinop .Ole (.Evar dense.id.«nauty:noncheaplevel» tint) (tv dense.id.«save») tint)
+              (sk
+                (.Sset
+                  (idOf 715)
+                  (.Ecast
+                    (.Ebinop .Osub (.Evar dense.id.«nauty:noncheaplevel» tint) (ci 1 tint) tint)
+                    tint)))
+              (sk (.Sset (idOf 715) (.Ecast (tv dense.id.«save») tint)))))
+          (.Sset dense.id.«newlevel» (tv (idOf 715))))
+        (.Ssequence
+          (.Ssequence
+            (sk
+              (.Sifthenelse
+                (tv dense.id.«ispruneok»)
+                (sk
+                  (.Sset
+                    (idOf 716)
+                    (.Ecast
+                      (.Ebinop .One
+                        (tv dense.id.«newlevel»)
+                        (.Evar dense.id.«nauty:gca_first» tint)
+                        tint)
+                      tbool)))
+                (.Sset (idOf 716) (ci 0 tint))))
+            (.Sifthenelse
+              (tv (idOf 716))
+              (sk (.Sassign (.Evar dense.id.«nauty:needshortprune» tint) (ci 1 tint)))
+              .Sskip))
+          (sk (.Sreturn (some (tv dense.id.«newlevel»))))))))
+
 abbrev body : statement :=
   (.Ssequence
     (sk (.Sset dense.id.«code» (ci 0 tint)))
