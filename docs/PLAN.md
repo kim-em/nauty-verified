@@ -414,6 +414,32 @@ Conventions settled while doing these:
   of `canonlab` into `lab`; the `n >= 320` release through the three
   `*_freedyn` functions; `dispatch.cleanup = NULL`.
 
+Open dense pieces (state of main at 70aa43a):
+
+- `processnode_satisfies` (`Proofs/Search/Processnode/`): `classify` part,
+  cases 2-4 and the callback pieces proved; left: case 1 and the case
+  assembly, the `maxlevel` clamp, the `pruneReturn` tail, the switch, the
+  `sr` local, the theorem.
+- `firstpathnode_body` (`Proofs/Search/Node/`): `wp_nodeVisit` (doref and
+  the rebuild), `recordFirst`, the target cell and `firsttc` proved; left:
+  locals and `tcalloc`, the leaf via `firstterminal`, the kill read,
+  `cheapautom`, the child loop against `sweep_true_some`/`firstChild`, the
+  tail, and the chain-freshness conjunct of the post.
+- `othernode_body`: every child-loop step proved (`wp_nodeBreakout`,
+  `wp_fixAdd`/`Del`, `wp_nodeChild`, `wp_prune0`, `wp_nodeLong`,
+  `wp_nodeRecover`, `wp_nodeNext`); left: the loop invariant, the body
+  assembly, then `nodes_satisfies` by induction on `n + 2 - level`. Its
+  output is `Emits t (Em …)` for an abstract `Em` obeying `EmLawOff` /
+  `EmLawFirst` (`Node/Em.lean`), proved for HexGraphIso's `emitted` after the
+  re-pin.
+- Hex facts at the `processnode` call (`LeafOk` of the classified state,
+  `SInv` after `breakout`): in progress (`Spec/NodeProc.lean`).
+- `nauty()` (`Proofs/Top/`): head, sizes, allocations, target-cell reset
+  proved; left: option copies, `ptn`/active, orbits/stats/workspace
+  initialisation, the root call (establishing `SearchAt … (initialC …)`),
+  `updatecan` and the `canonlab` copy, `freedyn`, the composition; then the
+  `Writes`→`Emits` switch in `densenautySpec` together with `main`.
+
 ## Phase 6: dense end-to-end
 
 Shape of the composition: `main`'s specification (`Proofs/Harness/`) is an
