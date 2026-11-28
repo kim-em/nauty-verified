@@ -369,3 +369,6 @@ import NautyVerified.Proofs.Sparse.Refine.DistPass
 import NautyVerified.Proofs.Sparse.Refine.Queue
 import NautyVerified.Proofs.Sparse.Refine.Starts
 import NautyVerified.Proofs.Sparse.Refine.Code
+import NautyVerified.Proofs.Sparse.Refine.Nontrivial.Count
+import NautyVerified.Proofs.Sparse.Refine.Nontrivial.Call
+import NautyVerified.Proofs.Sparse.Refine.Nontrivial.Sort

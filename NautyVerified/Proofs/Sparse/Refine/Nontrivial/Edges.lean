@@ -316,4 +316,92 @@ theorem wp_edge {Q : Post} {le : temp_env} {m : mem} {s : RefineSt n} {c : CS} {
         rw [Array.getElem!_set!_self _ _ _ (by rw [hclsz]; exact hj)] at this
         simp only [hcl]; omega
 
+/-- The `r`-th neighbour of the vertex at position `q` is a vertex. -/
+theorem edge_lt {s : RefineSt n} {level q r : Nat} (hv : s.Valid level) (hq : q < n)
+    (hrd : r < deg (.ofGraph G) s q) :
+    (Graph.ofGraph G).neighbor ((Graph.ofGraph G).offsets[s.lab[q]!]! + r) < n := by
+  have hl := Hex.GraphIso.Nauty.Sparse.perm_bound hv.lab hq
+  have hlo := G.offset_mono (i := s.lab[q]!) (j := s.lab[q]! + 1) (by omega) (by omega)
+  have hhi := G.offset_le (i := s.lab[q]! + 1) (by omega)
+  exact neighbor_lt G (by simp only [deg, Graph.ofGraph] at hrd ⊢; omega)
+
+/-- The loop over the neighbours of the vertex at position `q`. -/
+theorem wp_edgeLoopN {Q : Post} {le : temp_env} {m : mem} {s : RefineSt n} {c : CS} {split q : Nat}
+    (hok : Ok n L) (hm : Mem m L G s S) (hr : Rep L s S) (ht : Tmp le L s) (hv : s.Valid L.level)
+    (hcr : CRep s S c)
+    (hscan : CountScan n s.stamp s.marks c.1 c.2.2 s.cellstart c.2.1 (seenTo (.ofGraph G) s split q 0))
+    (hq : q < n) (hsq : split ≤ q)
+    (hvi : PTree.get id.«vi» le = some (.Vlong (lr (Graph.ofGraph G).offsets[s.lab[q]!]!)))
+    (hdi : PTree.get id.«di» le = some (.Vint (ir (deg (.ofGraph G) s q))))
+    (hii : PTree.get id.«ii» le = some (.Vlong (lr 0)))
+    (hhc : PTree.get id.«hitcells» le = some (.Vint (ir c.2.2.size)))
+    (hQ : ∀ le' m' S', Mem m' L G s S' → Rep L s S' → CRep s S' (countVertex (.ofGraph G) s c q) →
+      CountScan n s.stamp s.marks (countVertex (.ofGraph G) s c q).1
+        (countVertex (.ofGraph G) s c q).2.2 s.cellstart (countVertex (.ofGraph G) s c q).2.1
+        (seenTo (.ofGraph G) s split (q + 1) 0) →
+      Frame L m m' →
+      PTree.get id.«hitcells» le' = some (.Vint (ir (countVertex (.ofGraph G) s c q).2.2.size)) →
+      (∀ x, x ∉ edgeTemps → PTree.get x le' = PTree.get x le) → Q.normal E0 empty_env le' m') :
+    Wp xi sge F edgeLoopN Q empty_env le m := by
+  have hnl := hok.nlt
+  let D := deg (.ofGraph G) s q
+  have hl := Hex.GraphIso.Nauty.Sparse.perm_bound hv.lab hq
+  have hD : D ≤ n := degree_lt G hl
+  let I := fun (v : Nat) (tr : trace) (e' : env) (le' : temp_env) (m' : mem) => tr = E0 ∧
+    e' = empty_env ∧ ∃ r S', r ≤ D ∧ v = D - r ∧ Mem m' L G s S' ∧ Rep L s S' ∧
+      CRep s S' (edgesTo (.ofGraph G) s c q r) ∧
+      CountScan n s.stamp s.marks (edgesTo (.ofGraph G) s c q r).1 (edgesTo (.ofGraph G) s c q r).2.2
+        s.cellstart (edgesTo (.ofGraph G) s c q r).2.1 (seenTo (.ofGraph G) s split q r) ∧
+      Frame L m m' ∧ PTree.get id.«ii» le' = some (.Vlong (lr r)) ∧
+      PTree.get id.«hitcells» le' = some (.Vint (ir (edgesTo (.ofGraph G) s c q r).2.2.size)) ∧
+      ∀ x, x ∉ edgeTemps → PTree.get x le' = PTree.get x le
+  let J := fun (v : Nat) (tr : trace) (e' : env) (le' : temp_env) (m' : mem) => tr = E0 ∧
+    e' = empty_env ∧ ∃ r S', r < D ∧ v = D - r ∧ Mem m' L G s S' ∧ Rep L s S' ∧
+      CRep s S' (edgesTo (.ofGraph G) s c q (r + 1)) ∧
+      CountScan n s.stamp s.marks (edgesTo (.ofGraph G) s c q (r + 1)).1
+        (edgesTo (.ofGraph G) s c q (r + 1)).2.2 s.cellstart (edgesTo (.ofGraph G) s c q (r + 1)).2.1
+        (seenTo (.ofGraph G) s split q (r + 1)) ∧
+      Frame L m m' ∧ PTree.get id.«ii» le' = some (.Vlong (lr r)) ∧
+      PTree.get id.«hitcells» le' = some (.Vint (ir (edgesTo (.ofGraph G) s c q (r + 1)).2.2.size)) ∧
+      ∀ x, x ∉ edgeTemps → PTree.get x le' = PTree.get x le
+  rw [edgeLoopN_eq]
+  refine wp_loop (I := I) (J := J) ?_ ?_ (n := D - 0)
+    ⟨rfl, rfl, 0, S, Nat.zero_le _, rfl, hm, hr, hcr, hscan, Frame.refl _ _, hii, hhc, fun _ _ => rfl⟩
+  · rintro v tr e' le' m' ⟨rfl, rfl, r, S', hr', rfl, hm', hr2, hcr', hsc', hf, hii', hhc', ho⟩
+    have ht' := ht.frame ho (by decide)
+    have hvi' : PTree.get id.«vi» le' = _ := (ho _ (by decide)).trans hvi
+    have hdi' : PTree.get id.«di» le' = _ := (ho _ (by decide)).trans hdi
+    wp_step; wp_step; wp_step
+    apply wp_if_eval
+    rw [Exec.evalExpr, show Exec.evalExpr sge empty_env le' m' (.Etempvar id.«ii» tulong) = _ from hii',
+      show Exec.evalExpr sge empty_env le' m' (tv id.«di») = _ from hdi']
+    simp only [typeof, cop, Isautom.cast_l_i (deg (.ofGraph G) s q) (by omega),
+      Alloc.ltu_lr (a := r) (b := deg (.ofGraph G) s q) (by omega) (by omega)]
+    by_cases hrD : r < D
+    · rw [ite_eq_left (by simpa using hrD)]
+      apply wp_skip
+      refine wp_edge (split := split) hok hm' hr2 ht' hv hcr' hsc' hq hsq hrD hvi' hii' hhc' ?_
+      intro le2 m2 S2 hm2 hr3 hcr2 hf2 hhc2 ho2 hii2
+      refine ⟨by simp, rfl, r, S2, hrD, rfl, hm2, hr3, by rw [edgesTo_succ]; exact hcr2, ?_,
+        hf.trans hf2, hii2.trans hii', by rw [edgesTo_succ]; exact hhc2,
+        fun x hx => (ho2 x hx).trans (ho x hx)⟩
+      have := edge_scan hv (j := (Graph.ofGraph G).neighbor ((Graph.ofGraph G).offsets[s.lab[q]!]! + r))
+        (edge_lt hv hq hrD) hsc'
+      rw [edgesTo_succ, seenTo_succ _ _ _ _ _ hrD]
+      exact this
+    · rw [ite_eq_right (by simpa using hrD)]
+      apply wp_break
+      have hrD' : r = D := by omega
+      subst hrD'
+      refine hQ le' m' S' hm' hr2 hcr' ?_ hf hhc' ho
+      rw [← seenTo_next _ _ hsq]; exact hsc'
+  · rintro v tr e' le' m' ⟨rfl, rfl, r, S', hr', rfl, hm', hr2, hcr', hsc', hf, hii', hhc', ho⟩
+    wp_step; wp_step
+    apply wp_set_eval
+    simp only [Exec.evalExpr, hii', typeof, cop, Alloc.add_lr_one]
+    refine ⟨D - (r + 1), by omega, by simp, rfl, r + 1, S', hr', rfl, hm', hr2, hcr', hsc', hf,
+      temps_gss _ _ _, ?_, fun x hx => ?_⟩
+    · rw [temps_gso _ _ (by decide)]; exact hhc'
+    · rw [temps_gso _ _ (fun h => hx (by simp [h])), ho x hx]
+
 end NautyVerified.Proofs.Sparse.Refine.Nontrivial
