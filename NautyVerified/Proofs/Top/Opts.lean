@@ -28,7 +28,7 @@ set_option linter.unusedSimpArgs false
 variable {xi : ExternalCalls}
 
 /-- `g = rhs` for a scalar global `g` of by-value type `ty`. -/
-theorem wp_gset {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {g : ident}
+theorem wp_gset {ge : genv} {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {g : ident}
     {ty : Cfrontend.Ctypes.type} {chunk : memory_chunk} {b : block}
     (hge : PTree.get g e = none) (hg : Genv.find_symbol ge.genv_genv g = some b)
     (hacc : Cfrontend.Ctypes.access_mode ty = .By_value chunk)

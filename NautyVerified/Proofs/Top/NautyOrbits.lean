@@ -20,6 +20,8 @@ open NautyVerified.Proofs.Search (FieldAt IntAt PtrAt)
 
 set_option linter.unusedSimpArgs false
 
+variable {ge : genv} [E : NautyEnv ge]
+
 variable {xi : ExternalCalls}
 
 /-- `*(pe + a) = rhs` for an `int *` expression `pe`. -/
@@ -73,10 +75,10 @@ theorem idFrom_all (v : Nat → val) (n : Nat) :
 /-- `orbits[i] = i` for `i < n` (`tOrbits`). -/
 theorem wp_tOrbits {Q : Post} {le : temp_env} {m : mem} {bo : block} {n : Nat} {v : Nat → val}
     (hn : n < 1073741824)
-    (hO : FieldAt m .Mint64 Search.Block.orbits 0 (.Vptr bo Ptrofs.zero))
-    (hN : IntAt m Search.Block.n n)
+    (hO : FieldAt m .Mint64 E.orbits 0 (.Vptr bo Ptrofs.zero))
+    (hN : IntAt m E.n n)
     (harr : ArrayAt m .Mint32 bo 0 v n)
-    (hsep : bo ≠ Search.Block.orbits ∧ bo ≠ Search.Block.n)
+    (hsep : bo ≠ E.orbits ∧ bo ≠ E.n)
     (hQ : ∀ le' m', ArrayAt m' .Mint32 bo 0 (ints (Array.ofFn (n := n) fun i => i.val)) n →
       Unch m m' (· = bo) → (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
       (∀ x, x ≠ dense.id.«i» → PTree.get x le' = PTree.get x le) →
@@ -98,7 +100,7 @@ theorem wp_tOrbits {Q : Post} {le : temp_env} {m : mem} {bo : block} {n : Nat} {
   · rintro k le' m' ⟨hk, hi, -, hu, -, -⟩
     refine ⟨hk, hi, ?_⟩
     rw [Exec.evalExpr, show Exec.evalExpr ge (nEnv bI) le' m' (Refine.tv dense.id.«i») = _ from hi,
-      Search.eval_gint (e := nEnv bI) rfl Search.find_n (hN.unch hu (Ne.symm hsep.2))]
+      Search.eval_gint (e := nEnv bI) rfl E.find_n (hN.unch hu (Ne.symm hsep.2))]
     simp only [typeof, cop]
     rw [ir_lt (a := k) (b := n) ⟨by omega, by omega⟩ ⟨by omega, by omega⟩]
     simp
@@ -113,7 +115,7 @@ theorem wp_tOrbits {Q : Post} {le : temp_env} {m : mem} {bo : block} {n : Nat} {
     refine wp_storeE (ofs := Ptrofs.zero) harr' (by omega) _ ?_ rfl (Refine.tv dense.id.«i») k hk hi rfl
       (Refine.tv dense.id.«i») k hi rfl ?_
     · simp only [Exec.evalExpr, Exec.lvalOfVar, show PTree.get dense.id.«nauty:orbits» (nEnv bI) = none
-        from rfl, Search.find_orbits, Exec.derefLoc, Cfrontend.Ctypes.access_mode, Mem.loadv,
+        from rfl, E.find_orbits, Exec.derefLoc, Cfrontend.Ctypes.access_mode, Mem.loadv,
         Alloc.Mptr_eq, show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl, hO'.load]
     intro m'' harr'' hu'' hg''
     rw [idFrom_succ] at harr''

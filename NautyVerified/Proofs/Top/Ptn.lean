@@ -36,7 +36,7 @@ abbrev emptySetGE (g : Common.AST.ident) (mE : expr) (es t : Common.AST.ident) :
           (.Sassign (.Ederef (pv t) tulong) (ci 0 tint))))
       .Sskip)
 
-theorem wp_emptySetGE {g es tmp : Common.AST.ident} {mE : expr} (het : es ≠ tmp) {f : function} {Q : Post}
+theorem wp_emptySetGE {ge : genv} {g es tmp : Common.AST.ident} {mE : expr} (het : es ≠ tmp) {f : function} {Q : Post}
     {e : env} {le : temp_env} {m : mem} {bg ba : block} {ofs : ptrofs} {vals : Nat → val} {M : Nat}
     (hge : PTree.get g e = none) (hg : Genv.find_symbol ge.genv_genv g = some bg)
     (hp : Mem.load .Mint64 m bg (zOfInt 0) = some (.Vptr ba ofs)) (hbg : bg ≠ ba)
@@ -60,7 +60,8 @@ theorem wp_emptySetGE {g es tmp : Common.AST.ident} {mE : expr} (het : es ≠ tm
   simp only [Exec.evalExpr, Exec.lvalOfVar, hge, hg, Exec.derefLoc, Cfrontend.Ctypes.access_mode,
     Mem.loadv, Alloc.Mptr_eq, show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl, hp,
     typeof, cop]
-  rw [add_ptrTo ofs _ M (by omega), sizeof_tulong]
+  rw [add_ptrTo ofs _ M (by omega),
+    show intOfZ (Cfrontend.Ctypes.sizeof ge.genv_cenv tulong) = 8 from rfl]
   simp only [E0_append]
   let base := intOfZ (Ptrofs.unsigned ofs)
   refine wp_loop (I := fun k t e' le' m' => t = E0 ∧ e = e' ∧ k ≤ M ∧
