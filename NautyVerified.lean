@@ -304,6 +304,7 @@ import NautyVerified.Proofs.Sparse.Sort.Part
 import NautyVerified.Proofs.Sparse.Canon
 import NautyVerified.Proofs.Sparse.Prep
 import NautyVerified.Proofs.Sparse.Testcanlab.Satisfies
+import NautyVerified.Proofs.Sparse.Updatecan.Rows
 import NautyVerified.Proofs.Sparse.Testcanlab.Rows
 import NautyVerified.Proofs.Alloc.DynL
 import NautyVerified.Proofs.Sparse.Sort.Ins
