@@ -8,8 +8,7 @@ rev = "03d48470d58705ccfe876e3dc86e8fbda159df88"  # branch nauty-verified
 
 [[require]]
 name = "hex-graph-iso"
-git = "https://github.com/leanprover/hex-graph-iso.git"
-rev = "v0.10.0"
+path = "/tmp/hgi-11048"
 
 [[lean_lib]]
 name = "NautyVerified"
