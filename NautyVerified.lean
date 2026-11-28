@@ -337,3 +337,4 @@ import NautyVerified.Proofs.Sparse.Distvals.Syntax
 import NautyVerified.Proofs.Sparse.Distvals.Loops
 import NautyVerified.Proofs.Sparse.Distvals.Search
 import NautyVerified.Proofs.Sparse.Distvals.Satisfies
+import NautyVerified.Proofs.Sparse.Refine.Pieces
