@@ -48,14 +48,6 @@ theorem cast_dispatch (m : mem) (b : block) (o : Lib.Integers.ptrofs) :
   unfold Cfrontend.Cop.sem_cast Cfrontend.Cop.classify_cast
   simp
 
-kernel_rfl sizeof_dispatch :
-  Cfrontend.Ctypes.sizeof ge.genv_cenv (Cfrontend.Ctypes.Tstruct dense.id._1027 Cfrontend.Ctypes.noattr) =
-    zOfInt 88
-
-kernel_rfl align_dispatch :
-  Cfrontend.Ctypes.alignof_blockcopy ge.genv_cenv
-    (Cfrontend.Ctypes.Tstruct dense.id._1027 Cfrontend.Ctypes.noattr) = zOfInt 8
-
 theorem bool_null (m : mem) (t : Cfrontend.Ctypes.type) :
     Cfrontend.Cop.bool_val Vnullptr (tptr t) m = some false := rfl
 

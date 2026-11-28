@@ -5,7 +5,8 @@ import NautyVerified.Exec.Expr
 # Struct fields `nauty()` reads
 
 Offsets of the fields of `optionstruct` and of the `dispatchvec` (`_1027`)
-fields not in `Search/Node/Fields.lean`, as the composite environment of the
+fields not in `Search/Node/Fields.lean`, and the size and alignment of
+`dispatchvec`, as the composite environment of the
 dense program lays them out, each checked by the kernel.
 -/
 
@@ -111,5 +112,13 @@ kernel_rfl field_dInit : ∀ (b : block) (ofs : ptrofs),
 kernel_rfl field_dCleanup : ∀ (b : block) (ofs : ptrofs),
   Exec.lvalOfField ge (Tstruct dense.id.«_1027» noattr) dense.id.«cleanup» (.Vptr b ofs) =
     some (b, Ptrofs.add ofs (Ptrofs.repr (zOfInt 80)), CompCert4Lean.Cfrontend.Ctypes.bitfield.Full)
+
+kernel_rfl sizeof_dispatch :
+  Cfrontend.Ctypes.sizeof ge.genv_cenv (Cfrontend.Ctypes.Tstruct dense.id._1027 Cfrontend.Ctypes.noattr) =
+    zOfInt 88
+
+kernel_rfl align_dispatch :
+  Cfrontend.Ctypes.alignof_blockcopy ge.genv_cenv
+    (Cfrontend.Ctypes.Tstruct dense.id._1027 Cfrontend.Ctypes.noattr) = zOfInt 8
 
 end NautyVerified.Proofs.Top
