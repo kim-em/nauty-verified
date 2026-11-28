@@ -134,6 +134,59 @@ theorem FieldDyn.frame {m m' : mem} {bc : block} {po so po' so' : ptrofs} {c cap
     mal := fun hc => (h.mal hc).keep (hk hc)
     null := fun hc => by rw [hf.load _ _ h1 h2]; exact h.null hc }
 
+theorem Malloced.valid {m : mem} {b : block} {N : Nat} (h : Malloced m b N) : Mem.valid_block m b :=
+  Mem.perm_valid_block _ _ _ _ _ (h.perm (-1) (by decide) (by omega))
+
+/-- A pair survives a change that leaves its block and its allocated block alone. -/
+theorem FieldDyn.unch {m m' : mem} {bc : block} {po so : ptrofs} {c cap : Nat} {b : block}
+    {S : block → Prop} (h : FieldDyn m bc po so c cap b) (hu : Unch m m' S) (hbc : ¬ S bc)
+    (hb : 0 < cap → ¬ S b) : FieldDyn m' bc po so c cap b :=
+  { h with
+    capLd := by rw [hu.load _ _ _ hbc]; exact h.capLd
+    capW := hu.access _ _ _ _ hbc h.capW
+    ptrW := hu.access _ _ _ _ hbc h.ptrW
+    ptr := fun hc => by rw [hu.load _ _ _ hbc]; exact h.ptr hc
+    mal := fun hc => (h.mal hc).keep (Keep.unch hu (hb hc))
+    null := fun hc => by rw [hu.load _ _ _ hbc]; exact h.null hc }
+
+/-- A store into `bc` apart from the 8 bytes at `o` leaves them. -/
+theorem load_apart' {m m' : mem} {bc : block} {o : ptrofs} {v : val} {chunk : memory_chunk} {ofs : Z}
+    (hst : Mem.store chunk m bc ofs v = some m') (h : Apart chunk ofs o) :
+    Mem.load .Mint64 m' bc (Ptrofs.unsigned o) = Mem.load .Mint64 m bc (Ptrofs.unsigned o) := by
+  apply Mem.load_store_other _ _ _ _ _ _ hst
+  right
+  rcases h with h | h
+  · right; change intOfZ _ ≤ intOfZ _; rw [intOfZ_add]; exact h
+  · left; change intOfZ _ ≤ intOfZ _; rw [intOfZ_add]; exact h
+
+/-- A pair survives a store into its block apart from its two fields. -/
+theorem FieldDyn.store {m m' : mem} {bc : block} {po so : ptrofs} {c cap : Nat} {b : block}
+    {chunk : memory_chunk} {ofs : Z} {w : val} (h : FieldDyn m bc po so c cap b)
+    (hst : Mem.store chunk m bc ofs w = some m') (h1 : Apart chunk ofs po) (h2 : Apart chunk ofs so) :
+    FieldDyn m' bc po so c cap b :=
+  { h with
+    capLd := by rw [load_apart' hst h2]; exact h.capLd
+    capW := Mem.store_valid_access_1 _ _ _ _ _ _ hst _ _ _ _ h.capW
+    ptrW := Mem.store_valid_access_1 _ _ _ _ _ _ hst _ _ _ _ h.ptrW
+    ptr := fun hc => by rw [load_apart' hst h1]; exact h.ptr hc
+    mal := fun hc => (h.mal hc).keep (Keep.unch (Unch.store hst rfl) (h.bne hc).symm)
+    null := fun hc => by rw [load_apart' hst h1]; exact h.null hc }
+
+/-- An allocated pair survives a `wp_dynalloc1F` on another pair of its block. -/
+theorem FieldDyn.after {m m' : mem} {bc : block} {po so po' so' : ptrofs} {c cap cap2 : Nat}
+    {b b2 b2' : block} (h : FieldDyn m bc po' so' c cap b)
+    (hf : FieldFrame m m' bc po so)
+    (hu : Unch m m' (fun z => z = bc ∨ (0 < cap2 ∧ z = b2) ∨ (¬ Mem.valid_block m b2' ∧ z = b2')))
+    (hb2 : 0 < cap2 → b ≠ b2)
+    (h1 : Apart .Mint64 (Ptrofs.unsigned po') po) (h2 : Apart .Mint64 (Ptrofs.unsigned po') so)
+    (h3 : Apart .Mint64 (Ptrofs.unsigned so') po) (h4 : Apart .Mint64 (Ptrofs.unsigned so') so) :
+    FieldDyn m' bc po' so' c cap b :=
+  h.frame hf h1 h2 h3 h4 fun hc => Keep.unch hu fun hz => by
+    rcases hz with hz | ⟨hp2, hz⟩ | ⟨hv, hz⟩
+    · exact h.bne hc hz
+    · exact hb2 hp2 hz
+    · exact hv (hz ▸ (h.mal hc).valid)
+
 /-- Reading field `f` of the struct a temporary points to. -/
 theorem eval_fld {e : env} {le : temp_env} {m : mem} {p sid f : Common.AST.ident}
     {ty : Cfrontend.Ctypes.type} {chunk : memory_chunk} {bc : block} {cofs o : ptrofs} {v : val}

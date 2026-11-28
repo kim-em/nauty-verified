@@ -310,6 +310,7 @@ import NautyVerified.Proofs.Sparse.Updatecan.Rows
 import NautyVerified.Proofs.Sparse.Updatecan.Satisfies
 import NautyVerified.Proofs.Sparse.Check
 import NautyVerified.Proofs.Sparse.Freedyn
+import NautyVerified.Proofs.Sparse.Init.Satisfies
 import NautyVerified.Proofs.Sparse.Testcanlab.Rows
 import NautyVerified.Proofs.Alloc.DynL
 import NautyVerified.Proofs.Alloc.DynF
