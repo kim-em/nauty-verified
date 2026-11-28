@@ -1,4 +1,5 @@
 import NautyVerified.Proofs.Search.Processnode.Switch
+import NautyVerified.Proofs.Dispatch.Dense
 
 /-!
 # `processnode` meets its specification
@@ -51,15 +52,18 @@ theorem leafCode_ne (leaf : Leaf) : (leafCode leaf ≠ 0) ↔ (leaf != .internal
 theorem leafCode_le (leaf : Leaf) : 0 ≤ leafCode leaf ∧ leafCode leaf ≤ 4 := by
   cases leaf <;> simp [leafCode]
 
-variable {n : Nat} {m₀ m₁ m : mem} {S : SLoc} {ctx : Ctx n} {e : env} {bsr : block}
-  {st : Search n} {nsp : Bool}
+open NautyVerified.Proofs.Dispatch (Ops DispatchRep DispatchC)
+
+variable {ge : genv} [E : NautyEnv ge] {O : Ops}
+variable {n : Nat} {D : DispatchC ge O} {m₀ m₁ m : mem} {S : SLoc} {gl : D.GLoc} {cl : D.CLoc}
+  {G : O.Gr n} {e : env} {bsr : block} {st : SearchState n (O.Canon n)} {nsp : Bool}
 
 set_option maxHeartbeats 8000000 in
 theorem wp_maxC {f : function} {Q : Post} {le : temp_env} {level : Nat} {leaf : Leaf}
-    (c : PCtx m₀ m₁ S e bsr) (h : PAt m₀ m₁ m S ctx bsr st false)
+    (c : PCtx D m₀ m₁ S gl cl e bsr) (h : PAt D m₀ m₁ m S gl cl G bsr st false)
     (hcode : PTree.get dense.id.code le = some (.Vint (ir (leafCode leaf))))
     (hlev : PTree.get dense.id.level le = some (.Vint (ir level))) (hl : level ≤ n)
-    (hQ : ∀ le' m', PAt m₀ m₁ m' S ctx bsr
+    (hQ : ∀ le' m', PAt D m₀ m₁ m' S gl cl G bsr
         (if (leaf != .internal && level > st.maxlevel) then { st with maxlevel := level } else st) false →
       (∀ v, SrAt m bsr v → SrAt m' bsr v) → Unch m m' (· = S.bst) →
       (∀ x, x ≠ idOf 707 → PTree.get x le' = PTree.get x le) → Q.normal E0 e le' m') :
@@ -126,9 +130,10 @@ theorem va_of_perm {m : mem} {b : block} (h : Mem.perm m b (zOfInt 0) .Cur .None
   rw [this]; exact h
 
 set_option maxHeartbeats 16000000 in
-theorem processnode_satisfies (S : SLoc) (ctx : Ctx n) (st : Search n) (level numcells : Nat) :
+theorem processnode_satisfiesG (D : DispatchC ge O) (C : Classifier O) (S : SLoc) (gl : D.GLoc)
+    (cl : D.CLoc) (G : O.Gr n) (st : SearchState n (O.Canon n)) (level numcells : Nat) :
     Satisfies xi ge (.Internal dense.fn.«nauty:processnode»)
-      (processnodeSpec xi S ctx st level numcells) := by
+      (processnodeSpecG D.toDispatchRep xi S gl cl G st level numcells) := by
   refine satisfies_internal (Entry := fun _ m₀ e le m => ∃ bsr,
     e = PTree.set dense.id.sr (bsr, tint) empty_env ∧
     Mem.alloc m₀ (zOfInt 0) (sizeof ge.genv_cenv tint) = (m, bsr) ∧
@@ -159,30 +164,26 @@ theorem processnode_satisfies (S : SLoc) (ctx : Ctx n) (st : Search n) (level nu
         have h4 : intOfZ (Common.Memdata.size_chunk .Mint32) = 4 := rfl
         simp only [intOfZ_add, intOfZ_zOfInt, h4, Int.zero_add] at this
         exact this
-    have hne : ∀ z ∈ S.blocks, z ≠ bsr := fun z hz e => hfresh (e ▸ hval z hz)
-    have hwk0 : ∀ z, IsWork m₀ z → ¬ z = bsr := fun z hz e => hfresh (e ▸ hz.valid)
-    have hg : ∀ z ∈ workG, ¬ z = bsr := fun z hz => hne z (workG_blocks S hz)
-    have c : PCtx m₀ m₁ S (PTree.set dense.id.sr (bsr, tint) empty_env) bsr :=
+    have hne : ∀ z ∈ S.blocksG D.toDispatchRep gl cl, z ≠ bsr := fun z hz e => hfresh (e ▸ hval z hz)
+    have hwk0 : ∀ z, IsWorkG D.toDispatchRep m₀ z → ¬ z = bsr := fun z hz e => hfresh (e ▸ hz.valid)
+    have back := (h.work.unch hU (fun z hz => hne z (SLoc.mem_blocksG_of _
+        (.inr (.inr (.inr (.inr (.inr (D.wglobs_sub z hz))))))))
+      ⟨hne _ (SLoc.mem_blocksG_of _ (.inr (.inr (.inr (.inr (.inl (by simp))))))),
+        hne _ (SLoc.mem_blocksG_of _ (.inr (.inr (.inr (.inr (.inl (by simp)))))))⟩ hwk0 hv01).2
+    have c : PCtx D m₀ m₁ S gl cl (PTree.set dense.id.sr (bsr, tint) empty_env) bsr :=
       { valid0 := hval, fresh := hfresh, valid1 := hvnew, grow01 := hv01
-        work10 := fun z hz => by
-          obtain ⟨cW, bW, cS, bS, cB, bB, cN, bN, dW, dS, dB, dN, -⟩ := h.work.arr
-          simp only [List.forall_mem_cons] at hg
-          obtain ⟨g1, g2, g3, g4, g5, g6, g7, g8, -⟩ := hg
-          rcases hz with ⟨k, hk, d⟩ | ⟨k, hk, d⟩ | ⟨k, hk, d⟩ | ⟨k, hk, d⟩
-          · exact .inl (work_slot_unch dW hU g1 g2 hk d)
-          · exact .inr (.inl (work_slot_unch dS hU g3 g4 hk d))
-          · exact .inr (.inr (.inl (work_slot_unch dB hU g5 g6 hk d)))
-          · exact .inr (.inr (.inr (work_slot_unch dN hU g7 g8 hk d)))
+        work10 := back
         esr := PTree.gss _ _ _
         eg := fun x hx => by rw [PTree.gso _ _ hx]; rfl
         eEq := rfl }
-    have hP : PAt m₀ m₁ m₁ S ctx bsr st false :=
-      { search := h.unch hU hne hwk0
+    have hP : PAt D m₀ m₁ m₁ S gl cl G bsr st false :=
+      { search := h.unch hU hne hwk0 hv01
         frame := ⟨hU.mono fun z hz => .inr (.inl (hz ▸ hfresh)), hv01⟩
         work := fun z hz => .inl hz
         grow1 := fun _ h => h
         srW := hva1
-        ua := hU.access _ _ _ _ (hne _ (by simp [SLoc.blocks])) (va_of_perm hua) }
+        ua := hU.access _ _ _ _ (hne _ (SLoc.mem_blocksG_of _ (.inr (.inr (.inr (.inl (by simp)))))))
+          (va_of_perm hua) }
     have hinv := h.inv
     have hfr : dense.fn.«nauty:processnode».fn_return = tint := rfl
     rw [dense.fn.«nauty:processnode».fn_body_eq, body_eq]
@@ -206,14 +207,16 @@ theorem processnode_satisfies (S : SLoc) (ctx : Ctx n) (st : Search n) (level nu
     rw [eval_ci]
     simp only [seqPost, Post.after, E0_append]
     wp_step
-    refine wp_classifyC c hP (by rw [t0 _ (by simp)]; exact hlev0) hln
+    refine wp_classifyC C c hP (by rw [t0 _ (by simp)]; exact hlev0) hln
       (by rw [t0 _ (by simp)]; exact hnc0) hncl (by rw [t0 _ (by simp)]; exact hlab0) (temps_gss _ _ _)
       hlok.firstlabSmall hlok.firstlabSurj hlok.canonlabSmall hlok.canonlabSurj ?_
     intro le2 m2 hC
     simp only [seqPost, Post.after, E0_append]
-    have hk := Keeps.classify ctx level numcells st
-    have hcases := classify_cases ctx level numcells st
-    generalize hr : classify ctx level numcells st = r at hC hk hcases
+    have hcl := C.classify_eq G level numcells st
+    rw [hcl] at hC
+    have hk := Keeps.classifyBy (C.update G) G level numcells st
+    have hcases := classifyBy_cases C G level numcells st
+    generalize hr : classifyBy O (C.update G) G level numcells st = r at hC hk hcases
     have hlev2 : PTree.get dense.id.level le2 = some (.Vint (ir level)) := by
       rw [hC.temps _ (by simp), t0 _ (by simp)]; exact hlev0
     have hlab2 : PTree.get dense.id.lab le2 = some (.Vptr S.bl S.lofs) := by
@@ -231,7 +234,7 @@ theorem processnode_satisfies (S : SLoc) (ctx : Ctx n) (st : Search n) (level nu
       · exact ⟨⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩, rfl, rfl⟩
       · exact ⟨Keeps.refl _, rfl, rfl⟩
     have hKK := hk.trans hK2.1
-    have hd := h3.search.distinct
+    have hd := h3.search.lit
     refine wp_switchTail (level := level) (leaf := r.1) c h3 hcb hfr
       (by rw [ho3 _ (by decide)]; exact hC.code) (by rw [ho3 _ (by decide)]; exact hlev2) hln
       (by rw [ho3 _ (by decide)]; exact hlab2) (by rw [ho3 _ (by decide)]; exact hptn2)
@@ -263,14 +266,23 @@ theorem processnode_satisfies (S : SLoc) (ctx : Ctx n) (st : Search n) (level nu
     · intro m' t h' hW
       obtain ⟨mf, hfree, hS, hF, hWk⟩ := PAt.finish c h'
       refine ⟨mf, hfree, ?_⟩
-      have hle : leafExit (classify ctx level numcells st).1 level (classify ctx level numcells st).2 =
+      have hle : leafExit (O.classify G level numcells st).1 level (O.classify G level numcells st).2 =
           lxBody r.1 level st2 := by
-        rw [leafExit_eq, hr, hst2]
-      simp only [processnodeSpec]
+        rw [leafExit_eq, hcl, hr, hst2]
+      simp only [processnodeSpecG]
       rw [hle]
       refine ⟨rfl, hS, ?_, hF, hWk⟩
       have hng : st2.numgenerators = st.numgenerators := hKK.numgenerators
       simp only [leafWords, hng] at hW
       exact hW
+
+
+/-- The dense instance: nauty.c's `processnode` is HexGraphIso's `classify` followed by
+`leafExit`. -/
+theorem processnode_satisfies (S : SLoc) (ctx : Ctx n) (st : Search n) (level numcells : Nat) :
+    Satisfies xi Program.ge (.Internal dense.fn.«nauty:processnode»)
+      (processnodeSpec xi S ctx st level numcells) :=
+  processnodeSpec_ofG
+    (processnode_satisfiesG Dispatch.dense denseClassifier S () () ctx st level numcells)
 
 end NautyVerified.Proofs.Search.Processnode

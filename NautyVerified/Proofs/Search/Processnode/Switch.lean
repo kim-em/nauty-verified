@@ -25,8 +25,11 @@ open Hex.GraphIso.Nauty
 set_option linter.unusedSimpArgs false
 
 variable {xi : ExternalCalls}
-variable {n : Nat} {m₀ m₁ m : mem} {S : SLoc} {ctx : Ctx n} {e : env} {bsr : block}
-  {st : Search n} {nsp : Bool}
+open NautyVerified.Proofs.Dispatch (Ops DispatchRep DispatchC)
+
+variable {ge : genv} [E : NautyEnv ge] {O : Ops}
+variable {n : Nat} {D : DispatchC ge O} {m₀ m₁ m : mem} {S : SLoc} {gl : D.GLoc} {cl : D.CLoc}
+  {G : O.Gr n} {e : env} {bsr : block} {st : SearchState n (O.Canon n)} {nsp : Bool}
 
 abbrev switchC : statement :=
   sk (.Sswitch (tv dense.id.«code»)
@@ -35,11 +38,11 @@ abbrev switchC : statement :=
         (.LScons (some (zOfInt 2)) case2
           (.LScons (some (zOfInt 3)) case3 (.LScons (some (zOfInt 4)) case4 .LSnil))))))
 
-theorem pushAuto_numgen (st : Search n) (pair : VSet n × VSet n) :
+theorem pushAuto_numgen {κ : Type} (st : SearchState n κ) (pair : VSet n × VSet n) :
     (pushAuto st pair).numgenerators = st.numgenerators := by
   unfold pushAuto; split <;> rfl
 
-theorem pruneReturn_numgen (level : Nat) (st : Search n) :
+theorem pruneReturn_numgen {κ : Type} (level : Nat) (st : SearchState n κ) :
     (pruneReturn level st).2.numgenerators = st.numgenerators := by
   rw [pruneReturn_eq]; simp only []; split
   · exact pushAuto_numgen _ _
@@ -47,7 +50,7 @@ theorem pruneReturn_numgen (level : Nat) (st : Search n) :
 
 set_option maxHeartbeats 16000000 in
 theorem wp_switchTail {f : function} {Q : Post} {le : temp_env} {level : Nat} {leaf : Leaf}
-    (c : PCtx m₀ m₁ S e bsr) (h : PAt m₀ m₁ m S ctx bsr st false) (hcb : AutomCb xi S.bUA)
+    (c : PCtx D m₀ m₁ S gl cl e bsr) (h : PAt D m₀ m₁ m S gl cl G bsr st false) (hcb : AutomCb xi S.bUA)
     (hfr : f.fn_return = tint)
     (hcode : PTree.get dense.id.code le = some (.Vint (ir (leafCode leaf))))
     (hlev : PTree.get dense.id.level le = some (.Vint (ir level))) (hl : level ≤ n)
@@ -58,7 +61,7 @@ theorem wp_switchTail {f : function} {Q : Post} {le : temp_env} {level : Nat} {l
       ArrayAt m .Mint32 S.bWP 0 (ints st.workperm) n ∧
       ∀ x y, x < n → y < n → st.workperm[x]! = st.workperm[y]! → x = y)
     (hbetter : ∀ s, leaf = .better s → SrAt m bsr s ∧ s ≤ st.samerows)
-    (hFin : ∀ m' t, PAt m₀ m₁ m' S ctx bsr (lxBody leaf level st).2
+    (hFin : ∀ m' t, PAt D m₀ m₁ m' S gl cl G bsr (lxBody leaf level st).2
         (exitValue level (lxBody leaf level st).1).2 →
       Writes t (leafWords st (lxBody leaf level st).2) →
       ∃ mf, Mem.free_list m' (blocks_of_env ge e) = some mf ∧
@@ -91,7 +94,7 @@ theorem wp_switchTail {f : function} {Q : Post} {le : temp_env} {level : Nat} {l
       simp only [lxBody, admit_eq, pushAuto_numgen]
     have e2 : (lxBody .autoFirst level st).2.workperm = st.workperm := by
       simp only [lxBody, admit_eq]
-      exact (pushAuto_fields (st := { st with genTrace := st.genTrace.push st.workperm }) _).2
+      unfold pushAuto; split <;> rfl
     obtain ⟨mf, hf, hr⟩ := hFin m' t h' (by simp only [leafWords, e1, ite_true, e2]; exact hW)
     rw [ev] at hr
     exact ⟨mf, hf, hr⟩

@@ -26,7 +26,7 @@ open NautyVerified.Proofs.Search
 
 set_option linter.unusedSimpArgs false
 
-variable {xi : ExternalCalls}
+variable {xi : ExternalCalls} {ge : genv} [E : NautyEnv ge]
 
 theorem wp_scatter {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
     {ref : ident} {bgW bW bgR bR bl : block} {lofs : ptrofs} {R lab w : Array Nat} {N : Nat}
@@ -41,8 +41,8 @@ theorem wp_scatter {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
     (hra : ArrayAt m .Mint32 bR 0 (ints R) N)
     (hlab : PTree.get dense.id.lab le = some (.Vptr bl lofs))
     (hla : ArrayAt m .Mint32 bl (intOfZ (Ptrofs.unsigned lofs)) (ints lab) N)
-    (hnE : PTree.get dense.id.«nauty:n» e = none) (hn : IntAt m Block.n N)
-    (hWn : bW ≠ Block.n) (hWg : bW ≠ bgW) (hWl : bW ≠ bl) (hWR : bW ≠ bR) (hWgR : bW ≠ bgR)
+    (hnE : PTree.get dense.id.«nauty:n» e = none) (hn : IntAt m E.n N)
+    (hWn : bW ≠ E.n) (hWg : bW ≠ bgW) (hWl : bW ≠ bl) (hWR : bW ≠ bR) (hWgR : bW ≠ bgR)
     (hQ : ∀ le' m', ArrayAt m' .Mint32 bW 0 (ints (scatterW R lab w N)) N → Unch m m' (· = bW) →
       Keep m m' bW → (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
       (∀ x, x ≠ dense.id.i → PTree.get x le' = PTree.get x le) → Q.normal E0 e le' m') :
@@ -66,7 +66,7 @@ theorem wp_scatter {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
     dense.id.i _ rfl _ N hN ?_ ?_ ?_ ?_ ?_
   · rintro k le' m' ⟨hk, hi, -, -, hu, -, -⟩
     refine ⟨hk, hi, ?_⟩
-    rw [Exec.evalExpr, eval_gint (le := le') hnE find_n (hn.unch hu (Ne.symm hWn)),
+    rw [Exec.evalExpr, eval_gint (le := le') hnE E.find_n (hn.unch hu (Ne.symm hWn)),
       show Exec.evalExpr ge e le' m' (tv dense.id.i) = _ from hi]
     simp only [typeof, cop]
     rw [ir_lt (a := (k : Int)) (b := (N : Int)) ⟨by omega, by omega⟩ ⟨by omega, by omega⟩]

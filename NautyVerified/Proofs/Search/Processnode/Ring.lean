@@ -27,6 +27,10 @@ set_option linter.unusedSimpArgs false
 
 variable {xi : ExternalCalls}
 
+open NautyVerified.Proofs.Dispatch (Ops DispatchRep)
+
+variable {ge : genv} [E : NautyEnv ge] {O : Ops} {D : DispatchRep ge O}
+
 /-- The slot `pushAuto` writes. -/
 def slotOf (k : Nat) : Nat := if k = wsPairs then wsPairs - 1 else k
 
@@ -62,8 +66,9 @@ theorem eq_pp (ce : composite_env) (m : mem) (b1 b2 : block) (o1 o2 : ptrofs) (t
       (Val.cmplu_bool (Mem.valid_pointer m) .Ceq (.Vptr b1 o1) (.Vptr b2 o2)).map Val.of_bool := rfl
 
 /-- `fmptr == worktop`. -/
-theorem eval_full {n : Nat} {e : env} {le : temp_env} {m : mem} {S : SLoc} {ctx : Ctx n}
-    {st : Search n} {pre nsp : Bool} (h : SearchAt m S ctx st pre nsp)
+theorem eval_full {n : Nat} {e : env} {le : temp_env} {m : mem} {S : SLoc} {gl : D.GLoc}
+    {cl : D.CLoc} {G : O.Gr n} {st : SearchState n (O.Canon n)} {pre nsp : Bool}
+    (h : SearchAtG D m S gl cl G st pre nsp)
     (h1 : PTree.get dense.id.«nauty:fmptr» e = none) (h2 : PTree.get dense.id.«nauty:worktop» e = none) :
     Exec.evalExpr ge e le m (.Ebinop .Oeq (.Evar dense.id.«nauty:fmptr» (tptr tulong))
       (.Evar dense.id.«nauty:worktop» (tptr tulong)) tint) =
@@ -99,11 +104,11 @@ theorem eval_full {n : Nat} {e : env} {le : temp_env} {m : mem} {S : SLoc} {ctx 
       simp only [← intOfZ_Ptrofs_unsigned, hu _ hk1, hu _ (Nat.le_refl _)] at this
       omega
     · intro he; rw [he]
-  have hfm : PtrAt m Block.fmptr (.Vptr S.bws (ptrTo S.wb 8 K)) := by
+  have hfm : PtrAt m E.fmptr (.Vptr S.bws (ptrTo S.wb 8 K)) := by
     rw [← hK, ← fmptr_ptrTo]; exact h.arrays.autos.fmptr
-  have hwt : PtrAt m Block.worktop (.Vptr S.bws (ptrTo S.wb 8 T)) := by
+  have hwt : PtrAt m E.worktop (.Vptr S.bws (ptrTo S.wb 8 T)) := by
     rw [← hT, ← worktop_ptrTo]; exact h.fixed.worktop
-  rw [Exec.evalExpr, eval_gptr h1 find_fmptr rfl hfm, eval_gptr h2 find_worktop rfl hwt]
+  rw [Exec.evalExpr, eval_gptr h1 E.find_fmptr rfl hfm, eval_gptr h2 E.find_worktop rfl hwt]
   simp only [typeof, eq_pp, hcmp, Option.map]
   have : (K = T) ↔ st.autos.size = wsPairs := by
     rw [← hK, ← hT]
@@ -130,11 +135,12 @@ theorem wp_gptrSet {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
 
 /-- `if (fmptr == worktop) fmptr -= 2 * m;` -/
 theorem wp_wrap {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem} {S : SLoc}
-    {ctx : Ctx n} {st : Search n} {pre nsp : Bool} (h : SearchAt m S ctx st pre nsp)
+    {gl : D.GLoc} {cl : D.CLoc} {G : O.Gr n} {st : SearchState n (O.Canon n)} {pre nsp : Bool}
+    (h : SearchAtG D m S gl cl G st pre nsp)
     (h1 : PTree.get dense.id.«nauty:fmptr» e = none) (h2 : PTree.get dense.id.«nauty:worktop» e = none)
     (h3 : PTree.get dense.id.«nauty:m» e = none)
-    (hQ : ∀ m', PtrAt m' Block.fmptr (.Vptr S.bws (ptrTo S.wb 8 (2 * S.M * slotOf st.autos.size))) →
-      Unch m m' (· = Block.fmptr) → (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
+    (hQ : ∀ m', PtrAt m' E.fmptr (.Vptr S.bws (ptrTo S.wb 8 (2 * S.M * slotOf st.autos.size))) →
+      Unch m m' (· = E.fmptr) → (∀ z, Mem.valid_block m z → Mem.valid_block m' z) →
       Q.normal E0 e le m') :
     Wp xi ge f (Set.sk (.Sifthenelse
       (.Ebinop .Oeq (.Evar dense.id.«nauty:fmptr» (tptr tulong))
@@ -145,7 +151,7 @@ theorem wp_wrap {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_env} {m
       .Sskip)) Q e le m := by
   have hM := h.M1
   have hMl := h.Mlt
-  have hfm : PtrAt m Block.fmptr (.Vptr S.bws (ptrTo S.wb 8 (2 * S.M * st.autos.size))) := by
+  have hfm : PtrAt m E.fmptr (.Vptr S.bws (ptrTo S.wb 8 (2 * S.M * st.autos.size))) := by
     rw [← fmptr_ptrTo]; exact h.arrays.autos.fmptr
   wp_step; wp_step
   refine wp_ifB (eval_full h h1 h2) rfl ?_
@@ -154,10 +160,10 @@ theorem wp_wrap {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_env} {m
     wp_step; wp_step
     have hk : 2 * S.M * wsPairs = 2 * S.M * (wsPairs - 1) + 2 * S.M := by
       rw [Nat.mul_sub_one, Nat.sub_add_cancel (Nat.le_mul_of_pos_right _ (by decide))]
-    refine wp_gptrSet h1 find_fmptr hfm.writable (b := S.bws)
+    refine wp_gptrSet h1 E.find_fmptr hfm.writable (b := S.bws)
       (o := ptrTo S.wb 8 (2 * S.M * (wsPairs - 1))) ?_ rfl ?_
-    · rw [Exec.evalExpr, eval_gptr h1 find_fmptr rfl hfm, Exec.evalExpr, eval_ci,
-        eval_gint h3 find_m h.fixed.mm]
+    · rw [Exec.evalExpr, eval_gptr h1 E.find_fmptr rfl hfm, Exec.evalExpr, eval_ci,
+        eval_gint h3 E.find_m h.fixed.mm]
       simp only [typeof, cop, ir_mul]
       rw [hf, hk, show (2 : Int) * (S.M : Int) = ((2 * S.M : Nat) : Int) by push_cast; rfl,
         sub_ptrTo8 _ _ _ _ (by omega)]

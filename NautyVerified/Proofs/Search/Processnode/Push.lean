@@ -56,8 +56,8 @@ theorem pushA_get {autos : Array (VSet n × VSet n)} (pair : VSet n × VSet n)
       simp only [getElem!_def, Array.getElem?_push]
       rw [if_neg hk]
 
-theorem AutosAt.push {m m' : mem} {S : SLoc} {autos : Array (VSet n × VSet n)}
-    (ha : AutosAt m S autos) (hM : 0 < S.M) {pair : VSet n × VSet n}
+theorem AutosAtG.push {ge : genv} [E : NautyEnv ge] {m m' : mem} {S : SLoc} {autos : Array (VSet n × VSet n)}
+    (ha : AutosAtG m S autos) (hM : 0 < S.M) {pair : VSet n × VSet n}
     {wf wm : Nat → Lib.Integers.int64}
     (hf : ArrayAt m' .Mint64 S.bws (S.wb + 8 * (2 * S.M * slotOf autos.size)) (longs wf) S.M)
     (hm : ArrayAt m' .Mint64 S.bws (S.wb + 8 * (2 * S.M * slotOf autos.size + S.M)) (longs wm) S.M)
@@ -65,8 +65,8 @@ theorem AutosAt.push {m m' : mem} {S : SLoc} {autos : Array (VSet n × VSet n)}
     (hr : Rest m m' S.bws (S.wb + 8 * (2 * S.M * slotOf autos.size)) S.bws
       (S.wb + 8 * (2 * S.M * slotOf autos.size + S.M)) S.M)
     (hk : Alloc.Keep m m' S.bws)
-    (hp : PtrAt m' Block.fmptr (.Vptr S.bws (ptrTo S.wb 8 (2 * S.M * (slotOf autos.size + 1))))) :
-    AutosAt m' S (pushA autos pair) := by
+    (hp : PtrAt m' E.fmptr (.Vptr S.bws (ptrTo S.wb 8 (2 * S.M * (slotOf autos.size + 1))))) :
+    AutosAtG m' S (pushA autos pair) := by
   have hsz := ha.size
   obtain ⟨ww, hws, hrep⟩ := ha.arr
   have hk1 : slotOf autos.size + 1 ≤ wsPairs := by

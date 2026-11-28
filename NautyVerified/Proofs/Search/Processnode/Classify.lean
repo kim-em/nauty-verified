@@ -24,21 +24,24 @@ open Hex.GraphIso.Nauty
 set_option linter.unusedSimpArgs false
 
 variable {xi : ExternalCalls}
-variable {n : Nat} {m₀ m₁ m : mem} {S : SLoc} {ctx : Ctx n} {e : env} {bsr : block}
-  {st : Search n} {nsp : Bool}
+open NautyVerified.Proofs.Dispatch (Ops DispatchRep DispatchC)
 
-theorem canonTestS_canonlab (ctx : Ctx n) (level : Nat) (st : Search n) :
-    (canonTestS ctx level st).1.canonlab = st.canonlab := by
-  unfold canonTestS; split
+variable {ge : genv} [E : NautyEnv ge] {O : Ops}
+variable {n : Nat} {D : DispatchC ge O} {m₀ m₁ m : mem} {S : SLoc} {gl : D.GLoc} {cl : D.CLoc}
+  {G : O.Gr n} {e : env} {bsr : block} {st : SearchState n (O.Canon n)} {nsp : Bool}
+
+theorem canonTestG_canonlab (upd : O.Canon n → Array Nat → Nat → O.Canon n) (level : Nat)
+    (st : SearchState n (O.Canon n)) : (canonTestG O upd G level st).1.canonlab = st.canonlab := by
+  unfold canonTestG; split
   · split <;> rfl
   · rfl
 
-theorem pickCanon_ne (st : Search n) (s : Nat) : (pickCanon st s).1 ≠ .autoFirst := by
+theorem pickCanon_ne {κ : Type} (st : SearchState n κ) (s : Nat) : (pickCanon st s).1 ≠ .autoFirst := by
   unfold pickCanon; split
   · simp
   · split <;> simp
 
-theorem pickCanon_better (st : Search n) {s s' : Nat} (h : (pickCanon st s).1 = .better s') :
+theorem pickCanon_better {κ : Type} (st : SearchState n κ) {s s' : Nat} (h : (pickCanon st s).1 = .better s') :
     s' = s := by
   revert h; unfold pickCanon; split
   · simp
@@ -47,9 +50,10 @@ theorem pickCanon_better (st : Search n) {s s' : Nat} (h : (pickCanon st s).1 = 
     · simp
 
 /-- What the C leaves for the classification `r`. -/
-structure Classified (m₀ m₁ m' : mem) (S : SLoc) (ctx : Ctx n) (bsr : block) (le le' : temp_env)
-    (r : Leaf × Search n) : Prop where
-  at_ : PAt m₀ m₁ m' S ctx bsr r.2 false
+structure Classified (D : DispatchC ge O) (m₀ m₁ m' : mem) (S : SLoc) (gl : D.GLoc) (cl : D.CLoc)
+    (G : O.Gr n) (bsr : block) (le le' : temp_env) (r : Leaf × SearchState n (O.Canon n)) :
+    Prop where
+  at_ : PAt D m₀ m₁ m' S gl cl G bsr r.2 false
   code : PTree.get dense.id.code le' = some (.Vint (ir (leafCode r.1)))
   perm : r.1 = .autoFirst ∨ r.1 = .autoCanon → ArrayAt m' .Mint32 S.bWP 0 (ints r.2.workperm) n
   sr : ∀ s, r.1 = .better s → SrAt m' bsr s
@@ -57,13 +61,13 @@ structure Classified (m₀ m₁ m' : mem) (S : SLoc) (ctx : Ctx n) (bsr : block)
     PTree.get x le' = PTree.get x le
 
 /-- The canonical comparison and its code, from `code == 0`. -/
-theorem wp_canonBranch {f : function} {Q : Post} {le : temp_env} {level : Nat}
-    (c : PCtx m₀ m₁ S e bsr) (h : PAt m₀ m₁ m S ctx bsr st false)
+theorem wp_canonBranch {f : function} {Q : Post} {le : temp_env} {level : Nat} (C : Classifier O)
+    (c : PCtx D m₀ m₁ S gl cl e bsr) (h : PAt D m₀ m₁ m S gl cl G bsr st false)
     (hlev : PTree.get dense.id.level le = some (.Vint (ir level))) (hlv : level < 2147483648)
     (hlab : PTree.get dense.id.lab le = some (.Vptr S.bl S.lofs))
     (hcode : PTree.get dense.id.code le = some (.Vint (ir 0)))
     (hcl : ∀ i < n, st.canonlab[i]! < n) (hcs : ∀ v < n, ∃ i < n, st.canonlab[i]! = v)
-    (hQ : ∀ le' m', Classified m₀ m₁ m' S ctx bsr le le' (classifyCanon ctx level st) →
+    (hQ : ∀ le' m', Classified D m₀ m₁ m' S gl cl G bsr le le' (classifyCanonG O (C.update G) G level st) →
       Q.normal E0 e le' m') :
     Wp xi ge f (sk (.Sifthenelse (.Ebinop .Oeq (tv dense.id.«code») (ci 0 tint) tint)
       (sk (.Sifthenelse (.Evar dense.id.«nauty:getcanon» tint)
@@ -72,14 +76,14 @@ theorem wp_canonBranch {f : function} {Q : Post} {le : temp_env} {level : Nat}
         (sk (.Sset dense.id.«code» (ci 4 tint)))))
       .Sskip)) Q e le m := by
   have hs := h.search
-  rw [classifyCanon_pick] at hQ
+  rw [classifyCanonG_pick] at hQ
   wp_step; wp_step
   refine wp_ifB (eval_eqI (show Exec.evalExpr ge e le m (tv dense.id.code) = _ from hcode)
     (eval_ci 0) rfl rfl ⟨by decide, by decide⟩ ⟨by decide, by decide⟩) rfl ?_
   simp only [decide_true, ite_true]
   wp_step; wp_step
   apply wp_if_eval
-  rw [eval_gint (c.eg _ (by decide)) find_getcanon hs.fixed.getcanon]
+  rw [eval_gint (c.eg _ (by decide)) E.find_getcanon hs.fixed.getcanon]
   simp only [typeof, cop]
   rw [ite_eq_left (by decide)]
   wp_step; wp_step; wp_step
@@ -87,11 +91,11 @@ theorem wp_canonBranch {f : function} {Q : Post} {le : temp_env} {level : Nat}
   intro m2 h2 hsr2
   simp only [seqPost, Post.after, E0_append]
   wp_step
-  refine wp_canonTest c h2 hsr2 hlev hlv hlab hcl hcs ?_
+  refine wp_canonTest C c h2 hsr2 hlev hlv hlab hcl hcs ?_
   intro le3 m3 h3 hsr3 ho3
   simp only [seqPost, Post.after, E0_append]
-  refine wp_canonPick (s := (canonTestS ctx level st).2) c h3 (by rw [canonTestS_canonlab]; exact hcl)
-    (by rw [canonTestS_canonlab]; exact hcs)
+  refine wp_canonPick (s := (canonTestG O (C.update G) G level st).2) c h3
+    (by rw [canonTestG_canonlab]; exact hcl) (by rw [canonTestG_canonlab]; exact hcs)
     (by rw [ho3 _ (by decide)]; exact hlab) ?_
   intro le4 m4 h4 hc4 hp4 hsr4 ho4
   refine hQ le4 m4 ⟨h4, hc4, fun hx => hp4 (by
@@ -106,21 +110,22 @@ theorem wp_canonBranch {f : function} {Q : Post} {le : temp_env} {level : Nat}
 
 set_option maxHeartbeats 4000000 in
 theorem wp_classifyC {f : function} {Q : Post} {le : temp_env} {level numcells : Nat}
-    (c : PCtx m₀ m₁ S e bsr) (h : PAt m₀ m₁ m S ctx bsr st false)
+    (C : Classifier O)
+    (c : PCtx D m₀ m₁ S gl cl e bsr) (h : PAt D m₀ m₁ m S gl cl G bsr st false)
     (hlev : PTree.get dense.id.level le = some (.Vint (ir level))) (hlv : level ≤ n)
     (hnc : PTree.get dense.id.numcells le = some (.Vint (ir numcells))) (hncn : numcells ≤ n)
     (hlab : PTree.get dense.id.lab le = some (.Vptr S.bl S.lofs))
     (hcode : PTree.get dense.id.code le = some (.Vint (ir 0)))
     (hfl : ∀ i < n, st.firstlab[i]! < n) (hfs : ∀ v < n, ∃ i < n, st.firstlab[i]! = v)
     (hcl : ∀ i < n, st.canonlab[i]! < n) (hcs : ∀ v < n, ∃ i < n, st.canonlab[i]! = v)
-    (hQ : ∀ le' m', Classified m₀ m₁ m' S ctx bsr le le' (classify ctx level numcells st) →
+    (hQ : ∀ le' m', Classified D m₀ m₁ m' S gl cl G bsr le le' (O.classify G level numcells st) →
       Q.normal E0 e le' m') :
     Wp xi ge f classifyC Q e le m := by
   have hs := h.search
   have hinv := hs.inv
   have hnlt := hs.nlt
   obtain ⟨-, -, -, -, a5, -, -, b8, b9, -, -, -⟩ := hinv.scalars
-  rw [Spec.classify_eq] at hQ
+  rw [C.classify_eq] at hQ; unfold classifyBy at hQ
   -- the numcells branch, entered with `code == 0`
   have hN : ∀ le2, ¬ (st.eqlevFirst ≠ level ∧ st.compCanon < 0) →
       (∀ x, x ≠ idOf 706 → PTree.get x le2 = PTree.get x le) →
@@ -145,7 +150,7 @@ theorem wp_classifyC {f : function} {Q : Post} {le : temp_env} {level numcells :
     refine wp_ifB (eval_eqI (show Exec.evalExpr ge e le2 m (tv dense.id.numcells) = _ by
         rw [show Exec.evalExpr ge e le2 m (tv dense.id.numcells) = PTree.get dense.id.numcells le2
           from rfl, g _ (by decide)]; exact hnc)
-      (eval_gint (c.eg _ (by decide)) find_n hs.fixed.nn) rfl rfl ⟨by omega, by omega⟩
+      (eval_gint (c.eg _ (by decide)) E.find_n hs.fixed.nn) rfl rfl ⟨by omega, by omega⟩
       ⟨by omega, by omega⟩) rfl ?_
     by_cases hnn : numcells = n
     · rw [decide_eq_true (by exact_mod_cast hnn), ite_eq_left rfl]
@@ -156,13 +161,13 @@ theorem wp_classifyC {f : function} {Q : Post} {le : temp_env} {level numcells :
         rw [g _ (by decide)]; exact hlab
       have hcode2 : PTree.get dense.id.code le2 = some (.Vint (ir 0)) := by
         rw [g _ (by decide)]; exact hcode
-      have key : firstAuto ctx st = true ↔ (st.gcaFirst ≥ st.noncheaplevel ∨
-          isautom ctx (scatter st.firstlab st).workperm = true) := by simp [firstAuto]
+      have key : firstAuto O G st = true ↔ (st.gcaFirst ≥ st.noncheaplevel ∨
+          O.isautom G (scatter st.firstlab st).workperm = true) := by simp [firstAuto]
       have tl : ∀ x ∈ [dense.id.lab, dense.id.ptn, dense.id.level, dense.id.numcells],
           x ≠ dense.id.i ∧ x ≠ idOf 703 ∧ x ≠ idOf 704 ∧ x ≠ dense.id.code ∧ x ≠ idOf 705 ∧
             x ≠ idOf 706 := by decide
       wp_step; wp_step; wp_step
-      refine wp_ifB (eval_eqI (eval_gint (c.eg _ (by decide)) find_eqlevFirst hs.scalars.eqlevFirst)
+      refine wp_ifB (eval_eqI (eval_gint (c.eg _ (by decide)) E.find_eqlevFirst hs.scalars.eqlevFirst)
         (show Exec.evalExpr ge e le2 m (tv dense.id.level) = _ from hlev2) rfl rfl
         ⟨by omega, by omega⟩ ⟨by omega, by omega⟩) rfl ?_
       by_cases hel : st.eqlevFirst = level
@@ -171,9 +176,9 @@ theorem wp_classifyC {f : function} {Q : Post} {le : temp_env} {level numcells :
         refine wp_firstC c h hfl hfs hlab2 ?_
         intro le3 m3 h3 ha3 hT hF hsr3 ho3
         simp only [seqPost, Post.after, E0_append]
-        cases hfa : firstAuto ctx st
+        cases hfa : firstAuto O G st
         · rw [if_neg (fun hh => by rw [← key, hfa] at hh; exact absurd hh (by decide))] at hQ
-          refine wp_canonBranch c h3 (by rw [ho3 _ (by decide) (by decide) (by decide) (by decide)]; exact hlev2)
+          refine wp_canonBranch C c h3 (by rw [ho3 _ (by decide) (by decide) (by decide) (by decide)]; exact hlev2)
             (by omega) (by rw [ho3 _ (by decide) (by decide) (by decide) (by decide)]; exact hlab2)
             (by rw [hF hfa]; exact hcode2) (by rw [Spec.scatter_eq]; exact hcl)
             (by rw [Spec.scatter_eq]; exact hcs) ?_
@@ -195,7 +200,7 @@ theorem wp_classifyC {f : function} {Q : Post} {le : temp_env} {level numcells :
         rw [if_neg hel] at hQ
         apply wp_skip
         simp only [seqPost, Post.after, E0_append]
-        refine wp_canonBranch c h hlev2 (by omega) hlab2 hcode2 hcl hcs ?_
+        refine wp_canonBranch C c h hlev2 (by omega) hlab2 hcode2 hcl hcs ?_
         intro le4 m4 hC
         exact hQ le4 m4 ⟨hC.at_, hC.code, hC.perm, hC.sr, fun x hx => by
           rw [hC.temps x hx, g x (tl x hx).2.2.2.2.2]⟩
@@ -208,7 +213,7 @@ theorem wp_classifyC {f : function} {Q : Post} {le : temp_env} {level numcells :
           simp only [List.mem_cons, List.mem_nil_iff, or_false] at hx
           rcases hx with rfl | rfl | rfl | rfl <;> decide)⟩
   wp_step; wp_step; wp_step
-  refine wp_ifB (eval_neI (eval_gint (c.eg _ (by decide)) find_eqlevFirst hs.scalars.eqlevFirst)
+  refine wp_ifB (eval_neI (eval_gint (c.eg _ (by decide)) E.find_eqlevFirst hs.scalars.eqlevFirst)
     (show Exec.evalExpr ge e le m (tv dense.id.level) = _ from hlev) rfl rfl
     ⟨by omega, by omega⟩ ⟨by omega, by omega⟩) rfl ?_
   by_cases hel : st.eqlevFirst = level
@@ -223,12 +228,12 @@ theorem wp_classifyC {f : function} {Q : Post} {le : temp_env} {level numcells :
   · rw [decide_eq_true (by exact_mod_cast hel), ite_eq_left rfl]
     wp_step; wp_step
     apply wp_if_eval
-    rw [Exec.evalExpr, eval_gint (c.eg _ (by decide)) find_getcanon hs.fixed.getcanon]
+    rw [Exec.evalExpr, eval_gint (c.eg _ (by decide)) E.find_getcanon hs.fixed.getcanon]
     simp only [typeof, cop]
     rw [show (!!Int.eq (ir 1) Int.zero) = false from rfl, if_neg (by decide)]
     wp_step; wp_step; wp_step
     apply wp_set_eval
-    rw [Exec.evalExpr, eval_ltI (eval_gint (c.eg _ (by decide)) find_compCanon hs.scalars.compCanon)
+    rw [Exec.evalExpr, eval_ltI (eval_gint (c.eg _ (by decide)) E.find_compCanon hs.scalars.compCanon)
       (eval_ci 0) rfl rfl ⟨by omega, by omega⟩ ⟨by decide, by decide⟩]
     by_cases hcn : st.compCanon < 0
     · simp only [decide_eq_true hcn, typeof, cop, seqPost, Post.after, E0_append]

@@ -705,6 +705,25 @@ Tools from batch 1, for the batches after it:
   `wp_copyIntsG` is the copy loop over any `NautyEnv`. The dense
   `firstterminal_satisfies` and `wp_copyInts` are their instances. A generic
   node body calls `firstterminal_satisfiesG` directly.
+- Processnode (batch 2 (d)): `processnode_satisfiesG D C S gl cl G st level
+  numcells` meets `processnodeSpecG D.toDispatchRep` for any
+  `D : DispatchC ge O` and `C : Classifier O` (`Processnode/Classifier.lean`):
+  `O.classify` is `classifyBy O (C.update G)`, `classify_eq`'s processnode-order
+  restatement over `O.isautom`, `O.testcanlab` and the store update `C.update`
+  (rows `O.updatecan`, `rows_update`), with `testcanlab_range`. The dense
+  `processnode_satisfies` is its instance at `Dispatch.dense` and
+  `denseClassifier` through `processnodeSpec_ofG`. A sparse instance needs a
+  `Classifier` with `update` the store's own update and `classify_eq` proved as
+  `Spec.classify_eq` is. `PCtx D`/`PAt D` (`Processnode/State.lean`) are over
+  `SearchAtG`; `PAt.call` and `PAt.callSame` step across a dispatch call
+  (`DispatchRep.Step`, outputs among the store's blocks and `sr`), `PAt.nautil`
+  across a reallocation of nautil.c's `workperm` pair (`fmperm`), and
+  `PAt.sepG`/`PAt.sepGC` and `SearchAtG.ctx` give a call's `Sep` and `Ctx`.
+  The dispatch preconditions come from `SearchAtG` as it stands: `lab`
+  injective from onto (`lab_inj`, by `surj_inj`), `O.StoreOk` from
+  `SInvG.canong`, `O.GraphOk` from `SearchAtG.graphOk`. `Keeps`, `lxBody`,
+  `leafExit_eq`, `leafWords` are over any store, and `Processnode/Set.lean`
+  has the `ArraysG` updates (`set`, `setCanong`, `setAutos`, `wp`, `cast`).
 
 Remaining files (`Proofs/`), in dependency order; the files of one batch
 depend only on earlier batches, so a batch's groups can go to parallel

@@ -26,8 +26,11 @@ open Hex.GraphIso.Nauty
 set_option linter.unusedSimpArgs false
 
 variable {xi : ExternalCalls}
-variable {n : Nat} {m₀ m₁ m : mem} {S : SLoc} {ctx : Ctx n} {e : env} {bsr : block}
-  {st : Search n} {nsp : Bool}
+open NautyVerified.Proofs.Dispatch (Ops DispatchRep DispatchC)
+
+variable {ge : genv} [E : NautyEnv ge] {O : Ops}
+variable {n : Nat} {D : DispatchC ge O} {m₀ m₁ m : mem} {S : SLoc} {gl : D.GLoc} {cl : D.CLoc}
+  {G : O.Gr n} {e : env} {bsr : block} {st : SearchState n (O.Canon n)} {nsp : Bool}
 
 kernel_rfl type_orbjoinG : type_of_fundef (.Internal dense.fn.«orbjoin») =
   tfun [tptr tint, tptr tint, tint] tint
@@ -41,9 +44,9 @@ theorem orbjoin_facts {o w : Array Nat} (hd : Orbit.Descending o n) (hw : ∀ i 
 
 set_option maxHeartbeats 4000000 in
 theorem wp_orbjoin {f : function} {Q : Post} {le : temp_env} {t : ident} {w : Array Nat}
-    (c : PCtx m₀ m₁ S e bsr) (h : PAt m₀ m₁ m S ctx bsr st nsp)
+    (c : PCtx D m₀ m₁ S gl cl e bsr) (h : PAt D m₀ m₁ m S gl cl G bsr st nsp)
     (hw : ArrayAt m .Mint32 S.bWP 0 (ints w) n) (hws : ∀ i < n, w[i]! < n)
-    (hQ : ∀ m', PAt m₀ m₁ m' S ctx bsr
+    (hQ : ∀ m', PAt D m₀ m₁ m' S gl cl G bsr
         { st with orbits := (orbjoin st.orbits w n).1, numorbits := (orbjoin st.orbits w n).2 } nsp →
       ArrayAt m' .Mint32 S.bWP 0 (ints w) n → (∀ v, SrAt m bsr v → SrAt m' bsr v) →
       Q.normal E0 e (PTree.set t (.Vint (ir (orbjoin st.orbits w n).2)) le) m') :
@@ -53,25 +56,25 @@ theorem wp_orbjoin {f : function} {Q : Post} {le : temp_env} {t : ident} {w : Ar
          (.Evar dense.id.«nauty:n» tint)]))
       (.Sassign (statsF dense.id.numorbits tint) (tv t))) Q e le m := by
   have hs := h.search
-  have hd := hs.distinct
+  have hd := hs.lit
   have hinv := hs.inv
   have hnl := hs.nlt
   have hcWP : 0 < S.capWP := by have := hs.dyns.capWP; have := hs.n0; omega
   obtain ⟨hdesc', hle'⟩ := orbjoin_facts hinv.orbitsDesc hws
   wp_step; wp_step; wp_step
-  refine wp_call (vf := .Vptr Block.orbjoinFn Ptrofs.zero)
+  refine wp_call (vf := .Vptr E.orbjoinFn Ptrofs.zero)
     (targs := [tptr tint, tptr tint, tint]) (tres := tint)
     (cc := cc_default) (vargs := [.Vptr S.bo S.oofs, .Vptr S.bWP Ptrofs.zero, .Vint (ir n)]) _ _
     (Satisfies.grow (Orbjoin.orbjoin_satisfies S.bo S.oofs S.bWP Ptrofs.zero st.orbits w n)) rfl ?_ ?_
-    (by simp [Genv.find_funct, funct_orbjoinFn]) type_orbjoinG
+    (by simp [Genv.find_funct, E.funct_orbjoinFn]) type_orbjoinG
     ⟨rfl, hs.arrays.orbits, hw, by sep_ne hd, by omega, hws, hinv.orbitsDesc⟩ ?_
   · simp only [Exec.evalExpr, Exec.lvalOfVar, c.eg _ (by decide : dense.id.«orbjoin» ≠ dense.id.sr),
-      find_orbjoinFn, Exec.derefLoc, access_mode]
+      E.find_orbjoinFn, Exec.derefLoc, access_mode]
   · simp only [Exec.evalExprlist,
-      eval_gptr (ty := tptr tint) (c.eg _ (by decide)) find_orbits rfl hs.fixed.orbits,
-      eval_gptr (ty := tptr tint) (c.eg _ (by decide)) find_nautyWorkperm rfl
+      eval_gptr (ty := tptr tint) (c.eg _ (by decide)) E.find_orbits rfl hs.fixed.orbits,
+      eval_gptr (ty := tptr tint) (c.eg _ (by decide)) E.find_nautyWorkperm rfl
         ⟨hs.dyns.workperm.ptr hcWP, hs.dyns.workperm.bpW⟩,
-      eval_gint (c.eg _ (by decide)) find_n hs.fixed.nn, typeof, cop]
+      eval_gint (c.eg _ (by decide)) E.find_n hs.fixed.nn, typeof, cop]
   rintro tr r m1 ⟨⟨rfl, rfl, ho1, hu1, hk1⟩, hv1⟩
   simp only [set_opttemp, seqPost, Post.after, E0_append]
   have hfit := hs.stats.fits
@@ -88,7 +91,7 @@ theorem wp_orbjoin {f : function} {Q : Post} {le : temp_env} {t : ident} {w : Ar
   have hv : ∀ z, Mem.valid_block m z → Mem.valid_block m2 z :=
     fun z hz => Mem.store_valid_block_1 _ _ _ _ _ _ hst _ (hv1 _ hz)
   have sS := hs.stats.unch hu1 (by sep_ne hd)
-  refine hQ m2 (PAt.next c h hu (by simp [SLoc.wr, SLoc.wrV]) ?_ hv
+  refine hQ m2 (PAt.next c h hu (by simp) ?_ hv
       ((hs.scalars.unch hu (by sep_all hd)).cast rfl)
       { (sS.fix.store hst (by first | omega | (simp only [csize32, csize64]; omega))) with
         numorbits := FieldAt.store_same hst sS.numorbits.writable
@@ -105,8 +108,9 @@ theorem wp_orbjoin {f : function} {Q : Post} {le : temp_env} {t : ident} {w : Ar
         (hs.arrays.fixedpts' hu (by sep_notin hd)) (hs.arrays.workperm' hu (by sep_notin hd))
         (hs.arrays.firstlab.unch hu (by sep_notin hd)) (hs.arrays.canonlab.unch hu (by sep_notin hd))
         (hs.arrays.firstcode.unch hu (by sep_notin hd)) (hs.arrays.canoncode.unch hu (by sep_notin hd))
-        (hs.arrays.firsttc.unch hu (by sep_notin hd)) (hs.arrays.canong.unch hu (by sep_notin hd))
-        (hs.arrays.autos.unch hu (by sep_notin hd) (by sep_notin hd)) (by sep_notin hd))
+        (hs.arrays.firsttc.unch hu (by sep_notin hd))
+        (D.canon_unch hs.arrays.canong hu (hs.canon_notin (by simp)))
+        (hs.arrays.autos.unch hu (by sep_notin hd) (by sep_notin hd)) (hs.graph_notin (by simp)))
       { hinv with
         orbitsSmall := fun i hi => by
           show (orbjoin st.orbits w n).1[i]! < n
@@ -115,8 +119,8 @@ theorem wp_orbjoin {f : function} {Q : Post} {le : temp_env} {t : ident} {w : Ar
         numorbitsLe := hle'
         orbitsDesc := hdesc' }) (hw.unch hu (by sep_notin hd)) fun v hv' => hv'.unch hu (by
         simp only [List.mem_cons, List.mem_nil_iff, or_false, not_or]
-        exact ⟨fun e => c.ne_blocks (by simp [SLoc.blocks]) e.symm,
-          fun e => c.ne_blocks (by simp [SLoc.blocks]) e.symm⟩)
+        exact ⟨fun e => c.ne_blocks (SLoc.mem_blocksG_lit (by simp [SLoc.litG])) e.symm,
+          fun e => c.ne_blocks (SLoc.mem_blocksG_lit (by simp [SLoc.litG])) e.symm⟩)
   intro z hz
   simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
   rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>

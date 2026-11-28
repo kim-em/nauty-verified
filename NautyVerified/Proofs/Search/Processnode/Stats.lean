@@ -26,31 +26,37 @@ open Hex.GraphIso.Nauty
 set_option linter.unusedSimpArgs false
 
 variable {xi : ExternalCalls}
-variable {n : Nat} {m₀ m₁ m : mem} {S : SLoc} {ctx : Ctx n} {e : env} {bsr : block}
-  {st : Search n} {nsp : Bool}
+open NautyVerified.Proofs.Dispatch (Ops DispatchRep DispatchC)
 
-theorem PAt.stat {m' : mem} {st' : Search n} (c : PCtx m₀ m₁ S e bsr)
-    (h : PAt m₀ m₁ m S ctx bsr st nsp) {chunk : memory_chunk} {ofs : Z} {w : val}
-    (hst : Mem.store chunk m S.bst ofs w = some m') (hs' : Stats m' S st' false)
-    (e1 : scalView st' = scalView st) (e2 : arrView st' = arrView st) (hinv : SInv st') :
-    PAt m₀ m₁ m' S ctx bsr st' nsp ∧ (∀ v, SrAt m bsr v → SrAt m' bsr v) ∧ Unch m m' (· = S.bst) := by
+variable {ge : genv} [E : NautyEnv ge] {O : Ops}
+variable {n : Nat} {D : DispatchC ge O} {m₀ m₁ m : mem} {S : SLoc} {gl : D.GLoc} {cl : D.CLoc}
+  {G : O.Gr n} {e : env} {bsr : block} {st : SearchState n (O.Canon n)} {nsp : Bool}
+
+theorem PAt.stat {m' : mem} {st' : SearchState n (O.Canon n)} (c : PCtx D m₀ m₁ S gl cl e bsr)
+    (h : PAt D m₀ m₁ m S gl cl G bsr st nsp) {chunk : memory_chunk} {ofs : Z} {w : val}
+    (hst : Mem.store chunk m S.bst ofs w = some m') (hs' : StatsG m' S st' false)
+    (e1 : scalView st' = scalView st) (e2 : arrView st' = arrView st) (hinv : SInvG O G st') :
+    PAt D m₀ m₁ m' S gl cl G bsr st' nsp ∧ (∀ v, SrAt m bsr v → SrAt m' bsr v) ∧ Unch m m' (· = S.bst) := by
   have hs := h.search
-  have hd := hs.distinct
+  have hd := hs.lit
   have hu : Unch m m' (· = S.bst) := Unch.store hst rfl
   have hu' : Unch m m' (· ∈ [S.bst]) := hu.mono fun z hz => by simp [hz]
-  refine ⟨PAt.next c h hu' (by simp [SLoc.wr, SLoc.wrV]) ?_
+  refine ⟨PAt.next c h hu' (by simp) ?_
     (fun z hz => Mem.store_valid_block_1 _ _ _ _ _ _ hst _ hz)
-    ((hs.scalars.unch hu (by sep_all hd)).cast e1) hs' ((hs.arrays.unch hu (by sep_all hd)).cast e2)
-    hinv, fun v hv => hv.unch hu fun e => c.ne_blocks (by simp [SLoc.blocks]) e.symm, hu⟩
+    ((hs.scalars.unch hu (by sep_all hd)).cast e1) hs'
+    ((hs.arrays.unch hu (by sep_all hd) (fun z hz e => hs.graph_ne hz (.inl (by simp)) e)
+      (fun z hz e => hs.canon_ne hz (.inr (.inl (by simp))) e)).cast e2)
+    hinv, fun v hv => hv.unch hu fun e =>
+      c.ne_blocks (SLoc.mem_blocksG_of _ (.inr (.inl (by simp)))) e.symm, hu⟩
   intro z hz
   simp only [List.mem_cons, List.mem_nil_iff, or_false] at hz
   rcases hz with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> exact Keep.unch hu (by sep_ne hd)
 
 /-- `stats->maxlevel = level`. -/
 theorem wp_maxlevel {f : function} {Q : Post} {le : temp_env} {level : Nat}
-    (c : PCtx m₀ m₁ S e bsr) (h : PAt m₀ m₁ m S ctx bsr st nsp)
+    (c : PCtx D m₀ m₁ S gl cl e bsr) (h : PAt D m₀ m₁ m S gl cl G bsr st nsp)
     (hlev : PTree.get dense.id.level le = some (.Vint (ir level))) (hl : level ≤ n)
-    (hQ : ∀ m', PAt m₀ m₁ m' S ctx bsr { st with maxlevel := level } nsp →
+    (hQ : ∀ m', PAt D m₀ m₁ m' S gl cl G bsr { st with maxlevel := level } nsp →
       (∀ v, SrAt m bsr v → SrAt m' bsr v) → Unch m m' (· = S.bst) → Q.normal E0 e le m') :
     Wp xi ge f (.Sassign (statsF dense.id.maxlevel tint) (tv dense.id.level)) Q e le m := by
   have hs := h.search
@@ -75,8 +81,8 @@ theorem wp_maxlevel {f : function} {Q : Post} {le : temp_env} {level : Nat}
 
 /-- `stats->numgenerators += 1`. -/
 theorem wp_numgenerators {f : function} {Q : Post} {le : temp_env}
-    (c : PCtx m₀ m₁ S e bsr) (h : PAt m₀ m₁ m S ctx bsr st nsp)
-    (hQ : ∀ m', PAt m₀ m₁ m' S ctx bsr { st with numgenerators := st.numgenerators + 1 } nsp →
+    (c : PCtx D m₀ m₁ S gl cl e bsr) (h : PAt D m₀ m₁ m S gl cl G bsr st nsp)
+    (hQ : ∀ m', PAt D m₀ m₁ m' S gl cl G bsr { st with numgenerators := st.numgenerators + 1 } nsp →
       (∀ v, SrAt m bsr v → SrAt m' bsr v) → Unch m m' (· = S.bst) → Q.normal E0 e le m') :
     Wp xi ge f (.Sassign (statsF dense.id.numgenerators tint)
       (.Ebinop .Oadd (statsF dense.id.numgenerators tint) (ci 1 tint) tint)) Q e le m := by
@@ -108,8 +114,8 @@ theorem wp_numgenerators {f : function} {Q : Post} {le : temp_env}
 
 /-- `stats->canupdates += 1`. -/
 theorem wp_canupdates {f : function} {Q : Post} {le : temp_env}
-    (c : PCtx m₀ m₁ S e bsr) (h : PAt m₀ m₁ m S ctx bsr st nsp)
-    (hQ : ∀ m', PAt m₀ m₁ m' S ctx bsr { st with canupdates := st.canupdates + 1 } nsp →
+    (c : PCtx D m₀ m₁ S gl cl e bsr) (h : PAt D m₀ m₁ m S gl cl G bsr st nsp)
+    (hQ : ∀ m', PAt D m₀ m₁ m' S gl cl G bsr { st with canupdates := st.canupdates + 1 } nsp →
       (∀ v, SrAt m bsr v → SrAt m' bsr v) → Unch m m' (· = S.bst) → Q.normal E0 e le m') :
     Wp xi ge f (.Sassign (statsF dense.id.canupdates tulong)
       (.Ebinop .Oadd (statsF dense.id.canupdates tulong) (ci 1 tint) tulong)) Q e le m := by
@@ -140,8 +146,8 @@ theorem wp_canupdates {f : function} {Q : Post} {le : temp_env}
 
 /-- `stats->numbadleaves += 1`. -/
 theorem wp_numbadleaves {f : function} {Q : Post} {le : temp_env}
-    (c : PCtx m₀ m₁ S e bsr) (h : PAt m₀ m₁ m S ctx bsr st nsp)
-    (hQ : ∀ m', PAt m₀ m₁ m' S ctx bsr { st with numbadleaves := st.numbadleaves + 1 } nsp →
+    (c : PCtx D m₀ m₁ S gl cl e bsr) (h : PAt D m₀ m₁ m S gl cl G bsr st nsp)
+    (hQ : ∀ m', PAt D m₀ m₁ m' S gl cl G bsr { st with numbadleaves := st.numbadleaves + 1 } nsp →
       (∀ v, SrAt m bsr v → SrAt m' bsr v) → Unch m m' (· = S.bst) → Q.normal E0 e le m') :
     Wp xi ge f (.Sassign (statsF dense.id.numbadleaves tulong)
       (.Ebinop .Oadd (statsF dense.id.numbadleaves tulong) (ci 1 tint) tulong)) Q e le m := by

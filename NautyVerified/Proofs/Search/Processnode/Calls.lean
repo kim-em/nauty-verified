@@ -24,17 +24,19 @@ open NautyVerified NautyVerified.Logic NautyVerified.Program NautyVerified.Word 
 open NautyVerified.Source
 open NautyVerified.Proofs.Search
 
+variable {ge : genv} [E : NautyEnv ge]
+
 /-- `*dispatch.fld`, a function of type `fty`, for the field at byte `off`. -/
 theorem eval_dispatch {e : env} {le : temp_env} {m : mem} {fld : ident} {fty : type}
     {off : Int} {fb : block} (hge : PTree.get dense.id.«nauty:dispatch» e = none)
     (hfld : ∀ b o, Exec.lvalOfField ge (Tstruct dense.id.«_1027» noattr) fld (.Vptr b o) =
       some (b, Ptrofs.add o (Ptrofs.repr (zOfInt off)), .Full))
     (hacc : access_mode fty = .By_reference) (h0 : 0 ≤ off) (h1 : off < 2 ^ 32)
-    (hf : FieldAt m .Mint64 Block.dispatch off (.Vptr fb Ptrofs.zero)) :
+    (hf : FieldAt m .Mint64 E.dispatch off (.Vptr fb Ptrofs.zero)) :
     Exec.evalExpr ge e le m
       (.Ederef (.Efield (.Evar dense.id.«nauty:dispatch» (Tstruct dense.id.«_1027» noattr)) fld
         (tptr fty)) fty) = some (.Vptr fb Ptrofs.zero) := by
-  simp only [Exec.evalExpr, Exec.lvalOfVar, hge, find_dispatch, Exec.derefLoc, typeof, hfld,
+  simp only [Exec.evalExpr, Exec.lvalOfVar, hge, E.find_dispatch, Exec.derefLoc, typeof, hfld,
     Mem.loadv, hacc, Alloc.Mptr_eq, show access_mode (tptr fty) = .By_value .Mint64 from rfl,
     show access_mode (Tstruct dense.id.«_1027» noattr) = .By_copy from rfl]
   rw [unsigned_add_off Ptrofs.zero h0 (by

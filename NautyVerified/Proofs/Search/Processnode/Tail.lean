@@ -25,16 +25,19 @@ open Hex.GraphIso.Nauty
 set_option linter.unusedSimpArgs false
 
 variable {xi : ExternalCalls}
-variable {n : Nat} {m₀ m₁ m : mem} {S : SLoc} {ctx : Ctx n} {e : env} {bsr : block}
-  {st : Search n} {nsp : Bool}
+open NautyVerified.Proofs.Dispatch (Ops DispatchRep DispatchC)
+
+variable {ge : genv} [E : NautyEnv ge] {O : Ops}
+variable {n : Nat} {D : DispatchC ge O} {m₀ m₁ m : mem} {S : SLoc} {gl : D.GLoc} {cl : D.CLoc}
+  {G : O.Gr n} {e : env} {bsr : block} {st : SearchState n (O.Canon n)} {nsp : Bool}
 
 /-- `pruneReturn`'s level. -/
-def newLevel (st : Search n) : Int :=
+def newLevel {κ : Type} (st : SearchState n κ) : Int :=
   let save : Int := if Int.ofNat st.allsamelevel > st.eqlevCanon then Int.ofNat st.allsamelevel - 1
     else st.eqlevCanon
   if Int.ofNat st.noncheaplevel ≤ save then Int.ofNat st.noncheaplevel - 1 else save
 
-theorem pruneReturn_eq (level : Nat) (st : Search n) :
+theorem pruneReturn_eq {κ : Type} (level : Nat) (st : SearchState n κ) :
     pruneReturn level st =
       (.unwind (newLevel st).toNat ((level != st.noncheaplevel) && newLevel st != Int.ofNat st.gcaFirst),
         if level != st.noncheaplevel then pushAuto st (fmptn st.lab st.ptn st.noncheaplevel n) else st) := by
@@ -42,7 +45,9 @@ theorem pruneReturn_eq (level : Nat) (st : Search n) :
   simp only [Id.run, pure]
   split
   · rename_i h
-    have := pushAuto_fields (st := st) (fmptn st.lab st.ptn st.noncheaplevel n)
+    have : (pushAuto st (fmptn st.lab st.ptn st.noncheaplevel n)).orbits = st.orbits ∧
+        (pushAuto st (fmptn st.lab st.ptn st.noncheaplevel n)).workperm = st.workperm := by
+      unfold pushAuto; split <;> exact ⟨rfl, rfl⟩
     unfold pushAuto at this ⊢
     split <;> simp_all
   · simp_all
@@ -82,32 +87,32 @@ theorem ofBool_ir (b : Bool) : Val.of_bool b = .Vint (ir (if b then 1 else 0)) :
   cases b <;> rfl
 
 /-- `needshortprune = 1`. -/
-theorem wp_nsp1 {f : function} {Q : Post} {le : temp_env} (c : PCtx m₀ m₁ S e bsr)
-    (h : PAt m₀ m₁ m S ctx bsr st nsp)
-    (hQ : ∀ m', PAt m₀ m₁ m' S ctx bsr st true → Q.normal E0 e le m') :
+theorem wp_nsp1 {f : function} {Q : Post} {le : temp_env} (c : PCtx D m₀ m₁ S gl cl e bsr)
+    (h : PAt D m₀ m₁ m S gl cl G bsr st nsp)
+    (hQ : ∀ m', PAt D m₀ m₁ m' S gl cl G bsr st true → Q.normal E0 e le m') :
     Wp xi ge f (.Sassign (.Evar dense.id.«nauty:needshortprune» tint) (ci 1 tint)) Q e le m := by
   have hs := h.search
-  have hd := hs.distinct
-  refine wp_gint (c.eg _ (by decide)) find_needshortprune hs.scalars.needshortprune.writable
+  have hd := hs.lit
+  refine wp_gint (c.eg _ (by decide)) E.find_needshortprune hs.scalars.needshortprune.writable
     (eval_ci 1) rfl ?_
   intro m' hI hu hv
-  have hu' : Unch m m' (· ∈ [Block.needshortprune]) := hu.mono fun z hz => by simp [hz]
+  have hu' : Unch m m' (· ∈ [E.needshortprune]) := hu.mono fun z hz => by simp [hz]
   have sc := hs.scalars
-  exact hQ m' (PAt.next c h hu' (by simp [SLoc.wr, wrG]) (keeps hd, hu) hv
+  exact hQ m' (PAt.next c h hu' (by simp) (keeps hd, hu) hv
     ⟨sc.gcaFirst.unch hu (by sep_ne hd), sc.gcaCanon.unch hu (by sep_ne hd),
       sc.noncheaplevel.unch hu (by sep_ne hd), sc.allsamelevel.unch hu (by sep_ne hd),
       sc.eqlevFirst.unch hu (by sep_ne hd), sc.eqlevCanon.unch hu (by sep_ne hd),
       sc.compCanon.unch hu (by sep_ne hd), sc.samerows.unch hu (by sep_ne hd),
       sc.canonlevel.unch hu (by sep_ne hd), sc.stabvertex.unch hu (by sep_ne hd),
       sc.cosetindex.unch hu (by sep_ne hd), by simpa using hI⟩
-    (hs.stats.unch hu (by sep_ne hd)) (hs.arrays.unch hu (by sep_all hd)) hs.inv)
+    (hs.stats.unch hu (by sep_ne hd)) (hs.arrays.unch hu' (by sep_all hd) (hs.graph_notin (by simp)) (hs.canon_notin (by simp))) hs.inv)
 
 set_option maxHeartbeats 8000000 in
 theorem wp_tailRest {f : function} {Q : Post} {le : temp_env} {ok : Bool}
-    (c : PCtx m₀ m₁ S e bsr) (h : PAt m₀ m₁ m S ctx bsr st false) (hfr : f.fn_return = tint)
+    (c : PCtx D m₀ m₁ S gl cl e bsr) (h : PAt D m₀ m₁ m S gl cl G bsr st false) (hfr : f.fn_return = tint)
     (hec : 0 ≤ st.eqlevCanon) (hnc : 1 ≤ st.noncheaplevel)
     (hok : PTree.get dense.id.ispruneok le = some (.Vint (ir (if ok then 1 else 0))))
-    (hR : ∀ m', PAt m₀ m₁ m' S ctx bsr st (ok && newLevel st != Int.ofNat st.gcaFirst) →
+    (hR : ∀ m', PAt D m₀ m₁ m' S gl cl G bsr st (ok && newLevel st != Int.ofNat st.gcaFirst) →
       ∃ mf, Mem.free_list m' (blocks_of_env ge e) = some mf ∧
         Q.ret E0 (.Vint (ir (newLevel st))) mf) :
     Wp xi ge f tailRest Q e le m := by
@@ -122,15 +127,15 @@ theorem wp_tailRest {f : function} {Q : Post} {le : temp_env} {ok : Bool}
   wp_step; wp_step
   refine wp_sel (b := decide (st.eqlevCanon < st.allsamelevel))
     (v1 := .Vint (ir ((st.allsamelevel : Int) - 1))) (v2 := .Vint (ir st.eqlevCanon))
-    (eval_gtI (eval_gint (c.eg _ (by decide)) find_allsamelevel sc.allsamelevel)
-      (eval_gint (c.eg _ (by decide)) find_eqlevCanon sc.eqlevCanon) rfl rfl
+    (eval_gtI (eval_gint (c.eg _ (by decide)) E.find_allsamelevel sc.allsamelevel)
+      (eval_gint (c.eg _ (by decide)) E.find_eqlevCanon sc.eqlevCanon) rfl rfl
       ⟨by omega, by omega⟩ ⟨by omega, by omega⟩) rfl
     (fun _ => by
-      rw [Exec.evalExpr, Exec.evalExpr, eval_gint (c.eg _ (by decide)) find_allsamelevel
+      rw [Exec.evalExpr, Exec.evalExpr, eval_gint (c.eg _ (by decide)) E.find_allsamelevel
         sc.allsamelevel, eval_ci]
       simp only [typeof, cop, ir_sub])
     (fun _ => by
-      rw [Exec.evalExpr, eval_gint (c.eg _ (by decide)) find_eqlevCanon sc.eqlevCanon]
+      rw [Exec.evalExpr, eval_gint (c.eg _ (by decide)) E.find_eqlevCanon sc.eqlevCanon]
       simp only [typeof, cop]) ?_
   have e714 : (if decide (st.eqlevCanon < st.allsamelevel) then val.Vint (ir ((st.allsamelevel : Int) - 1))
       else .Vint (ir st.eqlevCanon)) = .Vint (ir S1) := by
@@ -149,11 +154,11 @@ theorem wp_tailRest {f : function} {Q : Post} {le : temp_env} {ok : Bool}
   wp_step; wp_step
   refine wp_sel (b := decide ((st.noncheaplevel : Int) ≤ S1))
     (v1 := .Vint (ir ((st.noncheaplevel : Int) - 1))) (v2 := .Vint (ir S1))
-    (eval_leI (eval_gint (c.eg _ (by decide)) find_noncheaplevel sc.noncheaplevel)
+    (eval_leI (eval_gint (c.eg _ (by decide)) E.find_noncheaplevel sc.noncheaplevel)
       (show Exec.evalExpr ge e le1 m (tv dense.id.save) = _ from hsave) rfl rfl
       ⟨by omega, by omega⟩ ⟨by omega, by omega⟩) rfl
     (fun _ => by
-      rw [Exec.evalExpr, Exec.evalExpr, eval_gint (c.eg _ (by decide)) find_noncheaplevel
+      rw [Exec.evalExpr, Exec.evalExpr, eval_gint (c.eg _ (by decide)) E.find_noncheaplevel
         sc.noncheaplevel, eval_ci]
       simp only [typeof, cop, ir_sub])
     (fun _ => by
@@ -175,7 +180,7 @@ theorem wp_tailRest {f : function} {Q : Post} {le : temp_env} {ok : Bool}
     rw [temps_gso _ _ (by decide), temps_gso _ _ (by decide), temps_gso _ _ (by decide),
       temps_gso _ _ (by decide), hok, ofBool_ir]
   have hcmp := eval_neI (show Exec.evalExpr ge e le2 m (tv dense.id.newlevel) = _ from hnl)
-    (eval_gint (c.eg _ (by decide)) find_gcaFirst sc.gcaFirst) rfl rfl
+    (eval_gint (c.eg _ (by decide)) E.find_gcaFirst sc.gcaFirst) rfl rfl
     ⟨by omega, by omega⟩ ⟨by omega, by omega⟩
   wp_step; wp_step
   refine wp_sel' (b := ok) (v1 := Val.of_bool (decide (N ≠ (st.gcaFirst : Int))))
@@ -185,7 +190,7 @@ theorem wp_tailRest {f : function} {Q : Post} {le : temp_env} {ok : Bool}
       cases decide (N ≠ (st.gcaFirst : Int)) <;> rfl)
     (fun _ => eval_ci 0) ?_
   simp only [seqPost, Post.after, E0_append]
-  have hret : ∀ m' nsp' v716, PAt m₀ m₁ m' S ctx bsr st nsp' →
+  have hret : ∀ m' nsp' v716, PAt D m₀ m₁ m' S gl cl G bsr st nsp' →
       nsp' = (ok && newLevel st != Int.ofNat st.gcaFirst) →
       Wp xi ge f (sk (.Sreturn (some (tv dense.id.newlevel)))) Q e
         (PTree.set (idOf 716) v716 le2) m' := by
@@ -235,12 +240,12 @@ theorem newLevel_nonneg (hec : 0 ≤ st.eqlevCanon) (hnc : 1 ≤ st.noncheapleve
 
 set_option maxHeartbeats 8000000 in
 theorem wp_tail {f : function} {Q : Post} {le : temp_env} {level : Nat}
-    (c : PCtx m₀ m₁ S e bsr) (h : PAt m₀ m₁ m S ctx bsr st false) (hfr : f.fn_return = tint)
+    (c : PCtx D m₀ m₁ S gl cl e bsr) (h : PAt D m₀ m₁ m S gl cl G bsr st false) (hfr : f.fn_return = tint)
     (hlev : PTree.get dense.id.level le = some (.Vint (ir level))) (hl : level ≤ n)
     (hlab : PTree.get dense.id.lab le = some (.Vptr S.bl S.lofs))
     (hptn : PTree.get dense.id.ptn le = some (.Vptr S.bp S.pofs))
     (hec : 0 ≤ st.eqlevCanon) (hnc : 1 ≤ st.noncheaplevel)
-    (hR : ∀ m', PAt m₀ m₁ m' S ctx bsr (pruneReturn level st).2
+    (hR : ∀ m', PAt D m₀ m₁ m' S gl cl G bsr (pruneReturn level st).2
         (exitValue level (pruneReturn level st).1).2 →
       ∃ mf, Mem.free_list m' (blocks_of_env ge e) = some mf ∧
         Q.ret E0 (.Vint (ir (exitValue level (pruneReturn level st).1).1)) mf) :
@@ -255,7 +260,7 @@ theorem wp_tail {f : function} {Q : Post} {le : temp_env} {level : Nat}
   rw [Int.toNat_of_nonneg hN] at hR
   wp_step; wp_step; wp_step
   refine wp_ifB (eval_neI (show Exec.evalExpr ge e le m (tv dense.id.level) = _ from hlev)
-    (eval_gint (c.eg _ (by decide)) find_noncheaplevel hs.scalars.noncheaplevel) rfl rfl
+    (eval_gint (c.eg _ (by decide)) E.find_noncheaplevel hs.scalars.noncheaplevel) rfl rfl
     ⟨by omega, by omega⟩ ⟨by omega, by omega⟩) rfl ?_
   by_cases hne : level = st.noncheaplevel
   · rw [decide_eq_false (by exact_mod_cast not_not_intro hne), ite_eq_right (by decide)]

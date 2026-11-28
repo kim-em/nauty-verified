@@ -25,12 +25,15 @@ open Hex.GraphIso.Nauty
 set_option linter.unusedSimpArgs false
 
 variable {xi : ExternalCalls}
-variable {n : Nat} {m₀ m₁ m : mem} {S : SLoc} {ctx : Ctx n} {e : env} {bsr : block}
-  {st : Search n} {nsp : Bool}
+open NautyVerified.Proofs.Dispatch (Ops DispatchRep DispatchC)
+
+variable {ge : genv} [E : NautyEnv ge] {O : Ops}
+variable {n : Nat} {D : DispatchC ge O} {m₀ m₁ m : mem} {S : SLoc} {gl : D.GLoc} {cl : D.CLoc}
+  {G : O.Gr n} {e : env} {bsr : block} {st : SearchState n (O.Canon n)} {nsp : Bool}
 
 /-- `genTrace` is not in memory. -/
-theorem PAt.genTrace (h : PAt m₀ m₁ m S ctx bsr st nsp) (g : Array (Array Nat)) :
-    PAt m₀ m₁ m S ctx bsr { st with genTrace := g } nsp :=
+theorem PAt.genTrace (h : PAt D m₀ m₁ m S gl cl G bsr st nsp) (g : Array (Array Nat)) :
+    PAt D m₀ m₁ m S gl cl G bsr { st with genTrace := g } nsp :=
   { h with
     search := { h.search with
       scalars := h.search.scalars.cast rfl
@@ -50,23 +53,26 @@ theorem wp_ifG0 {f : function} {Q : Post} {le : temp_env} {g : ident} {b : block
   rw [ite_eq_right (by decide)]
   exact wp_skip hQ
 
-theorem admit_eq (st : Search n) :
+theorem admit_eq {κ : Type} (st : SearchState n κ) :
     admit st = { pushAuto { st with genTrace := st.genTrace.push st.workperm } (fmperm st.workperm n) with
       orbits := (orbjoin st.orbits st.workperm n).1, numorbits := (orbjoin st.orbits st.workperm n).2 } := by
   unfold admit
   simp only [Id.run, pure]
-  have := pushAuto_fields (st := { st with genTrace := st.genTrace.push st.workperm })
-    (fmperm st.workperm n)
+  have : (pushAuto { st with genTrace := st.genTrace.push st.workperm } (fmperm st.workperm n)).orbits =
+        st.orbits ∧
+      (pushAuto { st with genTrace := st.genTrace.push st.workperm } (fmperm st.workperm n)).workperm =
+        st.workperm := by
+    unfold pushAuto; split <;> exact ⟨rfl, rfl⟩
   rw [this.1, this.2]
 
 set_option maxHeartbeats 8000000 in
 theorem wp_case1 {f : function} {Q : Post} {le : temp_env} {level : Nat}
-    (c : PCtx m₀ m₁ S e bsr) (h : PAt m₀ m₁ m S ctx bsr st false) (hcb : AutomCb xi S.bUA)
+    (c : PCtx D m₀ m₁ S gl cl e bsr) (h : PAt D m₀ m₁ m S gl cl G bsr st false) (hcb : AutomCb xi S.bUA)
     (hfr : f.fn_return = tint)
     (hw : ArrayAt m .Mint32 S.bWP 0 (ints st.workperm) n) (hwsz : st.workperm.size = n)
     (hws : ∀ i < n, st.workperm[i]! < n)
     (hwi : ∀ x y, x < n → y < n → st.workperm[x]! = st.workperm[y]! → x = y)
-    (hR : ∀ m' t, PAt m₀ m₁ m' S ctx bsr (lxBody .autoFirst level st).2 false →
+    (hR : ∀ m' t, PAt D m₀ m₁ m' S gl cl G bsr (lxBody .autoFirst level st).2 false →
       Writes t (genWords st.workperm n) →
       ∃ mf, Mem.free_list m' (blocks_of_env ge e) = some mf ∧
         Q.ret t (.Vint (ir st.gcaFirst)) mf) :
@@ -79,7 +85,7 @@ theorem wp_case1 {f : function} {Q : Post} {le : temp_env} {level : Nat}
   intro m2 h2 hw2 hsr2
   rw [pushAuto_eq { st with genTrace := st.genTrace.push st.workperm } _ hinv.wsCap] at h2
   wp_step
-  refine wp_ifG0 (c.eg _ (by decide)) find_writeautoms h2.search.fixed.writeautoms ?_
+  refine wp_ifG0 (c.eg _ (by decide)) E.find_writeautoms h2.search.fixed.writeautoms ?_
   simp only [seqPost, Post.after, E0_append]
   wp_step
   refine wp_orbjoin (t := idOf 708) c h2 hw2 hws ?_
@@ -89,17 +95,17 @@ theorem wp_case1 {f : function} {Q : Post} {le : temp_env} {level : Nat}
   refine wp_numgenerators c h3 ?_
   intro m4 h4 hsr4 hu4
   simp only [seqPost, Post.after, E0_append]
-  have hd := h4.search.distinct
+  have hd := h4.search.lit
   wp_step
   refine wp_callback c h4 hcb (hw3.unch hu4 (by sep_ne hd)) hws ?_
   intro t hW
   simp only [seqPost, Post.after, E0_append]
   wp_step
-  refine wp_ifG0 (c.eg _ (by decide)) find_doschreier h4.search.fixed.doschreier ?_
+  refine wp_ifG0 (c.eg _ (by decide)) E.find_doschreier h4.search.fixed.doschreier ?_
   simp only [seqPost, Post.after, E0_append, E0_left, E0_right]
   wp_step; wp_step
   obtain ⟨mf, hfree, hret⟩ := hR m4 t h4 hW
-  refine wp_return_some (v' := .Vint (ir st.gcaFirst)) (eval_gint (c.eg _ (by decide)) find_gcaFirst h4.search.scalars.gcaFirst)
+  refine wp_return_some (v' := .Vint (ir st.gcaFirst)) (eval_gint (c.eg _ (by decide)) E.find_gcaFirst h4.search.scalars.gcaFirst)
     (by rw [hfr]; rfl) hfree ?_
   simpa using hret
 

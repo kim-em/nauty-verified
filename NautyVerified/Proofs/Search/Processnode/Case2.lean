@@ -27,8 +27,11 @@ open Hex.GraphIso.Nauty
 set_option linter.unusedSimpArgs false
 
 variable {xi : ExternalCalls}
-variable {n : Nat} {m₀ m₁ m : mem} {S : SLoc} {ctx : Ctx n} {e : env} {bsr : block}
-  {st : Search n} {nsp : Bool}
+open NautyVerified.Proofs.Dispatch (Ops DispatchRep DispatchC)
+
+variable {ge : genv} [E : NautyEnv ge] {O : Ops}
+variable {n : Nat} {D : DispatchC ge O} {m₀ m₁ m : mem} {S : SLoc} {gl : D.GLoc} {cl : D.CLoc}
+  {G : O.Gr n} {e : env} {bsr : block} {st : SearchState n (O.Canon n)} {nsp : Bool}
 
 /-- `if (gca_canon != gca_first) needshortprune = 1;` -/
 abbrev nspIf : statement :=
@@ -36,18 +39,18 @@ abbrev nspIf : statement :=
     (.Ebinop .One (.Evar dense.id.«nauty:gca_canon» tint) (.Evar dense.id.«nauty:gca_first» tint) tint)
     (sk (.Sassign (.Evar dense.id.«nauty:needshortprune» tint) (ci 1 tint))) .Sskip)
 
-theorem wp_nspIf {f : function} {Q : Post} {le : temp_env} (c : PCtx m₀ m₁ S e bsr)
-    (h : PAt m₀ m₁ m S ctx bsr st false)
-    (hQ : ∀ m', PAt m₀ m₁ m' S ctx bsr st (st.gcaCanon != st.gcaFirst) →
+theorem wp_nspIf {f : function} {Q : Post} {le : temp_env} (c : PCtx D m₀ m₁ S gl cl e bsr)
+    (h : PAt D m₀ m₁ m S gl cl G bsr st false)
+    (hQ : ∀ m', PAt D m₀ m₁ m' S gl cl G bsr st (st.gcaCanon != st.gcaFirst) →
       (∀ v, SrAt m bsr v → SrAt m' bsr v) → Q.normal E0 e le m') :
     Wp xi ge f nspIf Q e le m := by
   have hs := h.search
-  have hd := hs.distinct
+  have hd := hs.lit
   have hinv := hs.inv
   obtain ⟨a1, a2, -, -, -, -, -, -, -, -, -, -⟩ := hinv.scalars
   wp_step; wp_step
-  refine wp_ifB (eval_neI (eval_gint (c.eg _ (by decide)) find_gcaCanon hs.scalars.gcaCanon)
-    (eval_gint (c.eg _ (by decide)) find_gcaFirst hs.scalars.gcaFirst) rfl rfl
+  refine wp_ifB (eval_neI (eval_gint (c.eg _ (by decide)) E.find_gcaCanon hs.scalars.gcaCanon)
+    (eval_gint (c.eg _ (by decide)) E.find_gcaFirst hs.scalars.gcaFirst) rfl rfl
     ⟨by omega, by omega⟩ ⟨by omega, by omega⟩) rfl ?_
   by_cases hne : st.gcaCanon = st.gcaFirst
   · rw [decide_eq_false (by exact_mod_cast not_not_intro hne), ite_eq_right (by decide)]
@@ -55,24 +58,25 @@ theorem wp_nspIf {f : function} {Q : Post} {le : temp_env} (c : PCtx m₀ m₁ S
     exact hQ m (by rw [show (st.gcaCanon != st.gcaFirst) = false by simp [hne]]; exact h) fun _ h => h
   · rw [decide_eq_true (by exact_mod_cast hne), ite_eq_left rfl]
     wp_step; wp_step
-    refine wp_gint (c.eg _ (by decide)) find_needshortprune hs.scalars.needshortprune.writable
+    refine wp_gint (c.eg _ (by decide)) E.find_needshortprune hs.scalars.needshortprune.writable
       (eval_ci 1) rfl ?_
     intro m' hI hu hv
-    have hu' : Unch m m' (· ∈ [Block.needshortprune]) := hu.mono fun z hz => by simp [hz]
+    have hu' : Unch m m' (· ∈ [E.needshortprune]) := hu.mono fun z hz => by simp [hz]
     have sc := hs.scalars
-    refine hQ m' ?_ fun v hv' => hv'.unch hu fun e => c.ne_blocks (by simp [SLoc.blocks]) e.symm
+    refine hQ m' ?_ fun v hv' => hv'.unch hu fun e => c.ne_blocks (SLoc.mem_blocksG_lit (by simp [SLoc.litG])) e.symm
     rw [show (st.gcaCanon != st.gcaFirst) = true by simp [hne]]
-    exact PAt.next c h hu' (by simp [SLoc.wr, wrG]) (keeps hd, hu) hv
+    exact PAt.next c h hu' (by simp) (keeps hd, hu) hv
       ⟨sc.gcaFirst.unch hu (by sep_ne hd), sc.gcaCanon.unch hu (by sep_ne hd),
         sc.noncheaplevel.unch hu (by sep_ne hd), sc.allsamelevel.unch hu (by sep_ne hd),
         sc.eqlevFirst.unch hu (by sep_ne hd), sc.eqlevCanon.unch hu (by sep_ne hd),
         sc.compCanon.unch hu (by sep_ne hd), sc.samerows.unch hu (by sep_ne hd),
         sc.canonlevel.unch hu (by sep_ne hd), sc.stabvertex.unch hu (by sep_ne hd),
         sc.cosetindex.unch hu (by sep_ne hd), by simpa using hI⟩
-      (hs.stats.unch hu (by sep_ne hd)) (hs.arrays.unch hu (by sep_all hd)) hinv
+      (hs.stats.unch hu (by sep_ne hd))
+      (hs.arrays.unch hu' (by sep_all hd) (hs.graph_notin (by simp)) (hs.canon_notin (by simp))) hinv
 
 /-- `orbits[cosetindex] < cosetindex`. -/
-theorem eval_coset {le : temp_env} (c : PCtx m₀ m₁ S e bsr) (h : PAt m₀ m₁ m S ctx bsr st nsp)
+theorem eval_coset {le : temp_env} (c : PCtx D m₀ m₁ S gl cl e bsr) (h : PAt D m₀ m₁ m S gl cl G bsr st nsp)
     (hci : st.cosetindex < n) :
     Exec.evalExpr ge e le m (.Ebinop .Olt (gat dense.id.«nauty:orbits» (.Evar dense.id.«nauty:cosetindex» tint))
       (.Evar dense.id.«nauty:cosetindex» tint) tint) =
@@ -83,9 +87,9 @@ theorem eval_coset {le : temp_env} (c : PCtx m₀ m₁ S e bsr) (h : PAt m₀ m�
   have ho : Exec.evalExpr ge e le m (gat dense.id.«nauty:orbits» (.Evar dense.id.«nauty:cosetindex» tint)) =
       some (ints st.orbits st.cosetindex) := by
     simp only [Exec.evalExpr, Exec.lvalOfVar, c.eg _ (by decide : dense.id.«nauty:orbits» ≠ dense.id.sr),
-      find_orbits, Exec.derefLoc, access_mode, Mem.loadv, Alloc.Mptr_eq,
+      E.find_orbits, Exec.derefLoc, access_mode, Mem.loadv, Alloc.Mptr_eq,
       show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl, hs.fixed.orbits.load,
-      c.eg _ (by decide : dense.id.«nauty:cosetindex» ≠ dense.id.sr), find_cosetindex,
+      c.eg _ (by decide : dense.id.«nauty:cosetindex» ≠ dense.id.sr), E.find_cosetindex,
       hs.scalars.cosetindex.load, typeof, cop]
     apply load_array harr hci
     apply addr_elem S.oofs _ .Mint32 rfl rfl (by omega)
@@ -94,7 +98,7 @@ theorem eval_coset {le : temp_env} (c : PCtx m₀ m₁ S e bsr) (h : PAt m₀ m�
     have hob : S.ob = intOfZ (Ptrofs.unsigned S.oofs) := rfl
     rw [h4] at hf ⊢
     omega
-  have := eval_ltI ho (eval_gint (c.eg _ (by decide)) find_cosetindex hs.scalars.cosetindex) rfl rfl
+  have := eval_ltI ho (eval_gint (c.eg _ (by decide)) E.find_cosetindex hs.scalars.cosetindex) rfl rfl
     ⟨by have := hs.inv.orbitsSmall _ hci; omega, by have := hs.inv.orbitsSmall _ hci; omega⟩
     ⟨by omega, by omega⟩
   rw [show decide ((st.orbits[st.cosetindex]! : Int) < st.cosetindex) =
@@ -102,17 +106,17 @@ theorem eval_coset {le : temp_env} (c : PCtx m₀ m₁ S e bsr) (h : PAt m₀ m�
   exact this
 
 /-- What `processnode` writes for an exit from `st`. -/
-abbrev leafWords (st r : Search n) : List Int :=
+abbrev leafWords {κ : Type} (st r : SearchState n κ) : List Int :=
   if r.numgenerators = st.numgenerators + 1 then genWords r.workperm n else []
 
 set_option maxHeartbeats 16000000 in
 theorem wp_case2 {f : function} {Q : Post} {le : temp_env} {level : Nat}
-    (c : PCtx m₀ m₁ S e bsr) (h : PAt m₀ m₁ m S ctx bsr st false) (hcb : AutomCb xi S.bUA)
+    (c : PCtx D m₀ m₁ S gl cl e bsr) (h : PAt D m₀ m₁ m S gl cl G bsr st false) (hcb : AutomCb xi S.bUA)
     (hfr : f.fn_return = tint) (hci : st.cosetindex < n)
     (hw : ArrayAt m .Mint32 S.bWP 0 (ints st.workperm) n) (hwsz : st.workperm.size = n)
     (hws : ∀ i < n, st.workperm[i]! < n)
     (hwi : ∀ x y, x < n → y < n → st.workperm[x]! = st.workperm[y]! → x = y)
-    (hR : ∀ m' t, PAt m₀ m₁ m' S ctx bsr (lxBody .autoCanon level st).2
+    (hR : ∀ m' t, PAt D m₀ m₁ m' S gl cl G bsr (lxBody .autoCanon level st).2
         (exitValue level (lxBody .autoCanon level st).1).2 →
       Writes t (leafWords st (lxBody .autoCanon level st).2) →
       ∃ mf, Mem.free_list m' (blocks_of_env ge e) = some mf ∧
@@ -158,7 +162,7 @@ theorem wp_case2 {f : function} {Q : Post} {le : temp_env} {level : Nat}
     obtain ⟨mf, hfree, hret⟩ := hR m4 E0 h4 (by
       simp only [leafWords]; rw [if_neg (by omega)]; exact .nil)
     refine wp_return_some (v' := .Vint (ir st.gcaCanon))
-      (eval_gint (c.eg _ (by decide)) find_gcaCanon h4.search.scalars.gcaCanon) (by rw [hfr]; rfl)
+      (eval_gint (c.eg _ (by decide)) E.find_gcaCanon h4.search.scalars.gcaCanon) (by rw [hfr]; rfl)
       hfree ?_
     simpa using hret
   · rw [decide_eq_false (by exact_mod_cast heq), ite_eq_right (by decide)]
@@ -167,19 +171,19 @@ theorem wp_case2 {f : function} {Q : Post} {le : temp_env} {level : Nat}
     apply wp_skip
     simp only [seqPost, Post.after, E0_append]
     wp_step
-    refine wp_ifG0 (c.eg _ (by decide)) find_writeautoms h3.search.fixed.writeautoms ?_
+    refine wp_ifG0 (c.eg _ (by decide)) E.find_writeautoms h3.search.fixed.writeautoms ?_
     simp only [seqPost, Post.after, E0_append]
     wp_step; wp_step; wp_step
     refine wp_numgenerators c h3 ?_
     intro m4 h4 hsr4 hu4
     simp only [seqPost, Post.after, E0_append]
-    have hd := h4.search.distinct
+    have hd := h4.search.lit
     wp_step
     refine wp_callback c h4 hcb (hw3.unch hu4 (by sep_ne hd)) hws ?_
     intro t hW
     simp only [seqPost, Post.after, E0_append]
     wp_step
-    refine wp_ifG0 (c.eg _ (by decide)) find_doschreier h4.search.fixed.doschreier ?_
+    refine wp_ifG0 (c.eg _ (by decide)) E.find_doschreier h4.search.fixed.doschreier ?_
     simp only [seqPost, Post.after, E0_append, E0_left, E0_right]
     have hWt : Writes t (leafWords st { st with
         autos := pushA st.autos (fmperm st.workperm n), genTrace := st.genTrace.push st.workperm,
@@ -194,7 +198,7 @@ theorem wp_case2 {f : function} {Q : Post} {le : temp_env} {level : Nat}
       wp_step; wp_step
       obtain ⟨mf, hfree, hret⟩ := hR m4 t h4 hWt
       refine wp_return_some (v' := .Vint (ir st.gcaFirst))
-        (eval_gint (c.eg _ (by decide)) find_gcaFirst h4.search.scalars.gcaFirst) (by rw [hfr]; rfl)
+        (eval_gint (c.eg _ (by decide)) E.find_gcaFirst h4.search.scalars.gcaFirst) (by rw [hfr]; rfl)
         hfree ?_
       simpa using hret
     · rw [decide_eq_false hlt, ite_eq_right (by decide)]
@@ -208,7 +212,7 @@ theorem wp_case2 {f : function} {Q : Post} {le : temp_env} {level : Nat}
       wp_step; wp_step
       obtain ⟨mf, hfree, hret⟩ := hR m5 t h5 hWt
       refine wp_return_some (v' := .Vint (ir st.gcaCanon))
-        (eval_gint (c.eg _ (by decide)) find_gcaCanon h5.search.scalars.gcaCanon) (by rw [hfr]; rfl)
+        (eval_gint (c.eg _ (by decide)) E.find_gcaCanon h5.search.scalars.gcaCanon) (by rw [hfr]; rfl)
         hfree ?_
       simpa using hret
 

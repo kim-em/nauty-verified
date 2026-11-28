@@ -25,8 +25,11 @@ open Hex.GraphIso.Nauty
 set_option linter.unusedSimpArgs false
 
 variable {xi : ExternalCalls}
-variable {n : Nat} {m₀ m₁ m : mem} {S : SLoc} {ctx : Ctx n} {e : env} {bsr : block}
-  {st : Search n} {nsp : Bool}
+open NautyVerified.Proofs.Dispatch (Ops DispatchRep DispatchC)
+
+variable {ge : genv} [E : NautyEnv ge] {O : Ops}
+variable {n : Nat} {D : DispatchC ge O} {m₀ m₁ m : mem} {S : SLoc} {gl : D.GLoc} {cl : D.CLoc}
+  {G : O.Gr n} {e : env} {bsr : block} {st : SearchState n (O.Canon n)} {nsp : Bool}
 
 abbrev cbType : type := tfun [tint, tptr tint, tptr tint, tint, tint, tint] .Tvoid
 
@@ -49,7 +52,7 @@ theorem perm_of_va {m : mem} {b : block}
     omega⟩
 
 theorem wp_callback {f : function} {Q : Post} {le : temp_env} {w : Array Nat}
-    (c : PCtx m₀ m₁ S e bsr) (h : PAt m₀ m₁ m S ctx bsr st nsp) (hcb : AutomCb xi S.bUA)
+    (c : PCtx D m₀ m₁ S gl cl e bsr) (h : PAt D m₀ m₁ m S gl cl G bsr st nsp) (hcb : AutomCb xi S.bUA)
     (hw : ArrayAt m .Mint32 S.bWP 0 (ints w) n) (hws : ∀ i < n, w[i]! < n)
     (hQ : ∀ t, Writes t (genWords w n) → Q.normal t e le m) :
     Wp xi ge f callbackC Q e le m := by
@@ -61,7 +64,7 @@ theorem wp_callback {f : function} {Q : Post} {le : temp_env} {w : Array Nat}
   obtain ⟨fd, hfd, hty, hsat⟩ := hcb
   wp_step; wp_step
   apply wp_if_eval
-  rw [Exec.evalExpr, eval_gptr (c.eg _ (by decide)) find_userautomproc rfl hua]
+  rw [Exec.evalExpr, eval_gptr (c.eg _ (by decide)) E.find_userautomproc rfl hua]
   simp only [Exec.evalExpr, typeof, cop, Top.ne_pl, Top.cmp_null_ne (perm_of_va h.ua), Option.map]
   simp only [cop, ite_true]
   wp_step; wp_step
@@ -72,18 +75,18 @@ theorem wp_callback {f : function} {Q : Post} {le : temp_env} {w : Array Nat}
     (hsat (ir st.numgenerators) S.bWP Ptrofs.zero w n S.bo S.oofs (ir st.numorbits)
       (ir st.stabvertex)) rfl ?_ ?_ hfd hty ⟨rfl, hw, by omega, fun i hi => by have := hws i hi; omega⟩ ?_
   · simp only [Exec.evalExpr, Exec.lvalOfVar, c.eg _ (by decide : dense.id.«nauty:userautomproc» ≠ dense.id.sr),
-      find_userautomproc, Exec.derefLoc, access_mode, Mem.loadv, Alloc.Mptr_eq,
+      E.find_userautomproc, Exec.derefLoc, access_mode, Mem.loadv, Alloc.Mptr_eq,
       show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl, hua.load]
   · simp only [Exec.evalExprlist,
       eval_statsF (ty := tint) (c.eg _ (by decide)) fld_numgenerators rfl hs.fixed.stats (by decide)
         (by omega) hs.stats.numgenerators,
-      eval_gptr (ty := tptr tint) (c.eg _ (by decide)) find_nautyWorkperm rfl
+      eval_gptr (ty := tptr tint) (c.eg _ (by decide)) E.find_nautyWorkperm rfl
         ⟨hs.dyns.workperm.ptr hcWP, hs.dyns.workperm.bpW⟩,
-      eval_gptr (ty := tptr tint) (c.eg _ (by decide)) find_orbits rfl hs.fixed.orbits,
+      eval_gptr (ty := tptr tint) (c.eg _ (by decide)) E.find_orbits rfl hs.fixed.orbits,
       eval_statsF (ty := tint) (c.eg _ (by decide)) fld_numorbits rfl hs.fixed.stats (by decide)
         (by omega) hs.stats.numorbits,
-      eval_gint (c.eg _ (by decide)) find_stabvertex hs.scalars.stabvertex,
-      eval_gint (c.eg _ (by decide)) find_n hs.fixed.nn, typeof, cop]
+      eval_gint (c.eg _ (by decide)) E.find_stabvertex hs.scalars.stabvertex,
+      eval_gint (c.eg _ (by decide)) E.find_n hs.fixed.nn, typeof, cop]
   · rintro t r m' ⟨hW, rfl⟩
     simp only [set_opttemp]
     exact hQ t hW
