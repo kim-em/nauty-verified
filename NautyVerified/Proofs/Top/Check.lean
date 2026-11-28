@@ -118,7 +118,8 @@ def checkSpec (mv nv : val) : FunSpec where
   pre args _ := args = [.Vint (ir 64), mv, nv, .Vint (ir 29300)]
   post _ m t _ m' := t = E0 ∧ m' = m
 
-theorem nautil_check_satisfies {xi : ExternalCalls} (mv nv : val) :
+set_option maxRecDepth 20000 in
+theorem nautil_check_satisfies {ge : genv} {xi : ExternalCalls} (mv nv : val) :
     Satisfies xi ge (.Internal dense.fn.nautil_check) (checkSpec mv nv) := by
   refine satisfies_internal (Entry := fun _ m₀ e le m => e = empty_env ∧
     PTree.get dense.id.wordsize le = some (.Vint (ir 64)) ∧
