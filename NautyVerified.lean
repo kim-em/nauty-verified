@@ -111,6 +111,7 @@ import NautyVerified.Proofs.Top.NautyInit
 import NautyVerified.Proofs.Top.NautyOrbits
 import NautyVerified.Proofs.Top.NautyStats
 import NautyVerified.Proofs.Top.NautyWork
+import NautyVerified.Proofs.Top.NautyRoot
 import NautyVerified.Proofs.Search.Node.Spec
 import NautyVerified.Proofs.Search.Node.OtherHex
 import NautyVerified.Proofs.Search.Node.Rebuild
