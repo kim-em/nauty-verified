@@ -127,4 +127,54 @@ theorem wp_nodeNextAt {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_e
     simp only [Exec.evalExpr, temps_gss, Refine.tv]
     exact hQ r (Refine.next_eq hrep hspec)
 
+/-! ### For any dispatch representation -/
+
+section Generic
+
+open NautyVerified.Proofs.Dispatch (Ops DispatchRep)
+
+variable {ge : genv} [E : NautyEnv ge] {O : Ops} {D : DispatchRep ge O}
+
+/-- `x = nextelement(tcell, M, tv); tv = x;`, for `D`. -/
+theorem wp_nodeNextAtG {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_env} {m : mem}
+    {S : SLoc} {gl : D.GLoc} {cl : D.CLoc} {G : O.Gr n} {st : SearchState n (O.Canon n)}
+    {pre nsp : Bool} (x : ident)
+    (h : SearchAtG D m S gl cl G st pre nsp)
+    (hge : ∀ x ∈ [dense.id.«nextelement», dense.id.«nauty:m»], PTree.get x e = none)
+    {btc : block} (htl : PTree.get dense.id.tcell le = some (.Vptr btc Ptrofs.zero))
+    {tw : Nat → Lib.Integers.int64} (htw : ArrayAt m .Mint64 btc 0 (longs tw) S.M)
+    {cell : VSet n} (hrep : SetRep (fun w => bv64 (tw w)) S.M cell)
+    {p : Nat} (htv : PTree.get dense.id.«tv» le = some (.Vint (ir p))) (hp : p < n)
+    (hQ : ∀ r : Int, ((cell.nextElem (some p) = none ∧ r = -1) ∨
+        ∃ v : Nat, cell.nextElem (some p) = some v ∧ r = v) →
+      Q.normal E0 e (PTree.set dense.id.«tv» (.Vint (ir r))
+        (PTree.set x (.Vint (ir r)) le)) m) :
+    Wp xi ge f (nextStepAt x) Q e le m := by
+  have hM1 := h.M1
+  have hMl := h.Mlt
+  have hnM := h.nM
+  simp only [List.forall_mem_cons] at hge
+  obtain ⟨g1, g2, -⟩ := hge
+  wp_step; wp_step; wp_step
+  refine wp_call (vf := .Vptr E.nextelement Ptrofs.zero) (targs := [tptr tulong, tint, tint])
+    (tres := tint) (cc := Common.AST.cc_default)
+    (vargs := [.Vptr btc Ptrofs.zero, .Vint (ir S.M), .Vint (ir ((p : Nat) : Int))]) _
+    (Nextelement.nextSpec btc Ptrofs.zero S.M (Refine.posOf (some p)) tw)
+    (Nextelement.nextelement_satisfies _ _ _ _ _) rfl ?_ ?_
+    (by simp [Common.Globalenvs.Genv.find_funct, E.funct_nextelement]) Isautom.type_nextelement
+    ⟨rfl, by simp [Refine.posOf], by simp [Refine.posOf]; omega, hM1, by omega,
+      Graph.wordsAt_of htw, h.tables.env.left⟩ ?_
+  · simp only [Exec.evalExpr, Exec.lvalOfVar, g1, E.find_nextelement, Exec.derefLoc,
+      Cfrontend.Ctypes.access_mode]
+  · simp only [Exec.evalExprlist, Exec.evalExpr, Exec.lvalOfVar, g2, E.find_m, Exec.derefLoc,
+      Cfrontend.Ctypes.access_mode, Mem.loadv, show Ptrofs.unsigned Ptrofs.zero = zOfInt 0 from rfl,
+      h.fixed.mm.load, htl, htv, Refine.tv, typeof, cop]
+  · rintro t' v m' ⟨rfl, rfl, r, rfl, hspec⟩
+    simp only [set_opttemp]
+    apply wp_set_eval
+    simp only [Exec.evalExpr, temps_gss, Refine.tv]
+    exact hQ r (Refine.next_eq hrep hspec)
+
+end Generic
+
 end NautyVerified.Proofs.Search
