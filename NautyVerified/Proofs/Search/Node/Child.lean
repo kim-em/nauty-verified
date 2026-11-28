@@ -58,6 +58,7 @@ theorem wp_nodeChild {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_en
         level + 1 ≤ chain'.length ∧ chain'.take level = chain.take level ∧
         ∀ p ∈ chain', p ∈ chain ∨ (¬ Mem.valid_block m p.1 ∧ ¬ Mem.valid_block m p.2)) →
       NodeFrame m m' S chain (level + 1) →
+      (∀ z, IsWork m' z → IsWork m z ∨ ¬ Mem.valid_block m z) →
       Q.normal t e (PTree.set dense.id.«rtnlevel»
         (.Vint (ir (exitValue (level + 1) (hexNode false ctx (level + 1) (nc + 1) st).1).1))
         (PTree.set (idOf 717)
@@ -82,12 +83,12 @@ theorem wp_nodeChild {n : Nat} {f : function} {Q : Post} {e : env} {le : temp_en
       ir_add]
     push_cast
     rfl
-  · rintro t v m' ⟨hv, hS', hE, hC, hF⟩
+  · rintro t v m' ⟨hv, hS', hE, hC, hF, hW⟩
     subst hv
     simp only [set_opttemp]
     apply wp_set_eval
     simp only [Exec.evalExpr, temps_gss, Refine.tv, append_E0]
-    refine hQ t m' hS' hE ?_ hF
+    refine hQ t m' hS' hE ?_ hF hW
     obtain ⟨c', h1, h2, h3, h4, h5⟩ := hC
     exact ⟨c', h1, h2, h3, by simpa using h4, h5⟩
 

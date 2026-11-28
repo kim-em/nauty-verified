@@ -39,7 +39,8 @@ with `SearchInf.NodeOk G` (`Spec/NodeOk.lean`).
 `NodeFrame m m' S chain level`: the blocks a node at `level` may change: those
 of `SFrame`, the list's nodes from index `level - 2` (the parent's `next`
 field) and their target cells from index `level - 1`. The parent's own
-target cell (index `level - 2`) is unchanged.
+target cell (index `level - 2`) is unchanged. A work block afterwards was a work
+block before or is newly allocated.
 -/
 
 namespace NautyVerified.Proofs.Search
@@ -123,7 +124,7 @@ def nodeSpec {n : Nat} (xi : ExternalCalls) (NodeOk : Bool → Nat → Nat → S
     (∃ chain', TcChain m' S.M Block.tcnode0 chain' ∧ TcOk m' S chain' ∧ level ≤ chain'.length ∧
       chain'.take (level - 1) = chain.take (level - 1) ∧
       ∀ p ∈ chain', p ∈ chain ∨ (¬ Mem.valid_block m p.1 ∧ ¬ Mem.valid_block m p.2)) ∧
-    NodeFrame m m' S chain level
+    NodeFrame m m' S chain level ∧ ∀ z, IsWork m' z → IsWork m z ∨ ¬ Mem.valid_block m z
 
 /-- `firstpathnode0`. -/
 abbrev firstpathnodeSpec {n : Nat} (xi : ExternalCalls)
