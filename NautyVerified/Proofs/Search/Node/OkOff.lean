@@ -45,7 +45,7 @@ theorem sweepOkOff_next {G : Colored n k} {level numcells tc tv1 tv : Nat} {cell
     (B := nautyInfinity) hn0 hn) false fuel (level + 1) (numcells + 1) (child false level tc tv st₀)
     ⟨by omega, hokc⟩
   obtain ⟨hdreach, himp⟩ := hpost
-  obtain ⟨hoff, -⟩ := himp (child_inv hinv)
+  obtain ⟨hoff, -⟩ := himp (child_inv hinv fun h => absurd h (by decide))
   have hac : AgreeTo (last + 1) t (child false level tc tv st₀).firsttc := by
     rw [(ref_fields hcf).1]; exact ha
   obtain ⟨heq, hdd, hfd, hinvd⟩ := hoff rfl last t hcd hac
@@ -79,7 +79,7 @@ theorem sweepOkOff_next {G : Colored n k} {level numcells tc tv1 tv : Nat} {cell
     have hrf := F.recover level s9
     dsimp only [policy, Generic.Policy.recover] at hr hrd hrf
     have hri : Inv (recover (n + 2) level s9) := by
-      refine ⟨?_, by rw [(ref_fields hrf).2]; exact hi9.2⟩
+      refine ⟨?_, by rw [(ref_fields hrf).2]; exact hi9.2.1, leafI_recover hi9.2.2 (n + 2) level⟩
       rw [recover_noncheap]; split <;> omega
     have hsub' : ∀ v, (if (tv == tv1) = true then longprune cell' s9.fixedpts s9.autos else cell').mem v = true →
         cell.mem v = true := by

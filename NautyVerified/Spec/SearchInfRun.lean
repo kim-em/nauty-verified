@@ -1,4 +1,5 @@
 import NautyVerified.Spec.SearchInf
+import NautyVerified.Spec.LeafInv
 import HexGraphIso.Nauty.Policy.Boundary
 import HexGraphIso.Nauty.Policy.Depth
 import HexGraphIso.Nauty.Policy.First.State
@@ -54,8 +55,17 @@ theorem AgreeTo.set {A : Nat} {t s : Array Int} (h : AgreeTo A t s) (v : Int) :
 def OrbId (st : Search n) : Prop := ∀ v, v < n → st.orbits[v]! = v
 
 /-- Facts every call keeps: the `noncheaplevel` bound the leaf code's `fmptn`
-needs, and the size of the first-path codes. -/
-def Inv (st : Search n) : Prop := st.noncheaplevel ≤ n + 1 ∧ st.firstcode.size = n + 2
+needs, the size of the first-path codes, and what a leaf may rely on (`LeafI`). -/
+def Inv (st : Search n) : Prop := st.noncheaplevel ≤ n + 1 ∧ st.firstcode.size = n + 2 ∧ LeafI st
+
+/-- The initial state meets `Inv`: no first leaf yet, `noncheaplevel = 1`, coset index `0`. -/
+theorem initial_inv (hn0 : 0 < n) (lab0 : Array Nat) (cellEnds : List Nat) :
+    Inv (initial n lab0 cellEnds) :=
+    ⟨by show 1 ≤ n + 1; omega, by simp [initial], Nat.le_refl 1, hn0, fun ⟨i, hi⟩ => by
+      change (Array.replicate (n + 2) 0)[i]! = codeSentinel at hi
+      by_cases h : i < n + 2
+      · rw [getElem!_pos _ i (by simpa using h)] at hi; simp [codeSentinel] at hi
+      · rw [getElem!_neg _ i (by simpa using h)] at hi; simp [codeSentinel] at hi⟩
 
 theorem level_le_of_ok {G : Colored n k} {level numcells : Nat} {st : Search n}
     (h : SearchOk G level numcells st) : level ≤ n :=
@@ -199,7 +209,8 @@ theorem nodeStep_off (hn0 : 0 < n) (hB : n + 2 < B) (fuel : Nat) (next : Generic
   have hcl := R.compare level code nc s1 hok1
   dsimp only [policy, Generic.Policy.compareCodes] at hcf hcl
   have hci : Inv (compareCodes level code s1) :=
-    ⟨by rw [compare_noncheap]; exact hvi.1, by rw [(hrf hcf).2]; exact hvi.2⟩
+    ⟨by rw [compare_noncheap]; exact hvi.1, by rw [(hrf hcf).2]; exact hvi.2.1,
+      leafI_compare hvi.2.2 level code⟩
   rw [compareCodes_tw]
   generalize compareCodes level code s1 = s2 at hcd hcf hcl hci ⊢
   -- target
@@ -213,7 +224,8 @@ theorem nodeStep_off (hn0 : 0 < n) (hB : n + 2 < B) (fuel : Nat) (next : Generic
   have htr := R.target false level nc s2 hlevel hcl.ok
   dsimp only [policy, Generic.Policy.chooseTarget] at htd htf htr
   have hti : Inv (chooseTarget false ctx tcLevel level nc s2).2.2.2 :=
-    ⟨by rw [target_noncheap]; exact hci.1, by rw [(hrf htf).2]; exact hci.2⟩
+    ⟨by rw [target_noncheap]; exact hci.1, by rw [(hrf htf).2]; exact hci.2.1,
+      leafI_target hci.2.2 false ctx tcLevel level nc⟩
   generalize chooseTarget false ctx tcLevel level nc s2 = c at htd htf htr hti ⊢
   obtain ⟨tc, cell, size, s3⟩ := c
   obtain ⟨htl, htarget⟩ := htr
@@ -226,7 +238,8 @@ theorem nodeStep_off (hn0 : 0 < n) (hB : n + 2 < B) (fuel : Nat) (next : Generic
   have hclr := R.classify level nc s3 htl.ok
   dsimp only [policy, Generic.Policy.classify] at hcld hclf hclr
   have hcli : Inv (classify ctx level nc s3).2 :=
-    ⟨by rw [classify_noncheap]; exact hti.1, by rw [(hrf hclf).2]; exact hti.2⟩
+    ⟨by rw [classify_noncheap]; exact hti.1, by rw [(hrf hclf).2]; exact hti.2.1,
+      leafI_classify hti.2.2 ctx level nc⟩
   generalize classify ctx level nc s3 = cl at hcld hclf hclr hcli ⊢
   obtain ⟨leaf, s4⟩ := cl
   dsimp only at hcld hclf hclr hcli ⊢
@@ -237,7 +250,8 @@ theorem nodeStep_off (hn0 : 0 < n) (hB : n + 2 < B) (fuel : Nat) (next : Generic
   have hler := R.leaf leaf level nc s4 hclr.ok
   dsimp only [policy, Generic.Policy.leafExit] at hled hlef hler
   have hlei : Inv (leafExit leaf level s4).2 :=
-    ⟨by rw [leafExit_noncheap]; exact hcli.1, by rw [(hrf hlef).2]; exact hcli.2⟩
+    ⟨by rw [leafExit_noncheap]; exact hcli.1, by rw [(hrf hlef).2]; exact hcli.2.1,
+      leafI_leafExit hcli.2.2 leaf level (labPerm_of_ok hn0 hclr.ok)⟩
   generalize leafExit leaf level s4 = le at hled hlef hler hlei ⊢
   obtain ⟨exit, s5⟩ := le
   dsimp only at hled hlef hler hlei ⊢
@@ -254,7 +268,7 @@ theorem nodeStep_off (hn0 : 0 < n) (hB : n + 2 < B) (fuel : Nat) (next : Generic
     have hchr := R.cheap false level nc s5 hler.ok
     dsimp only [policy, Generic.Policy.cheapCheck] at hchd hchf hchr
     have hchi : Inv (cheapCheck false level s5) := by
-      refine ⟨?_, by rw [(hrf hchf).2]; exact hlei.2⟩
+      refine ⟨?_, by rw [(hrf hchf).2]; exact hlei.2.1, leafI_cheap hlei.2.2 false level⟩
       unfold cheapCheck; split
       · show level + 1 ≤ n + 1; omega
       · exact hlei.1
@@ -313,17 +327,20 @@ theorem nodeStep_first (hn0 : 0 < n) (hB : n + 2 < B) (fuel : Nat)
     Generic.Policy.compareCodes, Generic.Policy.chooseTarget, Generic.Policy.firstterminal,
     Generic.Policy.classify, Generic.Policy.leafExit, Generic.Policy.cheapCheck,
     Generic.Policy.afterSweep] at hv ⊢
+  have hcode := (depthPolicy ctx (n + 2) tcLevel 0).code level numcells st
+  dsimp only [policy, Generic.Policy.visit] at hcode
   rw [visit_tw t ctx level numcells st hL1 hL2]
-  generalize visit ctx level numcells st = r at hv hvi hvo hva ⊢
+  generalize visit ctx level numcells st = r at hv hvi hvo hva hcode ⊢
   obtain ⟨nc, code, s1⟩ := r
   obtain ⟨hok1, -⟩ := hv
-  dsimp only at hok1 hvi hvo hva ⊢
+  dsimp only at hok1 hvi hvo hva hcode ⊢
   simp only [ite_true]
   -- the first-path code
   rw [recordFirst_tw]
   have hrl := R.record level code nc s1 hok1
   dsimp only [policy, Generic.Policy.recordFirst] at hrl
-  have hri : Inv (recordFirst level code s1) := ⟨hvi.1, by simp [recordFirst, hvi.2]⟩
+  have hri : Inv (recordFirst level code s1) := ⟨hvi.1, by simp [recordFirst, hvi.2.1],
+    leafI_record hvi.2.2 hcode⟩
   have hro : OrbId (recordFirst level code s1) := hvo
   have hra : AgreeTo (level - 1) t (recordFirst level code s1).firsttc := hva
   generalize recordFirst level code s1 = s2 at hrl hri hro hra ⊢
@@ -349,9 +366,10 @@ theorem nodeStep_first (hn0 : 0 < n) (hB : n + 2 < B) (fuel : Nat)
     refine ⟨(t.set! level tc).set! (level + 1) (-1), by rw [firstterminal_tw]; rfl, .inr ⟨level, ?_, ?_⟩, ?_⟩
     · refine ⟨Nat.le_refl _, ?_⟩
       show (s3.firstcode.set! (level + 1) codeSentinel)[level + 1]! = codeSentinel
-      exact Array.getElem!_set!_self _ _ _ (by rw [hi3.2]; omega)
+      exact Array.getElem!_set!_self _ _ _ (by rw [hi3.2.1]; omega)
     · exact ha3.set (-1)
-    · exact ⟨hi3.1, by show (s3.firstcode.set! (level + 1) codeSentinel).size = n + 2; simp [hi3.2]⟩
+    · exact ⟨hi3.1, by show (s3.firstcode.set! (level + 1) codeSentinel).size = n + 2; simp [hi3.2.1],
+        leafI_firstterminal hi3.2.2 level (labPerm_of_ok hn0 htl.ok)⟩
   · simp only [hleaf, Bool.false_eq_true, ite_false]
     obtain ⟨v, hv⟩ := hcell (by simpa using hleaf)
     rw [cheapCheck_tw (t.set! level tc) true level s3 hL1 hL2]
@@ -362,7 +380,8 @@ theorem nodeStep_first (hn0 : 0 < n) (hB : n + 2 < B) (fuel : Nat)
       · exact ⟨level + 1, rfl, by omega⟩
       · exact ⟨s3.noncheaplevel, rfl, hi3.1⟩
     obtain ⟨k', hk', hk'le⟩ := hcheq
-    have hchi : Inv (cheapCheck true level s3) := by rw [hk']; exact ⟨hk'le, hi3.2⟩
+    have hchi : Inv (cheapCheck true level s3) :=
+      ⟨by rw [hk']; exact hk'le, by rw [hk']; exact hi3.2.1, leafI_cheap hi3.2.2 true level⟩
     have hcho : OrbId (cheapCheck true level s3) := by rw [hk']; exact ho3
     have hcha : AgreeTo level (t.set! level tc) (cheapCheck true level s3).firsttc := by
       rw [hk']; exact ha3
@@ -404,9 +423,12 @@ theorem ref_fields {x y : Search n} (h : x.reference = y.reference) :
     x.firsttc = y.firsttc ∧ x.firstcode = y.firstcode :=
   ⟨congrArg (fun r => r.2.1) h, congrArg (fun r => r.1) h⟩
 
-theorem child_inv {first : Bool} {level tc tv : Nat} {st : Search n} (h : Inv st) :
-    Inv (child first level tc tv st) := by
-  cases first <;> exact h
+theorem child_inv {first : Bool} {level tc tv : Nat} {st : Search n} (h : Inv st)
+    (htv : first = true → tv < n) : Inv (child first level tc tv st) := by
+  have hl := leafI_child h.2.2 first level tc tv htv
+  cases first
+  · exact ⟨h.1, h.2.1, hl⟩
+  · exact ⟨h.1, h.2.1, hl⟩
 
 theorem child_orbId {first : Bool} {level tc tv : Nat} {st : Search n} (h : OrbId st) :
     OrbId (child first level tc tv st) := by
@@ -443,7 +465,7 @@ theorem resume_off (hn0 : 0 < n) (hB : n + 2 < B) (fuel cfuel : Nat)
   have hrf := F.recover level out
   dsimp only [policy, Generic.Policy.recover] at hr hrd hrf
   have hri : Inv (recover (n + 2) level out) := by
-    refine ⟨?_, by rw [(ref_fields hrf).2]; exact hinv.2⟩
+    refine ⟨?_, by rw [(ref_fields hrf).2]; exact hinv.2.1, leafI_recover hinv.2.2 (n + 2) level⟩
     rw [recover_noncheap]; split <;> omega
   -- the pruned cell
   let cell'' := if (!first && tv == tv1) = true then longprune cell' out.fixedpts out.autos else cell'
@@ -527,7 +549,7 @@ theorem sweepStep_off (hn0 : 0 < n) (hB : n + 2 < B) (fuel cfuel : Nat)
     obtain ⟨hokc, hceff⟩ := hch
     have hdn := hdescend false (level + 1) (numcells + 1) (child first level tc tv st) ⟨by omega, hokc⟩
     obtain ⟨hdreach, hdimp⟩ := hdn
-    obtain ⟨hoff, -⟩ := hdimp (child_inv hinv)
+    obtain ⟨hoff, -⟩ := hdimp (child_inv hinv fun _ => VSet.mem_lt htv)
     have hac : AgreeTo (last + 1) t (child first level tc tv st).firsttc := by
       rw [(ref_fields hcf).1]; exact ha
     obtain ⟨heq, hdd, hfd, hinvd⟩ := hoff rfl last t hcd hac
@@ -628,7 +650,7 @@ theorem sweepStep_first (hn0 : 0 < n) (hB : n + 2 < B) (fuel cfuel : Nat)
   obtain ⟨hokc, hceff⟩ := hch
   have hdn := hdescend true (level + 1) (numcells + 1) (child true level tc tv1 st) ⟨by omega, hokc⟩
   obtain ⟨hdreach, hdimp⟩ := hdn
-  obtain ⟨-, hfirst⟩ := hdimp (child_inv hinv)
+  obtain ⟨-, hfirst⟩ := hdimp (child_inv hinv fun _ => VSet.mem_lt htv)
   have hac : AgreeTo (level + 1 - 1) t (child true level tc tv1 st).firsttc := by
     rw [(ref_fields hcf).1, Nat.add_sub_cancel]; exact ha
   obtain ⟨t', heq, hph, hinvd⟩ := hfirst rfl t (child_orbId horb) hac
@@ -783,7 +805,7 @@ theorem node_inf (G : Colored n k) (hn0 : 0 < n) (hn : n + 2 < nautyInfinity) :
     (initial n (initialPartition G).1 (initialPartition G).2) ⟨Nat.le_refl _, initial_ok G hn0⟩
   obtain ⟨-, himp⟩ := hpost
   have hinv : Inv (initial n (initialPartition G).1 (initialPartition G).2) :=
-    ⟨by show 1 ≤ n + 1; omega, by simp [initial]⟩
+    initial_inv hn0 _ _
   have horb : OrbId (initial n (initialPartition G).1 (initialPartition G).2) := by
     intro v hv
     show (Array.ofFn (n := n) fun i => i.val)[v]! = v

@@ -76,7 +76,7 @@ theorem nodeOk_root (G : Colored n k) (hn0 : 0 < n) :
     NodeOk G true 1 (initialPartition G).2.length
       (initialC n (initialPartition G).1 (initialPartition G).2) := by
   refine ⟨⟨.replicate (n + 2) 0, initial n (initialPartition G).1 (initialPartition G).2,
-    initialC_eq _ _ _, Nat.le_refl _, initial_ok G hn0, ⟨by show 1 ≤ n + 1; omega, by simp [initial]⟩,
+    initialC_eq _ _ _, Nat.le_refl _, initial_ok G hn0, initial_inv hn0 _ _,
     fun _ => ⟨?_, ?_⟩, fun h => absurd h (by decide)⟩, fun h => absurd h (by decide)⟩
   · intro v hv
     show (Array.ofFn (n := n) fun i => i.val)[v]! = v

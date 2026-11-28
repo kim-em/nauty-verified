@@ -63,16 +63,18 @@ theorem nodeOk_sweepFirst₀ {G : Colored n k} {level numcells : Nat} {st : Sear
   have hvi : Inv (visit ctx level numcells st₀).2.2 := hinv
   have hvo : OrbId (visit ctx level numcells st₀).2.2 := horb
   have hva : AgreeTo (level - 1) t (visit ctx level numcells st₀).2.2.firsttc := ha
-  dsimp only [policy, Generic.Policy.visit] at hv ⊢
+  have hcode := (depthPolicy ctx (n + 2) tcLevel 0).code level numcells st₀
+  dsimp only [policy, Generic.Policy.visit] at hv hcode ⊢
   rw [visit_tw t ctx level numcells st₀ hL1 hL2]
-  generalize visit ctx level numcells st₀ = r at hv hvi hvo hva ⊢
+  generalize visit ctx level numcells st₀ = r at hv hvi hvo hva hcode ⊢
   obtain ⟨nc, code, s1⟩ := r
   obtain ⟨hok1, -⟩ := hv
-  dsimp only at hok1 hvi hvo hva ⊢
+  dsimp only at hok1 hvi hvo hva hcode ⊢
   rw [recordFirst_tw]
   have hrl := R.record level code nc s1 hok1
   dsimp only [policy, Generic.Policy.recordFirst] at hrl
-  have hri : Inv (recordFirst level code s1) := ⟨hvi.1, by simp [recordFirst, hvi.2]⟩
+  have hri : Inv (recordFirst level code s1) := ⟨hvi.1, by simp [recordFirst, hvi.2.1],
+    leafI_record hvi.2.2 hcode⟩
   have hro : OrbId (recordFirst level code s1) := hvo
   have hra : AgreeTo (level - 1) t (recordFirst level code s1).firsttc := hva
   generalize recordFirst level code s1 = s2 at hrl hri hro hra ⊢
@@ -104,7 +106,7 @@ theorem nodeOk_sweepFirst₀ {G : Colored n k} {level numcells : Nat} {st : Sear
   obtain ⟨k', hk', hk'le⟩ := hcheq
   refine ⟨v, hv, t.set! level tc, cheapCheck true level s3, rfl, hlevel, hchr.ok,
     htarget.of_out hchr.effect, fun w hw => by cases hw; exact VSet.nextElem_mem hv,
-    by rw [hk']; exact ⟨hk'le, hi3.2⟩, .inl ⟨rfl, by rw [hk']; exact ho3, by rw [hk']; exact ha3⟩⟩
+    ⟨by rw [hk']; exact hk'le, by rw [hk']; exact hi3.2.1, leafI_cheap hi3.2.2 true level⟩, .inl ⟨rfl, by rw [hk']; exact ho3, by rw [hk']; exact ha3⟩⟩
 
 /-- A first-path node that is not a leaf starts its sweep in `SweepOkFirst`. -/
 theorem nodeOk_sweepFirst {G : Colored n k} {level numcells : Nat} {st : Search n}
@@ -136,7 +138,7 @@ theorem sweepOkFirst_child₀ {G : Colored n k} {level numcells tc tv1 tv : Nat}
   · have htv : tv = tv1 := Option.some.inj hc
     subst htv
     simp only [beq_self_eq_true]
-    refine ⟨t, child true level tc tv st₀, rfl, by omega, hch.1, child_inv hinv,
+    refine ⟨t, child true level tc tv st₀, rfl, by omega, hch.1, child_inv hinv (fun _ => VSet.mem_lt (hcur tv rfl)),
       fun _ => ⟨child_orbId horb, ?_⟩, fun h => absurd h (by decide)⟩
     rw [(ref_fields hcf).1, Nat.add_sub_cancel]; exact ha
   · have hlt := hpast rfl tv rfl
@@ -145,7 +147,7 @@ theorem sweepOkFirst_child₀ {G : Colored n k} {level numcells tc tv1 tv : Nat}
     have D := depthPolicy ctx (n + 2) tcLevel last
     have hcd := D.child true level tc tv st₀ hd
     dsimp only [policy, Generic.Policy.child] at hcd
-    refine ⟨t, child true level tc tv st₀, rfl, by omega, hch.1, child_inv hinv,
+    refine ⟨t, child true level tc tv st₀, rfl, by omega, hch.1, child_inv hinv (fun _ => VSet.mem_lt (hcur tv rfl)),
       fun h => absurd h (by decide), fun _ => ⟨last, hcd, ?_⟩⟩
     rw [(ref_fields hcf).1]; exact ha
 
@@ -188,7 +190,7 @@ theorem sweepOkFirst_next₀ {G : Colored n k} {level numcells tc tv1 tv : Nat} 
     have hrf := F.recover level s9
     dsimp only [policy, Generic.Policy.recover] at hr hrd hrf
     have hri : Inv (recover (n + 2) level s9) := by
-      refine ⟨?_, by rw [(ref_fields hrf).2]; exact hi9.2⟩
+      refine ⟨?_, by rw [(ref_fields hrf).2]; exact hi9.2.1, leafI_recover hi9.2.2 (n + 2) level⟩
       rw [recover_noncheap]; split <;> omega
     rw [recover_tw t' level s9 (by omega) (by omega)]
     refine ⟨t', recover (n + 2) level s9, rfl, hlevel, hr.ok, (htarget.subset hsub).of_out hr.effect,
@@ -211,7 +213,7 @@ theorem sweepOkFirst_next₀ {G : Colored n k} {level numcells tc tv1 tv : Nat} 
       (B := nautyInfinity) hn0 hn) (tv == tv1) fuel (level + 1) (numcells + 1)
       (child true level tc tv st₀) ⟨by omega, hokc⟩
     obtain ⟨hdreach, himp⟩ := hpost
-    obtain ⟨hoffP, hfirstP⟩ := himp (child_inv hinv)
+    obtain ⟨hoffP, hfirstP⟩ := himp (child_inv hinv fun _ => VSet.mem_lt htv)
     rcases hph with ⟨hc, horb, ha⟩ | ⟨hpast, last, hd, ha⟩
     · -- the first child, on the first path
       have htv1 : tv = tv1 := Option.some.inj hc

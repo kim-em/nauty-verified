@@ -78,7 +78,8 @@ theorem nodeOk_sweepOff₀ {G : Colored n k} {level numcells : Nat} {st : Search
   have hcl := R.compare level code nc s1 hok1
   dsimp only [policy, Generic.Policy.compareCodes] at hcf hcl
   have hci : Inv (compareCodes level code s1) :=
-    ⟨by rw [compare_noncheap]; exact hvi.1, by rw [(hrf hcf).2]; exact hvi.2⟩
+    ⟨by rw [compare_noncheap]; exact hvi.1, by rw [(hrf hcf).2]; exact hvi.2.1,
+      leafI_compare hvi.2.2 level code⟩
   rw [compareCodes_tw]
   generalize compareCodes level code s1 = s2 at hcd hcf hcl hci ⊢
   have ht : false = false → s2.eqlevFirst = level → t[level]! = s2.firsttc[level]! := by
@@ -91,7 +92,8 @@ theorem nodeOk_sweepOff₀ {G : Colored n k} {level numcells : Nat} {st : Search
   have htr := R.target false level nc s2 hlevel hcl.ok
   dsimp only [policy, Generic.Policy.chooseTarget] at htd htf htr
   have hti : Inv (chooseTarget false ctx tcLevel level nc s2).2.2.2 :=
-    ⟨by rw [target_noncheap]; exact hci.1, by rw [(hrf htf).2]; exact hci.2⟩
+    ⟨by rw [target_noncheap]; exact hci.1, by rw [(hrf htf).2]; exact hci.2.1,
+      leafI_target hci.2.2 false ctx tcLevel level nc⟩
   generalize chooseTarget false ctx tcLevel level nc s2 = c at htd htf htr hti ⊢
   obtain ⟨tc, cell, size, s3⟩ := c
   obtain ⟨htl, htarget⟩ := htr
@@ -103,7 +105,8 @@ theorem nodeOk_sweepOff₀ {G : Colored n k} {level numcells : Nat} {st : Search
   have hclr := R.classify level nc s3 htl.ok
   dsimp only [policy, Generic.Policy.classify] at hcld hclf hclr
   have hcli : Inv (classify ctx level nc s3).2 :=
-    ⟨by rw [classify_noncheap]; exact hti.1, by rw [(hrf hclf).2]; exact hti.2⟩
+    ⟨by rw [classify_noncheap]; exact hti.1, by rw [(hrf hclf).2]; exact hti.2.1,
+      leafI_classify hti.2.2 ctx level nc⟩
   generalize classify ctx level nc s3 = cl at hcld hclf hclr hcli ⊢
   obtain ⟨leaf, s4⟩ := cl
   dsimp only at hcld hclf hclr hcli ⊢
@@ -113,7 +116,8 @@ theorem nodeOk_sweepOff₀ {G : Colored n k} {level numcells : Nat} {st : Search
   have hler := R.leaf leaf level nc s4 hclr.ok
   dsimp only [policy, Generic.Policy.leafExit] at hled hlef hler
   have hlei : Inv (leafExit leaf level s4).2 :=
-    ⟨by rw [leafExit_noncheap]; exact hcli.1, by rw [(hrf hlef).2]; exact hcli.2⟩
+    ⟨by rw [leafExit_noncheap]; exact hcli.1, by rw [(hrf hlef).2]; exact hcli.2.1,
+      leafI_leafExit hcli.2.2 leaf level (labPerm_of_ok hn0 hclr.ok)⟩
   generalize leafExit leaf level s4 = le at hled hlef hler hlei ⊢
   obtain ⟨exit, s5⟩ := le
   dsimp only at hled hlef hler hlei ⊢
@@ -126,7 +130,7 @@ theorem nodeOk_sweepOff₀ {G : Colored n k} {level numcells : Nat} {st : Search
   have hchr := R.cheap false level nc s5 hler.ok
   dsimp only [policy, Generic.Policy.cheapCheck] at hchd hchf hchr
   have hchi : Inv (cheapCheck false level s5) := by
-    refine ⟨?_, by rw [(hrf hchf).2]; exact hlei.2⟩
+    refine ⟨?_, by rw [(hrf hchf).2]; exact hlei.2.1, leafI_cheap hlei.2.2 false level⟩
     unfold cheapCheck; split
     · show level + 1 ≤ n + 1; omega
     · exact hlei.1
@@ -167,7 +171,7 @@ theorem sweepOkOff_child {G : Colored n k} {level numcells tc tv : Nat} {cell : 
   have hcf := F.child false level tc tv st₀
   dsimp only [policy, Generic.Policy.child] at hch hcd hcf
   rw [child_tw t false level tc tv st₀ (by omega)]
-  refine ⟨t, child false level tc tv st₀, rfl, by omega, hch.1, child_inv hinv,
+  refine ⟨t, child false level tc tv st₀, rfl, by omega, hch.1, child_inv hinv (fun h => absurd h (by decide)),
     fun h => absurd h (by decide), fun _ => ⟨last, hcd, ?_⟩⟩
   rw [(ref_fields hcf).1]; exact ha
 

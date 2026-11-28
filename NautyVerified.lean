@@ -217,6 +217,8 @@ import NautyVerified.Spec.NodeOk
 import NautyVerified.Spec.Gca
 import NautyVerified.Spec.NodeExit
 import NautyVerified.Spec.NodeOkOff
+import NautyVerified.Spec.LeafInv
+import NautyVerified.Spec.NodeProc
 import NautyVerified.Spec.PartOk
 import NautyVerified.Spec.NtcPlace
 import NautyVerified.Spec.CountWin
@@ -248,3 +250,4 @@ import NautyVerified.Proofs.Harness.InputMain
 import NautyVerified.Proofs.Harness.Phases
 import NautyVerified.Proofs.Harness.Main
 import NautyVerified.Proofs.Harness.Facts
+import NautyVerified.Proofs.Search.Node.ProcFacts
